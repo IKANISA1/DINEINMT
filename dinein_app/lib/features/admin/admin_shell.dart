@@ -91,9 +91,13 @@ class _AdminTopBar extends StatelessWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const DineInLogoText(
-                              fontSize: 18,
-                              suffix: ' HQ',
+                            Text(
+                              'HQ',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
                             ),
                             Text(
                               'ADMIN CONSOLE',

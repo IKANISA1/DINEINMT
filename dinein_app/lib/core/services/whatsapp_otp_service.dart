@@ -28,6 +28,7 @@ class WhatsAppOtpVerificationResult {
   final DateTime? verifiedAt;
   final AdminAccessSession? adminSession;
   final VenueAccessSession? venueSession;
+  final String? onboardingMenuToken;
   final String? claimStatus;
 
   const WhatsAppOtpVerificationResult({
@@ -37,6 +38,7 @@ class WhatsAppOtpVerificationResult {
     this.verifiedAt,
     this.adminSession,
     this.venueSession,
+    this.onboardingMenuToken,
     this.claimStatus,
   });
 }
@@ -209,6 +211,11 @@ class WhatsAppOtpService {
       venueSession: venueSessionRaw == null
           ? null
           : VenueAccessSession.fromJson(venueSessionRaw),
+      onboardingMenuToken:
+          (json['onboardingMenuToken'] as Map?)?['access_token'] as String? ??
+          (json['onboarding_menu_token'] as Map?)?['access_token'] as String? ??
+          json['onboardingMenuToken'] as String? ??
+          json['onboarding_menu_token'] as String?,
       claimStatus:
           json['claimStatus'] as String? ?? json['claim_status'] as String?,
     );

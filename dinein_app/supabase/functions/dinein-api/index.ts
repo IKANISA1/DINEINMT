@@ -386,6 +386,18 @@ async function venueSessionClaims(req: Request): Promise<JsonRecord | null> {
   });
 }
 
+async function onboardingMenuClaims(body: JsonRecord): Promise<JsonRecord | null> {
+  const token = stringValue(body.onboardingMenuToken) ??
+    stringValue(body.onboarding_menu_token);
+  if (!token) return null;
+  return await signedTokenClaims(token, {
+    aud: "dinein-onboarding-menu",
+    role: "onboarding_menu",
+    secret: "DINEIN_ONBOARDING_MENU_SECRET",
+    fallbackSecret: "DINEIN_ADMIN_SESSION_SECRET",
+  });
+}
+
 async function currentUser(req: Request) {
   if (!req.headers.get("Authorization")) {
     return null;
@@ -2145,6 +2157,29 @@ async function handleOcrExtractMenu(
   _req: Request,
   body: JsonRecord,
 ): Promise<Response> {
+  const authHeader = _req.headers.get("Authorization");
+  const isServiceRole = decodeJwtRole(authHeader) === "service_role";
+  let isAuthorized = isServiceRole;
+
+  if (!isAuthorized) {
+    const aid = await adminUserId(supabase, _req).catch(() => null);
+    if (aid) isAuthorized = true;
+  }
+
+  if (!isAuthorized) {
+    const venueClaims = await venueSessionClaims(_req).catch(() => null);
+    if (venueClaims?.venue_id) isAuthorized = true;
+  }
+
+  if (!isAuthorized) {
+    const onboardingClaims = await onboardingMenuClaims(body).catch(() => null);
+    if (onboardingClaims?.phone) isAuthorized = true;
+  }
+
+  if (!isAuthorized) {
+    throw new HttpError(401, "Authentication required to extract menus.");
+  }
+
   const fileUrl = requireString(body, "fileUrl", "file_url");
   if (!isAllowedMenuUploadUrl(fileUrl, getEnv("SUPABASE_URL"))) {
     throw new HttpError(
@@ -2524,6 +2559,29 @@ async function handleUploadMenuFile(
   _req: Request,
   body: JsonRecord,
 ): Promise<Response> {
+  const authHeader = _req.headers.get("Authorization");
+  const isServiceRole = decodeJwtRole(authHeader) === "service_role";
+  let isAuthorized = isServiceRole;
+
+  if (!isAuthorized) {
+    const aid = await adminUserId(supabase, _req).catch(() => null);
+    if (aid) isAuthorized = true;
+  }
+
+  if (!isAuthorized) {
+    const venueClaims = await venueSessionClaims(_req).catch(() => null);
+    if (venueClaims?.venue_id) isAuthorized = true;
+  }
+
+  if (!isAuthorized) {
+    const onboardingClaims = await onboardingMenuClaims(body).catch(() => null);
+    if (onboardingClaims?.phone) isAuthorized = true;
+  }
+
+  if (!isAuthorized) {
+    throw new HttpError(401, "Authentication required to upload menu files.");
+  }
+
   const fileName = sanitizeStorageFileName(
     stringValue(body.fileName) ?? stringValue(body.file_name) ?? "menu-upload",
   );
@@ -3170,7 +3228,7 @@ async function handleIssueVenueToken(
   return ok(token);
 }
 
-Deno.serve(async (req) => {
+export async function handleAppRequest(req: Request): Promise<Response> {
   if (req.method == "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -3285,4 +3343,6 @@ Deno.serve(async (req) => {
       500,
     );
   }
-});
+}
+
+Deno.serve(handleAppRequest);

@@ -9,6 +9,7 @@ class OnboardingDraftService {
 
   static const _claimedVenueKey = 'dinein.claimed_venue';
   static const _menuDraftItemsKey = 'dinein.menu_draft_items';
+  static const _onboardingMenuTokenKey = 'dinein.onboarding_menu_token';
 
   static Future<SharedPreferences> get _prefs async =>
       SharedPreferences.getInstance();
@@ -51,5 +52,22 @@ class OnboardingDraftService {
   static Future<void> clearMenuDraftItems() async {
     final prefs = await _prefs;
     await prefs.remove(_menuDraftItemsKey);
+  }
+
+  static Future<void> saveOnboardingMenuToken(String token) async {
+    final prefs = await _prefs;
+    await prefs.setString(_onboardingMenuTokenKey, token);
+  }
+
+  static Future<String?> loadOnboardingMenuToken() async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_onboardingMenuTokenKey);
+    if (raw == null || raw.isEmpty) return null;
+    return raw;
+  }
+
+  static Future<void> clearOnboardingMenuToken() async {
+    final prefs = await _prefs;
+    await prefs.remove(_onboardingMenuTokenKey);
   }
 }

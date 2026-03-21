@@ -21,20 +21,20 @@ class VenueLegalScreen extends ConsumerWidget {
     _PolicyItem(
       icon: LucideIcons.fileText,
       title: 'Terms of Service',
-      updatedLabel: 'UPDATED JAN 2026',
-      url: 'https://dineinmalta.com/terms',
+      updatedLabel: 'UPDATED MAR 2026',
+      url: 'https://dineinmt.ikanisa.com/terms.html',
     ),
     _PolicyItem(
       icon: LucideIcons.shield,
       title: 'Privacy Policy',
-      updatedLabel: 'UPDATED DEC 2025',
-      url: 'https://dineinmalta.com/privacy',
+      updatedLabel: 'UPDATED MAR 2026',
+      url: 'https://dineinmt.ikanisa.com/privacy.html',
     ),
     _PolicyItem(
       icon: LucideIcons.info,
       title: 'Cookie Policy',
-      updatedLabel: 'UPDATED JAN 2026',
-      url: 'https://dineinmalta.com/cookies',
+      updatedLabel: 'UPDATED MAR 2026',
+      url: 'https://dineinmt.ikanisa.com/privacy.html',
     ),
   ];
 

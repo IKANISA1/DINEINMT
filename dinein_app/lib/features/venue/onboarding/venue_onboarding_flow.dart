@@ -12,6 +12,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/constants/enums.dart';
 
 import '../../../core/router/app_routes.dart';
+import '../../../core/models/models.dart';
 import '../../../core/models/onboarding_draft_models.dart';
 import '../../../core/services/auth_repository.dart';
 import '../../../core/services/claim_repository.dart';
@@ -60,6 +61,8 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   List<OcrDraftMenuItem> _draftItems = [];
   bool _isProcessingOcr = false;
   String _ocrStatusMessage = 'UPLOADING FILE…';
+  String? _onboardingMenuToken;
+  bool _returnToMenuAfterVerification = false;
 
   // Step 4
   final _phoneCtrl = TextEditingController();
@@ -104,10 +107,13 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   Future<void> _loadExistingDraft() async {
     final venue = await OnboardingDraftService.loadClaimedVenue();
     final items = await OnboardingDraftService.loadMenuDraftItems();
+    final onboardingMenuToken =
+        await OnboardingDraftService.loadOnboardingMenuToken();
     if (!mounted) return;
     setState(() {
       _claimedVenue = venue;
       _draftItems = items;
+      _onboardingMenuToken = onboardingMenuToken;
     });
   }
 
@@ -163,11 +169,17 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       case _Phase.step3:
         return 'Review Menu';
       case _Phase.step4:
+        if (_hasVerifiedMenuAccess) return 'Submit Claim';
         return _otpStep == 'phone' ? 'Activate Venue' : 'Verify Identity';
     }
   }
 
   bool get _showStepHeader => _phase != _Phase.building;
+  bool get _hasVerifiedMenuAccess =>
+      (_onboardingMenuToken?.isNotEmpty ?? false) &&
+      (_claimedVenue?.contactPhone?.isNotEmpty ?? false);
+
+  String? get _verifiedContactPhone => _claimedVenue?.contactPhone;
 
   // ─── NAVIGATION ───
   void _goBack() {
@@ -187,7 +199,11 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
             _error = null;
           });
         } else {
-          setState(() => _phase = _Phase.step3);
+          setState(() {
+            _phase = _returnToMenuAfterVerification ? _Phase.step2 : _Phase.step3;
+            _returnToMenuAfterVerification = false;
+            _info = null;
+          });
         }
     }
   }
@@ -287,7 +303,20 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   }
 
   // ─── STEP 2 ACTIONS ───
+  bool _ensureMenuUploadAccess() {
+    if (_hasVerifiedMenuAccess) return true;
+    setState(() {
+      _phase = _Phase.step4;
+      _otpStep = 'phone';
+      _returnToMenuAfterVerification = true;
+      _error = null;
+      _info = 'Verify your WhatsApp number to unlock menu scanning.';
+    });
+    return false;
+  }
+
   Future<void> _takePhoto() async {
+    if (!_ensureMenuUploadAccess()) return;
     try {
       final picker = ImagePicker();
       final image = await picker.pickImage(
@@ -306,6 +335,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   }
 
   Future<void> _uploadFile() async {
+    if (!_ensureMenuUploadAccess()) return;
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -333,12 +363,18 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
 
     try {
       // Upload to Supabase Storage
-      final fileUrl = await MenuRepository.instance.uploadMenuFile(filePath);
+      final fileUrl = await MenuRepository.instance.uploadMenuFile(
+        filePath,
+        onboardingMenuToken: _onboardingMenuToken,
+      );
       if (!mounted) return;
       setState(() => _ocrStatusMessage = 'EXTRACTING MENU…');
 
       // OCR extraction via Gemini
-      final items = await MenuRepository.instance.extractMenuFromFile(fileUrl);
+      final items = await MenuRepository.instance.extractMenuFromFile(
+        fileUrl,
+        onboardingMenuToken: _onboardingMenuToken,
+      );
       if (!mounted) return;
       setState(() => _ocrStatusMessage = 'BUILDING DRAFT…');
 
@@ -694,6 +730,74 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       return;
     }
 
+    await _storeVerifiedOnboardingAccess(
+      phone: _normalizedPhone,
+      onboardingMenuToken: result.onboardingMenuToken,
+    );
+
+    if (_returnToMenuAfterVerification) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _phase = _Phase.step2;
+        _otpStep = 'phone';
+        _returnToMenuAfterVerification = false;
+        _challenge = null;
+        _error = null;
+        _info = 'Identity verified. Menu scanning is now unlocked.';
+      });
+      return;
+    }
+
+    await _completeClaimSubmission(
+      verifiedPhone: _normalizedPhone,
+      venueSession: result.venueSession,
+    );
+  }
+
+  Future<void> _submitClaimWithVerifiedPhone() async {
+    final verifiedPhone = _verifiedContactPhone;
+    if (verifiedPhone == null || verifiedPhone.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Verify your WhatsApp number before submitting the claim.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    await _completeClaimSubmission(verifiedPhone: verifiedPhone);
+  }
+
+  Future<void> _storeVerifiedOnboardingAccess({
+    required String phone,
+    String? onboardingMenuToken,
+  }) async {
+    final claimedVenue =
+        _claimedVenue ?? await OnboardingDraftService.loadClaimedVenue();
+    if (claimedVenue == null) {
+      return;
+    }
+
+    final persistedVenue = claimedVenue.copyWith(contactPhone: phone);
+    await OnboardingDraftService.saveClaimedVenue(persistedVenue);
+    if (onboardingMenuToken != null && onboardingMenuToken.isNotEmpty) {
+      await OnboardingDraftService.saveOnboardingMenuToken(onboardingMenuToken);
+    }
+    if (!mounted) return;
+    setState(() {
+      _claimedVenue = persistedVenue;
+      _onboardingMenuToken = onboardingMenuToken ?? _onboardingMenuToken;
+    });
+  }
+
+  Future<void> _completeClaimSubmission({
+    required String verifiedPhone,
+    VenueAccessSession? venueSession,
+  }) async {
     final claimedVenue =
         _claimedVenue ?? await OnboardingDraftService.loadClaimedVenue();
     if (claimedVenue == null) {
@@ -724,7 +828,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
         venueId: resolved.venueId!,
         venueName: resolved.name,
         venueArea: resolved.address,
-        contactPhone: _normalizedPhone,
+        contactPhone: verifiedPhone,
       );
     } catch (e) {
       if (!mounted) return;
@@ -736,15 +840,14 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
     }
 
     final persisted = resolved.copyWith(
-      contactPhone: _normalizedPhone,
+      contactPhone: verifiedPhone,
       claimSubmitted: true,
     );
     await OnboardingDraftService.saveClaimedVenue(persisted);
 
     final matchedVenueSession =
-        result.venueSession != null &&
-            result.venueSession!.venueId == resolved.venueId
-        ? result.venueSession
+        venueSession != null && venueSession.venueId == resolved.venueId
+        ? venueSession
         : null;
     if (matchedVenueSession != null) {
       await AuthRepository.instance.saveVenueSession(matchedVenueSession);
@@ -759,6 +862,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
         }
       }
       if (!mounted) return;
+      await OnboardingDraftService.clearOnboardingMenuToken();
       context.goNamed(AppRouteNames.venueDashboard);
       return;
     }
@@ -771,10 +875,13 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       }
     }
 
+    await OnboardingDraftService.clearOnboardingMenuToken();
+
     if (!mounted) return;
     setState(() {
       _isLoading = false;
       _otpStep = 'submitted';
+      _onboardingMenuToken = null;
       _error = null;
       _info = 'Your claim was submitted and is pending admin review.';
     });
@@ -922,7 +1029,9 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
             SizedBox(
               width: double.infinity,
               child: PremiumButton(
-                label: 'Submit Menu',
+                label: _hasVerifiedMenuAccess
+                    ? 'Review Claim'
+                    : 'Verify & Continue',
                 icon: LucideIcons.arrowRight,
                 onPressed: () => setState(() => _phase = _Phase.step4),
               ),
@@ -1525,7 +1634,10 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
             ),
             const SizedBox(height: AppTheme.space4),
           ],
-          if (_otpStep == 'phone') _buildPhoneInput(cs, tt),
+          if (_otpStep == 'phone' && _hasVerifiedMenuAccess)
+            _buildVerifiedSubmitPanel(cs, tt),
+          if (_otpStep == 'phone' && !_hasVerifiedMenuAccess)
+            _buildPhoneInput(cs, tt),
           if (_otpStep == 'otp') _buildOtpInput(cs, tt),
         ],
       ),
@@ -1552,6 +1664,57 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
           icon: const WhatsAppIcon(),
           isLoading: _isLoading,
           onPressed: _phoneCtrl.text.trim().length >= 4 ? _sendOtp : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVerifiedSubmitPanel(ColorScheme cs, TextTheme tt) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppTheme.space6),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+            border: Border.all(color: AppColors.white5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'VERIFIED WHATSAPP',
+                style: tt.labelSmall?.copyWith(
+                  color: cs.primary,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: AppTheme.space2),
+              Text(
+                _verifiedContactPhone ?? '',
+                style: tt.titleMedium,
+              ),
+              const SizedBox(height: AppTheme.space2),
+              Text(
+                'Your identity is already verified. Submit the venue claim when you are ready.',
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppTheme.space8),
+        OtpActionButton.green(
+          label: 'Submit Claim',
+          icon: Icon(
+            LucideIcons.checkCircle2,
+            size: 22,
+            color: AppColors.onSecondary,
+          ),
+          isLoading: _isLoading,
+          onPressed: _isLoading ? null : _submitClaimWithVerifiedPhone,
         ),
       ],
     );

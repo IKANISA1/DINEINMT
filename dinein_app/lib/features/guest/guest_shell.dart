@@ -106,10 +106,7 @@ class _TopAppBar extends StatelessWidget {
                           shadowBlur: 12,
                           shadowOpacity: 0.20,
                         ),
-                        const SizedBox(width: 8),
-                        const DineInLogoText(
-                          fontSize: 20,
-                        ),
+                        // Logo image contains the text now
                       ],
                     ),
                   ),

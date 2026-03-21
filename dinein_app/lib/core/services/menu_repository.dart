@@ -136,7 +136,10 @@ class MenuRepository {
 
   /// Upload a menu file (image/PDF) to Supabase Storage.
   /// Returns the publicly accessible URL of the uploaded file.
-  Future<String> uploadMenuFile(String filePath) async {
+  Future<String> uploadMenuFile(
+    String filePath, {
+    String? onboardingMenuToken,
+  }) async {
     final file = File(filePath);
     final bytes = await file.readAsBytes();
     final fileName = path.basename(filePath);
@@ -158,6 +161,8 @@ class MenuRepository {
         'fileName': fileName,
         'contentType': contentType,
         'fileData': base64Encode(bytes),
+        if (onboardingMenuToken != null)
+          'onboarding_menu_token': onboardingMenuToken,
         ..._venueSessionPayload(),
       },
     );
@@ -172,10 +177,18 @@ class MenuRepository {
 
   /// Call the OCR edge function to extract menu items from a file.
   /// Returns a list of extracted draft menu items.
-  Future<List<OcrDraftMenuItem>> extractMenuFromFile(String fileUrl) async {
+  Future<List<OcrDraftMenuItem>> extractMenuFromFile(
+    String fileUrl, {
+    String? onboardingMenuToken,
+  }) async {
     final result = await DineinApiService.invoke(
       'ocr_extract_menu',
-      payload: {'fileUrl': fileUrl, ..._venueSessionPayload()},
+      payload: {
+        'fileUrl': fileUrl,
+        if (onboardingMenuToken != null)
+          'onboarding_menu_token': onboardingMenuToken,
+        ..._venueSessionPayload(),
+      },
     );
     final items =
         (result as Map<String, dynamic>)['items'] as List<dynamic>? ?? [];

@@ -44,3 +44,7 @@ coverage/
 *.ipa
 *.app.dSYM.zip
 *.aab
+
+# Local tooling caches
+.wrangler/
+dinein_app/test_output.txt

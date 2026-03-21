@@ -30,9 +30,6 @@ class BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolvedRadius = borderRadius ?? size * 0.22;
-    // For tiny sizes show just "D"; otherwise full wordmark
-    final bool compact = size < 36;
-    final resolvedFontSize = fontSize ?? (compact ? size * 0.52 : size * 0.24);
 
     return Container(
       width: size,
@@ -49,37 +46,12 @@ class BrandMark extends StatelessWidget {
                 ),
               ],
       ),
-      child: Center(
-        child: compact
-            ? Text(
-                'D',
-                style: TextStyle(
-                  color: AppColors.brandGold,
-                  fontSize: resolvedFontSize,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                ),
-              )
-            : RichText(
-                text: TextSpan(
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: resolvedFontSize,
-                    height: 1,
-                    letterSpacing: -0.3,
-                  ),
-                  children: const [
-                    TextSpan(
-                      text: 'DINE',
-                      style: TextStyle(color: AppColors.brandGold),
-                    ),
-                    TextSpan(
-                      text: 'IN',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.asset(
+        'assets/branding/dinein_logo.png',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
       ),
     );
   }

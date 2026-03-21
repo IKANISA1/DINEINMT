@@ -110,7 +110,23 @@ class GuestSettingsScreen extends ConsumerWidget {
             _SettingsTile(
               icon: LucideIcons.shield,
               title: 'Privacy Policy',
-              onTap: () => _showPrivacySheet(context),
+              onTap: () async {
+                final uri = Uri.parse('https://dineinmt.ikanisa.com/privacy.html');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+            const SizedBox(height: AppTheme.space3),
+            _SettingsTile(
+              icon: LucideIcons.fileText,
+              title: 'Terms & Conditions',
+              onTap: () async {
+                final uri = Uri.parse('https://dineinmt.ikanisa.com/terms.html');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
             ),
             const SizedBox(height: AppTheme.space8),
 
@@ -153,11 +169,7 @@ class GuestSettingsScreen extends ConsumerWidget {
               shadowOpacity: 0.25,
             ),
             const SizedBox(height: AppTheme.space4),
-            DineInLogoText(
-              fontSize: tt.headlineSmall?.fontSize ?? 24,
-              suffix: ' MALTA',
-            ),
-            const SizedBox(height: 4),
+            // DineInLogoText removed as BrandMark image contains the text
             Text('Version 1.0.0', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
             const SizedBox(height: AppTheme.space6),
             Text(
@@ -194,110 +206,6 @@ class GuestSettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showPrivacySheet(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.75,
-        maxChildSize: 0.9,
-        minChildSize: 0.5,
-        builder: (_, scrollController) => Container(
-          margin: const EdgeInsets.all(AppTheme.space4),
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-            border: Border.all(color: AppColors.white5),
-          ),
-          child: Column(
-            children: [
-              // Handle
-              Padding(
-                padding: const EdgeInsets.only(top: AppTheme.space4),
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.20),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(AppTheme.space6),
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.shield, color: cs.primary, size: 24),
-                    const SizedBox(width: AppTheme.space3),
-                    Text(
-                      'Privacy Policy',
-                      style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _PolicySection(
-                        title: 'Data Collection',
-                        body: 'DINEIN collects minimal data necessary for order processing. '
-                            'This includes your table number and order items. No personal data '
-                            'is required for browsing menus.',
-                        tt: tt,
-                        cs: cs,
-                      ),
-                      _PolicySection(
-                        title: 'Order Information',
-                        body: 'Order data is stored to provide order history and enable venue '
-                            'staff to fulfill your requests. Orders are associated with your '
-                            'device session, not personal identity.',
-                        tt: tt,
-                        cs: cs,
-                      ),
-                      _PolicySection(
-                        title: 'No Tracking',
-                        body: 'DINEIN does not use geolocation, camera permissions, or any '
-                            'device tracking. Entry to venues is via QR code scan using your '
-                            'phone\'s native camera — no in-app scanner required.',
-                        tt: tt,
-                        cs: cs,
-                      ),
-                      _PolicySection(
-                        title: 'Payment Handling',
-                        body: 'DINEIN does not process payments in-app. All payments are '
-                            'handled externally via cash or Revolut link. '
-                            'No payment credentials are stored.',
-                        tt: tt,
-                        cs: cs,
-                      ),
-                      _PolicySection(
-                        title: 'Data Retention',
-                        body: 'Order history is retained for 90 days to allow you to review '
-                            'past orders. You may request deletion of your data at any time '
-                            'by contacting us.',
-                        tt: tt,
-                        cs: cs,
-                      ),
-                      const SizedBox(height: AppTheme.space8),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   void _showContactSheet(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -408,43 +316,6 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-class _PolicySection extends StatelessWidget {
-  final String title;
-  final String body;
-  final TextTheme tt;
-  final ColorScheme cs;
-
-  const _PolicySection({
-    required this.title,
-    required this.body,
-    required this.tt,
-    required this.cs,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppTheme.space6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: AppTheme.space2),
-          Text(
-            body,
-            style: tt.bodyMedium?.copyWith(
-              color: cs.onSurfaceVariant,
-              height: 1.6,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 
 

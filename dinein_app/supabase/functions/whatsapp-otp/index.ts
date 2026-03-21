@@ -206,6 +206,21 @@ async function signVenueSessionJwt(payload: JsonRecord): Promise<string> {
   return `${signingInput}.${signature}`;
 }
 
+async function signOnboardingMenuJwt(payload: JsonRecord): Promise<string> {
+  const header = { alg: "HS256", typ: "JWT" };
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signature = await hmacSha256Base64Url(
+    signingInput,
+    getSigningSecret(
+      "DINEIN_ONBOARDING_MENU_SECRET",
+      "DINEIN_ADMIN_SESSION_SECRET",
+    ),
+  );
+  return `${signingInput}.${signature}`;
+}
+
 async function otpHash(phone: string, code: string): Promise<string> {
   const pepper = Deno.env.get("WHATSAPP_OTP_PEPPER") ?? "";
   return await sha256Hex(`${digitsOnly(phone)}:${code}:${pepper}`);
@@ -498,6 +513,27 @@ async function buildVenueSession(
     venue_image_url: typeof venueData.image_url === "string"
       ? venueData.image_url
       : null,
+    issued_at: issuedAt.toISOString(),
+    expires_at: expiresAt.toISOString(),
+  };
+}
+
+async function buildOnboardingMenuToken(normalizedPhone: string) {
+  const issuedAt = new Date();
+  const expiresAt = new Date(issuedAt.getTime() + 15 * 60 * 1000);
+  const token = await signOnboardingMenuJwt({
+    iss: "dinein-whatsapp-otp",
+    aud: "dinein-onboarding-menu",
+    sub: normalizedPhone,
+    role: "onboarding_menu",
+    phone: normalizedPhone,
+    iat: Math.floor(issuedAt.getTime() / 1000),
+    exp: Math.floor(expiresAt.getTime() / 1000),
+  });
+
+  return {
+    access_token: token,
+    phone: normalizedPhone,
     issued_at: issuedAt.toISOString(),
     expires_at: expiresAt.toISOString(),
   };
@@ -820,6 +856,7 @@ async function handleVerify(
 
   let adminSession: JsonRecord | null = null;
   let venueSession: JsonRecord | null = null;
+  let onboardingMenuToken: JsonRecord | null = null;
   let claimStatus: "approved" | "pending" | "not_found" | null = null;
   if (data.app_scope === "admin") {
     const adminProfile = await getAdminProfileByPhone(
@@ -866,6 +903,13 @@ async function handleVerify(
       );
       claimStatus = pendingClaim ? "pending" : "not_found";
     }
+
+    try {
+      onboardingMenuToken = await buildOnboardingMenuToken(normalizedPhone);
+    } catch (error) {
+      console.error("[whatsapp-otp] onboarding token build failed", error);
+      return errorResponse("Onboarding token is not configured.", 500);
+    }
   }
 
   await supabase
@@ -881,6 +925,7 @@ async function handleVerify(
     verifiedAt: new Date().toISOString(),
     ...(adminSession == null ? {} : { adminSession }),
     ...(venueSession == null ? {} : { venueSession }),
+    ...(onboardingMenuToken == null ? {} : { onboardingMenuToken }),
     ...(claimStatus == null ? {} : { claimStatus }),
   });
 }

@@ -40,7 +40,16 @@ class RoleSwitchFooter extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: AppTheme.space4),
-            const DineInLogoText(fontSize: 10, suffix: ' MALTA v1.0.0'),
+            const BrandMark(size: 20, shadowOpacity: 0),
+            const SizedBox(height: AppTheme.space2),
+            const Text(
+              'MALTA v1.0.0',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: Colors.white54,
+              ),
+            ),
             const SizedBox(height: AppTheme.space4),
           ],
         ),
