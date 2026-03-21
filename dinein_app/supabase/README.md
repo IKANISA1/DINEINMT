@@ -1,0 +1,136 @@
+# AI Content Setup
+
+This Supabase project now includes two production AI pipelines:
+
+- Gemini-powered menu image generation
+- Gemini Google Maps grounding plus Gemini Search-grounded venue profile enrichment
+
+## What Was Added
+
+- A migration that extends `dinein_menu_items` with AI image metadata and creates the `menu-images` storage bucket.
+- A follow-up migration that explicitly grants `service_role` and app roles access to the DineIn tables.
+- `generate-menu-item-image` for single-item generation and regeneration.
+- `backfill-menu-images` for batch-filling missing images.
+- A migration that extends `dinein_venues` with Google provider metadata, web links, review snapshots, and enrichment status fields.
+- `enrich-venue-profile` for a single-venue refresh using Gemini Google Maps grounding plus Gemini Google Search grounding.
+- `backfill-venue-profiles` for batch venue enrichment.
+
+## Required Secrets
+
+Set these in Supabase before deploying the functions:
+
+```bash
+supabase secrets set \
+  GEMINI_API_KEY=your_google_api_key \
+  GEMINI_IMAGE_MODELS=gemini-3.1-flash-image-preview,gemini-2.5-flash-image \
+  GEMINI_VENUE_MODELS=gemini-2.5-flash,gemini-2.5-flash-lite \
+  MENU_IMAGE_BUCKET=menu-images \
+  MENU_IMAGE_CRON_SECRET=choose-a-long-random-secret \
+  VENUE_ENRICHMENT_CRON_SECRET=choose-a-second-long-random-secret
+```
+
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are provided by the Supabase runtime.
+
+`GEMINI_API_KEY` must be able to call Gemini image generation, Gemini Google
+Maps grounding, and Gemini Google Search grounding.
+
+## Deploy
+
+Run from `dinein_app/`:
+
+```bash
+supabase db push
+supabase functions deploy dinein-api
+supabase functions deploy generate-menu-item-image
+supabase functions deploy backfill-menu-images
+supabase functions deploy enrich-venue-profile
+supabase functions deploy backfill-venue-profiles
+```
+
+If the linked project has drifted migration history, repair or align the remote
+history before pushing. The image metadata and grants migrations are already
+applied on the linked production project.
+
+## Recommended Schedule
+
+Create a scheduled call to `backfill-menu-images` with the `x-cron-secret` header and a small batch size, for example:
+
+```json
+{
+  "limit": 12
+}
+```
+
+Recommended cadence:
+
+- every 5 to 15 minutes for production backfill
+- every 30 to 60 minutes if cost control matters more than freshness
+
+The checked-in migration
+`20260321023000_menu_image_backfill_automation.sql`
+installs `pg_net` and `pg_cron`, adds the image-signature indexes, and creates a
+5-minute cron job that posts to `backfill-menu-images`.
+
+Before applying it, replace the placeholder `MENU_IMAGE_CRON_SECRET` in that
+migration with the actual deployed secret value for the target project.
+
+The checked-in migration
+`20260321040000_venue_profile_backfill_automation.sql`
+creates a 15-minute cron job that posts to `dinein-api` with
+`action=backfill_venue_profiles`. It uses `x-cron-secret` instead of a service
+role token because `dinein-api` is the production path already verified on the
+linked project.
+
+For venue enrichment, keep the batch size very small. Grounded Google Maps plus
+Search enrichment is materially heavier than the old provider-only path, so a
+`limit` of `1` is the safe default for scheduled runs on Supabase Edge
+Functions.
+
+Before applying it, replace the placeholder `VENUE_ENRICHMENT_CRON_SECRET` in
+that migration with the actual deployed secret value for the target project.
+
+## Venue Enrichment Notes
+
+- Gemini Google Maps grounding is the structured source of truth for address, phone, price level, rating, place ID, Maps links, grounded review summaries, and grounded place summaries.
+- Gemini Google Search grounding is used to fill missing web-facing fields such as website, reservation link, social links, and a short factual venue description.
+- The enrichment pipeline normalizes venue categories to `Bar`, `Bar & Restaurants`, `Restaurants`, or `Hotels`.
+- The batch function updates provider metadata on every pass, but only fills first-party fields like `description`, `image_url`, `website_url`, and `reservation_url` when they are missing unless `overwriteExisting=true` is passed.
+- Venue `image_url` backfill now prefers the official website hero image or JSON-LD image metadata once the grounded website is known.
+
+## Ops Scripts
+
+From `dinein_app/`, these scripts can drive the same production workflow that is now running live:
+
+```bash
+chmod +x scripts/menu_image_generate_representatives.sh
+chmod +x scripts/menu_image_fanout.sh
+chmod +x scripts/venue_profile_backfill.sh
+
+DATABASE_URL=postgresql://... \
+SUPABASE_URL=https://your-project.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_jwt \
+PARTITION=all \
+scripts/menu_image_generate_representatives.sh
+
+DATABASE_URL=postgresql://... \
+ITERATIONS=20 \
+SLEEP_SEC=60 \
+scripts/menu_image_fanout.sh
+
+SUPABASE_URL=https://your-project.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_jwt \
+LIMIT=1 \
+ITERATIONS=6 \
+SLEEP_SEC=60 \
+scripts/venue_profile_backfill.sh
+```
+
+`PARTITION=even` and `PARTITION=odd` can be used to run multiple representative-generation workers in parallel.
+
+## Flutter Behavior
+
+- New menu items without images automatically trigger single-item generation.
+- OCR imports trigger a bounded backfill.
+- Venue owners can generate or regenerate an image from the item editor through `dinein-api`.
+- Venue owners can trigger a missing-image backfill from the menu manager through `dinein-api`.
+- Protected images are skipped by automatic AI generation.

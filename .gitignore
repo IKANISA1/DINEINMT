@@ -1,0 +1,46 @@
+# Root ignore rules for the DineIn workspace.
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.iml
+
+# Node
+node_modules/
+dist/
+
+# Flutter / Dart
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Environment
+.env
+.env.*
+!.env.example
+dinein_app/env/*.json
+!dinein_app/env/*.example.json
+dinein_app/android/key.properties
+dinein_app/android/*.jks
+dinein_app/android/*.keystore
+
+# Generated
+*.g.dart
+*.freezed.dart
+firebase-debug.log
+
+# Coverage
+coverage/
+
+# Build artifacts
+*.apk
+*.ipa
+*.app.dSYM.zip
+*.aab

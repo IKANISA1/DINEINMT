@@ -1,0 +1,43 @@
+import 'package:dinein_app/core/models/models.dart';
+import 'package:dinein_app/core/providers/providers.dart';
+import 'package:dinein_app/core/services/auth_repository.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    await AuthRepository.instance.clearVenueSession();
+  });
+
+  test(
+    'currentVenueProvider falls back to the persisted venue session when backend access is unavailable',
+    () async {
+      final now = DateTime.now();
+      await AuthRepository.instance.saveVenueSession(
+        VenueAccessSession(
+          accessToken: 'test-venue-token',
+          venueId: 'venue-123',
+          venueName: 'Session Venue',
+          whatsAppNumber: '+35612345678',
+          venueImageUrl: 'https://example.com/venue.png',
+          issuedAt: now.subtract(const Duration(minutes: 5)),
+          expiresAt: now.add(const Duration(days: 1)),
+        ),
+      );
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final venue = await container.read(currentVenueProvider.future);
+
+      expect(venue, isNotNull);
+      expect(venue?.id, 'venue-123');
+      expect(venue?.name, 'Session Venue');
+      expect(venue?.imageUrl, 'https://example.com/venue.png');
+    },
+  );
+}

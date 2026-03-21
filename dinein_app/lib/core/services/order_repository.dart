@@ -1,0 +1,123 @@
+import '../constants/enums.dart';
+import '../models/models.dart';
+import 'auth_repository.dart';
+import 'dinein_api_service.dart';
+import 'order_receipt_service.dart';
+
+/// Repository for order data access via the DineIn edge API.
+class OrderRepository {
+  OrderRepository._();
+  static final instance = OrderRepository._();
+
+  Map<String, dynamic> _venueSessionPayload() {
+    final session = AuthRepository.instance.currentVenueSession;
+    if (session == null || session.accessToken.isEmpty) return const {};
+    return {
+      'venue_session': {'access_token': session.accessToken},
+    };
+  }
+
+  /// Place a new order.
+  Future<Order> placeOrder(Order order) async {
+    final data = await DineinApiService.invoke(
+      'place_order',
+      payload: {'order': order.toJson()},
+    );
+    final placedOrder = Order.fromJson(data as Map<String, dynamic>);
+    final receiptToken = placedOrder.guestReceiptToken;
+    if (receiptToken != null && receiptToken.trim().isNotEmpty) {
+      await OrderReceiptService.instance.saveReceiptToken(
+        placedOrder.id,
+        receiptToken,
+      );
+    }
+    return placedOrder;
+  }
+
+  /// Fetch orders for a venue (venue owner view).
+  ///
+  /// Use [limit] and [offset] for pagination. Omit both to fetch all.
+  Future<List<Order>> getOrdersForVenue(
+    String venueId, {
+    int? limit,
+    int? offset,
+  }) async {
+    final data =
+        await DineinApiService.invoke(
+              'get_orders_for_venue',
+              payload: {
+                'venueId': venueId,
+                ..._venueSessionPayload(),
+                'limit': ?limit,
+                'offset': ?offset,
+              },
+            )
+            as List<dynamic>;
+    return data.map((e) => Order.fromJson(e)).toList();
+  }
+
+  /// Fetch orders for the current user (order history).
+  ///
+  /// Use [limit] and [offset] for pagination. Omit both to fetch all.
+  Future<List<Order>> getOrdersForUser(
+    String userId, {
+    int? limit,
+    int? offset,
+  }) async {
+    final data =
+        await DineinApiService.invoke(
+              'get_orders_for_user',
+              payload: {
+                'userId': userId,
+                'limit': ?limit,
+                'offset': ?offset,
+              },
+            )
+            as List<dynamic>;
+    return data.map((e) => Order.fromJson(e)).toList();
+  }
+
+  /// Fetch all orders system-wide (admin view).
+  ///
+  /// Use [limit] and [offset] for pagination. Omit both to fetch all.
+  Future<List<Order>> getAllOrders({int? limit, int? offset}) async {
+    final data =
+        await DineinApiService.invoke(
+              'get_all_orders',
+              useAdminSession: true,
+              payload: {
+                'limit': ?limit,
+                'offset': ?offset,
+              },
+            )
+            as List<dynamic>;
+    return data.map((e) => Order.fromJson(e)).toList();
+  }
+
+  /// Fetch a single order by ID.
+  Future<Order?> getOrderById(String orderId) async {
+    final receiptToken = await OrderReceiptService.instance.getReceiptToken(
+      orderId,
+    );
+    final data = await DineinApiService.invoke(
+      'get_order_by_id',
+      payload: {
+        'orderId': orderId,
+        ...?receiptToken == null ? null : {'receiptToken': receiptToken},
+      },
+    );
+    return data != null ? Order.fromJson(data) : null;
+  }
+
+  /// Update order status (venue owner action).
+  Future<void> updateOrderStatus(String orderId, OrderStatus status) async {
+    await DineinApiService.invoke(
+      'update_order_status',
+      payload: {
+        'orderId': orderId,
+        'status': status.dbValue,
+        ..._venueSessionPayload(),
+      },
+    );
+  }
+}

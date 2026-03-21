@@ -1,0 +1,391 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_theme.dart';
+import 'pressable_scale.dart';
+
+// ─────────────────────────────────────────────────────────────
+// MaltaPhoneInput — 🇲🇹 +356 country code pill + phone field
+// ─────────────────────────────────────────────────────────────
+
+/// Split country-code + phone number input matching the DineIn design system.
+///
+/// Renders a non-editable 🇲🇹 +356 pill on the left and a dark rounded
+/// phone number field on the right. The [controller] value contains only
+/// the local part (no country code).
+class MaltaPhoneInput extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback? onSubmitted;
+  final ValueChanged<String>? onChanged;
+
+  const MaltaPhoneInput({
+    super.key,
+    required this.controller,
+    this.onSubmitted,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        // Country code pill
+        Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🇲🇹', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              Text(
+                '+356',
+                style: tt.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 22,
+                  color: cs.onSurface,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                LucideIcons.chevronDown,
+                size: 16,
+                color: cs.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+
+        // Phone number field
+        Expanded(
+          child: Container(
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: controller.text.isNotEmpty
+                    ? cs.primary.withValues(alpha: 0.5)
+                    : Colors.transparent,
+                width: 1.5,
+              ),
+            ),
+            child: Center(
+              child: TextField(
+                controller: controller,
+                keyboardType: TextInputType.phone,
+                autofillHints: const [AutofillHints.telephoneNumber],
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => onSubmitted?.call(),
+                onChanged: onChanged,
+                style: tt.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 22,
+                  letterSpacing: 1,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(8),
+                ],
+                decoration: InputDecoration(
+                  hintText: '9912 3456',
+                  hintStyle: tt.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 22,
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                  ),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                  filled: false,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// OtpPillFields — 6 individual pill-shaped digit inputs
+// ─────────────────────────────────────────────────────────────
+
+/// Six individual pill-shaped OTP digit inputs with auto-advance,
+/// backspace navigation, and optional auto-submit.
+class OtpPillFields extends StatelessWidget {
+  final List<TextEditingController> controllers;
+  final List<FocusNode> focusNodes;
+
+  /// Called when the complete 6-digit code is entered.
+  final VoidCallback? onComplete;
+
+  const OtpPillFields({
+    super.key,
+    required this.controllers,
+    required this.focusNodes,
+    this.onComplete,
+  });
+
+  String get code => controllers.map((c) => c.text).join();
+
+  void _onDigitChanged(int index, String value) {
+    if (value.length == 1 && index < 5) {
+      focusNodes[index + 1].requestFocus();
+    }
+    if (code.length == 6) {
+      onComplete?.call();
+    }
+  }
+
+  void _onKeyEvent(int index, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.backspace &&
+        controllers[index].text.isEmpty &&
+        index > 0) {
+      controllers[index - 1].clear();
+      focusNodes[index - 1].requestFocus();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(6, (index) {
+        final hasValue = controllers[index].text.isNotEmpty;
+        final isFocused = focusNodes[index].hasFocus;
+
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(left: index == 0 ? 0 : 10),
+            child: KeyboardListener(
+              focusNode: FocusNode(),
+              onKeyEvent: (event) => _onKeyEvent(index, event),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: 56,
+                decoration: BoxDecoration(
+                  color: hasValue
+                      ? AppColors.surfaceContainerHigh
+                      : AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                  border: Border.all(
+                    color: isFocused
+                        ? cs.primary.withValues(alpha: 0.6)
+                        : hasValue
+                            ? cs.onSurfaceVariant.withValues(alpha: 0.15)
+                            : cs.onSurfaceVariant.withValues(alpha: 0.08),
+                    width: isFocused ? 1.5 : 1,
+                  ),
+                ),
+                child: Center(
+                  child: TextField(
+                    controller: controllers[index],
+                    focusNode: focusNodes[index],
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    maxLength: 1,
+                    onChanged: (v) => _onDigitChanged(index, v),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    style: tt.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 22,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      counterText: '',
+                      contentPadding: EdgeInsets.zero,
+                      filled: false,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// OtpActionButton — Large action button (gold / green)
+// ─────────────────────────────────────────────────────────────
+
+/// Full-width 64px pill button with colored background, label, and optional
+/// trailing icon. Includes a color-matched glow shadow when enabled.
+class OtpActionButton extends StatelessWidget {
+  final String label;
+  final Widget? icon;
+  final bool isLoading;
+  final Color color;
+  final Color textColor;
+  final VoidCallback? onPressed;
+
+  const OtpActionButton({
+    super.key,
+    required this.label,
+    this.icon,
+    this.isLoading = false,
+    required this.color,
+    required this.textColor,
+    this.onPressed,
+  });
+
+  /// Gold "Get OTP" / "Send" style.
+  const OtpActionButton.gold({
+    super.key,
+    required this.label,
+    this.icon,
+    this.isLoading = false,
+    this.onPressed,
+  })  : color = AppColors.primary,
+        textColor = AppColors.onPrimary;
+
+  /// Green "Submit" / "Verify" style.
+  const OtpActionButton.green({
+    super.key,
+    required this.label,
+    this.icon,
+    this.isLoading = false,
+    this.onPressed,
+  })  : color = AppColors.secondary,
+        textColor = AppColors.onSecondary;
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final isDisabled = onPressed == null;
+
+    return PressableScale(
+      onTap: isDisabled ? null : onPressed,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: double.infinity,
+        height: 64,
+        decoration: BoxDecoration(
+          color: isDisabled ? color.withValues(alpha: 0.35) : color,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: isDisabled
+              ? []
+              : [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.25),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+        ),
+        child: Center(
+          child: isLoading
+              ? SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: textColor,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: tt.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: textColor,
+                        fontSize: 18,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    if (icon != null) ...[
+                      const SizedBox(width: 12),
+                      icon!,
+                    ],
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// WhatsAppIcon — Compact branded icon for OTP buttons
+// ─────────────────────────────────────────────────────────────
+
+/// Small WhatsApp-style icon rendered via CustomPaint.
+class WhatsAppIcon extends StatelessWidget {
+  final Color color;
+  const WhatsAppIcon({super.key, this.color = AppColors.onPrimary});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: CustomPaint(painter: _WhatsAppPainter(color: color)),
+    );
+  }
+}
+
+class _WhatsAppPainter extends CustomPainter {
+  final Color color;
+  _WhatsAppPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round;
+
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final r = size.width * 0.42;
+
+    canvas.drawCircle(Offset(cx, cy), r, paint);
+
+    final phonePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    path.moveTo(cx - 3, cy + 4);
+    path.quadraticBezierTo(cx - 5, cy + 2, cx - 5, cy - 1);
+    path.quadraticBezierTo(cx - 5, cy - 3, cx - 3, cy - 4);
+    path.lineTo(cx - 1, cy - 4);
+    path.quadraticBezierTo(cx, cy - 3, cx, cy - 1);
+    path.lineTo(cx, cy + 1);
+    path.quadraticBezierTo(cx, cy + 3, cx + 1, cy + 4);
+    path.lineTo(cx + 3, cy + 4);
+    path.quadraticBezierTo(cx + 5, cy + 3, cx + 5, cy + 1);
+    path.quadraticBezierTo(cx + 5, cy - 1, cx + 3, cy - 2);
+
+    canvas.drawPath(path, phonePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
