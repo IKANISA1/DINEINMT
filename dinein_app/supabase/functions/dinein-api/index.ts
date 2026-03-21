@@ -20,6 +20,15 @@ import {
   type VenueRecord as EnrichmentVenueRecord,
 } from "../_shared/venue-enrichment.ts";
 import {
+  createVenueProfileImageAdminClient,
+  getVenueProfileImageEnv,
+  HttpError as VenueProfileImageHttpError,
+  isVenueProfileImageGenerationInFlight,
+  normalizeVenueProfileImageLimit,
+  processVenueProfileImageGeneration,
+  venueNeedsProfileImageGeneration,
+} from "../_shared/venue-profile-image.ts";
+import {
   isAllowedMenuUploadUrl,
   normalizeMenuUploadContentType,
 } from "./security.ts";
@@ -42,8 +51,22 @@ const venueStatuses = new Set([
   "pending_claim",
   "pending_activation",
 ]);
+const publicVenueStatuses = new Set([
+  "active",
+  "inactive",
+  "maintenance",
+  "pending_claim",
+  "pending_activation",
+]);
 const orderStatuses = new Set(["placed", "received", "served", "cancelled"]);
 const paymentMethods = new Set(["cash", "momo_ussd", "revolut_link"]);
+const orderPaymentStatuses = new Set([
+  "pending",
+  "confirmed",
+  "not_required",
+  "failed",
+]);
+const accessVerificationMethods = new Set(["otp", "admin_override"]);
 const menuImageStatuses = new Set(["pending", "generating", "ready", "failed"]);
 const menuImageSources = new Set(["manual", "ai_gemini"]);
 
@@ -81,6 +104,10 @@ function hasMatchingSecretHeader(req: Request, envName: string): boolean {
 
 function isVenueEnrichmentCronInvocation(req: Request): boolean {
   return hasMatchingSecretHeader(req, "VENUE_ENRICHMENT_CRON_SECRET");
+}
+
+function isVenueProfileImageCronInvocation(req: Request): boolean {
+  return hasMatchingSecretHeader(req, "VENUE_IMAGE_CRON_SECRET");
 }
 
 function getSigningSecret(primary: string, fallback?: string): string {
@@ -196,6 +223,219 @@ function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
+export function generateOrderNumber(): string {
+  const randomValue = new Uint32Array(1);
+  crypto.getRandomValues(randomValue);
+  return String(10_000_000 + (randomValue[0] % 90_000_000));
+}
+
+export function normalizePaymentMethod(rawValue: unknown): string {
+  const normalized = (stringValue(rawValue) ?? "cash")
+    .trim()
+    .toLowerCase()
+    .replaceAll(/[\s-]+/g, "_");
+
+  switch (normalized) {
+    case "cash":
+      return "cash";
+    case "momo":
+    case "momo_ussd":
+    case "mobile_money":
+      return "momo_ussd";
+    case "revolut":
+    case "revolut_link":
+    case "revolutlink":
+    case "revolut_me":
+      return "revolut_link";
+    default:
+      throw new HttpError(400, `Unsupported payment method: ${normalized}`);
+  }
+}
+
+export function orderPaymentStatusForMethod(paymentMethod: string): string {
+  if (!paymentMethods.has(paymentMethod)) {
+    throw new HttpError(400, `Unsupported payment method: ${paymentMethod}`, {
+      code: "unsupported_payment_method",
+    });
+  }
+
+  const paymentStatus = (() => {
+    switch (paymentMethod) {
+      case "cash":
+        return "not_required";
+      case "momo_ussd":
+      case "revolut_link":
+        return "pending";
+      default:
+        return "pending";
+    }
+  })();
+  if (!orderPaymentStatuses.has(paymentStatus)) {
+    throw new HttpError(500, `Unsupported payment status: ${paymentStatus}`, {
+      code: "unsupported_payment_status",
+    });
+  }
+
+  return paymentStatus;
+}
+
+export function normalizeVenueSupportedPaymentMethods(
+  rawValue: unknown,
+  rawRevolutUrl?: unknown,
+): string[] {
+  const values = Array.isArray(rawValue)
+    ? rawValue
+    : typeof rawValue == "string"
+    ? rawValue.split(",")
+    : [];
+
+  const normalized = values
+    .map((value) => {
+      const raw = stringValue(value);
+      return raw ? normalizePaymentMethod(raw) : null;
+    })
+    .filter((value): value is string => Boolean(value));
+
+  if (normalized.length == 0) {
+    const fallback = ["cash"];
+    if (stringValue(rawRevolutUrl)) {
+      fallback.push("revolut_link");
+    }
+    return fallback;
+  }
+
+  return [...new Set(normalized)];
+}
+
+export function venueOrderingReadiness(rawVenue: unknown): {
+  ready: boolean;
+  reasons: string[];
+  supportedPaymentMethods: string[];
+} {
+  const venue = asRecord(rawVenue);
+  const reasons: string[] = [];
+  const googleBusinessStatus =
+    stringValue(venue.google_business_status)?.trim().toUpperCase() ?? null;
+  const googleClosedOverride =
+    booleanValue(venue.google_closed_override_enabled) ?? false;
+  const declaredPaymentMethods = normalizeVenueSupportedPaymentMethods(
+    venue.supported_payment_methods,
+    venue.revolut_url,
+  );
+  const supportedPaymentMethods = declaredPaymentMethods.filter((method) => {
+    switch (method) {
+      case "cash":
+        return true;
+      case "revolut_link":
+        return Boolean(stringValue(venue.revolut_url));
+      case "momo_ussd":
+        return false;
+      default:
+        return false;
+    }
+  });
+
+  if (venueStatus(venue) != "active") {
+    reasons.push("venue_not_active");
+  }
+  if (
+    googleBusinessStatus == "CLOSED_PERMANENTLY" &&
+    !googleClosedOverride
+  ) {
+    reasons.push("google_business_closed_permanently");
+  }
+  if (!stringValue(venue.approved_claim_id)) {
+    reasons.push("approved_claim_required");
+  }
+  if (!stringValue(venue.approved_at)) {
+    reasons.push("approved_at_required");
+  }
+  if (!stringValue(venue.access_verified_at)) {
+    reasons.push("access_verification_required");
+  }
+  if (!stringValue(venue.name)) {
+    reasons.push("venue_name_required");
+  }
+  if (!stringValue(venue.address)) {
+    reasons.push("venue_address_required");
+  }
+  if (!effectiveVenuePhone(venue)) {
+    reasons.push("venue_phone_required");
+  }
+  if (!stringValue(venue.image_url)) {
+    reasons.push("venue_image_required");
+  }
+  if (
+    !(
+      stringValue(venue.owner_contact_phone) ??
+        stringValue(venue.owner_whatsapp_number)
+    )
+  ) {
+    reasons.push("owner_contact_required");
+  }
+  if (supportedPaymentMethods.length == 0) {
+    if (
+      declaredPaymentMethods.includes("revolut_link") &&
+      !stringValue(venue.revolut_url)
+    ) {
+      reasons.push("revolut_url_required");
+    }
+    if (declaredPaymentMethods.includes("momo_ussd")) {
+      reasons.push("momo_configuration_required");
+    }
+    if (reasons.length == 0) {
+      reasons.push("payment_method_required");
+    }
+  }
+
+  return {
+    ready: reasons.length == 0,
+    reasons,
+    supportedPaymentMethods,
+  };
+}
+
+export function assertValidOrderStatusTransition(
+  currentStatus: string,
+  nextStatus: string,
+): void {
+  if (!orderStatuses.has(currentStatus)) {
+    throw new HttpError(
+      500,
+      `Unexpected stored order status: ${currentStatus}`,
+      {
+        code: "invalid_stored_order_status",
+      },
+    );
+  }
+
+  if (!orderStatuses.has(nextStatus)) {
+    throw new HttpError(400, `Unsupported order status: ${nextStatus}`, {
+      code: "unsupported_order_status",
+    });
+  }
+
+  if (currentStatus == nextStatus) return;
+
+  const allowedTransitions: Record<string, string[]> = {
+    placed: ["received", "cancelled"],
+    received: ["served", "cancelled"],
+    served: [],
+    cancelled: [],
+  };
+  if (allowedTransitions[currentStatus]?.includes(nextStatus)) return;
+
+  throw new HttpError(
+    409,
+    `Invalid order status transition: ${currentStatus} -> ${nextStatus}.`,
+    {
+      code: "invalid_order_transition",
+      current_status: currentStatus,
+      next_status: nextStatus,
+    },
+  );
+}
+
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
 }
@@ -240,6 +480,56 @@ function slugify(value: string): string {
     .replace(/^-+|-+$/g, "");
 
   return base.length > 0 ? base : `venue-${Date.now()}`;
+}
+
+function normalizeVenueSearchQuery(value: unknown): string | null {
+  const raw = stringValue(value);
+  if (!raw) return null;
+  const normalized = raw.replace(/[,%()]/g, " ").replace(/\s+/g, " ").trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function buildVenueSearchOrClause(query: string): string {
+  const normalized = normalizeVenueSearchQuery(query) ?? query.trim();
+  const slugTerm = slugify(normalized);
+  const clauses = [
+    `name.ilike.%${normalized}%`,
+    `address.ilike.%${normalized}%`,
+    `category.ilike.%${normalized}%`,
+  ];
+
+  if (!slugTerm.startsWith("venue-")) {
+    clauses.push(`slug.ilike.%${slugTerm}%`);
+  }
+
+  return clauses.join(",");
+}
+
+function buildVenueConflictOrClause(name: string, slug: string): string {
+  const normalizedName = normalizeVenueSearchQuery(name) ?? name.trim();
+  return [`slug.eq.${slug}`, `name.ilike.${normalizedName}`].join(",");
+}
+
+function canonicalVenueLabel(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ")
+    .trim();
+}
+
+function isStrongOnboardingVenueMatch(
+  query: string,
+  rawVenue: unknown,
+): boolean {
+  const venue = asRecord(rawVenue);
+  const normalizedQuery = canonicalVenueLabel(query);
+  if (!normalizedQuery) return false;
+
+  const venueName = canonicalVenueLabel(stringValue(venue.name) ?? "");
+  const querySlug = slugify(query);
+  const venueSlug = slugify(
+    stringValue(venue.slug) ?? stringValue(venue.name) ?? "",
+  );
+
+  return venueName == normalizedQuery || venueSlug == querySlug;
 }
 
 function requireString(body: JsonRecord, ...keys: string[]): string {
@@ -386,7 +676,9 @@ async function venueSessionClaims(req: Request): Promise<JsonRecord | null> {
   });
 }
 
-async function onboardingMenuClaims(body: JsonRecord): Promise<JsonRecord | null> {
+async function onboardingMenuClaims(
+  body: JsonRecord,
+): Promise<JsonRecord | null> {
   const token = stringValue(body.onboardingMenuToken) ??
     stringValue(body.onboarding_menu_token);
   if (!token) return null;
@@ -533,6 +825,161 @@ function claimMatchesContact(row: JsonRecord, lookup: ContactLookup): boolean {
   return false;
 }
 
+function claimContactPhone(claim: JsonRecord): string | null {
+  return stringValue(claim.contact_phone) ??
+    stringValue(claim.whatsapp_number) ??
+    null;
+}
+
+function claimWhatsappNumber(claim: JsonRecord): string | null {
+  return stringValue(claim.whatsapp_number) ??
+    stringValue(claim.contact_phone) ??
+    null;
+}
+
+function venueHasLinkedAccess(row: JsonRecord): boolean {
+  return Boolean(
+    stringValue(row.owner_id) ?? stringValue(row.approved_claim_id),
+  );
+}
+
+function effectiveVenuePhone(rawVenue: unknown): string | null {
+  const venue = asRecord(rawVenue);
+  return stringValue(venue.phone) ?? stringValue(venue.owner_contact_phone) ??
+    stringValue(venue.owner_whatsapp_number) ?? null;
+}
+
+export function buildApprovedClaimUpdate(
+  reviewedAt: string,
+  reviewedBy?: string,
+): JsonRecord {
+  return {
+    status: "approved",
+    reviewed_at: reviewedAt,
+    approved_at: reviewedAt,
+    ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
+  };
+}
+
+export function buildApprovedVenueLinkage(
+  claim: JsonRecord,
+  approvedAt: string,
+): JsonRecord {
+  const claimId = stringValue(claim.id);
+  if (!claimId) {
+    throw new HttpError(500, "Approved claim linkage is missing a claim id.");
+  }
+
+  const claimantId = stringValue(claim.claimant_id);
+  return {
+    approved_claim_id: claimId,
+    approved_at: approvedAt,
+    owner_contact_phone: claimContactPhone(claim),
+    owner_whatsapp_number: claimWhatsappNumber(claim),
+    ...(claimantId ? { owner_id: claimantId } : {}),
+  };
+}
+
+export function buildClaimAccessAuditUpdate(args: {
+  issuedAt: string;
+  verifiedAt?: string;
+  normalizedPhone?: string;
+  challengeId?: string;
+  verificationMethod?: string;
+  verifiedBy?: string;
+  verificationNote?: string | null;
+}): JsonRecord {
+  if (
+    args.verificationMethod &&
+    !accessVerificationMethods.has(args.verificationMethod)
+  ) {
+    throw new HttpError(
+      500,
+      `Unsupported access verification method: ${args.verificationMethod}`,
+    );
+  }
+  return {
+    last_access_token_issued_at: args.issuedAt,
+    ...(args.verifiedAt ? { whatsapp_verified_at: args.verifiedAt } : {}),
+    ...(args.normalizedPhone
+      ? { last_verified_whatsapp_number: args.normalizedPhone }
+      : {}),
+    ...(args.challengeId ? { last_otp_challenge_id: args.challengeId } : {}),
+    ...(args.verifiedAt && args.verificationMethod
+      ? { access_verification_method: args.verificationMethod }
+      : {}),
+    ...(args.verifiedAt && args.verifiedBy
+      ? { access_verified_by: args.verifiedBy }
+      : {}),
+    ...(args.verifiedAt && args.verificationNote !== undefined
+      ? { access_verification_note: args.verificationNote }
+      : {}),
+  };
+}
+
+export function buildVenueAccessAuditUpdate(
+  claim: JsonRecord,
+  args: {
+    issuedAt: string;
+    verifiedAt?: string;
+    approvedAt?: string;
+    verificationMethod?: string;
+    verifiedBy?: string;
+    verificationNote?: string | null;
+  },
+): JsonRecord {
+  if (
+    args.verificationMethod &&
+    !accessVerificationMethods.has(args.verificationMethod)
+  ) {
+    throw new HttpError(
+      500,
+      `Unsupported access verification method: ${args.verificationMethod}`,
+    );
+  }
+  return {
+    ...buildApprovedVenueLinkage(
+      claim,
+      args.approvedAt ?? stringValue(claim.approved_at) ??
+        stringValue(claim.reviewed_at) ?? args.issuedAt,
+    ),
+    last_access_token_issued_at: args.issuedAt,
+    ...(args.verifiedAt ? { access_verified_at: args.verifiedAt } : {}),
+    ...(args.verifiedAt && args.verificationMethod
+      ? { access_verification_method: args.verificationMethod }
+      : {}),
+    ...(args.verifiedAt && args.verifiedBy
+      ? { access_verified_by: args.verifiedBy }
+      : {}),
+    ...(args.verifiedAt && args.verificationNote !== undefined
+      ? { access_verification_note: args.verificationNote }
+      : {}),
+  };
+}
+
+async function venueSnapshot(
+  supabase: ReturnType<typeof adminClient>,
+  venueId: string,
+): Promise<JsonRecord> {
+  const { data, error } = await supabase
+    .from("dinein_venues")
+    .select("*")
+    .eq("id", venueId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[dinein-api] venue snapshot lookup failed", error);
+    throw new HttpError(500, "Could not load the venue.");
+  }
+
+  const venue = asRecord(data);
+  if (!stringValue(venue.id)) {
+    throw new HttpError(404, "Venue not found.");
+  }
+
+  return venue;
+}
+
 const VENUE_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
 function venueTokenSecret(): string {
@@ -546,8 +993,18 @@ async function issueVenueToken(
   venueId: string,
   contactPhone: string,
   venueName: string,
-): Promise<{ access_token: string; expires_at: string }> {
-  const now = Math.floor(Date.now() / 1000);
+  options?: {
+    claimId?: string;
+    issuedAt?: string;
+  },
+): Promise<{ access_token: string; issued_at: string; expires_at: string }> {
+  const issuedAtDate = options?.issuedAt
+    ? new Date(options.issuedAt)
+    : new Date();
+  const issuedAtMs = Number.isNaN(issuedAtDate.getTime())
+    ? Date.now()
+    : issuedAtDate.getTime();
+  const now = Math.floor(issuedAtMs / 1000);
   const exp = now + VENUE_TOKEN_TTL_SECONDS;
 
   const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }))
@@ -555,10 +1012,12 @@ async function issueVenueToken(
 
   const payload = btoa(JSON.stringify({
     aud: "dinein-venue",
+    sub: options?.claimId ?? venueId,
     role: "venue_owner",
     venue_id: venueId,
     phone: contactPhone,
     venue_name: venueName,
+    ...(options?.claimId ? { claim_id: options.claimId } : {}),
     iat: now,
     exp,
   })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
@@ -568,13 +1027,14 @@ async function issueVenueToken(
 
   return {
     access_token: `${signingInput}.${signature}`,
+    issued_at: new Date(issuedAtMs).toISOString(),
     expires_at: new Date(exp * 1000).toISOString(),
   };
 }
 
 async function verifyVenueToken(
   token: string,
-): Promise<{ venueId: string; contactPhone: string }> {
+): Promise<{ venueId: string; contactPhone: string; claimId?: string }> {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new HttpError(403, "Invalid venue access token.");
@@ -613,7 +1073,11 @@ async function verifyVenueToken(
     throw new HttpError(403, "Venue access token is missing required claims.");
   }
 
-  return { venueId, contactPhone: phone };
+  return {
+    venueId,
+    contactPhone: phone,
+    claimId: stringValue(payload.claim_id),
+  };
 }
 
 async function authorizeVenueSession(
@@ -621,7 +1085,7 @@ async function authorizeVenueSession(
   _supabase: ReturnType<typeof adminClient>,
   rawSession: unknown,
   venueId: string,
-): Promise<{ venueId: string; contactPhone: string }> {
+): Promise<{ venueId: string; contactPhone: string; claimId?: string }> {
   const bearerClaims = await venueSessionClaims(req);
   if (bearerClaims) {
     const tokenVenueId = stringValue(bearerClaims.venue_id);
@@ -638,7 +1102,11 @@ async function authorizeVenueSession(
         "Venue access token does not match the requested venue.",
       );
     }
-    return { venueId: tokenVenueId, contactPhone: tokenPhone };
+    return {
+      venueId: tokenVenueId,
+      contactPhone: tokenPhone,
+      claimId: stringValue(bearerClaims.claim_id),
+    };
   }
 
   const session = asRecord(rawSession);
@@ -664,6 +1132,173 @@ async function authorizeVenueSession(
   }
 
   throw new HttpError(401, "Venue access token required.");
+}
+
+async function persistApprovedVenueClaim(
+  supabase: ReturnType<typeof adminClient>,
+  claim: JsonRecord,
+  reviewedAt: string,
+  reviewedBy?: string,
+): Promise<void> {
+  const claimId = stringValue(claim.id);
+  if (!claimId) {
+    throw new HttpError(500, "Claim approval is missing a claim id.");
+  }
+
+  const { error } = await supabase
+    .from("dinein_venue_claims")
+    .update(buildApprovedClaimUpdate(reviewedAt, reviewedBy))
+    .eq("id", claimId);
+
+  if (error) {
+    console.error("[dinein-api] approve claim failed", error);
+    throw new HttpError(500, "Could not approve the claim.");
+  }
+}
+
+async function persistApprovedVenueLinkage(
+  supabase: ReturnType<typeof adminClient>,
+  claim: JsonRecord,
+  approvedAt: string,
+  options?: {
+    activateVenue?: boolean;
+  },
+): Promise<void> {
+  const venueId = stringValue(claim.venue_id);
+  if (!venueId) {
+    throw new HttpError(500, "Approved claim is missing a venue id.");
+  }
+
+  const currentVenue = await venueSnapshot(supabase, venueId);
+  const updatePayload: JsonRecord = {
+    ...buildApprovedVenueLinkage(claim, approvedAt),
+  };
+  if (!stringValue(currentVenue.phone) && claimContactPhone(claim)) {
+    updatePayload.phone = claimContactPhone(claim);
+  }
+  if (options?.activateVenue !== false) {
+    updatePayload.status = "active";
+    const nextVenue = {
+      ...currentVenue,
+      ...updatePayload,
+      status: "active",
+    };
+    updatePayload.ordering_enabled = venueOrderingReadiness(nextVenue).ready;
+  }
+
+  const { error } = await supabase
+    .from("dinein_venues")
+    .update(updatePayload)
+    .eq("id", venueId);
+
+  if (error) {
+    console.error("[dinein-api] approved venue linkage update failed", error);
+    throw new HttpError(
+      500,
+      options?.activateVenue === false
+        ? "Could not update the approved venue linkage."
+        : "Claim approved but venue could not be activated.",
+    );
+  }
+}
+
+async function persistVenueAccessAudit(
+  supabase: ReturnType<typeof adminClient>,
+  claim: JsonRecord,
+  args: {
+    issuedAt: string;
+    verifiedAt?: string;
+    normalizedPhone?: string;
+    challengeId?: string;
+    approvedAt?: string;
+    verificationMethod?: string;
+    verifiedBy?: string;
+    verificationNote?: string | null;
+  },
+): Promise<void> {
+  const claimId = stringValue(claim.id);
+  const venueId = stringValue(claim.venue_id);
+  if (!claimId || !venueId) {
+    throw new HttpError(500, "Venue access audit is missing claim linkage.");
+  }
+
+  const { error: claimError } = await supabase
+    .from("dinein_venue_claims")
+    .update(buildClaimAccessAuditUpdate(args))
+    .eq("id", claimId);
+
+  if (claimError) {
+    console.error("[dinein-api] claim access audit update failed", claimError);
+    throw new HttpError(500, "Could not record venue claim access.");
+  }
+
+  const currentVenue = await venueSnapshot(supabase, venueId);
+  const venueAuditUpdate: JsonRecord = {
+    ...buildVenueAccessAuditUpdate(claim, args),
+  };
+  if (!stringValue(currentVenue.phone) && claimContactPhone(claim)) {
+    venueAuditUpdate.phone = claimContactPhone(claim);
+  }
+
+  const { error: venueError } = await supabase
+    .from("dinein_venues")
+    .update(venueAuditUpdate)
+    .eq("id", venueId);
+
+  if (venueError) {
+    console.error("[dinein-api] venue access audit update failed", venueError);
+    throw new HttpError(500, "Could not record venue access linkage.");
+  }
+}
+
+async function upsertVenueOwnerProfileRole(
+  supabase: ReturnType<typeof adminClient>,
+  claimantId: string | undefined,
+): Promise<void> {
+  if (!claimantId) return;
+
+  const { data: profileData, error: profileLookupError } = await supabase
+    .from("dinein_profiles")
+    .select("id")
+    .eq("id", claimantId)
+    .maybeSingle();
+
+  if (profileLookupError) {
+    console.error(
+      "[dinein-api] claimant profile lookup failed",
+      profileLookupError,
+    );
+    return;
+  }
+
+  if (profileData?.id) {
+    const { error: profileUpdateError } = await supabase
+      .from("dinein_profiles")
+      .update({
+        role: "venue_owner",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", claimantId);
+
+    if (profileUpdateError) {
+      console.error(
+        "[dinein-api] claimant profile update failed",
+        profileUpdateError,
+      );
+    }
+    return;
+  }
+
+  const { error: profileInsertError } = await supabase
+    .from("dinein_profiles")
+    .insert({ id: claimantId, role: "venue_owner" });
+
+  if (profileInsertError) {
+    console.error(
+      "[dinein-api] claimant profile insert failed",
+      profileInsertError,
+    );
+  }
 }
 
 async function authorizeVenueMutation(
@@ -761,6 +1396,31 @@ async function orderVenueId(
   return venueId;
 }
 
+async function orderStatusSnapshot(
+  supabase: ReturnType<typeof adminClient>,
+  orderId: string,
+): Promise<{ venueId: string; status: string }> {
+  const { data, error } = await supabase
+    .from("dinein_orders")
+    .select("venue_id,status")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[dinein-api] order status lookup failed", error);
+    throw new HttpError(500, "Could not load the order.");
+  }
+
+  const record = asRecord(data);
+  const venueId = stringValue(record.venue_id);
+  const status = stringValue(record.status);
+  if (!venueId || !status) {
+    throw new HttpError(404, "Order not found.", { code: "order_not_found" });
+  }
+
+  return { venueId, status };
+}
+
 function orderReceiptSecret(): string {
   return optionalEnv("DINEIN_ORDER_RECEIPT_SECRET") ??
     optionalEnv("DINEIN_VENUE_SESSION_SECRET") ??
@@ -824,6 +1484,8 @@ function sanitizeVenueDraft(rawDraft: unknown): JsonRecord {
       stringValue(draft.contactPhone) ?? null,
     email: stringValue(draft.email) ?? stringValue(draft.contact_email) ??
       stringValue(draft.contactEmail) ?? null,
+    website_url: stringValue(draft.website_url) ??
+      stringValue(draft.websiteUrl) ?? null,
     image_url: stringValue(draft.image_url) ?? stringValue(draft.imageUrl) ??
       null,
     country: (stringValue(draft.country) ?? "MT").toUpperCase() == "RW"
@@ -852,7 +1514,6 @@ function sanitizeVenueUpdates(
   applyString("address");
   applyString("phone");
   applyString("email");
-  applyString("image_url");
   applyString("website_url");
   applyString("reservation_url");
   applyString("revolut_url");
@@ -880,8 +1541,36 @@ function sanitizeVenueUpdates(
     sanitized.wifi_password = stringValue(updates.wifiPassword) ?? null;
   }
 
-  if ("imageUrl" in updates) {
-    sanitized.image_url = stringValue(updates.imageUrl) ?? null;
+  if ("image_url" in updates || "imageUrl" in updates) {
+    const imageUrl = stringValue(updates.image_url ?? updates.imageUrl) ?? null;
+    sanitized.image_url = imageUrl;
+
+    if (imageUrl) {
+      sanitized.image_source = "manual";
+      sanitized.image_status = "ready";
+      sanitized.image_model = null;
+      sanitized.image_prompt = null;
+      sanitized.image_error = null;
+      sanitized.image_generated_at = null;
+      sanitized.image_storage_path = null;
+      sanitized.image_locked = true;
+    } else {
+      sanitized.image_source = null;
+      sanitized.image_status = "pending";
+      sanitized.image_model = null;
+      sanitized.image_prompt = null;
+      sanitized.image_error = null;
+      sanitized.image_generated_at = null;
+      sanitized.image_storage_path = null;
+      sanitized.image_locked = false;
+    }
+  }
+
+  if ("image_locked" in updates || "imageLocked" in updates) {
+    const imageLocked = booleanValue(
+      updates.image_locked ?? updates.imageLocked,
+    );
+    if (imageLocked != undefined) sanitized.image_locked = imageLocked;
   }
 
   if ("websiteUrl" in updates) {
@@ -918,6 +1607,47 @@ function sanitizeVenueUpdates(
   }
 
   if (allowAdminFields) {
+    if (
+      "supported_payment_methods" in updates ||
+      "supportedPaymentMethods" in updates
+    ) {
+      sanitized.supported_payment_methods =
+        normalizeVenueSupportedPaymentMethods(
+          updates.supported_payment_methods ?? updates.supportedPaymentMethods,
+          updates.revolut_url ?? updates.revolutUrl,
+        );
+    }
+
+    if ("ordering_enabled" in updates || "orderingEnabled" in updates) {
+      const orderingEnabled = booleanValue(
+        updates.ordering_enabled ?? updates.orderingEnabled,
+      );
+      if (orderingEnabled == undefined) {
+        throw new HttpError(
+          400,
+          "A valid ordering_enabled flag is required.",
+        );
+      }
+      sanitized.ordering_enabled = orderingEnabled;
+    }
+
+    if (
+      "google_closed_override_enabled" in updates ||
+      "googleClosedOverrideEnabled" in updates
+    ) {
+      const overrideEnabled = booleanValue(
+        updates.google_closed_override_enabled ??
+          updates.googleClosedOverrideEnabled,
+      );
+      if (overrideEnabled == undefined) {
+        throw new HttpError(
+          400,
+          "A valid google_closed_override_enabled flag is required.",
+        );
+      }
+      sanitized.google_closed_override_enabled = overrideEnabled;
+    }
+
     if ("country" in updates) {
       sanitized.country =
         requireString(updates, "country").toUpperCase() == "RW" ? "RW" : "MT";
@@ -941,6 +1671,7 @@ function sanitizeVenueUpdates(
 
 function publicVenueListPayload(rawVenue: unknown): JsonRecord {
   const venue = asRecord(rawVenue);
+  const readiness = venueOrderingReadiness(venue);
   return {
     id: stringValue(venue.id) ?? "",
     name: stringValue(venue.name) ?? "",
@@ -948,10 +1679,13 @@ function publicVenueListPayload(rawVenue: unknown): JsonRecord {
     category: stringValue(venue.category) ?? "restaurant",
     description: stringValue(venue.description) ?? "",
     address: stringValue(venue.address) ?? "",
-    phone: stringValue(venue.phone) ?? null,
+    phone: effectiveVenuePhone(venue),
     email: stringValue(venue.email) ?? null,
     image_url: stringValue(venue.image_url) ?? null,
     status: stringValue(venue.status) ?? "active",
+    ordering_enabled: (booleanValue(venue.ordering_enabled) ?? false) &&
+      readiness.ready,
+    supported_payment_methods: readiness.supportedPaymentMethods,
     rating: numberValue(venue.rating) ?? 0,
     rating_count: numberValue(venue.rating_count) ?? 0,
     country: stringValue(venue.country) ?? "MT",
@@ -968,8 +1702,41 @@ function publicVenueDetailPayload(rawVenue: unknown): JsonRecord {
     revolut_url: stringValue(venue.revolut_url) ?? null,
     social_links: venue.social_links ?? null,
     wifi_ssid: stringValue(venue.wifi_ssid) ?? null,
-    // wifi_password intentionally excluded from public payload
+    wifi_password: stringValue(venue.wifi_password) ?? null,
     wifi_security: stringValue(venue.wifi_security) ?? null,
+  };
+}
+
+function venueStatus(rawVenue: unknown): string {
+  return stringValue(asRecord(rawVenue).status) ?? "active";
+}
+
+function venueOrderingEnabled(rawVenue: unknown): boolean {
+  return booleanValue(asRecord(rawVenue).ordering_enabled) ?? false;
+}
+
+function venueSupportedPaymentMethods(rawVenue: unknown): string[] {
+  return venueOrderingReadiness(rawVenue).supportedPaymentMethods;
+}
+
+function isGuestVisibleVenue(rawVenue: unknown): boolean {
+  return publicVenueStatuses.has(venueStatus(rawVenue));
+}
+
+function canVenueAcceptGuestOrders(rawVenue: unknown): boolean {
+  return venueOrderingEnabled(rawVenue) &&
+    venueOrderingReadiness(rawVenue).ready;
+}
+
+function publicMenuItemPayload(
+  rawItem: unknown,
+  { hidePrice = false }: { hidePrice?: boolean } = {},
+): JsonRecord {
+  const item = asRecord(rawItem);
+  return {
+    ...item,
+    price: hidePrice ? 0 : numberValue(item.price) ?? 0,
+    price_hidden: hidePrice,
   };
 }
 
@@ -1256,35 +2023,87 @@ function sanitizeOrderItems(rawItems: unknown): SanitizedOrderItemInput[] {
   });
 }
 
-function sanitizeOrderInsert(
+export function sanitizeOrderInsert(
   rawOrder: unknown,
   userId?: string | null,
 ): JsonRecord {
   const order = asRecord(rawOrder);
-  const paymentMethod = stringValue(order.payment_method) ??
-    stringValue(order.paymentMethod) ??
-    "cash";
+  const paymentMethod = normalizePaymentMethod(
+    order.payment_method ?? order.paymentMethod,
+  );
+  const requestedUserId = stringValue(order.user_id) ??
+    stringValue(order.userId);
+  if (requestedUserId && !userId) {
+    throw new HttpError(
+      403,
+      "Authenticated session required to attach an order to a user account.",
+      { code: "user_id_auth_required" },
+    );
+  }
+  if (requestedUserId && userId && requestedUserId != userId) {
+    throw new HttpError(
+      403,
+      "Order user does not match the authenticated session.",
+      { code: "user_id_mismatch" },
+    );
+  }
 
-  if (!paymentMethods.has(paymentMethod)) {
-    throw new HttpError(400, `Unsupported payment method: ${paymentMethod}`);
+  const tableNumber = stringValue(order.table_number) ??
+    stringValue(order.tableNumber);
+  if (!tableNumber) {
+    throw new HttpError(
+      400,
+      "Table number is required to place a dine-in order.",
+      { code: "table_number_required" },
+    );
   }
 
   return {
     venue_id: requireString(order, "venue_id", "venueId"),
-    venue_name: requireString(order, "venue_name", "venueName"),
-    user_id: userId ?? stringValue(order.user_id) ??
-      stringValue(order.userId) ?? null,
+    venue_name: stringValue(order.venue_name) ?? stringValue(order.venueName) ??
+      null,
+    user_id: userId ?? requestedUserId ?? null,
     user_name: stringValue(order.user_name) ?? stringValue(order.userName) ??
       null,
     items: sanitizeOrderItems(order.items),
     status: "placed",
     payment_method: paymentMethod,
-    table_number: stringValue(order.table_number) ??
-      stringValue(order.tableNumber) ?? null,
+    payment_status: orderPaymentStatusForMethod(paymentMethod),
+    table_number: tableNumber,
     special_requests: stringValue(order.special_requests) ??
       stringValue(order.specialRequests) ??
       null,
   };
+}
+
+async function uniqueOrderInsert(
+  supabase: ReturnType<typeof adminClient>,
+  order: JsonRecord,
+): Promise<JsonRecord> {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const { data, error } = await supabase
+      .from("dinein_orders")
+      .insert({
+        ...order,
+        order_number: generateOrderNumber(),
+      })
+      .select("*")
+      .single();
+
+    if (!error && data) {
+      return asRecord(data);
+    }
+
+    if (error?.code != "23505") {
+      console.error("[dinein-api] place order failed", error);
+      throw new HttpError(500, "Could not place the order.");
+    }
+  }
+
+  throw new HttpError(
+    409,
+    "Could not allocate a unique order number. Please try again.",
+  );
 }
 
 async function uniqueVenueInsert(
@@ -1315,6 +2134,103 @@ async function uniqueVenueInsert(
   }
 
   throw new HttpError(409, "Could not allocate a unique venue slug.");
+}
+
+async function assertVenueDraftDoesNotConflict(
+  supabase: ReturnType<typeof adminClient>,
+  draft: JsonRecord,
+): Promise<void> {
+  const draftName = stringValue(draft.name) ?? "This venue";
+  const draftSlug = stringValue(draft.slug) ?? slugify(draftName);
+
+  const { data, error } = await supabase
+    .from("dinein_venues")
+    .select("id, name, status, owner_id, approved_claim_id")
+    .in("status", ["active", "pending_claim", "pending_activation"])
+    .or(buildVenueConflictOrClause(draftName, draftSlug))
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    console.error("[dinein-api] pending venue conflict lookup failed", error);
+    throw new HttpError(500, "Could not validate the venue before claim.");
+  }
+
+  const rows = Array.isArray(data) ? data : data ? [data] : [];
+  const candidate = rows.find((venue) =>
+    isStrongOnboardingVenueMatch(draftName, venue)
+  );
+  if (!candidate) {
+    return;
+  }
+
+  const venue = asRecord(candidate);
+  const venueName = stringValue(venue.name) ?? draftName;
+  const ownerId = stringValue(venue.owner_id);
+  const status = stringValue(venue.status) ?? "active";
+
+  if (status == "active" && venueHasLinkedAccess(venue)) {
+    throw new HttpError(
+      409,
+      `Venue "${venueName}" is already live on DineIn and cannot be claimed from onboarding.`,
+    );
+  }
+
+  if (status == "active") {
+    throw new HttpError(
+      409,
+      `Venue "${venueName}" already exists on DineIn. Search and select the existing listing instead of creating a new one.`,
+    );
+  }
+
+  throw new HttpError(
+    409,
+    `Venue "${venueName}" already has a pending onboarding record on DineIn.`,
+  );
+}
+
+async function findUnavailableOnboardingVenueMatch(
+  supabase: ReturnType<typeof adminClient>,
+  query: string,
+): Promise<JsonRecord | null> {
+  const searchQuery = normalizeVenueSearchQuery(query);
+  if (!searchQuery) return null;
+
+  const { data, error } = await supabase
+    .from("dinein_venues")
+    .select("id, name, slug, status, owner_id, approved_claim_id")
+    .in("status", ["active", "pending_claim", "pending_activation"])
+    .or(buildVenueSearchOrClause(searchQuery))
+    .order("name", { ascending: true })
+    .limit(10);
+
+  if (error) {
+    console.error(
+      "[dinein-api] onboarding unavailable venue lookup failed",
+      error,
+    );
+    throw new HttpError(500, "Could not validate onboarding venue search.");
+  }
+
+  for (const candidate of data ?? []) {
+    const venue = asRecord(candidate);
+    if (!isStrongOnboardingVenueMatch(searchQuery, venue)) {
+      continue;
+    }
+
+    const status = stringValue(venue.status) ?? "active";
+    const name = stringValue(venue.name) ?? searchQuery;
+
+    if (status == "active" && venueHasLinkedAccess(venue)) {
+      return { name, reason: "already_live", status };
+    }
+
+    if (status == "pending_claim" || status == "pending_activation") {
+      return { name, reason: "already_onboarding", status };
+    }
+  }
+
+  return null;
 }
 
 async function handleCreateProfile(
@@ -1370,24 +2286,119 @@ async function handleGetVenues(
 ): Promise<Response> {
   const limit = normalizeListLimit(body.limit);
   const offset = normalizeListOffset(body.offset);
-  let query = supabase
+  const { data, error } = await supabase
     .from("dinein_venues")
     .select("*")
-    .eq("status", "active")
-    .order("rating", { ascending: false })
-    .order("rating_count", { ascending: false })
-    .order("name", { ascending: true });
-  if (limit != null) {
-    query = query.range(offset, offset + limit - 1);
-  }
-  const { data, error } = await query;
+    .neq("status", "deleted")
+    .neq("status", "suspended");
 
   if (error) {
     console.error("[dinein-api] get venues failed", error);
     throw new HttpError(500, "Could not load venues.");
   }
 
+  const venues = (data ?? [])
+    .filter((venue) => isGuestVisibleVenue(venue))
+    .sort((left, right) => {
+      const orderableCompare = Number(canVenueAcceptGuestOrders(right)) -
+        Number(canVenueAcceptGuestOrders(left));
+      if (orderableCompare != 0) return orderableCompare;
+
+      const ratingCompare = (numberValue(right.rating) ?? 0) -
+        (numberValue(left.rating) ?? 0);
+      if (ratingCompare != 0) return ratingCompare;
+
+      const ratingCountCompare = (numberValue(right.rating_count) ?? 0) -
+        (numberValue(left.rating_count) ?? 0);
+      if (ratingCountCompare != 0) return ratingCountCompare;
+
+      return (stringValue(left.name) ?? "").localeCompare(
+        stringValue(right.name) ?? "",
+      );
+    });
+  const visible = limit == null ? venues : venues.slice(offset, offset + limit);
+
+  return ok(visible.map(publicVenueListPayload));
+}
+
+async function handleGetClaimableVenues(
+  supabase: ReturnType<typeof adminClient>,
+  body: JsonRecord,
+): Promise<Response> {
+  const limit = normalizeListLimit(body.limit);
+  const offset = normalizeListOffset(body.offset);
+  const searchQuery = normalizeVenueSearchQuery(
+    body.query ?? body.search ?? body.term,
+  );
+
+  let query = supabase
+    .from("dinein_venues")
+    .select("*")
+    .eq("status", "active")
+    .is("owner_id", null)
+    .is("approved_claim_id", null)
+    .order("rating", { ascending: false })
+    .order("rating_count", { ascending: false })
+    .order("name", { ascending: true });
+
+  if (searchQuery) {
+    query = query.or(buildVenueSearchOrClause(searchQuery));
+  }
+
+  if (limit != null) {
+    query = query.range(offset, offset + limit - 1);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("[dinein-api] get claimable venues failed", error);
+    throw new HttpError(500, "Could not load claimable venues.");
+  }
+
   return ok((data ?? []).map(publicVenueListPayload));
+}
+
+async function handleSearchOnboardingVenues(
+  supabase: ReturnType<typeof adminClient>,
+  body: JsonRecord,
+): Promise<Response> {
+  const searchQuery = normalizeVenueSearchQuery(
+    body.query ?? body.search ?? body.term,
+  );
+  if (!searchQuery) {
+    return ok({
+      results: [],
+      blockedMatch: null,
+    });
+  }
+
+  const limit = normalizeListLimit(body.limit, 20) ?? 10;
+  const { data, error } = await supabase
+    .from("dinein_venues")
+    .select("*")
+    .eq("status", "active")
+    .is("owner_id", null)
+    .is("approved_claim_id", null)
+    .or(buildVenueSearchOrClause(searchQuery))
+    .order("rating", { ascending: false })
+    .order("rating_count", { ascending: false })
+    .order("name", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    console.error("[dinein-api] onboarding venue search failed", error);
+    throw new HttpError(500, "Could not search onboarding venues.");
+  }
+
+  const blockedMatch = await findUnavailableOnboardingVenueMatch(
+    supabase,
+    searchQuery,
+  );
+
+  return ok({
+    results: (data ?? []).map(publicVenueListPayload),
+    blockedMatch,
+  });
 }
 
 async function handleGetAllVenues(
@@ -1450,6 +2461,9 @@ async function handleGetVenueBySlug(
     venueId,
     body.venue_session,
   );
+  if (!canReadPrivate && !isGuestVisibleVenue(venue)) {
+    return ok(null);
+  }
   return ok(canReadPrivate ? venue : publicVenueDetailPayload(venue));
 }
 
@@ -1482,6 +2496,9 @@ async function handleGetVenueById(
     venueId,
     body.venue_session,
   );
+  if (!canReadPrivate && !isGuestVisibleVenue(venue)) {
+    return ok(null);
+  }
   return ok(canReadPrivate ? venue : publicVenueDetailPayload(venue));
 }
 
@@ -1525,6 +2542,31 @@ async function handleUpdateVenue(
     return ok(true);
   }
 
+  if (mode == "admin") {
+    const currentVenue = await venueSnapshot(supabase, venueId);
+    const nextVenue = { ...currentVenue, ...updates };
+    const readiness = venueOrderingReadiness(nextVenue);
+    const explicitEnable = updates.ordering_enabled === true;
+
+    if (explicitEnable && !readiness.ready) {
+      throw new HttpError(
+        409,
+        "Venue is not ready to accept guest orders.",
+        {
+          code: "venue_not_order_ready",
+          readiness_reasons: readiness.reasons,
+        },
+      );
+    }
+
+    if (
+      (booleanValue(currentVenue.ordering_enabled) ?? false) &&
+      !readiness.ready
+    ) {
+      updates.ordering_enabled = false;
+    }
+  }
+
   const { data, error } = await supabase
     .from("dinein_venues")
     .update(updates)
@@ -1534,6 +2576,19 @@ async function handleUpdateVenue(
 
   if (error) {
     console.error("[dinein-api] update venue failed", error);
+    if (error.code == "23514") {
+      throw new HttpError(
+        409,
+        "Venue is not ready to accept guest orders.",
+        {
+          code: "venue_not_order_ready",
+          readiness_reasons: String(error.details ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean),
+        },
+      );
+    }
     throw new HttpError(500, "Could not update the venue.");
   }
 
@@ -1557,10 +2612,9 @@ async function handleCreatePendingClaimVenue(
     );
   }
 
-  const created = await uniqueVenueInsert(
-    supabase,
-    sanitizeVenueDraft(body.draft),
-  );
+  const sanitizedDraft = sanitizeVenueDraft(body.draft);
+  await assertVenueDraftDoesNotConflict(supabase, sanitizedDraft);
+  const created = await uniqueVenueInsert(supabase, sanitizedDraft);
   return ok(created, 201);
 }
 
@@ -1701,7 +2755,7 @@ async function handleAutoApproveOnboardingClaim(
   req: Request,
   body: JsonRecord,
 ): Promise<Response> {
-  await requireAdmin(supabase, req);
+  const adminId = await requireAdmin(supabase, req);
   const claimId = requireString(body, "claimId", "claim_id");
   const venueId = requireString(body, "venueId", "venue_id");
   const contactPhone = stringValue(body.contactPhone) ??
@@ -1734,58 +2788,12 @@ async function handleAutoApproveOnboardingClaim(
   }
 
   // Approve the claim
-  const { error: updateClaimError } = await supabase
-    .from("dinein_venue_claims")
-    .update({
-      status: "approved",
-      reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", claimId);
+  const approvedAt = new Date().toISOString();
+  await persistApprovedVenueClaim(supabase, claim, approvedAt, adminId);
+  await persistApprovedVenueLinkage(supabase, claim, approvedAt);
 
-  if (updateClaimError) {
-    console.error("[dinein-api] auto-approve claim failed", updateClaimError);
-    throw new HttpError(500, "Could not approve the claim.");
-  }
-
-  // Assign ownership + set venue to ACTIVE (go-live)
   const claimantId = stringValue(claim.claimant_id);
-  const updatePayload: Record<string, unknown> = { status: "active" };
-  if (claimantId) {
-    updatePayload.owner_id = claimantId;
-  }
-
-  const { error: venueUpdateError } = await supabase
-    .from("dinein_venues")
-    .update(updatePayload)
-    .eq("id", venueId);
-
-  if (venueUpdateError) {
-    console.error(
-      "[dinein-api] auto-approve venue update failed",
-      venueUpdateError,
-    );
-    // Non-fatal: claim is approved but venue status update failed
-  }
-
-  // Upsert claimant profile to venue_owner
-  if (claimantId) {
-    const { data: profileData } = await supabase
-      .from("dinein_profiles")
-      .select("id")
-      .eq("id", claimantId)
-      .maybeSingle();
-
-    if (profileData?.id) {
-      await supabase
-        .from("dinein_profiles")
-        .update({ role: "venue_owner", updated_at: new Date().toISOString() })
-        .eq("id", claimantId);
-    } else {
-      await supabase
-        .from("dinein_profiles")
-        .insert({ id: claimantId, role: "venue_owner" });
-    }
-  }
+  await upsertVenueOwnerProfileRole(supabase, claimantId);
 
   // Load venue name for token
   const { data: venueData } = await supabase
@@ -1799,7 +2807,13 @@ async function handleAutoApproveOnboardingClaim(
     stringValue(claim.whatsapp_number) || "";
 
   // Issue venue access token
-  const token = await issueVenueToken(venueId, phone, venueName);
+  const token = await issueVenueToken(venueId, phone, venueName, {
+    claimId,
+  });
+  await persistVenueAccessAudit(supabase, claim, {
+    issuedAt: token.issued_at,
+    approvedAt,
+  });
 
   return ok({
     venue_name: venueName,
@@ -1852,81 +2866,11 @@ async function handleApproveClaim(
     );
   }
 
-  const { error: updateClaimError } = await supabase
-    .from("dinein_venue_claims")
-    .update({
-      status: "approved",
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: adminId,
-    })
-    .eq("id", claimId);
-
-  if (updateClaimError) {
-    console.error("[dinein-api] approve claim failed", updateClaimError);
-    throw new HttpError(500, "Could not approve the claim.");
-  }
-
+  const approvedAt = new Date().toISOString();
+  await persistApprovedVenueClaim(supabase, claim, approvedAt, adminId);
   const claimantId = stringValue(claim.claimant_id);
-  const venueUpdate: Record<string, unknown> = { status: "active" };
-  if (claimantId) {
-    venueUpdate.owner_id = claimantId;
-  }
-  const { error: venueUpdateError } = await supabase
-    .from("dinein_venues")
-    .update(venueUpdate)
-    .eq("id", claimVenueId);
-
-  if (venueUpdateError) {
-    console.error(
-      "[dinein-api] activate venue after claim failed",
-      venueUpdateError,
-    );
-    throw new HttpError(
-      500,
-      "Claim approved but venue could not be activated.",
-    );
-  }
-
-  if (claimantId) {
-    const { data: profileData, error: profileLookupError } = await supabase
-      .from("dinein_profiles")
-      .select("id")
-      .eq("id", claimantId)
-      .maybeSingle();
-
-    if (profileLookupError) {
-      console.error(
-        "[dinein-api] claimant profile lookup failed",
-        profileLookupError,
-      );
-    } else if (profileData?.id) {
-      const { error: profileUpdateError } = await supabase
-        .from("dinein_profiles")
-        .update({
-          role: "venue_owner",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", claimantId);
-
-      if (profileUpdateError) {
-        console.error(
-          "[dinein-api] claimant profile update failed",
-          profileUpdateError,
-        );
-      }
-    } else {
-      const { error: profileInsertError } = await supabase
-        .from("dinein_profiles")
-        .insert({ id: claimantId, role: "venue_owner" });
-
-      if (profileInsertError) {
-        console.error(
-          "[dinein-api] claimant profile insert failed",
-          profileInsertError,
-        );
-      }
-    }
-  }
+  await persistApprovedVenueLinkage(supabase, claim, approvedAt);
+  await upsertVenueOwnerProfileRole(supabase, claimantId);
 
   return ok({
     approved: true,
@@ -1937,6 +2881,8 @@ async function handleApproveClaim(
     venueStatus: "active",
     owner_assigned: claimantId != null,
     ownerAssigned: claimantId != null,
+    claim_linked: true,
+    claimLinked: true,
   });
 }
 
@@ -1967,9 +2913,39 @@ async function handleRejectClaim(
 
 async function handleGetMenuItems(
   supabase: ReturnType<typeof adminClient>,
+  req: Request,
   body: JsonRecord,
 ): Promise<Response> {
   const venueId = requireString(body, "venueId", "venue_id");
+  const { data: venueData, error: venueError } = await supabase
+    .from("dinein_venues")
+    .select("*")
+    .eq("id", venueId)
+    .maybeSingle();
+
+  if (venueError) {
+    console.error(
+      "[dinein-api] get menu items venue lookup failed",
+      venueError,
+    );
+    throw new HttpError(500, "Could not load the venue.");
+  }
+
+  const venue = asRecord(venueData);
+  if (!stringValue(venue.id)) {
+    throw new HttpError(404, "Venue not found.");
+  }
+
+  const canReadPrivate = await hasPrivateVenueAccess(
+    supabase,
+    req,
+    venueId,
+    body.venue_session,
+  );
+  if (!canReadPrivate && !isGuestVisibleVenue(venue)) {
+    throw new HttpError(404, "Venue not found.");
+  }
+
   const { data, error } = await supabase
     .from("dinein_menu_items")
     .select("*")
@@ -1982,7 +2958,15 @@ async function handleGetMenuItems(
     throw new HttpError(500, "Could not load menu items.");
   }
 
-  return ok(data ?? []);
+  const visibleItems = canReadPrivate
+    ? (data ?? [])
+    : (data ?? []).filter((item) =>
+      booleanValue(asRecord(item).is_available) ?? true
+    );
+  const hidePrice = !canReadPrivate && !canVenueAcceptGuestOrders(venue);
+  return ok(
+    visibleItems.map((item) => publicMenuItemPayload(item, { hidePrice })),
+  );
 }
 
 async function handleToggleMenuItemAvailability(
@@ -2528,6 +3512,127 @@ async function handleBackfillVenueProfiles(
   });
 }
 
+async function handleGenerateVenueProfileImage(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const venueId = requireString(body, "venueId", "venue_id");
+  const isPrivileged = decodeJwtRole(req.headers.get("Authorization")) ==
+      "service_role" || isVenueProfileImageCronInvocation(req);
+  if (!isPrivileged) {
+    await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+  }
+
+  const forceRegenerate = booleanValue(body.forceRegenerate) ?? false;
+  const forceGroundingRefresh = booleanValue(body.forceGroundingRefresh) ??
+    false;
+  const skipSearchGrounding = booleanValue(body.skipSearchGrounding) ?? false;
+  const imageClient = supabase as unknown as ReturnType<
+    typeof createVenueProfileImageAdminClient
+  >;
+  const venue = await fetchVenueForEnrichment(
+    imageClient as unknown as ReturnType<
+      typeof createVenueEnrichmentAdminClient
+    >,
+    venueId,
+  );
+
+  const result = await processVenueProfileImageGeneration({
+    adminClient: imageClient,
+    env: getVenueProfileImageEnv(),
+    venue,
+    forceRegenerate,
+    forceGroundingRefresh,
+    skipSearchGrounding,
+  });
+
+  return ok(result);
+}
+
+async function handleBackfillVenueProfileImages(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const venueId = stringValue(body.venueId) ?? stringValue(body.venue_id) ??
+    null;
+  const isServiceRole =
+    decodeJwtRole(req.headers.get("Authorization")) == "service_role";
+  const isCron = isVenueProfileImageCronInvocation(req);
+  if (venueId) {
+    if (!isServiceRole && !isCron) {
+      await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+    }
+  } else if (!isServiceRole && !isCron) {
+    await requireAdmin(supabase, req);
+  }
+
+  const forceRegenerate = booleanValue(body.forceRegenerate) ?? false;
+  const forceGroundingRefresh = booleanValue(body.forceGroundingRefresh) ??
+    false;
+  const skipSearchGrounding = booleanValue(body.skipSearchGrounding) ?? false;
+  const limit = normalizeVenueProfileImageLimit(body.limit);
+  const imageClient = supabase as unknown as ReturnType<
+    typeof createVenueProfileImageAdminClient
+  >;
+  const venues = venueId
+    ? [
+      await fetchVenueForEnrichment(
+        imageClient as unknown as ReturnType<
+          typeof createVenueEnrichmentAdminClient
+        >,
+        venueId,
+      ),
+    ]
+    : await loadVenuesForVenueImageBackfill(
+      imageClient,
+      limit,
+      forceRegenerate,
+    );
+
+  const results: JsonRecord[] = [];
+  let generated = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const venue of venues) {
+    try {
+      const result = await processVenueProfileImageGeneration({
+        adminClient: imageClient,
+        env: getVenueProfileImageEnv(),
+        venue,
+        forceRegenerate,
+        forceGroundingRefresh,
+        skipSearchGrounding,
+      });
+      results.push(result as unknown as JsonRecord);
+      if (result.status == "success") {
+        generated += 1;
+      } else {
+        skipped += 1;
+      }
+    } catch (error) {
+      failed += 1;
+      results.push({
+        venueId: venue.id,
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return ok({
+    status: "ok",
+    venueId,
+    attempted: venues.length,
+    generated,
+    skipped,
+    failed,
+    results,
+  });
+}
+
 async function loadVenuesForVenueProfileBackfill(
   supabase: ReturnType<typeof createVenueEnrichmentAdminClient>,
   limit: number,
@@ -2550,6 +3655,36 @@ async function loadVenuesForVenueProfileBackfill(
     .filter((venue) =>
       !isVenueEnrichmentInFlight(venue) &&
       venueNeedsEnrichment(venue, overwriteExisting)
+    )
+    .slice(0, limit);
+}
+
+async function loadVenuesForVenueImageBackfill(
+  supabase: ReturnType<typeof createVenueProfileImageAdminClient>,
+  limit: number,
+  forceRegenerate: boolean,
+): Promise<EnrichmentVenueRecord[]> {
+  const scanLimit = Math.max(limit * 5, limit);
+  const { data, error } = await supabase
+    .from("dinein_venues")
+    .select("*")
+    .eq("image_locked", false)
+    .order("last_enriched_at", { ascending: false })
+    .limit(Math.min(100, scanLimit));
+
+  if (error) {
+    console.error("[dinein-api] venue image backfill lookup failed", error);
+    throw new HttpError(
+      500,
+      "Could not load venues for profile image backfill.",
+    );
+  }
+
+  return ((data ?? []) as EnrichmentVenueRecord[])
+    .filter((venue) =>
+      !isVenueEnrichmentInFlight(venue) &&
+      !isVenueProfileImageGenerationInFlight(venue) &&
+      venueNeedsProfileImageGeneration(venue, forceRegenerate)
     )
     .slice(0, limit);
 }
@@ -2881,7 +4016,7 @@ async function handlePlaceOrder(
 
   const { data: venueData, error: venueError } = await supabase
     .from("dinein_venues")
-    .select("id,name,status")
+    .select("*")
     .eq("id", venueId)
     .maybeSingle();
 
@@ -2895,8 +4030,37 @@ async function handlePlaceOrder(
     throw new HttpError(404, "Venue not found.");
   }
 
-  if (stringValue(venue.status) != "active") {
-    throw new HttpError(409, "This venue is not accepting orders right now.");
+  if (!canVenueAcceptGuestOrders(venue)) {
+    throw new HttpError(
+      409,
+      "This venue is unavailable for guest ordering right now.",
+      { code: "venue_unavailable" },
+    );
+  }
+
+  if (
+    stringValue(order.payment_method) == "revolut_link" &&
+    !stringValue(venue.revolut_url)
+  ) {
+    throw new HttpError(
+      409,
+      "This venue has not configured Revolut payments yet.",
+      { code: "revolut_unavailable" },
+    );
+  }
+
+  const supportedPaymentMethods = venueSupportedPaymentMethods(venue);
+  if (
+    !supportedPaymentMethods.includes(stringValue(order.payment_method) ?? "")
+  ) {
+    throw new HttpError(
+      409,
+      "This venue does not support the selected payment method.",
+      {
+        code: "payment_method_unavailable",
+        supported_payment_methods: supportedPaymentMethods,
+      },
+    );
   }
 
   const uniqueItemIds = [
@@ -2928,6 +4092,7 @@ async function handlePlaceOrder(
       throw new HttpError(
         400,
         `Menu item "${item.menuItemId}" is not available for this venue.`,
+        { code: "menu_item_unavailable", menu_item_id: item.menuItemId },
       );
     }
 
@@ -2937,6 +4102,7 @@ async function handlePlaceOrder(
         `Menu item "${
           stringValue(menuItem.name) ?? item.menuItemId
         }" is sold out.`,
+        { code: "menu_item_sold_out", menu_item_id: item.menuItemId },
       );
     }
 
@@ -2966,25 +4132,16 @@ async function handlePlaceOrder(
   const serviceFee = roundCurrency(subtotal * 0.05);
   const total = roundCurrency(subtotal + serviceFee);
 
-  const { data, error } = await supabase
-    .from("dinein_orders")
-    .insert({
-      ...order,
-      items: normalizedItems,
-      subtotal,
-      service_fee: serviceFee,
-      total,
-      venue_name: stringValue(venue.name) ?? requireString(order, "venue_name"),
-    })
-    .select("*")
-    .single();
-
-  if (error) {
-    console.error("[dinein-api] place order failed", error);
-    throw new HttpError(500, "Could not place the order.");
-  }
-
-  const orderData = asRecord(data);
+  const orderData = await uniqueOrderInsert(supabase, {
+    ...order,
+    items: normalizedItems,
+    subtotal,
+    service_fee: serviceFee,
+    total,
+    venue_name: stringValue(venue.name) ??
+      stringValue(order.venue_name) ??
+      "Venue",
+  });
   const orderId = stringValue(orderData.id);
   const receiptToken = orderId
     ? await issueOrderReceiptToken(orderId, venueId)
@@ -3159,15 +4316,27 @@ async function handleUpdateOrderStatus(
   const status = requireString(body, "status");
 
   if (!orderStatuses.has(status)) {
-    throw new HttpError(400, `Unsupported order status: ${status}`);
+    throw new HttpError(400, `Unsupported order status: ${status}`, {
+      code: "unsupported_order_status",
+    });
   }
 
-  const venueId = await orderVenueId(supabase, orderId);
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+  const order = await orderStatusSnapshot(supabase, orderId);
+  await authorizeVenueMutation(
+    supabase,
+    req,
+    order.venueId,
+    body.venue_session,
+  );
+  assertValidOrderStatusTransition(order.status, status);
+
+  if (order.status == status) {
+    return ok(true);
+  }
 
   const { error } = await supabase
     .from("dinein_orders")
-    .update({ status })
+    .update({ status, updated_at: new Date().toISOString() })
     .eq("id", orderId);
 
   if (error) {
@@ -3195,7 +4364,7 @@ async function handleIssueVenueToken(
 
   const { data, error } = await supabase
     .from("dinein_venue_claims")
-    .select("venue_id,contact_phone,whatsapp_number,email,status,created_at")
+    .select("*")
     .eq("venue_id", venueId)
     .eq("status", "approved")
     .order("created_at", { ascending: false });
@@ -3205,10 +4374,10 @@ async function handleIssueVenueToken(
     throw new HttpError(500, "Could not verify venue access.");
   }
 
-  const hasApprovedClaim = (data ?? []).some((claim) =>
-    claimMatchesContact(asRecord(claim), lookup)
+  const approvedClaim = (data ?? []).map(asRecord).find((claim) =>
+    claimMatchesContact(claim, lookup)
   );
-  if (!hasApprovedClaim) {
+  if (!approvedClaim) {
     throw new HttpError(
       403,
       "No approved claim found for this venue and phone number.",
@@ -3224,8 +4393,102 @@ async function handleIssueVenueToken(
 
   const venueName = stringValue(asRecord(venueData ?? {}).name) ?? "";
 
-  const token = await issueVenueToken(venueId, lookup.normalized, venueName);
+  const token = await issueVenueToken(venueId, lookup.normalized, venueName, {
+    claimId: stringValue(approvedClaim.id),
+  });
+  await persistVenueAccessAudit(supabase, approvedClaim, {
+    issuedAt: token.issued_at,
+  });
   return ok(token);
+}
+
+async function handleConfirmVenueAccess(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const isServiceRole =
+    decodeJwtRole(req.headers.get("Authorization")) == "service_role";
+  const verifiedBy = isServiceRole
+    ? "service_role"
+    : await requireAdmin(supabase, req);
+
+  const contactPhone = requireString(body, "contactPhone", "contact_phone");
+  const venueId = requireString(body, "venueId", "venue_id");
+  const verificationNote = stringValue(
+    body.verificationNote ?? body.verification_note ?? body.note,
+  ) ?? "Admin confirmed venue access without OTP.";
+  const lookup = buildContactLookup(contactPhone);
+  if (lookup.kind !== "phone") {
+    throw new HttpError(400, "A valid phone number is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("dinein_venue_claims")
+    .select("*")
+    .eq("venue_id", venueId)
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(
+      "[dinein-api] confirm venue access claim lookup failed",
+      error,
+    );
+    throw new HttpError(500, "Could not verify venue access.");
+  }
+
+  const approvedClaim = (data ?? []).map(asRecord).find((claim) =>
+    claimMatchesContact(claim, lookup)
+  );
+  if (!approvedClaim) {
+    throw new HttpError(
+      404,
+      "No approved claim found for this venue and phone number.",
+    );
+  }
+
+  const { data: venueData, error: venueError } = await supabase
+    .from("dinein_venues")
+    .select("name")
+    .eq("id", venueId)
+    .maybeSingle();
+
+  if (venueError) {
+    console.error(
+      "[dinein-api] confirm venue access venue lookup failed",
+      venueError,
+    );
+    throw new HttpError(500, "Could not load the venue.");
+  }
+
+  const venueName = stringValue(asRecord(venueData ?? {}).name) ?? "";
+  const verifiedAt = new Date().toISOString();
+  const token = await issueVenueToken(venueId, lookup.normalized, venueName, {
+    claimId: stringValue(approvedClaim.id),
+    issuedAt: verifiedAt,
+  });
+  await persistVenueAccessAudit(supabase, approvedClaim, {
+    issuedAt: token.issued_at,
+    verifiedAt,
+    normalizedPhone: lookup.normalized,
+    verificationMethod: "admin_override",
+    verifiedBy,
+    verificationNote,
+  });
+
+  const nextVenue = await venueSnapshot(supabase, venueId);
+  const readiness = venueOrderingReadiness(nextVenue);
+  return ok({
+    venue_token: token,
+    verified_at: verifiedAt,
+    verification_method: "admin_override",
+    verified_by: verifiedBy,
+    verification_note: verificationNote,
+    ordering_ready: readiness.ready,
+    readiness_reasons: readiness.reasons,
+    supported_payment_methods: readiness.supportedPaymentMethods,
+  });
 }
 
 export async function handleAppRequest(req: Request): Promise<Response> {
@@ -3247,6 +4510,10 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleGetUserRole(supabase, req, body);
       case "get_venues":
         return await handleGetVenues(supabase, body);
+      case "get_claimable_venues":
+        return await handleGetClaimableVenues(supabase, body);
+      case "search_onboarding_venues":
+        return await handleSearchOnboardingVenues(supabase, body);
       case "get_all_venues":
         return await handleGetAllVenues(supabase, req, body);
       case "get_venue_by_slug":
@@ -3274,7 +4541,7 @@ export async function handleAppRequest(req: Request): Promise<Response> {
       case "reject_claim":
         return await handleRejectClaim(supabase, req, body);
       case "get_menu_items":
-        return await handleGetMenuItems(supabase, body);
+        return await handleGetMenuItems(supabase, req, body);
       case "toggle_menu_item_availability":
         return await handleToggleMenuItemAvailability(supabase, req, body);
       case "create_menu_item":
@@ -3293,6 +4560,10 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleEnrichVenueProfile(supabase, req, body);
       case "backfill_venue_profiles":
         return await handleBackfillVenueProfiles(supabase, req, body);
+      case "generate_venue_profile_image":
+        return await handleGenerateVenueProfileImage(supabase, req, body);
+      case "backfill_venue_profile_images":
+        return await handleBackfillVenueProfileImages(supabase, req, body);
       case "place_order":
         return await handlePlaceOrder(supabase, req, body);
       case "send_wave":
@@ -3311,6 +4582,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleGetOrderById(supabase, req, body);
       case "update_order_status":
         return await handleUpdateOrderStatus(supabase, req, body);
+      case "confirm_venue_access":
+        return await handleConfirmVenueAccess(supabase, req, body);
       case "issue_venue_token":
         return await handleIssueVenueToken(supabase, req, body);
       case "search_google_maps":
@@ -3334,6 +4607,10 @@ export async function handleAppRequest(req: Request): Promise<Response> {
     }
 
     if (error instanceof VenueEnrichmentHttpError) {
+      return fail(error.message, error.status, asRecord(error.details));
+    }
+
+    if (error instanceof VenueProfileImageHttpError) {
       return fail(error.message, error.status, asRecord(error.details));
     }
 

@@ -22,6 +22,7 @@ const defaultCountryCode =
 const allowMock = boolEnv("WHATSAPP_OTP_ALLOW_MOCK", false);
 const allowTextFallback = boolEnv("WHATSAPP_OTP_ALLOW_TEXT_FALLBACK", false);
 const allowTestOverride = boolEnv("WHATSAPP_OTP_ALLOW_TEST_OVERRIDE", false);
+const accessVerificationMethods = new Set(["otp", "admin_override"]);
 
 type JsonRecord = Record<string, unknown>;
 type AdminProfile = {
@@ -40,6 +41,8 @@ type VenueClaimRow = {
   contact_phone?: string | null;
   whatsapp_number?: string | null;
   status?: string | null;
+  approved_at?: string | null;
+  reviewed_at?: string | null;
   created_at?: string | null;
 };
 
@@ -70,7 +73,8 @@ function optionalEnv(name: string): string | null {
 }
 
 function getSigningSecret(primary: string, fallback?: string): string {
-  return optionalEnv(primary) ?? (fallback ? getEnv(fallback) : getEnv(primary));
+  return optionalEnv(primary) ??
+    (fallback ? getEnv(fallback) : getEnv(primary));
 }
 
 function adminClient() {
@@ -401,12 +405,97 @@ async function getAdminProfileByPhone(
   return null;
 }
 
-function claimMatchesPhone(claim: VenueClaimRow, normalizedPhone: string): boolean {
+function claimMatchesPhone(
+  claim: VenueClaimRow,
+  normalizedPhone: string,
+): boolean {
   const targetDigits = digitsOnly(normalizedPhone);
   return [
     claim.contact_phone,
     claim.whatsapp_number,
   ].some((value) => digitsOnly(value ?? "") === targetDigits);
+}
+
+function claimContactPhone(claim: VenueClaimRow): string | null {
+  return claim.contact_phone?.trim() || claim.whatsapp_number?.trim() || null;
+}
+
+function claimWhatsappNumber(claim: VenueClaimRow): string | null {
+  return claim.whatsapp_number?.trim() || claim.contact_phone?.trim() || null;
+}
+
+export function buildClaimAccessAuditUpdate(args: {
+  issuedAt: string;
+  verifiedAt?: string;
+  normalizedPhone?: string;
+  challengeId?: string;
+  verificationMethod?: string;
+  verifiedBy?: string;
+  verificationNote?: string | null;
+}): JsonRecord {
+  if (
+    args.verificationMethod &&
+    !accessVerificationMethods.has(args.verificationMethod)
+  ) {
+    throw new Error(
+      `Unsupported access verification method: ${args.verificationMethod}`,
+    );
+  }
+  return {
+    last_access_token_issued_at: args.issuedAt,
+    ...(args.verifiedAt ? { whatsapp_verified_at: args.verifiedAt } : {}),
+    ...(args.normalizedPhone
+      ? { last_verified_whatsapp_number: args.normalizedPhone }
+      : {}),
+    ...(args.challengeId ? { last_otp_challenge_id: args.challengeId } : {}),
+    ...(args.verifiedAt && args.verificationMethod
+      ? { access_verification_method: args.verificationMethod }
+      : {}),
+    ...(args.verifiedAt && args.verifiedBy
+      ? { access_verified_by: args.verifiedBy }
+      : {}),
+    ...(args.verifiedAt && args.verificationNote !== undefined
+      ? { access_verification_note: args.verificationNote }
+      : {}),
+  };
+}
+
+export function buildVenueAccessAuditUpdate(
+  claim: VenueClaimRow,
+  args: {
+    issuedAt: string;
+    verifiedAt?: string;
+    verificationMethod?: string;
+    verifiedBy?: string;
+    verificationNote?: string | null;
+  },
+): JsonRecord {
+  if (
+    args.verificationMethod &&
+    !accessVerificationMethods.has(args.verificationMethod)
+  ) {
+    throw new Error(
+      `Unsupported access verification method: ${args.verificationMethod}`,
+    );
+  }
+  return {
+    approved_claim_id: claim.id,
+    approved_at: claim.approved_at ?? claim.reviewed_at ?? args.issuedAt,
+    owner_contact_phone: claimContactPhone(claim),
+    owner_whatsapp_number: claimWhatsappNumber(claim),
+    ...(claim.claimant_id ? { owner_id: claim.claimant_id } : {}),
+    last_access_token_issued_at: args.issuedAt,
+    ...(args.verifiedAt ? { access_verified_at: args.verifiedAt } : {}),
+    ...(args.verifiedAt && args.verificationMethod
+      ? { access_verification_method: args.verificationMethod }
+      : {}),
+    ...(args.verifiedAt && args.verifiedBy
+      ? { access_verified_by: args.verifiedBy }
+      : {}),
+    ...(args.verifiedAt && args.verificationNote !== undefined
+      ? { access_verification_note: args.verificationNote }
+      : {}),
+  };
 }
 
 async function getLatestVenueClaimByPhone(
@@ -417,7 +506,7 @@ async function getLatestVenueClaimByPhone(
   const { data, error } = await supabase
     .from("dinein_venue_claims")
     .select(
-      "id, venue_id, venue_name, claimant_id, contact_phone, whatsapp_number, status, created_at",
+      "id, venue_id, venue_name, claimant_id, contact_phone, whatsapp_number, status, approved_at, reviewed_at, created_at",
     )
     .eq("status", status)
     .order("created_at", { ascending: false });
@@ -494,8 +583,9 @@ async function buildVenueSession(
   const token = await signVenueSessionJwt({
     iss: "dinein-whatsapp-otp",
     aud: "dinein-venue",
-    sub: claim.claimant_id ?? claim.venue_id,
+    sub: claim.claimant_id ?? claim.id,
     role: "venue_owner",
+    claim_id: claim.id,
     venue_id: claim.venue_id,
     phone: normalizedPhone,
     iat: Math.floor(issuedAt.getTime() / 1000),
@@ -504,6 +594,7 @@ async function buildVenueSession(
 
   return {
     access_token: token,
+    claim_id: claim.id,
     venue_id: claim.venue_id,
     venue_name:
       (typeof venueData.name === "string" && venueData.name.trim().length > 0)
@@ -516,6 +607,46 @@ async function buildVenueSession(
     issued_at: issuedAt.toISOString(),
     expires_at: expiresAt.toISOString(),
   };
+}
+
+async function persistVenueClaimVerification(
+  supabase: ReturnType<typeof adminClient>,
+  claim: VenueClaimRow,
+  args: {
+    issuedAt: string;
+    verifiedAt: string;
+    normalizedPhone: string;
+    challengeId: string;
+    verificationMethod: string;
+    verifiedBy: string;
+    verificationNote?: string | null;
+  },
+): Promise<void> {
+  const { error: claimError } = await supabase
+    .from("dinein_venue_claims")
+    .update(buildClaimAccessAuditUpdate(args))
+    .eq("id", claim.id);
+
+  if (claimError) {
+    console.error(
+      "[whatsapp-otp] claim verification audit update failed",
+      claimError,
+    );
+    throw new Error("Could not persist venue claim verification.");
+  }
+
+  const { error: venueError } = await supabase
+    .from("dinein_venues")
+    .update(buildVenueAccessAuditUpdate(claim, args))
+    .eq("id", claim.venue_id);
+
+  if (venueError) {
+    console.error(
+      "[whatsapp-otp] venue verification audit update failed",
+      venueError,
+    );
+    throw new Error("Could not persist venue access linkage.");
+  }
 }
 
 async function buildOnboardingMenuToken(normalizedPhone: string) {
@@ -858,6 +989,7 @@ async function handleVerify(
   let venueSession: JsonRecord | null = null;
   let onboardingMenuToken: JsonRecord | null = null;
   let claimStatus: "approved" | "pending" | "not_found" | null = null;
+  let approvedClaim: VenueClaimRow | null = null;
   if (data.app_scope === "admin") {
     const adminProfile = await getAdminProfileByPhone(
       supabase,
@@ -878,7 +1010,7 @@ async function handleVerify(
       return errorResponse("Admin OTP session is not configured.", 500);
     }
   } else if (data.app_scope === "venue") {
-    const approvedClaim = await getLatestVenueClaimByPhone(
+    approvedClaim = await getLatestVenueClaimByPhone(
       supabase,
       normalizedPhone,
       "approved",
@@ -912,17 +1044,43 @@ async function handleVerify(
     }
   }
 
-  await supabase
+  const verifiedAt = new Date().toISOString();
+  const { error: consumeError } = await supabase
     .from(tableName)
     .update({
-      consumed_at: new Date().toISOString(),
+      consumed_at: verifiedAt,
     })
     .eq("id", data.id as string);
+
+  if (consumeError) {
+    console.error("[whatsapp-otp] verify consume update failed", consumeError);
+    return errorResponse("Could not finalize the WhatsApp verification.", 500);
+  }
+
+  if (approvedClaim && venueSession?.issued_at) {
+    try {
+      await persistVenueClaimVerification(supabase, approvedClaim, {
+        issuedAt: venueSession.issued_at as string,
+        verifiedAt,
+        normalizedPhone,
+        challengeId: verificationId,
+        verificationMethod: "otp",
+        verifiedBy: normalizedPhone,
+        verificationNote: "Verified via WhatsApp OTP.",
+      });
+    } catch (error) {
+      console.error(
+        "[whatsapp-otp] venue verification persistence failed",
+        error,
+      );
+      return errorResponse("Could not persist venue access verification.", 500);
+    }
+  }
 
   return jsonResponse(200, {
     success: true,
     verified: true,
-    verifiedAt: new Date().toISOString(),
+    verifiedAt,
     ...(adminSession == null ? {} : { adminSession }),
     ...(venueSession == null ? {} : { venueSession }),
     ...(onboardingMenuToken == null ? {} : { onboardingMenuToken }),
