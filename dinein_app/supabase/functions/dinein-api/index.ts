@@ -87,6 +87,7 @@ let firebaseMessagingAccessTokenCache:
 let missingFirebaseMessagingConfigLogged = false;
 
 type JsonRecord = Record<string, unknown>;
+type CountryCode = "MT" | "RW";
 type VenuePushNotificationPayload = {
   title: string;
   body: string;
@@ -205,6 +206,27 @@ function stringValue(value: unknown): string | undefined {
     return String(value);
   }
   return undefined;
+}
+
+function normalizeCountryCode(
+  value: unknown,
+  fallback: CountryCode = "MT",
+): CountryCode {
+  const normalized = stringValue(value)?.toUpperCase();
+  if (normalized == "RW") return "RW";
+  if (normalized == "MT") return "MT";
+  return fallback;
+}
+
+function requestCountryCode(
+  body: JsonRecord,
+  fallback: CountryCode = "MT",
+): CountryCode {
+  return normalizeCountryCode(body.country ?? body.country_code, fallback);
+}
+
+function countryLabel(code: CountryCode): string {
+  return code == "RW" ? "Rwanda" : "Malta";
 }
 
 function numberValue(value: unknown): number | undefined {
@@ -2108,7 +2130,10 @@ async function verifyOrderReceiptToken(
   return stringValue(claims?.sub) == orderId;
 }
 
-function sanitizeVenueDraft(rawDraft: unknown): JsonRecord {
+function sanitizeVenueDraft(
+  rawDraft: unknown,
+  fallbackCountry: CountryCode = "MT",
+): JsonRecord {
   const draft = asRecord(rawDraft);
   const name = requireString(draft, "name");
 
@@ -2126,9 +2151,7 @@ function sanitizeVenueDraft(rawDraft: unknown): JsonRecord {
       stringValue(draft.websiteUrl) ?? null,
     image_url: stringValue(draft.image_url) ?? stringValue(draft.imageUrl) ??
       null,
-    country: (stringValue(draft.country) ?? "MT").toUpperCase() == "RW"
-      ? "RW"
-      : "MT",
+    country: normalizeCountryCode(draft.country, fallbackCountry),
     status: "pending_claim",
   };
 }
@@ -2287,8 +2310,7 @@ function sanitizeVenueUpdates(
     }
 
     if ("country" in updates) {
-      sanitized.country =
-        requireString(updates, "country").toUpperCase() == "RW" ? "RW" : "MT";
+      sanitized.country = normalizeCountryCode(updates.country);
     }
 
     const rating = numberValue(updates.rating);
@@ -2877,6 +2899,7 @@ async function assertVenueDraftDoesNotConflict(
 async function findUnavailableOnboardingVenueMatch(
   supabase: ReturnType<typeof adminClient>,
   query: string,
+  countryCode: CountryCode,
 ): Promise<JsonRecord | null> {
   const searchQuery = normalizeVenueSearchQuery(query);
   if (!searchQuery) return null;
@@ -2884,6 +2907,7 @@ async function findUnavailableOnboardingVenueMatch(
   const { data, error } = await supabase
     .from("dinein_venues")
     .select("id, name, slug, status, owner_id, approved_claim_id")
+    .eq("country", countryCode)
     .in("status", ["active", "pending_claim", "pending_activation"])
     .or(buildVenueSearchOrClause(searchQuery))
     .order("name", { ascending: true })
@@ -2969,11 +2993,13 @@ async function handleGetVenues(
   supabase: ReturnType<typeof adminClient>,
   body: JsonRecord,
 ): Promise<Response> {
+  const countryCode = requestCountryCode(body);
   const limit = normalizeListLimit(body.limit);
   const offset = normalizeListOffset(body.offset);
   const { data, error } = await supabase
     .from("dinein_venues")
     .select("*")
+    .eq("country", countryCode)
     .neq("status", "deleted")
     .neq("status", "suspended");
 
@@ -3010,6 +3036,7 @@ async function handleGetClaimableVenues(
   supabase: ReturnType<typeof adminClient>,
   body: JsonRecord,
 ): Promise<Response> {
+  const countryCode = requestCountryCode(body);
   const limit = normalizeListLimit(body.limit);
   const offset = normalizeListOffset(body.offset);
   const searchQuery = normalizeVenueSearchQuery(
@@ -3019,6 +3046,7 @@ async function handleGetClaimableVenues(
   let query = supabase
     .from("dinein_venues")
     .select("*")
+    .eq("country", countryCode)
     .eq("status", "active")
     .is("owner_id", null)
     .is("approved_claim_id", null)
@@ -3047,6 +3075,7 @@ async function handleSearchOnboardingVenues(
   supabase: ReturnType<typeof adminClient>,
   body: JsonRecord,
 ): Promise<Response> {
+  const countryCode = requestCountryCode(body);
   const searchQuery = normalizeVenueSearchQuery(
     body.query ?? body.search ?? body.term,
   );
@@ -3061,6 +3090,7 @@ async function handleSearchOnboardingVenues(
   const { data, error } = await supabase
     .from("dinein_venues")
     .select("*")
+    .eq("country", countryCode)
     .eq("status", "active")
     .is("owner_id", null)
     .is("approved_claim_id", null)
@@ -3078,6 +3108,7 @@ async function handleSearchOnboardingVenues(
   const blockedMatch = await findUnavailableOnboardingVenueMatch(
     supabase,
     searchQuery,
+    countryCode,
   );
 
   return ok({
@@ -3092,12 +3123,14 @@ async function handleGetAllVenues(
   body: JsonRecord,
 ): Promise<Response> {
   await requireAdmin(supabase, req);
+  const countryCode = requestCountryCode(body);
 
   const limit = normalizeListLimit(body.limit);
   const offset = normalizeListOffset(body.offset);
   let query = supabase
     .from("dinein_venues")
     .select("*")
+    .eq("country", countryCode)
     .order("created_at", { ascending: false });
   if (limit != null) {
     query = query.range(offset, offset + limit - 1);
@@ -3118,10 +3151,12 @@ async function handleGetVenueBySlug(
   body: JsonRecord,
 ): Promise<Response> {
   const slug = requireString(body, "slug");
+  const countryCode = requestCountryCode(body);
 
   const { data, error } = await supabase
     .from("dinein_venues")
     .select("*")
+    .eq("country", countryCode)
     .eq("slug", slug)
     .maybeSingle();
 
@@ -3158,10 +3193,12 @@ async function handleGetVenueById(
   body: JsonRecord,
 ): Promise<Response> {
   const venueId = requireString(body, "venueId", "venue_id");
+  const countryCode = requestCountryCode(body);
 
   const { data, error } = await supabase
     .from("dinein_venues")
     .select("*")
+    .eq("country", countryCode)
     .eq("id", venueId)
     .maybeSingle();
 
@@ -3193,11 +3230,13 @@ async function handleGetVenueForOwner(
   body: JsonRecord,
 ): Promise<Response> {
   const ownerId = requireString(body, "ownerId", "owner_id");
+  const countryCode = requestCountryCode(body);
   await requireSelfOrAdmin(supabase, req, ownerId);
 
   const { data, error } = await supabase
     .from("dinein_venues")
     .select("*")
+    .eq("country", countryCode)
     .eq("owner_id", ownerId)
     .maybeSingle();
 
@@ -3317,7 +3356,10 @@ async function handleCreatePendingClaimVenue(
     );
   }
 
-  const sanitizedDraft = sanitizeVenueDraft(body.draft);
+  const sanitizedDraft = sanitizeVenueDraft(
+    body.draft,
+    requestCountryCode(body),
+  );
   await assertVenueDraftDoesNotConflict(supabase, sanitizedDraft);
   const created = await uniqueVenueInsert(supabase, sanitizedDraft);
   return ok(created, 201);
@@ -4716,9 +4758,7 @@ async function handleSearchGoogleMaps(
     recordGoogleMapsSearchRateLimit(rateLimitKey, nowMs);
   }
 
-  // Keep the public onboarding search scoped to Malta to reduce abuse and
-  // accidental cross-market matches.
-  const country = "Malta";
+  const country = countryLabel(requestCountryCode(body));
   const models = (
     Deno.env.get("GEMINI_VENUE_MODELS") ??
       "gemini-2.5-flash,gemini-2.5-flash-lite"

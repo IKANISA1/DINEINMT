@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../config/country_runtime.dart';
+
 class SupportContactService {
   SupportContactService._();
 
-  static const whatsAppNumber = '35699711145';
+  static String get defaultWhatsAppNumber =>
+      CountryRuntime.config.supportWhatsApp;
 
-  static Uri get _appUri => Uri.parse('whatsapp://send?phone=$whatsAppNumber');
-  static Uri get _webUri => Uri.parse('https://wa.me/$whatsAppNumber');
+  static Future<void> contactSupport(
+    BuildContext context, {
+    String? whatsAppNumber,
+  }) async {
+    final resolvedWhatsAppNumber = whatsAppNumber ?? defaultWhatsAppNumber;
+    final appUri = Uri.parse('whatsapp://send?phone=$resolvedWhatsAppNumber');
+    final webUri = Uri.parse('https://wa.me/$resolvedWhatsAppNumber');
 
-  static Future<void> contactSupport(BuildContext context) async {
     try {
       final launched = await launchUrl(
-        _appUri,
+        appUri,
         mode: LaunchMode.externalApplication,
       );
       if (launched || !context.mounted) return;
@@ -22,7 +29,7 @@ class SupportContactService {
 
     try {
       final launched = await launchUrl(
-        _webUri,
+        webUri,
         mode: LaunchMode.externalApplication,
       );
       if (launched || !context.mounted) return;

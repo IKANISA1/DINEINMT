@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../core/config/country_runtime.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/services/auth_repository.dart';
 import '../../../core/services/whatsapp_otp_service.dart';
@@ -76,14 +77,25 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
   }
 
   bool get _isCoolingDown => _cooldownSeconds > 0;
-  String get _localPhone =>
-      normalizeMaltesePhoneLocalInput(_phoneController.text);
-  String get _fullPhone => _localPhone.isEmpty ? '' : '+356$_localPhone';
+  String get _countryCode => CountryRuntime.config.defaultCountryCode;
+  String get _dialCode => CountryRuntime.config.countryDialCode;
+  int get _expectedPhoneLength =>
+      CountryRuntime.config.country.code == 'RW' ? 10 : 8;
+  String get _localPhone => normalizePhoneLocalInput(
+    _phoneController.text,
+    countryCode: _countryCode,
+    maxDigits: _expectedPhoneLength,
+  );
+  String get _fullPhone => _localPhone.isEmpty ? '' : '$_dialCode$_localPhone';
   String get _otpCode => _otpControllers.map((c) => c.text).join();
   bool get _canSendOtp =>
       !_isLoading &&
       !_isCoolingDown &&
-      isValidMaltesePhoneLocalInput(_phoneController.text);
+      isValidPhoneLocalInput(
+        _phoneController.text,
+        countryCode: _countryCode,
+        expectedLength: _expectedPhoneLength,
+      );
 
   String _entryReturnPath(BuildContext context) {
     final candidate = GoRouterState.of(
@@ -116,8 +128,15 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
 
   Future<void> _sendOtp() async {
     if (_isCoolingDown) return;
-    if (!isValidMaltesePhoneLocalInput(_phoneController.text)) {
-      setState(() => _error = 'Enter your 8-digit Maltese phone number.');
+    if (!isValidPhoneLocalInput(
+      _phoneController.text,
+      countryCode: _countryCode,
+      expectedLength: _expectedPhoneLength,
+    )) {
+      setState(
+        () => _error =
+            'Enter your ${_expectedPhoneLength}-digit ${CountryRuntime.config.country.label} phone number.',
+      );
       return;
     }
 
@@ -343,7 +362,8 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         ),
         const SizedBox(height: 16),
 
-        MaltaPhoneInput(
+        CountryPhoneInput.fromConfig(
+          config: CountryRuntime.config,
           controller: _phoneController,
           onSubmitted: _canSendOtp ? _sendOtp : null,
           onChanged: (_) => setState(() {}),

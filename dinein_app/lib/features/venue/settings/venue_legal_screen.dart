@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/config/country_config.dart';
+import '../../../core/config/country_config_provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
@@ -17,29 +19,31 @@ import '../../../shared/widgets/shared_widgets.dart';
 class VenueLegalScreen extends ConsumerWidget {
   const VenueLegalScreen({super.key});
 
-  static const _policies = [
+  static List<_PolicyItem> _buildPolicies(CountryConfig config) => [
     _PolicyItem(
       icon: LucideIcons.fileText,
       title: 'Terms of Service',
       updatedLabel: 'UPDATED MAR 2026',
-      url: 'https://dineinmt.ikanisa.com/terms.html',
+      url: config.termsUrl,
     ),
     _PolicyItem(
       icon: LucideIcons.shield,
       title: 'Privacy Policy',
       updatedLabel: 'UPDATED MAR 2026',
-      url: 'https://dineinmt.ikanisa.com/privacy.html',
+      url: config.privacyPolicyUrl,
     ),
     _PolicyItem(
       icon: LucideIcons.info,
       title: 'Cookie Policy',
       updatedLabel: 'UPDATED MAR 2026',
-      url: 'https://dineinmt.ikanisa.com/privacy.html',
+      url: config.cookiePolicyUrl,
     ),
   ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(countryConfigProvider);
+    final policies = _buildPolicies(config);
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final venueAsync = ref.watch(currentVenueProvider);
@@ -105,8 +109,8 @@ class VenueLegalScreen extends ConsumerWidget {
               const SizedBox(height: AppTheme.space6),
 
               // ─── Policy Tiles ───
-              ...List.generate(_policies.length, (i) {
-                final policy = _policies[i];
+              ...List.generate(policies.length, (i) {
+                final policy = policies[i];
                 // Cycle icon color: primary, secondary, secondary-dim
                 final iconColors = [
                   cs.primary,

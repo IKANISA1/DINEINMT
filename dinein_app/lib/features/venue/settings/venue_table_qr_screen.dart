@@ -16,6 +16,7 @@ import '../../../core/providers/providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/config/country_config_provider.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 import 'venue_table_qr_pdf.dart';
 
@@ -115,9 +116,11 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
           );
         }
 
+        final config = ref.read(countryConfigProvider);
         final entry = buildVenueTableQrEntries(
           venue: venue,
           tableCount: _tableNumber,
+          config: config,
         ).last;
 
         return ListView(

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../core/config/country_config.dart';
 import '../../../core/constants/app_download_links.dart';
 import '../../../core/models/models.dart';
 
@@ -26,6 +27,7 @@ class VenueTableQrEntry {
 List<VenueTableQrEntry> buildVenueTableQrEntries({
   required Venue venue,
   required int tableCount,
+  required CountryConfig config,
 }) {
   return List.generate(tableCount, (index) {
     final tableNumber = index + 1;
@@ -35,11 +37,13 @@ List<VenueTableQrEntry> buildVenueTableQrEntries({
       redirectUri: buildVenueTableDownloadRedirectUri(
         slug: venue.slug,
         tableNumber: tableNumberText,
+        config: config,
         venueName: venue.name,
       ),
       deepLinkUri: buildVenueTableDeepLinkUri(
         slug: venue.slug,
         tableNumber: tableNumberText,
+        config: config,
       ),
     );
   });
@@ -53,16 +57,18 @@ String buildVenueTableQrFilename(Venue venue, {DateTime? now}) {
 Future<Uint8List> buildVenueTableQrPdfBytes({
   required Venue venue,
   required int tableCount,
+  required CountryConfig config,
   Uint8List? brandImageBytes,
 }) async {
   final entries = buildVenueTableQrEntries(
     venue: venue,
     tableCount: tableCount,
+    config: config,
   );
   final doc = pw.Document(
     title: '${venue.name} table QR pack',
-    author: 'DineIn Malta',
-    creator: 'DineIn Malta venue tools',
+    author: config.appName,
+    creator: '${config.appName} venue tools',
     subject: 'Printable QR code pack for venue tables',
   );
   final brandImage = brandImageBytes == null
@@ -76,12 +82,13 @@ Future<Uint8List> buildVenueTableQrPdfBytes({
         margin: const pw.EdgeInsets.all(24),
         build: (_) => pw.Column(
           children: [
-            _buildPageRow(pageEntries.take(2).toList(), venue, brandImage),
+            _buildPageRow(pageEntries.take(2).toList(), venue, brandImage, config),
             pw.SizedBox(height: 16),
             _buildPageRow(
               pageEntries.skip(2).take(2).toList(),
               venue,
               brandImage,
+              config,
             ),
           ],
         ),
@@ -96,6 +103,7 @@ pw.Widget _buildPageRow(
   List<VenueTableQrEntry> entries,
   Venue venue,
   pw.MemoryImage? brandImage,
+  CountryConfig config,
 ) {
   return pw.Expanded(
     child: pw.Row(
@@ -110,7 +118,7 @@ pw.Widget _buildPageRow(
             ),
             child: entry == null
                 ? pw.SizedBox.expand()
-                : _buildQrCard(entry, venue, brandImage),
+                : _buildQrCard(entry, venue, brandImage, config),
           ),
         );
       }),
@@ -122,6 +130,7 @@ pw.Widget _buildQrCard(
   VenueTableQrEntry entry,
   Venue venue,
   pw.MemoryImage? brandImage,
+  CountryConfig config,
 ) {
   final gold = PdfColor.fromInt(0xFFE1C28E);
   final brandGold = PdfColor.fromInt(0xFF8B7A3D);
@@ -172,7 +181,7 @@ pw.Widget _buildQrCard(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text(
-                    'DINEIN MALTA',
+                    config.appTitle,
                     style: pw.TextStyle(
                       color: gold,
                       fontSize: 9,
@@ -271,7 +280,7 @@ pw.Widget _buildQrCard(
             borderRadius: pw.BorderRadius.circular(16),
           ),
           child: pw.Text(
-            'Smart redirect · dineinmalta.com/download',
+            'Smart redirect · ${config.siteHost}/download',
             textAlign: pw.TextAlign.center,
             style: pw.TextStyle(
               color: gold,

@@ -582,6 +582,75 @@ Deno.test({
 });
 
 Deno.test({
+  name: "search_google_maps scopes the prompt to Rwanda when requested",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    resetGoogleMapsSearchRateLimitState();
+    Deno.env.set("GEMINI_API_KEY", "test-gemini-key");
+
+    mockFetch(async (req) => {
+      if (req.url.includes("generativelanguage.googleapis.com")) {
+        const payload = await req.json();
+        const prompt = payload.contents?.[0]?.parts?.[0]?.text as
+          | string
+          | undefined;
+        assertStringIncludes(prompt ?? "", "Country: Rwanda");
+
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text:
+                        '[{"name":"Kigali Table","address":"Kigali","category":"Restaurants"}]',
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "CF-Connecting-IP": "198.51.100.21",
+          "User-Agent": "DineInOnboarding/1.0",
+        },
+        body: JSON.stringify({
+          action: "search_google_maps",
+          query: "kigali dinner",
+          country: "RW",
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+      const body = await res.json();
+      assertEquals(Array.isArray(body.data), true);
+      assertEquals(body.data.length, 1);
+    } finally {
+      restoreFetch();
+      resetGoogleMapsSearchRateLimitState();
+      Deno.env.delete("GEMINI_API_KEY");
+    }
+  },
+});
+
+Deno.test({
   name:
     "get_menu_items - guest only receives available items and hidden prices for browse-only venues",
   sanitizeOps: false,
@@ -1250,6 +1319,7 @@ Deno.test({
       if (req.url.includes("/rest/v1/dinein_venues")) {
         const decodedUrl = decodeURIComponent(req.url);
         requestedClaimableFeed = true;
+        assertStringIncludes(decodedUrl, "country=eq.RW");
         assertStringIncludes(decodedUrl, "status=eq.active");
         assertStringIncludes(decodedUrl, "owner_id=is.null");
         assertStringIncludes(decodedUrl, "approved_claim_id=is.null");
@@ -1282,6 +1352,7 @@ Deno.test({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "get_claimable_venues",
+          country: "RW",
           query: "azure",
           limit: 5,
         }),
@@ -1310,6 +1381,7 @@ Deno.test({
       if (req.url.includes("/rest/v1/dinein_venues")) {
         const decodedUrl = decodeURIComponent(req.url);
         if (decodedUrl.includes("owner_id=is.null")) {
+          assertStringIncludes(decodedUrl, "country=eq.RW");
           assertStringIncludes(decodedUrl, "approved_claim_id=is.null");
           return new Response(JSON.stringify([]), { status: 200 });
         }
@@ -1319,6 +1391,7 @@ Deno.test({
             "select=id,name,slug,status,owner_id,approved_claim_id",
           )
         ) {
+          assertStringIncludes(decodedUrl, "country=eq.RW");
           return new Response(
             JSON.stringify([
               {
@@ -1344,6 +1417,7 @@ Deno.test({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "search_onboarding_venues",
+          country: "RW",
           query: "Azure Bar",
         }),
       });

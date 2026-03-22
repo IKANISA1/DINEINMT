@@ -1,0 +1,7 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.profile-rw.xcconfig"
+#include "Generated.xcconfig"
+
+APP_FLAVOR=rw
+APP_BUNDLE_IDENTIFIER=com.dineinrw.app
+APP_ENTITLEMENTS_PATH=Runner/Runner.rw.entitlements
+APP_FIREBASE_PLIST=Runner/GoogleService-Info-rw.plist

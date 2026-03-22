@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../core/config/country_runtime.dart';
 import '../../../core/constants/enums.dart';
 
 import '../../../core/providers/permission_providers.dart';
@@ -79,7 +80,6 @@ class _VenueOnboardingFlowState extends ConsumerState<VenueOnboardingFlow>
   final _phoneCtrl = TextEditingController();
   final _otpCtrls = List.generate(6, (_) => TextEditingController());
   final _otpFocus = List.generate(6, (_) => FocusNode());
-  final String _countryCode = '+356';
   String _otpStep = 'phone'; // phone | otp | submitted
   bool _isLoading = false;
   String? _error;
@@ -747,21 +747,34 @@ class _VenueOnboardingFlowState extends ConsumerState<VenueOnboardingFlow>
   }
 
   // ─── STEP 4: OTP ───
-  String get _localPhone => normalizeMaltesePhoneLocalInput(_phoneCtrl.text);
+  String get _countryCode => CountryRuntime.config.defaultCountryCode;
+  int get _expectedPhoneLength =>
+      CountryRuntime.config.country == Country.rw ? 10 : 8;
+  String get _localPhone => normalizePhoneLocalInput(
+    _phoneCtrl.text,
+    countryCode: _countryCode,
+    maxDigits: _expectedPhoneLength,
+  );
 
   String get _normalizedPhone {
     final local = _localPhone;
     if (local.isEmpty) return '';
-    final cc = _countryCode.replaceAll(RegExp(r'[^0-9]'), '');
-    return '+$cc$local';
+    return '${CountryRuntime.config.countryDialCode}$local';
   }
 
-  bool get _canSendOtp => !_isLoading && _localPhone.length == 8;
+  bool get _canSendOtp =>
+      !_isLoading &&
+      isValidPhoneLocalInput(
+        _phoneCtrl.text,
+        countryCode: _countryCode,
+        expectedLength: _expectedPhoneLength,
+      );
 
   Future<void> _sendOtp() async {
     if (!_canSendOtp) {
       setState(() {
-        _error = 'Enter your 8-digit Maltese phone number.';
+        _error =
+            'Enter your ${_expectedPhoneLength}-digit ${CountryRuntime.config.country.label} phone number.';
       });
       return;
     }
@@ -1877,7 +1890,8 @@ class _VenueOnboardingFlowState extends ConsumerState<VenueOnboardingFlow>
           ),
         ),
         const SizedBox(height: AppTheme.space4),
-        MaltaPhoneInput(
+        CountryPhoneInput.fromConfig(
+          config: CountryRuntime.config,
           controller: _phoneCtrl,
           onSubmitted: _canSendOtp ? _sendOtp : null,
           onChanged: (_) => setState(() {}),
@@ -2789,7 +2803,7 @@ class _MenuItemCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${Country.mt.currencySymbol}${item.price.toStringAsFixed(2)}',
+                  '${CountryRuntime.config.country.currencySymbol}${item.price.toStringAsFixed(2)}',
                   style: tt.titleMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                     fontWeight: FontWeight.w700,

@@ -18,10 +18,20 @@ class FirebaseRuntimeService {
   }
 
   static Future<bool> _initialize() async {
+    try {
+      await Firebase.initializeApp();
+      _initialized = true;
+      _initializing = null;
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint('[firebase] Native initialization unavailable: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+
     if (!DefaultFirebaseOptions.hasCurrentPlatformConfig) {
       debugPrint(
-        '[firebase] Initialization skipped: platform config is missing or '
-        'still contains placeholder values.',
+        '[firebase] Initialization skipped: native config is unavailable and '
+        'fallback firebase_options.dart does not contain usable values.',
       );
       _initializing = null;
       return false;
@@ -35,7 +45,7 @@ class FirebaseRuntimeService {
       _initializing = null;
       return true;
     } catch (error, stackTrace) {
-      debugPrint('[firebase] Initialization failed: $error');
+      debugPrint('[firebase] Fallback initialization failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       _initializing = null;
       return false;

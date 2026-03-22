@@ -35,3 +35,36 @@ jobs:
 
       - name: Run Flutter tests
         run: flutter test
+
+  release-tooling:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [mt, rw]
+    defaults:
+      run:
+        working-directory: dinein_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate release scripts syntax
+        run: |
+          bash -n scripts/build_android_release.sh
+          bash -n scripts/build_ios_release.sh
+          bash -n scripts/render_app_links.sh
+          bash -n scripts/smoke_live_backend.sh
+          bash -n scripts/validate_release_integrations.sh
+
+      - name: Render app-link artifacts
+        env:
+          PLAY_APP_SIGNING_SHA256: AA:BB:CC:DD:EE:FF
+          APPLE_TEAM_ID: ABCDE12345
+        run: |
+          tmp_dir="$(mktemp -d)"
+          ./scripts/render_app_links.sh --flavor "${{ matrix.flavor }}" --output-dir "${tmp_dir}"
+          ./scripts/validate_release_integrations.sh \
+            --flavor "${{ matrix.flavor }}" \
+            --android-only \
+            --well-known-dir "${tmp_dir}"

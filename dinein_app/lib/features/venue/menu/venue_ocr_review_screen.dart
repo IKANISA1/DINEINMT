@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../../core/constants/enums.dart';
+import '../../../core/config/country_runtime.dart';
 import '../../../core/models/onboarding_draft_models.dart';
 import '../../../core/services/menu_repository.dart';
 import '../../../core/services/onboarding_draft_service.dart';
@@ -302,7 +302,7 @@ class _VenueOcrReviewScreenState extends State<VenueOcrReviewScreen> {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      '${Country.mt.currencySymbol}${item.price.toStringAsFixed(2)}',
+                                      '${CountryRuntime.config.country.currencySymbol}${item.price.toStringAsFixed(2)}',
                                       style: tt.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w800,
                                       ),

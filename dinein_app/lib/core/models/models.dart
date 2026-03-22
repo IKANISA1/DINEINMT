@@ -601,6 +601,7 @@ class OrderItem extends Equatable {
 class Order extends Equatable {
   final String id;
   final String? orderNumber;
+  final Country country;
   final String venueId;
   final String venueName;
   final String? venueImageUrl;
@@ -620,6 +621,7 @@ class Order extends Equatable {
   const Order({
     required this.id,
     this.orderNumber,
+    this.country = Country.mt,
     required this.venueId,
     required this.venueName,
     this.venueImageUrl,
@@ -642,6 +644,9 @@ class Order extends Equatable {
       id: json['id'] as String,
       orderNumber:
           json['order_number'] as String? ?? json['orderNumber'] as String?,
+      country: Country.fromCode(
+        json['country'] as String? ?? json['venue_country'] as String? ?? 'MT',
+      ),
       venueId: json['venue_id'] as String,
       venueName: json['venue_name'] as String,
       venueImageUrl: json['venue_image_url'] as String?,
@@ -667,6 +672,7 @@ class Order extends Equatable {
   }
 
   Map<String, dynamic> toJson() => {
+    'country': country.code,
     'venue_id': venueId,
     'venue_name': venueName,
     'venue_image_url': venueImageUrl,
@@ -702,15 +708,14 @@ class Order extends Equatable {
     return derived > 0 ? derived : 0;
   }
 
-  /// Currency symbol derived from venue country.
-  /// Currently Malta-only; when multi-country is added,
-  /// store country on the order and derive from that.
-  String get currencySymbol => Country.mt.currencySymbol;
+  /// Currency symbol derived from the order venue country.
+  String get currencySymbol => country.currencySymbol;
 
   @override
   List<Object?> get props => [
     id,
     orderNumber,
+    country,
     venueId,
     venueImageUrl,
     total,

@@ -41,38 +41,69 @@ cp env/release.example.json env/release.json
 flutter build appbundle --release --dart-define-from-file=env/release.json
 ```
 
+For flavor-specific builds:
+
+```bash
+cp env/release.mt.example.json env/release.mt.json
+cp env/release.rw.example.json env/release.rw.json
+flutter build appbundle --release --flavor mt -t lib/main_mt.dart --dart-define-from-file=env/release.mt.json
+flutter build appbundle --release --flavor rw -t lib/main_rw.dart --dart-define-from-file=env/release.rw.json
+```
+
 For a guarded one-command Android release flow:
 
 ```bash
-./scripts/build_android_release.sh
+./scripts/build_android_release.sh --flavor mt
+./scripts/build_android_release.sh --flavor rw
+```
+
+For iOS release builds:
+
+```bash
+cp ios/Runner/GoogleService-Info-rw.plist.example ios/Runner/GoogleService-Info-rw.plist
+# replace the placeholder values above with the real Rwanda Firebase iOS app config
+
+./scripts/build_ios_release.sh --flavor mt
+./scripts/build_ios_release.sh --flavor rw
 ```
 
 For a live backend sanity check against the hosted Supabase project:
 
 ```bash
-./scripts/smoke_live_backend.sh
+./scripts/smoke_live_backend.sh --flavor mt
+./scripts/smoke_live_backend.sh --flavor rw
 ```
 
 For platform release integration checks before store submission:
 
 ```bash
-./scripts/validate_release_integrations.sh
+./scripts/validate_release_integrations.sh --flavor mt
+./scripts/validate_release_integrations.sh --flavor rw --android-only
 ```
+
+The Rwanda iOS path is scaffolded in-repo but still needs a real
+`ios/Runner/GoogleService-Info-rw.plist` before `--flavor rw` iOS archives can
+be produced. The committed `.example` file is intentionally non-secret and
+non-buildable.
 
 The project now reads Android signing values from `android/key.properties` or
 the environment variables `ANDROID_KEYSTORE_FILE`,
 `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and
 `ANDROID_KEY_PASSWORD`.
 
-The production deep-link host is `https://dineinmalta.com/v/{slug}`. Publish
-the app-link artifacts from `landing/.well-known/` to the domain's
-`.well-known/` directory before testing verified links on devices. Generate
-those files with:
+The production deep-link hosts are `https://dineinmalta.com/v/{slug}` for Malta
+and `https://dineinrw.ikanisa.com/v/{slug}` for Rwanda. Publish the app-link
+artifacts to each domain's `.well-known/` directory before testing verified
+links on devices. Generate those files with:
 
 ```bash
 PLAY_APP_SIGNING_SHA256="AA:BB:..." \
 APPLE_TEAM_ID="ABCDE12345" \
-./scripts/render_app_links.sh
+./scripts/render_app_links.sh --flavor mt
+
+PLAY_APP_SIGNING_SHA256="AA:BB:..." \
+APPLE_TEAM_ID="ABCDE12345" \
+./scripts/render_app_links.sh --flavor rw --output-dir ../landing-rw/.well-known
 ```
 
 ## Supabase Backend

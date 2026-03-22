@@ -9,6 +9,7 @@ import '../../../core/models/models.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/config/country_config_provider.dart';
 import '../../../core/constants/enums.dart';
 import '../../../core/providers/cart_provider.dart';
 import '../../../core/providers/providers.dart';
@@ -151,9 +152,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       final placed = await OrderRepository.instance.placeOrder(order);
 
       if (method == PaymentMethod.revolutLink) {
+        final config = ref.read(countryConfigProvider);
         final rawUrl = cart.venueRevolutUrl?.trim().isNotEmpty == true
             ? cart.venueRevolutUrl!.trim()
-            : 'https://revolut.me/dineinmalta';
+            : (config.revolutPayUrl ?? 'https://revolut.me/dinein');
         final url = Uri.parse(rawUrl);
         if (await canLaunchUrl(url)) {
           await launchUrl(url, mode: LaunchMode.externalApplication);

@@ -3,13 +3,54 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd "${script_dir}/.." && pwd)"
-env_file="${project_dir}/env/release.json"
 key_properties="${project_dir}/android/key.properties"
 
 skip_checks=false
-if [[ "${1:-}" == "--skip-checks" ]]; then
-  skip_checks=true
+flavor="mt"
+env_file=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-checks)
+      skip_checks=true
+      shift
+      ;;
+    --flavor)
+      flavor="${2:-}"
+      shift 2
+      ;;
+    --env-file)
+      env_file="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+case "$flavor" in
+  mt|rw)
+    ;;
+  *)
+    echo "Unsupported flavor: $flavor" >&2
+    echo "Use --flavor mt or --flavor rw." >&2
+    exit 1
+    ;;
+esac
+
+if [[ -z "$env_file" ]]; then
+  if [[ -f "${project_dir}/env/release.${flavor}.json" ]]; then
+    env_file="${project_dir}/env/release.${flavor}.json"
+  else
+    env_file="${project_dir}/env/release.json"
+  fi
 fi
+
+entrypoint="lib/main_${flavor}.dart"
+apk_path="build/app/outputs/flutter-apk/app-${flavor}-release.apk"
+bundle_path="build/app/outputs/bundle/${flavor}Release/app-${flavor}-release.aab"
 
 require_file() {
   local path="$1"
@@ -42,14 +83,21 @@ if [[ "${skip_checks}" != "true" ]]; then
   flutter test
 fi
 
-flutter build apk --release --dart-define-from-file=env/release.json
-flutter build appbundle --release --dart-define-from-file=env/release.json
+flutter build apk \
+  --release \
+  --flavor "${flavor}" \
+  -t "${entrypoint}" \
+  --dart-define-from-file="${env_file}"
+flutter build appbundle \
+  --release \
+  --flavor "${flavor}" \
+  -t "${entrypoint}" \
+  --dart-define-from-file="${env_file}"
 
 echo
-echo "Release artifacts"
-ls -lh build/app/outputs/flutter-apk/app-release.apk \
-  build/app/outputs/bundle/release/app-release.aab
+echo "Release artifacts (${flavor})"
+ls -lh "${apk_path}" "${bundle_path}"
 echo
 shasum -a 256 \
-  build/app/outputs/flutter-apk/app-release.apk \
-  build/app/outputs/bundle/release/app-release.aab
+  "${apk_path}" \
+  "${bundle_path}"

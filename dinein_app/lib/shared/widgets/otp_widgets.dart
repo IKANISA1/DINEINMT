@@ -2,40 +2,69 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../core/config/country_config.dart';
+import '../../core/constants/enums.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import 'pressable_scale.dart';
 
-const _maltaCountryCodeDigits = '356';
-
-String normalizeMaltesePhoneLocalInput(String value) {
+/// Normalize phone input — strips country code prefix, limits to [maxDigits].
+String normalizePhoneLocalInput(
+  String value, {
+  String countryCode = '356',
+  int maxDigits = 8,
+}) {
   var digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-  if (digits.startsWith('00$_maltaCountryCodeDigits')) {
-    digits = digits.substring(5);
-  } else if (digits.startsWith(_maltaCountryCodeDigits) && digits.length > 8) {
-    digits = digits.substring(3);
+  if (digits.startsWith('00$countryCode')) {
+    digits = digits.substring(2 + countryCode.length);
+  } else if (digits.startsWith(countryCode) && digits.length > maxDigits) {
+    digits = digits.substring(countryCode.length);
   }
-
-  if (digits.length > 8) {
-    digits = digits.substring(0, 8);
+  if (digits.length > maxDigits) {
+    digits = digits.substring(0, maxDigits);
   }
-
   return digits;
 }
 
-bool isValidMaltesePhoneLocalInput(String value) =>
-    normalizeMaltesePhoneLocalInput(value).length == 8 &&
-    !normalizeMaltesePhoneLocalInput(value).startsWith(_maltaCountryCodeDigits);
+/// Legacy alias for Malta.
+String normalizeMaltesePhoneLocalInput(String value) =>
+    normalizePhoneLocalInput(value, countryCode: '356', maxDigits: 8);
 
-class MaltesePhoneTextInputFormatter extends TextInputFormatter {
-  const MaltesePhoneTextInputFormatter();
+bool isValidPhoneLocalInput(
+  String value, {
+  String countryCode = '356',
+  int expectedLength = 8,
+}) {
+  final n = normalizePhoneLocalInput(
+    value,
+    countryCode: countryCode,
+    maxDigits: expectedLength,
+  );
+  return n.length == expectedLength && !n.startsWith(countryCode);
+}
+
+/// Legacy alias for Malta.
+bool isValidMaltesePhoneLocalInput(String value) =>
+    isValidPhoneLocalInput(value, countryCode: '356', expectedLength: 8);
+
+class PhoneTextInputFormatter extends TextInputFormatter {
+  final String countryCode;
+  final int maxDigits;
+  const PhoneTextInputFormatter({
+    this.countryCode = '356',
+    this.maxDigits = 8,
+  });
 
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final normalized = normalizeMaltesePhoneLocalInput(newValue.text);
+    final normalized = normalizePhoneLocalInput(
+      newValue.text,
+      countryCode: countryCode,
+      maxDigits: maxDigits,
+    );
     return TextEditingValue(
       text: normalized,
       selection: TextSelection.collapsed(offset: normalized.length),
@@ -44,26 +73,61 @@ class MaltesePhoneTextInputFormatter extends TextInputFormatter {
   }
 }
 
+/// Legacy alias.
+typedef MaltesePhoneTextInputFormatter = PhoneTextInputFormatter;
+
 // ─────────────────────────────────────────────────────────────
-// MaltaPhoneInput — 🇲🇹 +356 country code pill + phone field
+// CountryPhoneInput — configurable country code pill + phone field
 // ─────────────────────────────────────────────────────────────
 
 /// Split country-code + phone number input matching the DineIn design system.
 ///
-/// Renders a non-editable 🇲🇹 +356 pill on the left and a dark rounded
+/// Renders a non-editable country pill on the left and a dark rounded
 /// phone number field on the right. The [controller] value contains only
 /// the local part (no country code).
-class MaltaPhoneInput extends StatelessWidget {
+class CountryPhoneInput extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback? onSubmitted;
   final ValueChanged<String>? onChanged;
+  final String countryFlag;
+  final String dialCode;
+  final String hintText;
+  final String countryCode;
+  final int maxDigits;
 
-  const MaltaPhoneInput({
+  const CountryPhoneInput({
     super.key,
     required this.controller,
     this.onSubmitted,
     this.onChanged,
+    this.countryFlag = '🇲🇹',
+    this.dialCode = '+356',
+    this.hintText = '9912 3456',
+    this.countryCode = '356',
+    this.maxDigits = 8,
   });
+
+  /// Create from a [CountryConfig].
+  factory CountryPhoneInput.fromConfig({
+    Key? key,
+    required CountryConfig config,
+    required TextEditingController controller,
+    VoidCallback? onSubmitted,
+    ValueChanged<String>? onChanged,
+  }) {
+    final isRw = config.country == Country.rw;
+    return CountryPhoneInput(
+      key: key,
+      controller: controller,
+      onSubmitted: onSubmitted,
+      onChanged: onChanged,
+      countryFlag: config.countryFlag,
+      dialCode: config.countryDialCode,
+      hintText: isRw ? '078 123 4567' : '9912 3456',
+      countryCode: config.defaultCountryCode,
+      maxDigits: isRw ? 10 : 8,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,10 +149,10 @@ class MaltaPhoneInput extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('🇲🇹', style: TextStyle(fontSize: 22)),
+              Text(countryFlag, style: const TextStyle(fontSize: 22)),
               const SizedBox(width: 10),
               Text(
-                '+356',
+                dialCode,
                 style: tt.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                   fontSize: 22,
@@ -134,9 +198,14 @@ class MaltaPhoneInput extends StatelessWidget {
                   fontSize: 22,
                   letterSpacing: 1,
                 ),
-                inputFormatters: [const MaltesePhoneTextInputFormatter()],
+                inputFormatters: [
+                  PhoneTextInputFormatter(
+                    countryCode: countryCode,
+                    maxDigits: maxDigits,
+                  ),
+                ],
                 decoration: InputDecoration(
-                  hintText: '9912 3456',
+                  hintText: hintText,
                   hintStyle: tt.titleLarge?.copyWith(
                     fontWeight: FontWeight.w500,
                     fontSize: 22,
@@ -156,6 +225,9 @@ class MaltaPhoneInput extends StatelessWidget {
     );
   }
 }
+
+/// Legacy alias for backward compatibility.
+typedef MaltaPhoneInput = CountryPhoneInput;
 
 // ─────────────────────────────────────────────────────────────
 // OtpPillFields — 6 individual pill-shaped digit inputs

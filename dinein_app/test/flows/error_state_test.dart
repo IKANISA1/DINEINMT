@@ -1,3 +1,4 @@
+import 'package:dinein_app/core/config/country_config.dart';
 import 'package:dinein_app/core/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
@@ -103,7 +104,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(430, 932));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      await tester.pumpWidget(const ProviderScope(child: DineInApp()));
+      await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
       await tester.pump();
 
       appRouter.goNamed(
@@ -128,7 +129,7 @@ void main() {
     testWidgets('admin overview redirects to login when not authenticated', (
       tester,
     ) async {
-      await tester.pumpWidget(const ProviderScope(child: DineInApp()));
+      await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
       await tester.pump();
 
       appRouter.go(AppRoutePaths.adminOverview);
@@ -146,7 +147,7 @@ void main() {
     testWidgets('admin claims redirects to login when not authenticated', (
       tester,
     ) async {
-      await tester.pumpWidget(const ProviderScope(child: DineInApp()));
+      await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
       await tester.pump();
 
       appRouter.go(AppRoutePaths.adminClaims);

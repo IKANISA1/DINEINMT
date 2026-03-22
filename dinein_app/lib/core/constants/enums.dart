@@ -41,17 +41,20 @@ enum OrderStatus {
   }
 }
 
-/// Payment methods (Malta market).
-/// - Revolut link opens outside app (no API)
+/// Payment methods per market.
+/// - Revolut link opens outside app (Malta, no API)
+/// - MoMo USSD launches outside app (Rwanda, no API)
 /// - Cash always available.
 enum PaymentMethod {
   cash,
-  revolutLink;
+  revolutLink,
+  momoUssd;
 
   String get label {
     return switch (this) {
       PaymentMethod.cash => 'Cash',
       PaymentMethod.revolutLink => 'Revolut',
+      PaymentMethod.momoUssd => 'MoMo',
     };
   }
 
@@ -59,6 +62,7 @@ enum PaymentMethod {
     return switch (this) {
       PaymentMethod.cash => 'Pay at the venue',
       PaymentMethod.revolutLink => 'Pay via Revolut link',
+      PaymentMethod.momoUssd => 'Pay via MoMo mobile money',
     };
   }
 
@@ -67,6 +71,7 @@ enum PaymentMethod {
     return switch (this) {
       PaymentMethod.cash => 'cash',
       PaymentMethod.revolutLink => 'revolut_link',
+      PaymentMethod.momoUssd => 'momo_ussd',
     };
   }
 
@@ -74,31 +79,61 @@ enum PaymentMethod {
   static PaymentMethod fromString(String value) {
     return switch (value) {
       'revolut_link' => PaymentMethod.revolutLink,
+      'momo_ussd' => PaymentMethod.momoUssd,
       _ => PaymentMethod.cash,
     };
   }
 }
 
-/// Supported country — Malta only.
+/// Supported countries.
 /// Country is auto-derived from venue context, never manually picked.
 enum Country {
-  mt;
+  mt,
+  rw;
 
-  String get label => 'Malta';
+  String get label {
+    return switch (this) {
+      Country.mt => 'Malta',
+      Country.rw => 'Rwanda',
+    };
+  }
 
-  String get code => 'MT';
+  String get code {
+    return switch (this) {
+      Country.mt => 'MT',
+      Country.rw => 'RW',
+    };
+  }
 
-  String get currency => 'EUR';
+  String get currency {
+    return switch (this) {
+      Country.mt => 'EUR',
+      Country.rw => 'RWF',
+    };
+  }
 
-  String get currencySymbol => '€';
+  String get currencySymbol {
+    return switch (this) {
+      Country.mt => '€',
+      Country.rw => 'FRw',
+    };
+  }
 
-  /// Available payment methods.
+  /// Available payment methods per country.
   List<PaymentMethod> get paymentMethods {
-    return [PaymentMethod.cash, PaymentMethod.revolutLink];
+    return switch (this) {
+      Country.mt => [PaymentMethod.cash, PaymentMethod.revolutLink],
+      Country.rw => [PaymentMethod.cash, PaymentMethod.momoUssd],
+    };
   }
 
   /// Parse from database country code.
-  static Country fromCode(String code) => Country.mt;
+  static Country fromCode(String code) {
+    return switch (code.toUpperCase()) {
+      'RW' => Country.rw,
+      _ => Country.mt,
+    };
+  }
 }
 
 /// Venue status.

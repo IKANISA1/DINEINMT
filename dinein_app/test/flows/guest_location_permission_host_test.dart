@@ -1,3 +1,4 @@
+import 'package:dinein_app/core/config/country_config.dart';
 import 'package:dinein_app/core/providers/permission_providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
@@ -32,7 +33,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [appPermissionServiceProvider.overrideWithValue(service)],
-        child: const DineInApp(),
+        child: DineInApp(config: CountryConfig.mt),
       ),
     );
     await tester.pump();
@@ -58,7 +59,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [appPermissionServiceProvider.overrideWithValue(service)],
-        child: const DineInApp(),
+        child: DineInApp(config: CountryConfig.mt),
       ),
     );
     await tester.pump();

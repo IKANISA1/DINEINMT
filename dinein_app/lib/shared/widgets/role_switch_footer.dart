@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../core/config/country_config_provider.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/app_theme.dart';
 import 'pressable_scale.dart';
@@ -15,7 +17,7 @@ enum ActiveRole { guest, venue, admin }
 /// direct role switcher between profile contexts.
 ///
 /// Includes the DINEIN MALTA version footer text beneath the icons.
-class RoleSwitchFooter extends StatelessWidget {
+class RoleSwitchFooter extends ConsumerWidget {
   /// Which role the containing screen represents.
   final ActiveRole currentRole;
 
@@ -33,7 +35,8 @@ class RoleSwitchFooter extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(countryConfigProvider);
     final icons = currentRole == ActiveRole.guest
         ? [
             _RoleIconData(
@@ -110,7 +113,7 @@ class RoleSwitchFooter extends StatelessWidget {
               .slideY(begin: 0.1, end: 0, duration: 300.ms),
           const SizedBox(height: AppTheme.space3),
           Text(
-            'DINEIN MALTA V1.0.0',
+            '${config.appTitle} V1.0.0',
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,

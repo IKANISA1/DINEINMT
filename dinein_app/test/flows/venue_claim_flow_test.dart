@@ -1,3 +1,5 @@
+import 'package:dinein_app/core/config/country_config.dart';
+import 'package:dinein_app/core/config/country_config_provider.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/main.dart';
@@ -16,7 +18,12 @@ void main() {
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: DineInApp()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [countryConfigProvider.overrideWithValue(CountryConfig.mt)],
+        child: DineInApp(config: CountryConfig.mt),
+      ),
+    );
     await tester.pump();
   }
 

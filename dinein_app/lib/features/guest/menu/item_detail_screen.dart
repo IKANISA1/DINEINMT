@@ -7,9 +7,9 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/config/country_config_provider.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/cart_provider.dart';
-import '../../../core/providers/providers.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
 /// Full-page item detail screen — exact match of React ItemDetail.tsx.
@@ -46,11 +46,12 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
   }
 
   Future<void> _shareItem(MenuItem item) async {
+    final config = ref.read(countryConfigProvider);
     await SharePlus.instance.share(
       ShareParams(
-        title: '${item.name} on DineIn',
+        title: '${item.name} on DINEIN',
         text:
-            'Check out ${item.name} on DineIn Malta.\n'
+            'Check out ${item.name} on ${config.appTitle}.\n'
             '${item.description}\n'
             'Price: ${ref.read(cartProvider).currencySymbol}${item.price.toStringAsFixed(2)}',
       ),

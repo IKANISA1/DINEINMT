@@ -1,4 +1,5 @@
 import '../models/models.dart';
+import '../config/country_runtime.dart';
 import 'google_places_service.dart';
 
 typedef DiscoverPlacesSearch =
@@ -111,11 +112,15 @@ class DiscoverAssistantService {
   Future<DiscoverAssistantResult> explore({
     required String query,
     required List<Venue> venues,
+    String? countryName,
   }) async {
     final cleanedQuery = query.trim();
     if (cleanedQuery.isEmpty) {
       throw ArgumentError('Query must not be empty.');
     }
+    final resolvedCountryName = countryName?.trim().isNotEmpty == true
+        ? countryName!.trim()
+        : CountryRuntime.config.country.label;
 
     final dineInMatches = _buildLocalMatches(cleanedQuery, venues);
 
@@ -124,7 +129,9 @@ class DiscoverAssistantService {
 
     if (_googleMapsEnabled) {
       try {
-        final references = await _placesSearch(_scopeGoogleQuery(cleanedQuery));
+        final references = await _placesSearch(
+          _scopeGoogleQuery(cleanedQuery, countryName: resolvedCountryName),
+        );
         final localNames = dineInMatches
             .map((match) => _normalize(match.title))
             .toSet();
@@ -333,7 +340,7 @@ class DiscoverAssistantService {
   }) {
     if (dineInMatches.isNotEmpty && googleMapsMatches.isNotEmpty) {
       return 'I found ${dineInMatches.length} bookable DINEIN matches and '
-          '${googleMapsMatches.length} live Google Maps references for "$query" in Malta.';
+          '${googleMapsMatches.length} live Google Maps references for "$query".';
     }
 
     if (dineInMatches.isNotEmpty) {
@@ -345,7 +352,7 @@ class DiscoverAssistantService {
 
     if (googleMapsMatches.isNotEmpty) {
       return 'I could not find a strong DINEIN match for "$query" yet, but '
-          'Google Maps returned ${googleMapsMatches.length} live references in Malta.';
+          'Google Maps returned ${googleMapsMatches.length} live references.';
     }
 
     return 'I could not find a strong match for "$query" yet. Try a broader prompt like '
@@ -367,10 +374,13 @@ class DiscoverAssistantService {
     return 'No external Google Maps references were needed for this query.';
   }
 
-  String _scopeGoogleQuery(String query) {
+  String _scopeGoogleQuery(String query, {String? countryName}) {
+    final resolvedCountryName = countryName?.trim().isNotEmpty == true
+        ? countryName!.trim()
+        : CountryRuntime.config.country.label;
     final normalized = _normalize(query);
-    if (normalized.contains('malta')) return query;
-    return '$query in Malta';
+    if (normalized.contains(resolvedCountryName.toLowerCase())) return query;
+    return '$query in $resolvedCountryName';
   }
 
   String _normalize(String value) {

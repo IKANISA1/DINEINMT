@@ -1,3 +1,4 @@
+import 'package:dinein_app/core/config/country_config.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/services/auth_repository.dart';
@@ -18,7 +19,7 @@ void main() {
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: DineInApp()));
+    await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
     await tester.pump();
   }
 

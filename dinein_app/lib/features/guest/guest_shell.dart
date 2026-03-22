@@ -1,17 +1,19 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../core/constants/app_download_links.dart';
+import '../../core/config/country_config.dart';
+import '../../core/config/country_config_provider.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/shared_widgets.dart';
 
-class GuestShell extends StatelessWidget {
+class GuestShell extends ConsumerWidget {
   final Widget child;
 
   const GuestShell({super.key, required this.child});
@@ -28,7 +30,7 @@ class GuestShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final index = _currentIndex(context);
 
     return Scaffold(
@@ -48,20 +50,21 @@ class GuestShell extends StatelessWidget {
   }
 }
 
-class _TopAppBar extends StatelessWidget {
+class _TopAppBar extends ConsumerWidget {
   const _TopAppBar();
 
-  Future<void> _shareApp() async {
+  Future<void> _shareApp(CountryConfig config) async {
     await SharePlus.instance.share(
       ShareParams(
-        title: 'DINEIN Malta',
-        text: 'Discover venues on DINEIN Malta.\nhttps://$dineInSiteHost',
+        title: config.appTitle,
+        text: 'Discover venues on ${config.appTitle}.\nhttps://${config.siteHost}',
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(countryConfigProvider);
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
@@ -106,7 +109,7 @@ class _TopAppBar extends StatelessWidget {
                   const Spacer(),
                   _AppBarIcon(
                     icon: LucideIcons.share2,
-                    onTap: () => _shareApp(),
+                    onTap: () => _shareApp(config),
                   ),
                   const SizedBox(width: 8),
                   _AppBarIcon(

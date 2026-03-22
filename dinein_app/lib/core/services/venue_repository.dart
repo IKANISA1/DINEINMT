@@ -1,5 +1,6 @@
 import '../models/models.dart';
 import '../models/onboarding_draft_models.dart';
+import '../config/country_runtime.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 
@@ -161,6 +162,7 @@ class VenueRepository {
           'image_url': draft.imageUrl,
           'contact_phone': draft.contactPhone,
           'website_url': draft.websiteUrl,
+          'country': CountryRuntime.config.country.code,
         },
         if (draft.contactPhone != null) 'contactPhone': draft.contactPhone,
         if (draft.contactEmail != null) 'email': draft.contactEmail,
@@ -207,7 +209,7 @@ class VenueRepository {
   Future<List<Map<String, dynamic>>> searchGoogleMaps(String query) async {
     final data = await DineinApiService.invoke(
       'search_google_maps',
-      payload: {'query': query, 'country': 'Malta'},
+      payload: {'query': query},
     );
     return _normalizeGoogleResults(data);
   }

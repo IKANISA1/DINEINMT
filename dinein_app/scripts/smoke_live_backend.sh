@@ -3,8 +3,48 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd "${script_dir}/.." && pwd)"
-release_env_json="${project_dir}/env/release.json"
+flavor="mt"
+release_env_json=""
 project_ref="${SUPABASE_PROJECT_REF:-uskfnszcdqpcfrhjxitl}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --flavor)
+      flavor="${2:-}"
+      shift 2
+      ;;
+    --env-file)
+      release_env_json="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$release_env_json" ]]; then
+  if [[ -f "${project_dir}/env/release.${flavor}.json" ]]; then
+    release_env_json="${project_dir}/env/release.${flavor}.json"
+  else
+    release_env_json="${project_dir}/env/release.json"
+  fi
+fi
+
+case "$flavor" in
+  mt)
+    unauthorized_phone='+35699999999'
+    ;;
+  rw)
+    unauthorized_phone='+250788000000'
+    ;;
+  *)
+    echo "Unsupported flavor: $flavor" >&2
+    echo "Use --flavor mt or --flavor rw." >&2
+    exit 1
+    ;;
+esac
 
 extract_release_value() {
   local symbol="$1"
@@ -148,7 +188,7 @@ pass 'unauthenticated get_user_role is rejected'
 
 run_check \
   'update_venue' \
-  "{\"action\":\"update_venue\",\"venueId\":\"${first_venue_id}\",\"updates\":{\"status\":\"active\"},\"venue_session\":{\"venue_id\":\"${first_venue_id}\",\"contact_phone\":\"+35699999999\"}}" \
+  "{\"action\":\"update_venue\",\"venueId\":\"${first_venue_id}\",\"updates\":{\"status\":\"active\"},\"venue_session\":{\"venue_id\":\"${first_venue_id}\",\"contact_phone\":\"${unauthorized_phone}\"}}" \
   '403' \
   'venue_session_error' \
   >/dev/null

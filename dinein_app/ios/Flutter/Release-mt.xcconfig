@@ -1,0 +1,7 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release-mt.xcconfig"
+#include "Generated.xcconfig"
+
+APP_FLAVOR=mt
+APP_BUNDLE_IDENTIFIER=com.dineinmalta.app
+APP_ENTITLEMENTS_PATH=Runner/Runner.mt.entitlements
+APP_FIREBASE_PLIST=Runner/GoogleService-Info-mt.plist

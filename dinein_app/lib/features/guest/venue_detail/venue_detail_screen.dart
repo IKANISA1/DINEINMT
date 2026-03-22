@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/constants/app_download_links.dart';
+import '../../../core/config/country_config_provider.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/cart_provider.dart';
 import '../../../core/providers/providers.dart';
@@ -32,11 +33,12 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
   bool _isSaved = false;
 
   Uri _venueLink(Venue venue) {
+    final config = ref.read(countryConfigProvider);
     final table = widget.tableNumber?.trim();
     if (table != null && table.isNotEmpty) {
-      return buildVenueTableDeepLinkUri(slug: venue.slug, tableNumber: table);
+      return buildVenueTableDeepLinkUri(slug: venue.slug, tableNumber: table, config: config);
     }
-    return buildVenueDeepLinkUri(slug: venue.slug);
+    return buildVenueDeepLinkUri(slug: venue.slug, config: config);
   }
 
   void _openMenu(Venue venue) {
@@ -682,7 +684,7 @@ class _ShareVenueDialogState extends State<_ShareVenueDialog> {
       ShareParams(
         title: '${widget.venue.name} on DINEIN',
         text:
-            'Check out ${widget.venue.name} on DINEIN Malta.\n'
+            'Check out ${widget.venue.name} on DINEIN.\n'
             '${widget.shareUri}',
       ),
     );

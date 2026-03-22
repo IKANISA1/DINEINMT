@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../core/constants/enums.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/constants/enums.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/services/order_repository.dart';
@@ -262,7 +262,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                 ...order.items.map(
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: AppTheme.space3),
-                    child: _buildItemCard(cs, tt, item),
+                    child: _buildItemCard(cs, tt, item, order.currencySymbol),
                   ),
                 ),
                 const SizedBox(height: AppTheme.space5),
@@ -504,7 +504,12 @@ class VenueOrderDetailScreen extends ConsumerWidget {
   }
 
   /// Item card with quantity badge, name, per-unit price, total, and optional note alert.
-  Widget _buildItemCard(ColorScheme cs, TextTheme tt, OrderItem item) {
+  Widget _buildItemCard(
+    ColorScheme cs,
+    TextTheme tt,
+    OrderItem item,
+    String currencySymbol,
+  ) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.space4),
       decoration: BoxDecoration(
@@ -548,7 +553,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      '${Country.mt.currencySymbol}${item.price.toStringAsFixed(2)} each',
+                      '$currencySymbol${item.price.toStringAsFixed(2)} each',
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ],
@@ -556,7 +561,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
               ),
               // Total
               Text(
-                '${Country.mt.currencySymbol}${item.subtotal.toStringAsFixed(2)}',
+                '$currencySymbol${item.subtotal.toStringAsFixed(2)}',
                 style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),
               ),
             ],

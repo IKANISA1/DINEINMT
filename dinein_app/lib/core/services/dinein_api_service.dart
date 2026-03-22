@@ -1,4 +1,5 @@
 import 'auth_repository.dart';
+import '../config/country_runtime.dart';
 import 'supabase_config.dart';
 
 /// Thin wrapper around the deployed `dinein-api` edge function.
@@ -13,6 +14,7 @@ class DineinApiService {
     final headers = <String, String>{};
     final bodyPayload = <String, dynamic>{
       'action': action,
+      'country': CountryRuntime.config.country.code,
       if (payload != null) ...payload,
     };
 

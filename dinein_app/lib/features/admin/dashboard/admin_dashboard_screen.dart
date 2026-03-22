@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/constants/enums.dart';
+import '../../../core/config/country_runtime.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
@@ -103,7 +104,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                                 o.createdAt.year == today.year,
                           )
                           .fold<double>(0, (sum, o) => sum + o.total);
-                      final cs = Country.mt.currencySymbol;
+                      final cs = CountryRuntime.config.country.currencySymbol;
                       return '$cs${todayRevenue.toStringAsFixed(0)} total';
                     },
                   ),
@@ -136,7 +137,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                         0,
                         (sum, o) => sum + o.total,
                       );
-                      final cs = Country.mt.currencySymbol;
+                      final cs = CountryRuntime.config.country.currencySymbol;
                       return '$cs${total.toStringAsFixed(0)} lifetime';
                     },
                   ),

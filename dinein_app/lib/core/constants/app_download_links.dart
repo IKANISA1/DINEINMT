@@ -1,32 +1,38 @@
+import '../config/country_config.dart';
 import '../router/app_routes.dart';
 
-const dineInSiteHost = 'dineinmalta.com';
-const dineInGooglePlayUrl =
-    'https://play.google.com/store/apps/details?id=com.dineinmalta.app';
-
-Uri buildVenueDeepLinkUri({required String slug}) {
-  return Uri.https(dineInSiteHost, '/v/$slug');
+/// Build a venue deep link URI using the active country config.
+Uri buildVenueDeepLinkUri({
+  required String slug,
+  required CountryConfig config,
+}) {
+  return Uri.https(config.siteHost, '/v/$slug');
 }
 
+/// Build a venue + table deep link URI.
 Uri buildVenueTableDeepLinkUri({
   required String slug,
   required String tableNumber,
+  required CountryConfig config,
 }) {
-  return Uri.https(dineInSiteHost, '/v/$slug', {
+  return Uri.https(config.siteHost, '/v/$slug', {
     AppRouteParams.table: tableNumber,
   });
 }
 
+/// Build a smart download redirect URI.
 Uri buildVenueTableDownloadRedirectUri({
   required String slug,
   required String tableNumber,
+  required CountryConfig config,
   String? venueName,
 }) {
   final target = buildVenueTableDeepLinkUri(
     slug: slug,
     tableNumber: tableNumber,
+    config: config,
   );
-  return Uri.https(dineInSiteHost, '/download/', {
+  return Uri.https(config.siteHost, '/download/', {
     'slug': slug,
     'target': target.toString(),
     AppRouteParams.table: tableNumber,

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../config/country_runtime.dart';
 import '../models/models.dart';
 import '../constants/enums.dart';
 
@@ -67,12 +68,15 @@ class CartState {
   double get total => subtotal + serviceFee;
   bool get isEmpty => items.isEmpty;
 
-  /// Currency symbol for the venue's country (defaults to €).
-  String get currencySymbol => venueCountry?.currencySymbol ?? '€';
+  /// Currency symbol for the venue's country (defaults to the active app country).
+  String get currencySymbol =>
+      venueCountry?.currencySymbol ??
+      CountryRuntime.config.country.currencySymbol;
 
   /// Payment methods available for the venue's country.
   List<PaymentMethod> get paymentMethods =>
-      venueCountry?.paymentMethods ?? Country.mt.paymentMethods;
+      venueCountry?.paymentMethods ??
+      CountryRuntime.config.country.paymentMethods;
 
   CartState copyWith({
     String? venueId,

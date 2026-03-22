@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/country_config.dart';
+import '../../../core/config/country_config_provider.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
-class GuestSettingsScreen extends StatelessWidget {
+class GuestSettingsScreen extends ConsumerWidget {
   const GuestSettingsScreen({super.key});
 
   Future<void> _launchExternal(BuildContext context, Uri uri) async {
@@ -28,8 +31,8 @@ class GuestSettingsScreen extends StatelessWidget {
     ).showSnackBar(const SnackBar(content: Text('Could not open that link.')));
   }
 
-  Future<void> _openWhatsApp(BuildContext context) async {
-    const phoneNumber = '35699711145';
+  Future<void> _openWhatsApp(BuildContext context, CountryConfig config) async {
+    final phoneNumber = config.supportWhatsApp;
     final appUri = Uri.parse('whatsapp://send?phone=$phoneNumber');
     final webUri = Uri.parse('https://wa.me/$phoneNumber');
 
@@ -46,9 +49,10 @@ class GuestSettingsScreen extends StatelessWidget {
     await _launchExternal(context, webUri);
   }
 
-  void _showAboutSheet(BuildContext context) {
+  void _showAboutSheet(BuildContext context, CountryConfig config) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final countryName = config.country.label;
 
     showModalBottomSheet(
       context: context,
@@ -79,7 +83,7 @@ class GuestSettingsScreen extends StatelessWidget {
             ),
             const SizedBox(height: AppTheme.space6),
             Text(
-              'DINEIN is a dine-in only ordering platform connecting guests with Malta\'s finest restaurants. '
+              'DINEIN is a dine-in only ordering platform connecting guests with $countryName\'s finest restaurants. '
               'Scan a QR code, browse the menu, and place your order from your table.',
               textAlign: TextAlign.center,
               style: tt.bodyMedium?.copyWith(
@@ -92,7 +96,7 @@ class GuestSettingsScreen extends StatelessWidget {
               children: [
                 _InfoChip(
                   icon: LucideIcons.mapPin,
-                  label: 'Malta',
+                  label: countryName,
                   cs: cs,
                   tt: tt,
                 ),
@@ -128,7 +132,8 @@ class GuestSettingsScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(countryConfigProvider);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         AppTheme.space6,
@@ -139,7 +144,7 @@ class GuestSettingsScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _ProfileHeaderCard()
+          _ProfileHeaderCard(welcomeMessage: config.welcomeMessage)
               .animate()
               .fadeIn(duration: 400.ms)
               .slideY(begin: 0.05),
@@ -170,7 +175,7 @@ class GuestSettingsScreen extends StatelessWidget {
           _SettingsTile(
                 icon: LucideIcons.messageSquare,
                 title: 'Get in Touch',
-                onTap: () => _openWhatsApp(context),
+                onTap: () => _openWhatsApp(context, config),
               )
               .animate()
               .fadeIn(delay: 180.ms, duration: 320.ms)
@@ -179,7 +184,7 @@ class GuestSettingsScreen extends StatelessWidget {
           _SettingsTile(
                 icon: LucideIcons.info,
                 title: 'About DINEIN',
-                onTap: () => _showAboutSheet(context),
+                onTap: () => _showAboutSheet(context, config),
               )
               .animate()
               .fadeIn(delay: 210.ms, duration: 320.ms)
@@ -190,7 +195,7 @@ class GuestSettingsScreen extends StatelessWidget {
                 title: 'Privacy Policy',
                 onTap: () => _launchExternal(
                   context,
-                  Uri.parse('https://dineinmt.ikanisa.com/privacy.html'),
+                  Uri.parse(config.privacyPolicyUrl),
                 ),
               )
               .animate()
@@ -205,7 +210,8 @@ class GuestSettingsScreen extends StatelessWidget {
 }
 
 class _ProfileHeaderCard extends StatelessWidget {
-  const _ProfileHeaderCard();
+  final String welcomeMessage;
+  const _ProfileHeaderCard({required this.welcomeMessage});
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +264,7 @@ class _ProfileHeaderCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'WELCOME TO DINEIN MALTA',
+            welcomeMessage,
             style: TextStyle(
               color: cs.onSurfaceVariant.withValues(alpha: 0.68),
               fontSize: 12,

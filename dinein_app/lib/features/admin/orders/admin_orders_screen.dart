@@ -516,6 +516,7 @@ class _OrderFeedCard extends StatelessWidget {
       return switch (order.paymentMethod) {
         PaymentMethod.revolutLink => LucideIcons.creditCard,
         PaymentMethod.cash => LucideIcons.banknote,
+        PaymentMethod.momoUssd => LucideIcons.smartphone,
       };
     }
 

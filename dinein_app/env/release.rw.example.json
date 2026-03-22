@@ -1,0 +1,7 @@
+{
+  "SUPABASE_URL": "https://your-rwanda-project.supabase.co",
+  "SUPABASE_ANON_KEY": "your-rwanda-supabase-anon-key",
+  "WHATSAPP_OTP_FUNCTION_NAME": "whatsapp-otp",
+  "DEFAULT_WHATSAPP_COUNTRY_CODE": "250",
+  "WHATSAPP_OTP_ALLOW_LOCAL_MOCK": "false"
+}
