@@ -1,0 +1,74 @@
+import 'package:dinein_app/core/models/models.dart';
+import 'package:dinein_app/core/providers/providers.dart';
+import 'package:dinein_app/features/venue/settings/venue_profile_screen.dart';
+import 'package:dinein_app/features/venue/settings/venue_table_qr_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  const venue = Venue(
+    id: 'venue_1',
+    name: 'Ocean Pearl',
+    slug: 'ocean-pearl',
+    category: 'Seafood',
+    description: 'Seafront dining.',
+    address: '45 Tower Rd, Sliema, Malta',
+    phone: '+356 2123 4567',
+    revolutUrl: 'https://revolut.me/oceanpearl',
+  );
+
+  Widget buildHarness(Widget child) {
+    return ProviderScope(
+      overrides: [currentVenueProvider.overrideWith((ref) async => venue)],
+      child: MaterialApp(home: Scaffold(body: child)),
+    );
+  }
+
+  testWidgets('venue profile screen renders screenshot-aligned controls', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildHarness(const VenueProfileScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Venue Profile'), findsOneWidget);
+    expect(find.text('UPDATE COVER'), findsOneWidget);
+    expect(find.text('SAVE CHANGES'), findsOneWidget);
+    expect(find.text('VENUE NAME'), findsOneWidget);
+    expect(find.text('Ocean Pearl'), findsAtLeast(1));
+    expect(find.text('REVOLUT LINK'), findsOneWidget);
+  });
+
+  testWidgets('venue table QR screen renders and updates table label', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildHarness(const VenueTableQrScreen()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Table QR Code'), findsOneWidget);
+    expect(find.text('TABLE 4'), findsOneWidget);
+    expect(find.text('SCAN TO GET DINEIN APP'), findsOneWidget);
+    expect(find.text('TABLE NUMBER'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('venue-table-qr-export-boundary')),
+        matching: find.text('TABLE NUMBER'),
+      ),
+      findsNothing,
+    );
+
+    await tester.enterText(find.byType(TextField), '7');
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('TABLE 7'), findsOneWidget);
+  });
+}

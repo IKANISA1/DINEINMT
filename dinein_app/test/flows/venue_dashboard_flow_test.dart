@@ -91,4 +91,46 @@ void main() {
     expect(find.text('Quick Actions'), findsOneWidget);
     expect(find.text('Top Items'), findsOneWidget);
   });
+
+  testWidgets(
+    'venue dashboard treats browse-only active venues as ordering disabled',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      const venue = Venue(
+        id: 'venue_browse_only',
+        name: 'Preview Lounge',
+        slug: 'preview-lounge',
+        category: 'Mediterranean',
+        description: 'Menu preview only.',
+        address: 'Sliema',
+        status: VenueStatus.active,
+        orderingEnabled: false,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            currentVenueProvider.overrideWith((ref) async => venue),
+            venueOrdersProvider(
+              venue.id,
+            ).overrideWith((ref) => Stream<List<Order>>.value(const <Order>[])),
+            menuItemsProvider(
+              venue.id,
+            ).overrideWith((ref) => const <MenuItem>[]),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: VenueDashboardScreen()),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pumpAndSettle(const Duration(seconds: 1));
+
+      expect(find.text('ORDERING DISABLED'), findsOneWidget);
+      expect(find.text('OFF'), findsOneWidget);
+    },
+  );
 }

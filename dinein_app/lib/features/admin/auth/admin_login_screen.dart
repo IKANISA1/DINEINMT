@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -78,17 +77,51 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
 
   bool get _isCoolingDown => _cooldownSeconds > 0;
 
-  String get _fullPhone => '+356${_phoneController.text.trim()}';
+  String get _localPhone =>
+      normalizeMaltesePhoneLocalInput(_phoneController.text);
 
-  String get _otpCode =>
-      _otpControllers.map((c) => c.text).join();
+  String get _fullPhone => _localPhone.isEmpty ? '' : '+356$_localPhone';
+
+  String get _otpCode => _otpControllers.map((c) => c.text).join();
+
+  bool get _canSendOtp =>
+      !_isLoading &&
+      !_isCoolingDown &&
+      isValidMaltesePhoneLocalInput(_phoneController.text);
+
+  String _entryReturnPath(BuildContext context) {
+    final candidate = GoRouterState.of(
+      context,
+    ).uri.queryParameters[AppRouteParams.returnTo];
+    switch (candidate) {
+      case AppRoutePaths.guestSettings:
+      case AppRoutePaths.venueSettings:
+      case AppRoutePaths.adminSettings:
+        return candidate!;
+      default:
+        return AppRoutePaths.splash;
+    }
+  }
+
+  bool _requiresSupportContact(Object error) {
+    final raw = error.toString().toLowerCase();
+    return raw.contains('not registered for admin');
+  }
+
+  Future<void> _showAdminSupportDialog() {
+    return showAccessSupportDialog(
+      context,
+      title: 'Admin Access Not Found',
+      message:
+          'This WhatsApp number is not registered for admin access. Contact support to activate or recover admin access.',
+    );
+  }
 
   // ─── Send OTP ───
 
   Future<void> _sendOtp() async {
     if (_isCoolingDown) return;
-    final local = _phoneController.text.trim();
-    if (local.length < 7) {
+    if (!isValidMaltesePhoneLocalInput(_phoneController.text)) {
       setState(() {
         _error = 'Enter your 8-digit Maltese phone number.';
       });
@@ -119,8 +152,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
         _isLoading = false;
         _info =
             !kReleaseMode && challenge.usesMock && challenge.debugCode != null
-                ? 'Dev code: ${challenge.debugCode}'
-                : null;
+            ? 'Dev code: ${challenge.debugCode}'
+            : null;
       });
 
       _fadeController.forward();
@@ -131,19 +164,19 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       });
     } catch (error) {
       if (!mounted) return;
-      String message;
-      if (error is Exception) {
-        final raw = error.toString();
-        if (raw.contains('not registered for admin')) {
-          message = 'This number is not registered for admin access.';
-        } else if (raw.contains('Too many')) {
-          message = 'Too many requests. Wait a few minutes.';
-        } else {
-          message = 'Could not send code. Check the number and retry.';
-        }
-      } else {
-        message = 'Could not send code. Check the number and retry.';
+      if (_requiresSupportContact(error)) {
+        setState(() {
+          _isLoading = false;
+          _error = null;
+        });
+        await _showAdminSupportDialog();
+        return;
       }
+
+      final raw = error.toString();
+      final message = raw.contains('Too many')
+          ? 'Too many requests. Wait a few minutes.'
+          : 'Could not send code. Check the number and retry.';
       setState(() {
         _isLoading = false;
         _error = message;
@@ -192,6 +225,15 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       context.goNamed(AppRouteNames.adminOverview);
     } catch (error) {
       if (!mounted) return;
+      if (_requiresSupportContact(error)) {
+        setState(() {
+          _isLoading = false;
+          _error = null;
+        });
+        await _showAdminSupportDialog();
+        return;
+      }
+
       String message;
       if (error is Exception) {
         final raw = error.toString();
@@ -242,7 +284,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
     _fadeController.forward();
   }
 
-
   // ─── Build ───
 
   @override
@@ -270,9 +311,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       children: [
         // Back button
-        _buildBackButton(context, onTap: () {
-          context.goNamed(AppRouteNames.splash);
-        }),
+        _buildBackButton(
+          context,
+          onTap: () {
+            context.go(_entryReturnPath(context));
+          },
+        ),
 
         const SizedBox(height: 48),
 
@@ -326,128 +370,42 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
         ),
         const SizedBox(height: 16),
 
-        // Country code + phone number row
-        Row(
-          children: [
-            // Country code pill
-            Container(
-              height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('🇲🇹', style: TextStyle(fontSize: 22)),
-                  const SizedBox(width: 10),
-                  Text(
-                    '+356',
-                    style: tt.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 22,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    LucideIcons.chevronDown,
-                    size: 16,
-                    color: cs.onSurfaceVariant,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Phone number input
-            Expanded(
-              child: Container(
-                height: 64,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: _phoneController.text.isNotEmpty
-                        ? cs.primary.withValues(alpha: 0.5)
-                        : Colors.transparent,
-                    width: 1.5,
-                  ),
-                ),
-                child: Center(
-                  child: TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    autofillHints: const [AutofillHints.telephoneNumber],
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _isLoading ? null : _sendOtp(),
-                    onChanged: (_) => setState(() {}),
-                    style: tt.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 22,
-                      letterSpacing: 1,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(8),
-                    ],
-                    decoration: InputDecoration(
-                      hintText: '9912 3456',
-                      hintStyle: tt.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 22,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.3),
-                      ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 20),
-                      filled: false,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+        MaltaPhoneInput(
+          controller: _phoneController,
+          onSubmitted: _canSendOtp ? _sendOtp : null,
+          onChanged: (_) => setState(() {}),
         ),
 
         // Error / Info
         if (_error != null) ...[
           const SizedBox(height: 16),
-          Text(
-            _error!,
-            style: tt.bodyMedium?.copyWith(color: cs.error),
-            textAlign: TextAlign.center,
+          OtpInlineNotice(
+            icon: LucideIcons.alertCircle,
+            message: _error!,
+            color: cs.error,
           ),
         ],
         if (_info != null) ...[
           const SizedBox(height: 16),
-          Text(
-            _info!,
-            style: tt.bodyMedium?.copyWith(color: cs.secondary),
-            textAlign: TextAlign.center,
+          OtpInlineNotice(
+            icon: LucideIcons.messageSquare,
+            message: _info!,
+            color: cs.secondary,
           ),
         ],
 
         const SizedBox(height: 32),
 
         // "Get OTP" button
-        _OtpActionButton(
+        OtpActionButton.gold(
           label: _isLoading
               ? 'Sending...'
               : _isCoolingDown
-                  ? 'Wait ${_cooldownSeconds}s'
-                  : 'Get OTP',
-          icon: _isLoading
-              ? null
-              : const _WhatsAppIcon(),
+              ? 'Wait ${_cooldownSeconds}s'
+              : 'Get OTP',
+          icon: _isLoading ? null : const WhatsAppIcon(),
           isLoading: _isLoading,
-          color: AppColors.primary,
-          textColor: AppColors.onPrimary,
-          onPressed:
-              (_isLoading || _isCoolingDown) ? null : _sendOtp,
+          onPressed: _canSendOtp ? _sendOtp : null,
         ),
       ],
     );
@@ -521,17 +479,17 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
         // Error
         if (_error != null) ...[
           const SizedBox(height: 20),
-          Text(
-            _error!,
-            style: tt.bodyMedium?.copyWith(color: cs.error),
-            textAlign: TextAlign.center,
+          OtpInlineNotice(
+            icon: LucideIcons.alertCircle,
+            message: _error!,
+            color: cs.error,
           ),
         ],
 
         const SizedBox(height: 32),
 
         // Submit button
-        _OtpActionButton(
+        OtpActionButton.green(
           label: _isLoading ? 'Verifying...' : 'Submit',
           icon: _isLoading
               ? null
@@ -541,10 +499,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
                   color: AppColors.onSecondary,
                 ),
           isLoading: _isLoading,
-          color: AppColors.secondary,
-          textColor: AppColors.onSecondary,
-          onPressed:
-              _isLoading || _otpCode.length != 6 ? null : _verifyOtp,
+          onPressed: _isLoading || _otpCode.length != 6 ? null : _verifyOtp,
         ),
 
         const SizedBox(height: 20),
@@ -591,142 +546,4 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       ),
     );
   }
-}
-
-// ─── Large Action Button (Gold / Green) ───
-
-class _OtpActionButton extends StatelessWidget {
-  final String label;
-  final Widget? icon;
-  final bool isLoading;
-  final Color color;
-  final Color textColor;
-  final VoidCallback? onPressed;
-
-  const _OtpActionButton({
-    required this.label,
-    this.icon,
-    this.isLoading = false,
-    required this.color,
-    required this.textColor,
-    this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
-    final isDisabled = onPressed == null;
-
-    return PressableScale(
-      onTap: isDisabled ? null : onPressed,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        width: double.infinity,
-        height: 64,
-        decoration: BoxDecoration(
-          color: isDisabled
-              ? color.withValues(alpha: 0.35)
-              : color,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: isDisabled
-              ? []
-              : [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.25),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-        ),
-        child: Center(
-          child: isLoading
-              ? SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: textColor,
-                  ),
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: tt.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: textColor,
-                        fontSize: 18,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    if (icon != null) ...[
-                      const SizedBox(width: 12),
-                      icon!,
-                    ],
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── WhatsApp Icon (matching the design reference) ───
-
-class _WhatsAppIcon extends StatelessWidget {
-  const _WhatsAppIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 24,
-      height: 24,
-      child: CustomPaint(painter: _WhatsAppPainter(color: AppColors.onPrimary)),
-    );
-  }
-}
-
-class _WhatsAppPainter extends CustomPainter {
-  final Color color;
-  _WhatsAppPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8
-      ..strokeCap = StrokeCap.round;
-
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final r = size.width * 0.42;
-
-    // Circle
-    canvas.drawCircle(Offset(cx, cy), r, paint);
-
-    // Phone icon inside (simplified)
-    final phonePaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    // Simplified phone handset shape
-    path.moveTo(cx - 3, cy + 4);
-    path.quadraticBezierTo(cx - 5, cy + 2, cx - 5, cy - 1);
-    path.quadraticBezierTo(cx - 5, cy - 3, cx - 3, cy - 4);
-    path.lineTo(cx - 1, cy - 4);
-    path.quadraticBezierTo(cx, cy - 3, cx, cy - 1);
-    path.lineTo(cx, cy + 1);
-    path.quadraticBezierTo(cx, cy + 3, cx + 1, cy + 4);
-    path.lineTo(cx + 3, cy + 4);
-    path.quadraticBezierTo(cx + 5, cy + 3, cx + 5, cy + 1);
-    path.quadraticBezierTo(cx + 5, cy - 1, cx + 3, cy - 2);
-
-    canvas.drawPath(path, phonePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -25,7 +25,11 @@ class VenueShell extends ConsumerWidget {
     final location = GoRouterState.of(context).uri.toString();
     if (location.startsWith(AppRoutePaths.venueOrders)) return 1;
     if (location.startsWith(AppRoutePaths.venueMenu)) return 2;
-    if (location.startsWith(AppRoutePaths.venueSettings)) return 3;
+    if (location.startsWith(AppRoutePaths.venueSettings) ||
+        location.startsWith(AppRoutePaths.venueProfile) ||
+        location.startsWith(AppRoutePaths.venueTableQr)) {
+      return 3;
+    }
     return 0;
   }
 
@@ -45,7 +49,9 @@ class VenueShell extends ConsumerWidget {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('🔔 New staff request (Table ${next.value!.last.tableNumber})'),
+                  content: Text(
+                    '🔔 New staff request (Table ${next.value!.last.tableNumber})',
+                  ),
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -59,7 +65,11 @@ class VenueShell extends ConsumerWidget {
     return Scaffold(
       body: Column(
         children: [
-          _VenueTopBar(venueName: venueName, avatarUrl: venueImageUrl, venueId: venueId),
+          _VenueTopBar(
+            venueName: venueName,
+            avatarUrl: venueImageUrl,
+            venueId: venueId,
+          ),
           Expanded(child: child),
         ],
       ),
@@ -143,47 +153,57 @@ class _VenueTopBar extends ConsumerWidget {
 
                   // ─── Bell Notifications ───
                   if (venueId != null)
-                    Builder(builder: (context) {
-                      final wavesAsync = ref.watch(pendingWavesProvider(venueId!));
-                      final count = wavesAsync.value?.length ?? 0;
-                      return GestureDetector(
-                        onTap: () => BellRequestsSheet.show(context, venueId!),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Icon(
-                                LucideIcons.bell,
-                                size: 24,
-                                color: count > 0 ? cs.onSurface : cs.onSurfaceVariant,
-                              ),
-                              if (count > 0)
-                                Positioned(
-                                  top: -2,
-                                  right: -2,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: cs.primary,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: cs.surface, width: 2),
-                                    ),
-                                    child: Text(
-                                      count.toString(),
-                                      style: TextStyle(
-                                        color: cs.onPrimary,
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
+                    Builder(
+                      builder: (context) {
+                        final wavesAsync = ref.watch(
+                          pendingWavesProvider(venueId!),
+                        );
+                        final count = wavesAsync.value?.length ?? 0;
+                        return GestureDetector(
+                          onTap: () =>
+                              BellRequestsSheet.show(context, venueId!),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Icon(
+                                  LucideIcons.bell,
+                                  size: 24,
+                                  color: count > 0
+                                      ? cs.onSurface
+                                      : cs.onSurfaceVariant,
+                                ),
+                                if (count > 0)
+                                  Positioned(
+                                    top: -2,
+                                    right: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: cs.primary,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: cs.surface,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        count.toString(),
+                                        style: TextStyle(
+                                          color: cs.onPrimary,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    }),
+                        );
+                      },
+                    ),
                   const SizedBox(width: 8),
 
                   // ─── Avatar ───

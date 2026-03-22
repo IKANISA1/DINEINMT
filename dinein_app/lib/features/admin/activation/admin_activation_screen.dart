@@ -24,6 +24,7 @@ class AdminActivationScreen extends ConsumerStatefulWidget {
 
 class _AdminActivationScreenState extends ConsumerState<AdminActivationScreen> {
   String _status = 'active'; // active, maintenance, suspended
+  bool _orderingEnabled = false;
   bool _isLoading = false;
   bool _initialized = false;
 
@@ -39,7 +40,12 @@ class _AdminActivationScreenState extends ConsumerState<AdminActivationScreen> {
         if (venue != null && !_initialized) {
           _initialized = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _status = venue.status.dbValue);
+            if (mounted) {
+              setState(() {
+                _status = venue.status.dbValue;
+                _orderingEnabled = venue.orderingEnabled;
+              });
+            }
           });
         }
       });
@@ -109,7 +115,7 @@ class _AdminActivationScreenState extends ConsumerState<AdminActivationScreen> {
                         ),
                         const SizedBox(height: AppTheme.space4),
                         Text(
-                          'Updating status…',
+                          'Saving venue policy…',
                           style: tt.bodyMedium?.copyWith(
                             color: cs.onSurfaceVariant,
                           ),
@@ -154,6 +160,47 @@ class _AdminActivationScreenState extends ConsumerState<AdminActivationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to update status: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateOrderingEnabled(bool enabled) async {
+    if (_isLoading || enabled == _orderingEnabled) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await VenueRepository.instance.updateVenueOrderingEnabled(
+        widget.venueId,
+        enabled,
+      );
+      ref.invalidate(allVenuesProvider);
+      ref.invalidate(venueByIdProvider(widget.venueId));
+      if (mounted) {
+        setState(() {
+          _orderingEnabled = enabled;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              enabled
+                  ? 'Guest ordering enabled for this venue'
+                  : 'Guest ordering disabled for this venue',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update guest ordering: $e'),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
@@ -436,7 +483,7 @@ class _AdminActivationScreenState extends ConsumerState<AdminActivationScreen> {
               // Status toggle buttons
               _StatusButton(
                 label: 'Activate Venue',
-                subtitle: 'Visible • Prices Visible • Ordering Enabled',
+                subtitle: 'Visible to guests • Ordering depends on validation',
                 icon: LucideIcons.play,
                 isSelected: _status == 'active',
                 selectedColor: AppColors.secondary,
@@ -445,7 +492,7 @@ class _AdminActivationScreenState extends ConsumerState<AdminActivationScreen> {
               const SizedBox(height: AppTheme.space4),
               _StatusButton(
                 label: 'Maintenance Mode',
-                subtitle: 'Visible • Prices Hidden • Ordering Disabled',
+                subtitle: 'Visible as unavailable • Ordering disabled',
                 icon: LucideIcons.clock,
                 isSelected: _status == 'maintenance',
                 selectedColor: AppColors.warning,
@@ -459,6 +506,50 @@ class _AdminActivationScreenState extends ConsumerState<AdminActivationScreen> {
                 isSelected: _status == 'suspended',
                 selectedColor: AppColors.error,
                 onTap: () => _updateStatus('suspended'),
+              ),
+              const SizedBox(height: AppTheme.space6),
+              Container(
+                padding: const EdgeInsets.all(AppTheme.space5),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Guest Ordering Validation',
+                            style: tt.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _orderingEnabled
+                                ? 'Validated venues can accept guest orders.'
+                                : 'Guests can browse this venue, but ordering stays unavailable.',
+                            style: tt.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.space4),
+                    Switch(
+                      value: _orderingEnabled,
+                      onChanged: _updateOrderingEnabled,
+                      activeThumbColor: AppColors.secondary,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

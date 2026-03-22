@@ -41,8 +41,10 @@ ios_entitlements="$app_root/ios/Runner/Runner.entitlements"
 firebase_options="$app_root/lib/firebase_options.dart"
 android_google_services="$app_root/android/app/google-services.json"
 ios_google_service_info="$app_root/ios/Runner/GoogleService-Info.plist"
-asset_links="$app_root/docs/release/app-links/assetlinks.json"
-apple_app_site_association="$app_root/docs/release/app-links/apple-app-site-association"
+asset_links_template="$app_root/docs/release/app-links/assetlinks.json"
+apple_app_site_association_template="$app_root/docs/release/app-links/apple-app-site-association"
+asset_links="$app_root/../landing/.well-known/assetlinks.json"
+apple_app_site_association="$app_root/../landing/.well-known/apple-app-site-association"
 
 require_contains \
   "$android_manifest" \
@@ -75,7 +77,10 @@ require_no_placeholder \
   'REPLACE_WITH_ACTUAL_' \
   'firebase_options.dart still contains placeholder values.'
 
-require_file "$asset_links" 'Android assetlinks template is missing.'
+require_file "$asset_links_template" 'Android assetlinks template is missing.'
+require_file \
+  "$asset_links" \
+  'Generated Android assetlinks file is missing. Run ./scripts/render_app_links.sh.'
 if [[ -f "$asset_links" ]]; then
   require_no_placeholder \
     "$asset_links" \
@@ -84,8 +89,11 @@ if [[ -f "$asset_links" ]]; then
 fi
 
 require_file \
-  "$apple_app_site_association" \
+  "$apple_app_site_association_template" \
   'apple-app-site-association template is missing.'
+require_file \
+  "$apple_app_site_association" \
+  'Generated apple-app-site-association file is missing. Run ./scripts/render_app_links.sh.'
 if [[ -f "$apple_app_site_association" ]]; then
   require_no_placeholder \
     "$apple_app_site_association" \

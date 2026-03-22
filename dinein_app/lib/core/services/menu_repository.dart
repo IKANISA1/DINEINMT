@@ -47,7 +47,13 @@ class MenuRepository {
             )
             as List<dynamic>;
     final items = data.map((e) => MenuItem.fromJson(e)).toList();
-    await _persistLocalMenuItems(venueId, items);
+    final allPricesHidden =
+        items.isNotEmpty && items.every((item) => item.priceHidden);
+    if (items.isEmpty || allPricesHidden) {
+      await _clearLocalMenuItems(venueId);
+    } else {
+      await _persistLocalMenuItems(venueId, items);
+    }
     return items;
   }
 
@@ -66,6 +72,10 @@ class MenuRepository {
         'isAvailable': isAvailable,
         ..._venueSessionPayload(),
       },
+    );
+    await _updateLocalMenuItemById(
+      itemId,
+      (item) => item.copyWith(isAvailable: isAvailable),
     );
   }
 
@@ -88,7 +98,7 @@ class MenuRepository {
     String itemId,
     Map<String, dynamic> updates,
   ) async {
-    await DineinApiService.invoke(
+    final data = await DineinApiService.invoke(
       'update_menu_item',
       payload: {
         'itemId': itemId,
@@ -96,6 +106,38 @@ class MenuRepository {
         ..._venueSessionPayload(),
       },
     );
+    if (data is Map<String, dynamic>) {
+      final updated = MenuItem.fromJson(data);
+      await _mergeAndPersistLocalMenuItems(updated.venueId, [updated]);
+    }
+  }
+
+  /// Persist the ordered guest highlight selection for a venue.
+  Future<List<MenuItem>> setMenuItemHighlights(
+    String venueId,
+    List<String> orderedItemIds,
+  ) async {
+    final normalizedIds = <String>[];
+    for (final rawId in orderedItemIds) {
+      final id = rawId.trim();
+      if (id.isEmpty || normalizedIds.contains(id)) continue;
+      normalizedIds.add(id);
+      if (normalizedIds.length == 3) break;
+    }
+
+    final data = await DineinApiService.invoke(
+      'set_menu_item_highlights',
+      payload: {
+        'venueId': venueId,
+        'itemIds': normalizedIds,
+        ..._venueSessionPayload(),
+      },
+    );
+    final items = (data as List<dynamic>)
+        .map((e) => MenuItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+    await _persistLocalMenuItems(venueId, items);
+    return items;
   }
 
   /// Delete a menu item.
@@ -104,6 +146,7 @@ class MenuRepository {
       'delete_menu_item',
       payload: {'itemId': itemId, ..._venueSessionPayload()},
     );
+    await _removeLocalMenuItemById(itemId);
   }
 
   /// Import OCR draft items for a venue.
@@ -263,6 +306,10 @@ class MenuRepository {
         ..._venueSessionPayload(),
       },
     );
+    await _updateLocalMenuItemById(
+      itemId,
+      (item) => item.copyWith(imageLocked: imageLocked),
+    );
   }
 
   String _generateLocalId() => 'local-${DateTime.now().microsecondsSinceEpoch}';
@@ -297,6 +344,11 @@ class MenuRepository {
     );
   }
 
+  Future<void> _clearLocalMenuItems(String venueId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_localMenuKey(venueId));
+  }
+
   Future<void> _mergeAndPersistLocalMenuItems(
     String venueId,
     List<MenuItem> items,
@@ -314,6 +366,50 @@ class MenuRepository {
       _localMenuKey(venueId),
       jsonEncode(merged.values.map((item) => item.toJson()).toList()),
     );
+  }
+
+  Future<void> _updateLocalMenuItemById(
+    String itemId,
+    MenuItem Function(MenuItem item) transform,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final key in prefs.getKeys().where(
+      (key) => key.startsWith(_localMenuPrefix),
+    )) {
+      final items = _readLocalMenuItemsByKey(prefs, key);
+      var didChange = false;
+      final updatedItems = items.map((item) {
+        if (item.id != itemId) return item;
+        didChange = true;
+        return transform(item);
+      }).toList();
+      if (!didChange) continue;
+      await prefs.setString(
+        key,
+        jsonEncode(updatedItems.map((item) => item.toJson()).toList()),
+      );
+    }
+  }
+
+  Future<void> _removeLocalMenuItemById(String itemId) async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final key in prefs.getKeys().where(
+      (key) => key.startsWith(_localMenuPrefix),
+    )) {
+      final items = _readLocalMenuItemsByKey(prefs, key);
+      final updatedItems = items
+          .where((item) => item.id != itemId)
+          .toList(growable: false);
+      if (updatedItems.length == items.length) continue;
+      if (updatedItems.isEmpty) {
+        await prefs.remove(key);
+        continue;
+      }
+      await prefs.setString(
+        key,
+        jsonEncode(updatedItems.map((item) => item.toJson()).toList()),
+      );
+    }
   }
 
   List<MenuItem> _readLocalMenuItemsByKey(SharedPreferences prefs, String key) {

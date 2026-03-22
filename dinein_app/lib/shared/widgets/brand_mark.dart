@@ -5,10 +5,7 @@ import '../../core/theme/app_colors.dart';
 /// Near-black background matching the new DINEIN app icon.
 const _brandBg = Color(0xFF141414);
 
-/// Shared DineIn brand mark used for app chrome and launcher icon previews.
-///
-/// Renders the DINEIN wordmark (gold "DINE" + white "IN") on a near-black
-/// background. For very small sizes (< 36 px) falls back to a single "D".
+/// Shared DineIn square brand mark used across app chrome and splash surfaces.
 class BrandMark extends StatelessWidget {
   final double size;
   final double? borderRadius;
@@ -48,7 +45,7 @@ class BrandMark extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: Image.asset(
-        'assets/branding/dinein_logo.png',
+        'assets/branding/dinein-brand-icon-1024.png',
         width: size,
         height: size,
         fit: BoxFit.cover,
@@ -99,12 +96,19 @@ class DineInLogoText extends StatelessWidget {
           height: 1,
         ),
         children: [
-          TextSpan(text: 'DINE', style: TextStyle(color: goldColor)),
-          TextSpan(text: 'IN', style: TextStyle(color: whiteColor)),
+          TextSpan(
+            text: 'DINE',
+            style: TextStyle(color: goldColor),
+          ),
+          TextSpan(
+            text: 'IN',
+            style: TextStyle(color: whiteColor),
+          ),
           if (suffix != null)
             TextSpan(
               text: suffix,
-              style: suffixStyle ??
+              style:
+                  suffixStyle ??
                   TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: fontSize,

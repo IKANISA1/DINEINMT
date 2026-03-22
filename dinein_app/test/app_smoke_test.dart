@@ -1,6 +1,7 @@
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/main.dart';
+import 'package:dinein_app/shared/widgets/brand_mark.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -46,6 +47,9 @@ void main() {
 
     // Wait for animations to settle enough to show content
     await tester.pump(const Duration(milliseconds: 1200));
+
+    expect(find.byType(DineInLogoText), findsOneWidget);
+    expect(find.byType(BrandMark), findsNothing);
 
     // The splash now shows the tagline instead of CTAs
     expect(find.text('DINE IN, STAND OUT.'), findsOneWidget);
@@ -125,7 +129,7 @@ void main() {
     await disposeApp(tester);
   });
 
-  testWidgets('order success route reads the order id query parameter', (
+  testWidgets('order success route prefers the order number query parameter', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(800, 1200));
@@ -135,12 +139,15 @@ void main() {
 
     appRouter.goNamed(
       AppRouteNames.orderSuccess,
-      queryParameters: {AppRouteParams.id: 'ORD-1234'},
+      queryParameters: {
+        AppRouteParams.id: 'ORD-1234',
+        AppRouteParams.orderNumber: '12345678',
+      },
     );
     await tester.pump();
-    await pumpUntilVisible(tester, find.text('#ORD-1234'));
+    await pumpUntilVisible(tester, find.text('#12345678'));
 
-    expect(find.text('#ORD-1234'), findsOneWidget);
+    expect(find.text('#12345678'), findsOneWidget);
 
     await disposeApp(tester);
   });

@@ -3,15 +3,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/enums.dart';
 import '../models/models.dart';
 import '../services/order_repository.dart';
+import '../services/order_receipt_service.dart';
 import 'auth_providers.dart';
+import 'order_history_loader.dart';
+import 'order_status_polling.dart';
 
 const _orderPollInterval = Duration(seconds: 4);
 
 /// Orders for the current user (order history).
 final userOrdersProvider = FutureProvider<List<Order>>((ref) async {
   final user = ref.watch(currentUserProvider);
-  if (user == null) return const [];
-  return await OrderRepository.instance.getOrdersForUser(user.id);
+  return await loadAccessibleUserOrders(
+    userId: user?.id,
+    fetchOrdersForUser: OrderRepository.instance.getOrdersForUser,
+    fetchTrackedOrderIds: OrderReceiptService.instance.getTrackedOrderIds,
+    fetchOrderById: OrderRepository.instance.getOrderById,
+    clearTrackedOrder: OrderReceiptService.instance.clearReceiptToken,
+  );
 });
 
 /// Orders for a venue (venue owner view) — Supabase Realtime stream.
@@ -43,14 +51,11 @@ final orderStreamProvider = StreamProvider.family<OrderStatus, String>((
   ref,
   orderId,
 ) async* {
-  final order = await OrderRepository.instance.getOrderById(orderId);
-  if (order == null) {
-    throw Exception('Order not found');
-  }
-  yield order.status;
-  yield* Stream<OrderStatus>.periodic(_orderPollInterval).asyncMap((_) async {
-    final refreshed = await OrderRepository.instance.getOrderById(orderId);
-    if (refreshed == null) throw Exception('Order not found');
-    return refreshed.status;
-  });
+  yield* pollOrderStatus(
+    pollInterval: _orderPollInterval,
+    fetchStatus: () async {
+      final order = await OrderRepository.instance.getOrderById(orderId);
+      return order?.status;
+    },
+  );
 });

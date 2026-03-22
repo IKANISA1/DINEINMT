@@ -14,8 +14,12 @@ import {
   handleAppRequest,
   normalizePaymentMethod,
   normalizeVenueSupportedPaymentMethods,
+  normalizeWaveTableNumber,
   orderPaymentStatusForMethod,
+  resetGoogleMapsSearchRateLimitState,
+  resetWaveRateLimitState,
   sanitizeOrderInsert,
+  shouldGenerateAiVenueProfileImage,
   venueOrderingReadiness,
 } from "./index.ts";
 
@@ -282,6 +286,64 @@ Deno.test("sanitizeOrderInsert rejects anonymous user spoofing", () => {
   );
 });
 
+Deno.test("normalizeWaveTableNumber canonicalizes numeric values", () => {
+  assertEquals(normalizeWaveTableNumber(" 04 "), "4");
+  assertEquals(normalizeWaveTableNumber(12), "12");
+  assertThrows(
+    () => normalizeWaveTableNumber("A12"),
+    Error,
+    "Table number must be 1 to 4 digits",
+  );
+  assertThrows(
+    () => normalizeWaveTableNumber("0000"),
+    Error,
+    "Table number must be 1 to 4 digits",
+  );
+});
+
+Deno.test("shouldGenerateAiVenueProfileImage skips only manual or locked images", () => {
+  assertEquals(
+    shouldGenerateAiVenueProfileImage({
+      image_url: null,
+      image_source: null,
+      image_locked: false,
+    }),
+    true,
+  );
+  assertEquals(
+    shouldGenerateAiVenueProfileImage({
+      image_url: "https://example.com/discovered.jpg",
+      image_source: null,
+      image_locked: false,
+    }),
+    true,
+  );
+  assertEquals(
+    shouldGenerateAiVenueProfileImage({
+      image_url: "https://example.com/generated.jpg",
+      image_source: "ai_gemini",
+      image_locked: false,
+    }),
+    false,
+  );
+  assertEquals(
+    shouldGenerateAiVenueProfileImage({
+      image_url: "https://example.com/manual.jpg",
+      image_source: "manual",
+      image_locked: false,
+    }),
+    false,
+  );
+  assertEquals(
+    shouldGenerateAiVenueProfileImage({
+      image_url: null,
+      image_source: null,
+      image_locked: true,
+    }),
+    false,
+  );
+});
+
 Deno.test("assertValidOrderStatusTransition enforces the dine-in lifecycle", () => {
   assertValidOrderStatusTransition("placed", "received");
   assertValidOrderStatusTransition("received", "served");
@@ -290,6 +352,95 @@ Deno.test("assertValidOrderStatusTransition enforces the dine-in lifecycle", () 
     Error,
     "Invalid order status transition",
   );
+});
+
+Deno.test({
+  name: "send_wave - rate limits anonymous request bursts from the same device",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    resetWaveRateLimitState();
+    let insertCount = 0;
+
+    mockFetch(async (req) => {
+      if (req.url.includes("/rest/v1/dinein_venues")) {
+        return new Response(
+          JSON.stringify({
+            id: "venue-123",
+            status: "active",
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (req.url.includes("/rest/v1/bell_requests") && req.method === "GET") {
+        return new Response("null", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (req.url.includes("/rest/v1/bell_requests") && req.method === "POST") {
+        insertCount += 1;
+        const payload = await req.json();
+        return new Response(
+          JSON.stringify({
+            id: `wave-${insertCount}`,
+            venue_id: payload.venue_id,
+            table_number: payload.table_number,
+            user_id: payload.user_id ?? null,
+            status: "pending",
+            created_at: `2026-03-22T10:00:0${insertCount}.000Z`,
+          }),
+          { status: 201 },
+        );
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const requestHeaders = {
+        "Content-Type": "application/json",
+        "CF-Connecting-IP": "198.51.100.10",
+        "User-Agent": "DineInQA/1.0",
+      };
+
+      for (const tableNumber of ["1", "2", "3"]) {
+        const req = new Request("http://localhost:8000/", {
+          method: "POST",
+          headers: requestHeaders,
+          body: JSON.stringify({
+            action: "send_wave",
+            venueId: "venue-123",
+            tableNumber,
+          }),
+        });
+
+        const res = await handleAppRequest(req);
+        assertEquals(res.status, 201);
+      }
+
+      const blockedReq = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify({
+          action: "send_wave",
+          venueId: "venue-123",
+          tableNumber: "4",
+        }),
+      });
+
+      const blockedRes = await handleAppRequest(blockedReq);
+      assertEquals(blockedRes.status, 429);
+      const blockedBody = await blockedRes.json();
+      assertEquals(blockedBody.code, "wave_rate_limited");
+      assertEquals(insertCount, 3);
+    } finally {
+      restoreFetch();
+      resetWaveRateLimitState();
+    }
+  },
 });
 
 Deno.test({
@@ -338,6 +489,94 @@ Deno.test({
       assertEquals(body.data?.wifi_security, "WPA");
     } finally {
       restoreFetch();
+    }
+  },
+});
+
+Deno.test({
+  name:
+    "search_google_maps rate limits repeated anonymous lookups from the same device",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    resetGoogleMapsSearchRateLimitState();
+    Deno.env.set("GEMINI_API_KEY", "test-gemini-key");
+    let upstreamCount = 0;
+
+    mockFetch(async (req) => {
+      if (req.url.includes("generativelanguage.googleapis.com")) {
+        upstreamCount += 1;
+        const payload = await req.json();
+        const prompt = payload.contents?.[0]?.parts?.[0]?.text as
+          | string
+          | undefined;
+        assertStringIncludes(prompt ?? "", "Country: Malta");
+
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text:
+                        '[{"name":"Harbor Table","address":"Valletta Waterfront","category":"Restaurants"}]',
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const requestHeaders = {
+        "Content-Type": "application/json",
+        "CF-Connecting-IP": "198.51.100.20",
+        "User-Agent": "DineInOnboarding/1.0",
+      };
+
+      for (let index = 0; index < 20; index += 1) {
+        const req = new Request("http://localhost:8000/", {
+          method: "POST",
+          headers: requestHeaders,
+          body: JSON.stringify({
+            action: "search_google_maps",
+            query: `harbor ${index}`,
+            country: "France",
+          }),
+        });
+
+        const res = await handleAppRequest(req);
+        assertEquals(res.status, 200);
+      }
+
+      const blockedReq = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: requestHeaders,
+        body: JSON.stringify({
+          action: "search_google_maps",
+          query: "harbor blocked",
+        }),
+      });
+
+      const blockedRes = await handleAppRequest(blockedReq);
+      assertEquals(blockedRes.status, 429);
+      const blockedBody = await blockedRes.json();
+      assertEquals(blockedBody.code, "google_maps_search_rate_limited");
+      assertEquals(upstreamCount, 20);
+    } finally {
+      restoreFetch();
+      resetGoogleMapsSearchRateLimitState();
+      Deno.env.delete("GEMINI_API_KEY");
     }
   },
 });
@@ -408,6 +647,129 @@ Deno.test({
       assertEquals(body.data?.[0]?.id, "item-1");
       assertEquals(body.data?.[0]?.price, 0);
       assertEquals(body.data?.[0]?.price_hidden, true);
+    } finally {
+      restoreFetch();
+    }
+  },
+});
+
+Deno.test({
+  name: "set_menu_item_highlights stores ordered guest highlights for a venue",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const updates: Array<{ url: string; body: unknown }> = [];
+
+    mockFetch(async (req) => {
+      if (
+        req.method === "GET" &&
+        req.url.includes("/rest/v1/dinein_menu_items") &&
+        req.url.includes("select=id")
+      ) {
+        return new Response(
+          JSON.stringify([{ id: "item-2" }, { id: "item-1" }]),
+          { status: 200 },
+        );
+      }
+
+      if (
+        req.method === "PATCH" &&
+        req.url.includes("/rest/v1/dinein_menu_items")
+      ) {
+        updates.push({
+          url: req.url,
+          body: await req.json(),
+        });
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+
+      if (
+        req.method === "GET" &&
+        req.url.includes("/rest/v1/dinein_menu_items") &&
+        req.url.includes("select=*")
+      ) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: "item-2",
+              venue_id: "venue-123",
+              name: "Chef Pick",
+              description: "",
+              category: "Mains",
+              price: 12,
+              highlight_rank: 1,
+              is_available: true,
+            },
+            {
+              id: "item-1",
+              venue_id: "venue-123",
+              name: "Signature Plate",
+              description: "",
+              category: "Mains",
+              price: 14,
+              highlight_rank: 2,
+              is_available: true,
+            },
+            {
+              id: "item-3",
+              venue_id: "venue-123",
+              name: "Fallback Plate",
+              description: "",
+              category: "Mains",
+              price: 16,
+              highlight_rank: null,
+              is_available: true,
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceRoleJwt}`,
+        },
+        body: JSON.stringify({
+          action: "set_menu_item_highlights",
+          venueId: "venue-123",
+          itemIds: ["item-2", "item-1"],
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+
+      const body = await res.json();
+      assertEquals(
+        body.data?.map((
+          item: { id: string; highlight_rank: number | null },
+        ) => [
+          item.id,
+          item.highlight_rank,
+        ]),
+        [
+          ["item-2", 1],
+          ["item-1", 2],
+          ["item-3", null],
+        ],
+      );
+
+      assertEquals(updates.length, 3);
+      assertEquals(updates[0].body, { highlight_rank: null });
+      assertEquals(
+        updates[0].url.includes("venue_id=eq.venue-123"),
+        true,
+      );
+      assertEquals(updates[1].body, { highlight_rank: 1 });
+      assertEquals(updates[1].url.includes("id=eq.item-2"), true);
+      assertEquals(updates[2].body, { highlight_rank: 2 });
+      assertEquals(updates[2].url.includes("id=eq.item-1"), true);
     } finally {
       restoreFetch();
     }

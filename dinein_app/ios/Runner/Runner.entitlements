@@ -6,5 +6,7 @@
 	<array>
 		<string>applinks:dineinmalta.com</string>
 	</array>
+	<key>com.apple.developer.networking.HotspotConfiguration</key>
+	<true/>
 </dict>
 </plist>

@@ -1,11 +1,23 @@
 import 'package:equatable/equatable.dart';
 import '../constants/enums.dart';
 
+String _toTitleCaseLabel(String value) {
+  return value
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .map((part) {
+        if (part.length == 1) return part.toUpperCase();
+        return '${part[0].toUpperCase()}${part.substring(1)}';
+      })
+      .join(' ');
+}
+
 String normalizeVenueCategoryLabel(
   String? value, {
   String fallback = 'Restaurants',
 }) {
-  final normalized = (value ?? '').trim().toLowerCase();
+  final raw = (value ?? '').trim();
+  final normalized = raw.toLowerCase();
   if (normalized.isEmpty) return fallback;
   if (normalized.contains('hotel')) return 'Hotels';
   if (normalized.contains('bar') && normalized.contains('restaurant')) {
@@ -13,7 +25,48 @@ String normalizeVenueCategoryLabel(
   }
   if (normalized.contains('bar')) return 'Bar';
   if (normalized.contains('restaurant')) return 'Restaurants';
-  return fallback;
+  return _toTitleCaseLabel(raw);
+}
+
+Map<String, OpeningHours>? _parseOpeningHours(Object? raw) {
+  if (raw is! Map) return null;
+
+  final parsed = <String, OpeningHours>{};
+  for (final entry in raw.entries) {
+    final key = entry.key;
+    final value = entry.value;
+    if (key is! String || value is! Map) continue;
+    parsed[key] = OpeningHours.fromJson(Map<String, dynamic>.from(value));
+  }
+
+  return parsed.isEmpty ? null : parsed;
+}
+
+List<PaymentMethod> _parseSupportedPaymentMethods(
+  Object? raw, {
+  String? revolutUrl,
+}) {
+  final parsed = <PaymentMethod>[];
+  if (raw is List) {
+    for (final value in raw) {
+      final method = switch (value) {
+        'cash' => PaymentMethod.cash,
+        'revolut_link' => PaymentMethod.revolutLink,
+        _ => null,
+      };
+      if (method != null && !parsed.contains(method)) {
+        parsed.add(method);
+      }
+    }
+  }
+
+  if (parsed.isNotEmpty) return parsed;
+
+  if ((revolutUrl ?? '').trim().isNotEmpty) {
+    return const [PaymentMethod.cash, PaymentMethod.revolutLink];
+  }
+
+  return const [PaymentMethod.cash];
 }
 
 /// A venue (restaurant, bar, café, etc.) available on DineIn.
@@ -29,12 +82,15 @@ class Venue extends Equatable {
   final String? imageUrl;
   final String? revolutUrl;
   final VenueStatus status;
+  final bool orderingEnabled;
   final double rating;
   final int ratingCount;
   final Country country;
   final Map<String, OpeningHours>? openingHours;
+  final String? websiteUrl;
   final String? ownerId;
   final List<Review>? reviews;
+  final List<PaymentMethod> supportedPaymentMethods;
   final String? wifiSsid;
   final String? wifiPassword;
   final String? wifiSecurity;
@@ -51,12 +107,15 @@ class Venue extends Equatable {
     this.imageUrl,
     this.revolutUrl,
     this.status = VenueStatus.active,
+    this.orderingEnabled = false,
     this.rating = 0.0,
     this.ratingCount = 0,
     this.country = Country.mt,
     this.openingHours,
+    this.websiteUrl,
     this.ownerId,
     this.reviews,
+    this.supportedPaymentMethods = const [PaymentMethod.cash],
     this.wifiSsid,
     this.wifiPassword,
     this.wifiSecurity,
@@ -76,13 +135,27 @@ class Venue extends Equatable {
       imageUrl: json['image_url'] as String?,
       revolutUrl: json['revolut_url'] as String?,
       status: VenueStatus.fromString(json['status'] as String? ?? 'active'),
+      orderingEnabled:
+          json['ordering_enabled'] as bool? ??
+          json['orderingEnabled'] as bool? ??
+          false,
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
       country: Country.fromCode(json['country'] as String? ?? 'MT'),
+      openingHours: _parseOpeningHours(
+        json['opening_hours'] ?? json['openingHours'],
+      ),
+      websiteUrl:
+          json['website_url'] as String? ?? json['websiteUrl'] as String?,
       ownerId: json['owner_id'] as String?,
       reviews: (json['reviews'] as List<dynamic>?)
           ?.map((r) => Review.fromJson(r as Map<String, dynamic>))
           .toList(),
+      supportedPaymentMethods: _parseSupportedPaymentMethods(
+        json['supported_payment_methods'] ?? json['supportedPaymentMethods'],
+        revolutUrl:
+            json['revolut_url'] as String? ?? json['revolutUrl'] as String?,
+      ),
       wifiSsid: json['wifi_ssid'] as String?,
       wifiPassword: json['wifi_password'] as String?,
       wifiSecurity: json['wifi_security'] as String?,
@@ -102,10 +175,18 @@ class Venue extends Equatable {
     'image_url': imageUrl,
     'revolut_url': revolutUrl,
     'status': status.dbValue,
+    'ordering_enabled': orderingEnabled,
     'rating': rating,
     'rating_count': ratingCount,
     'country': country.code,
+    'opening_hours': openingHours?.map(
+      (key, value) => MapEntry(key, value.toJson()),
+    ),
+    'website_url': websiteUrl,
     'owner_id': ownerId,
+    'supported_payment_methods': supportedPaymentMethods
+        .map((method) => method.dbValue)
+        .toList(growable: false),
     'wifi_ssid': wifiSsid,
     'wifi_password': wifiPassword,
     'wifi_security': wifiSecurity,
@@ -114,8 +195,56 @@ class Venue extends Equatable {
   /// Whether this venue is currently accepting orders.
   bool get isOpen => status == VenueStatus.active;
 
+  /// Whether guests can place orders with this venue right now.
+  bool get canAcceptGuestOrders => isOpen && orderingEnabled;
+
+  /// Whether guest-facing pricing should be hidden for this venue.
+  bool get shouldHideGuestPricing => !canAcceptGuestOrders;
+
+  /// Guest-facing browse label shown in discovery and venue detail surfaces.
+  String get guestAvailabilityLabel => canAcceptGuestOrders
+      ? 'Available'
+      : switch (status) {
+          VenueStatus.active ||
+          VenueStatus.pendingClaim ||
+          VenueStatus.pendingActivation => 'Browse Menu',
+          VenueStatus.maintenance ||
+          VenueStatus.inactive ||
+          VenueStatus.suspended ||
+          VenueStatus.deleted => 'Closed',
+        };
+
+  /// Short explanation for why the venue is browse-only.
+  String get guestAvailabilityReason {
+    if (canAcceptGuestOrders) return 'Now accepting guest orders.';
+    return switch (status) {
+      VenueStatus.maintenance => 'Temporarily unavailable for orders.',
+      VenueStatus.inactive => 'Currently unavailable for ordering.',
+      VenueStatus.pendingClaim ||
+      VenueStatus.pendingActivation => 'Activation pending. Menu preview only.',
+      VenueStatus.suspended ||
+      VenueStatus.deleted => 'Currently unavailable for ordering.',
+      VenueStatus.active =>
+        !orderingEnabled
+            ? 'Validation pending. Menu preview only.'
+            : 'Currently unavailable for ordering.',
+    };
+  }
+
   /// Whether this venue has WiFi credentials configured for guests.
   bool get hasWifi => wifiSsid != null && wifiSsid!.trim().isNotEmpty;
+
+  bool supportsPaymentMethod(PaymentMethod method) =>
+      supportedPaymentMethods.contains(method);
+
+  Uri? get websiteUri {
+    final raw = websiteUrl?.trim();
+    if (raw == null || raw.isEmpty) return null;
+    final resolved = raw.startsWith('http://') || raw.startsWith('https://')
+        ? raw
+        : 'https://$raw';
+    return Uri.tryParse(resolved);
+  }
 
   @override
   List<Object?> get props => [
@@ -124,11 +253,15 @@ class Venue extends Equatable {
     name,
     category,
     address,
+    websiteUrl,
     revolutUrl,
     status,
+    orderingEnabled,
     country,
+    openingHours,
     ownerId,
     reviews,
+    supportedPaymentMethods,
     wifiSsid,
     wifiPassword,
     wifiSecurity,
@@ -169,6 +302,18 @@ class OpeningHours extends Equatable {
     this.isOpen = true,
   });
 
+  factory OpeningHours.fromJson(Map<String, dynamic> json) => OpeningHours(
+    open: json['open'] as String? ?? '',
+    close: json['close'] as String? ?? '',
+    isOpen: json['is_open'] as bool? ?? json['isOpen'] as bool? ?? true,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'open': open,
+    'close': close,
+    'is_open': isOpen,
+  };
+
   @override
   List<Object?> get props => [open, close, isOpen];
 }
@@ -180,6 +325,8 @@ class MenuItem extends Equatable {
   final String name;
   final String description;
   final double price;
+  final bool priceHidden;
+  final int? highlightRank;
   final String category;
   final String? imageUrl;
   final MenuItemImageSource imageSource;
@@ -199,6 +346,8 @@ class MenuItem extends Equatable {
     required this.name,
     required this.description,
     required this.price,
+    this.priceHidden = false,
+    this.highlightRank,
     required this.category,
     this.imageUrl,
     this.imageSource = MenuItemImageSource.unknown,
@@ -219,7 +368,11 @@ class MenuItem extends Equatable {
       venueId: json['venue_id'] as String,
       name: json['name'] as String,
       description: json['description'] as String? ?? '',
-      price: (json['price'] as num).toDouble(),
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      priceHidden: json['price_hidden'] as bool? ?? false,
+      highlightRank:
+          (json['highlight_rank'] as num?)?.toInt() ??
+          (json['highlightRank'] as num?)?.toInt(),
       category: json['category'] as String? ?? 'Uncategorized',
       imageUrl: json['image_url'] as String?,
       imageSource: MenuItemImageSource.fromString(
@@ -246,6 +399,8 @@ class MenuItem extends Equatable {
     'name': name,
     'description': description,
     'price': price,
+    'price_hidden': priceHidden,
+    'highlight_rank': highlightRank,
     'category': category,
     'image_url': imageUrl,
     'image_source': effectiveImageSource?.dbValue,
@@ -266,6 +421,8 @@ class MenuItem extends Equatable {
     String? name,
     String? description,
     double? price,
+    bool? priceHidden,
+    Object? highlightRank = _menuItemNoChange,
     String? category,
     String? imageUrl,
     MenuItemImageSource? imageSource,
@@ -285,6 +442,10 @@ class MenuItem extends Equatable {
       name: name ?? this.name,
       description: description ?? this.description,
       price: price ?? this.price,
+      priceHidden: priceHidden ?? this.priceHidden,
+      highlightRank: identical(highlightRank, _menuItemNoChange)
+          ? this.highlightRank
+          : highlightRank as int?,
       category: category ?? this.category,
       imageUrl: imageUrl ?? this.imageUrl,
       imageSource: imageSource ?? this.imageSource,
@@ -306,6 +467,8 @@ class MenuItem extends Equatable {
 
   bool get needsGeneratedImage => !hasImage && !imageLocked;
 
+  bool get isGuestHighlight => highlightRank != null;
+
   MenuItemImageSource? get effectiveImageSource {
     if (imageSource != MenuItemImageSource.unknown) return imageSource;
     if (hasImage) return MenuItemImageSource.manual;
@@ -326,6 +489,8 @@ class MenuItem extends Equatable {
     name,
     description,
     price,
+    priceHidden,
+    highlightRank,
     category,
     imageUrl,
     imageSource,
@@ -337,6 +502,8 @@ class MenuItem extends Equatable {
     tags,
   ];
 }
+
+const Object _menuItemNoChange = Object();
 
 /// A single item in a cart or order.
 class OrderItem extends Equatable {
@@ -391,8 +558,10 @@ class OrderItem extends Equatable {
 /// A placed order.
 class Order extends Equatable {
   final String id;
+  final String? orderNumber;
   final String venueId;
   final String venueName;
+  final String? venueImageUrl;
   final String? userId;
   final String? userName;
   final List<OrderItem> items;
@@ -408,8 +577,10 @@ class Order extends Equatable {
 
   const Order({
     required this.id,
+    this.orderNumber,
     required this.venueId,
     required this.venueName,
+    this.venueImageUrl,
     this.userId,
     this.userName,
     required this.items,
@@ -427,8 +598,11 @@ class Order extends Equatable {
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
       id: json['id'] as String,
+      orderNumber:
+          json['order_number'] as String? ?? json['orderNumber'] as String?,
       venueId: json['venue_id'] as String,
       venueName: json['venue_name'] as String,
+      venueImageUrl: json['venue_image_url'] as String?,
       userId: json['user_id'] as String?,
       userName: json['user_name'] as String?,
       items: (json['items'] as List<dynamic>)
@@ -453,6 +627,7 @@ class Order extends Equatable {
   Map<String, dynamic> toJson() => {
     'venue_id': venueId,
     'venue_name': venueName,
+    'venue_image_url': venueImageUrl,
     'user_id': userId,
     'user_name': userName,
     'items': items.map((e) => e.toJson()).toList(),
@@ -464,6 +639,15 @@ class Order extends Equatable {
     'table_number': tableNumber,
     'special_requests': specialRequests,
   };
+
+  String get displayNumber {
+    final explicit = orderNumber?.trim();
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+    final normalizedId = id.trim();
+    if (normalizedId.isEmpty) return '';
+    if (normalizedId.length <= 8) return normalizedId.toUpperCase();
+    return normalizedId.substring(0, 8).toUpperCase();
+  }
 
   double get subtotal =>
       subtotalAmount ?? items.fold(0.0, (sum, item) => sum + item.subtotal);
@@ -484,7 +668,9 @@ class Order extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    orderNumber,
     venueId,
+    venueImageUrl,
     total,
     status,
     createdAt,

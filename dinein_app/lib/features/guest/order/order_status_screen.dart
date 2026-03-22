@@ -63,7 +63,7 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Text(
-              'Order #${widget.orderId.substring(0, 8).toUpperCase()}',
+              'Order #${displayOrder.displayNumber}',
               style: tt.headlineMedium,
             ),
             actions: [
@@ -71,7 +71,8 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
                 padding: const EdgeInsets.all(8),
                 child: IconButton(
                   icon: Icon(LucideIcons.hand, color: cs.primary),
-                  onPressed: () => WaveBottomSheet.show(context, displayOrder.venueId),
+                  onPressed: () =>
+                      WaveBottomSheet.show(context, displayOrder.venueId),
                 ),
               ),
             ],

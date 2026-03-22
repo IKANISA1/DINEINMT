@@ -18,6 +18,7 @@ abstract final class MockData {
       imageUrl:
           'https://lh3.googleusercontent.com/aida-public/AB6AXuCUatAlz3wpD_Tt2oNiSY4Cx3f0blmu-5oK-XIKsGinZNizl2IwpTpfCML283GOry8oEw9aL2f4sEDP8eIuuOb3uCQCG3_L0EHNw9riD1HVa0hNOqlpAT4753-LI-DLw1UxEGMddODp0mdNOiKV2QVCvoKkcQiwpTl3vNEWf-Sc0o3l-QEr34t2Ma9ql43uPUiF-1Wt_YFwiJBNAI2h-rpftwb5GRHLeOGM9AY_UEkomiE_CtZ-bZdtPikaQu5ha5qAhGbtaErFbU8',
       status: VenueStatus.active,
+      orderingEnabled: true,
       rating: 4.9,
       ratingCount: 156,
       country: Country.mt,
@@ -48,6 +49,7 @@ abstract final class MockData {
       imageUrl:
           'https://lh3.googleusercontent.com/aida-public/AB6AXuAbkXthgBhDCfPymd-NsbizhRkF_9hyjh9C2b0GK5Ez_rofbY_ACktQHOpVbDWMBHZRXKGOXajM7cCNuymoWwSQkw0h2DGL-1iOqDpRGaC4xxx1elS2Z5qG6U5_9ERiH48r-bdoOP2hl0agYimat3gzUxBfk7fKD2EFM1Ub1eXIJ9e-Pdg59N0vxSUU4VuXItN63heZqOygyMMT4BMcFHKAXSyPfYEEMRUZx8W6AF9svch-XI-qjWwc2ic-5PCWWcTmO26QDhRi3WU',
       status: VenueStatus.active,
+      orderingEnabled: true,
       rating: 4.8,
       ratingCount: 89,
       country: Country.mt,

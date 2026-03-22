@@ -3,6 +3,7 @@
 
 -- ═══ 1. Bell Requests INSERT: require venue is active ═══
 DROP POLICY IF EXISTS "Anyone can insert bell requests" ON bell_requests;
+DROP POLICY IF EXISTS "Insert bell requests for active venues" ON bell_requests;
 CREATE POLICY "Insert bell requests for active venues"
   ON bell_requests FOR INSERT
   WITH CHECK (

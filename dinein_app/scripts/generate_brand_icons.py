@@ -1,35 +1,19 @@
 #!/usr/bin/env python3
-"""Generate DINEIN brand app icons for Android, iOS, and Flutter preview.
-
-Design spec (from user's provided logo):
-  - Background: near-black (#141414)
-  - "DINE" text: dark warm gold/bronze (#8B7A3D)
-  - "IN" text: pure white (#FFFFFF)
-  - Font: Bold italic sans-serif, large, centered
-"""
+"""Generate DINEIN launcher icons from the approved square master asset."""
 from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 ANDROID_ICON_DIR = PROJECT_DIR / "android/app/src/main/res"
 IOS_ICON_DIR = PROJECT_DIR / "ios/Runner/Assets.xcassets/AppIcon.appiconset"
 PREVIEW_DIR = PROJECT_DIR / "assets/branding"
-
-# Exact colors from the user's provided logo
-BACKGROUND = (20, 20, 20, 255)        # #141414 — near-black
-GOLD = (139, 122, 61, 255)            # #8B7A3D — dark warm gold/bronze for "DINE"
-WHITE = (255, 255, 255, 255)          # #FFFFFF — pure white for "IN"
-
-FONT_CANDIDATES = [
-    Path("/System/Library/Fonts/Supplemental/Arial Bold Italic.ttf"),
-    Path("/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
-    Path("/System/Library/Fonts/Helvetica Bold.ttf"),
-    Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
-]
+ADAPTIVE_ICON_DIR = ANDROID_ICON_DIR / "mipmap-anydpi-v26"
+ANDROID_VALUES_DIR = ANDROID_ICON_DIR / "values"
+SOURCE_ICON = PREVIEW_DIR / "dinein-brand-icon-1024.png"
 
 ANDROID_TARGETS = {
     "mipmap-mdpi/ic_launcher.png": 48,
@@ -37,6 +21,14 @@ ANDROID_TARGETS = {
     "mipmap-xhdpi/ic_launcher.png": 96,
     "mipmap-xxhdpi/ic_launcher.png": 144,
     "mipmap-xxxhdpi/ic_launcher.png": 192,
+}
+
+ANDROID_ADAPTIVE_FOREGROUND_TARGETS = {
+    "mipmap-mdpi/ic_launcher_foreground.png": 108,
+    "mipmap-hdpi/ic_launcher_foreground.png": 162,
+    "mipmap-xhdpi/ic_launcher_foreground.png": 216,
+    "mipmap-xxhdpi/ic_launcher_foreground.png": 324,
+    "mipmap-xxxhdpi/ic_launcher_foreground.png": 432,
 }
 
 IOS_TARGETS = {
@@ -58,42 +50,21 @@ IOS_TARGETS = {
 }
 
 
-def resolve_font() -> Path:
-    for candidate in FONT_CANDIDATES:
-        if candidate.exists():
-            return candidate
-    raise FileNotFoundError("No suitable bold system font found for icon generation.")
+ADAPTIVE_ICON_XML = """<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>
+"""
 
 
-def build_master_icon(size: int, font_path: Path) -> Image.Image:
-    """Build a master 1024x1024 icon matching the user's exact logo."""
-    image = Image.new("RGBA", (size, size), BACKGROUND)
-    draw = ImageDraw.Draw(image)
+def load_master_icon() -> Image.Image:
+    if not SOURCE_ICON.exists():
+        raise FileNotFoundError(f"Missing launcher source asset: {SOURCE_ICON}")
 
-    # Font size: text should fill ~65-70% width, positioned slightly left of center vertically
-    font_size = int(size * 0.23)
-    font = ImageFont.truetype(str(font_path), font_size)
-
-    # Measure full text
-    full_text = "DINEIN"
-    full_bbox = draw.textbbox((0, 0), full_text, font=font)
-    full_width = full_bbox[2] - full_bbox[0]
-    full_height = full_bbox[3] - full_bbox[1]
-
-    # Center horizontally, slightly above center vertically (matching the logo)
-    x = (size - full_width) / 2 - full_bbox[0]
-    y = (size - full_height) / 2 - full_bbox[1] - size * 0.02
-
-    # Draw "DINE" in dark gold
-    draw.text((x, y), "DINE", font=font, fill=GOLD)
-
-    # Measure "DINE" width to position "IN" right after
-    dine_bbox = draw.textbbox((0, 0), "DINE", font=font)
-    dine_width = dine_bbox[2] - dine_bbox[0]
-
-    # Draw "IN" in white
-    draw.text((x + dine_width, y), "IN", font=font, fill=WHITE)
-
+    image = Image.open(SOURCE_ICON).convert("RGBA")
+    if image.size != (1024, 1024):
+        image = image.resize((1024, 1024), Image.Resampling.LANCZOS)
     return image
 
 
@@ -105,20 +76,44 @@ def write_targets(master: Image.Image, targets: dict[str, int], base_dir: Path) 
         resized.save(output_path)
 
 
+def write_text(path: Path, contents: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(contents, encoding="utf-8")
+
+
+def to_hex(rgb: tuple[int, int, int]) -> str:
+    return "#{:02X}{:02X}{:02X}".format(*rgb)
+
+
+def write_adaptive_resources(master: Image.Image) -> None:
+    bg_hex = to_hex(master.getpixel((0, 0))[:3])
+    colors_xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">{bg_hex}</color>
+</resources>
+"""
+    write_text(ANDROID_VALUES_DIR / "colors.xml", colors_xml)
+    write_text(ADAPTIVE_ICON_DIR / "ic_launcher.xml", ADAPTIVE_ICON_XML)
+    write_text(ADAPTIVE_ICON_DIR / "ic_launcher_round.xml", ADAPTIVE_ICON_XML)
+
+
 def main() -> None:
-    font_path = resolve_font()
-    master = build_master_icon(1024, font_path)
+    master = load_master_icon()
 
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
-    master.save(PREVIEW_DIR / "dinein-brand-icon-1024.png")
-
     write_targets(master, ANDROID_TARGETS, ANDROID_ICON_DIR)
+    write_targets(master, ANDROID_ADAPTIVE_FOREGROUND_TARGETS, ANDROID_ICON_DIR)
     write_targets(master, IOS_TARGETS, IOS_ICON_DIR)
+    write_adaptive_resources(master)
 
-    print(f"✅ Generated DINEIN brand icons using font: {font_path.name}")
-    print(f"   Master: {PREVIEW_DIR / 'dinein-brand-icon-1024.png'}")
-    print(f"   Android: {len(ANDROID_TARGETS)} icons")
+    print(f"✅ Generated DINEIN launcher icons from: {SOURCE_ICON.name}")
+    print(
+        "   Android: "
+        f"{len(ANDROID_TARGETS)} legacy + "
+        f"{len(ANDROID_ADAPTIVE_FOREGROUND_TARGETS)} adaptive foreground icons"
+    )
     print(f"   iOS: {len(IOS_TARGETS)} icons")
+    print(f"   Adaptive XML: {ADAPTIVE_ICON_DIR}")
 
 
 if __name__ == "__main__":

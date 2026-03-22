@@ -4,9 +4,11 @@ import 'pressable_scale.dart';
 export 'pressable_scale.dart';
 export 'dinein_image.dart';
 export 'brand_mark.dart';
+export 'permission_access_dialog.dart';
 export 'wave_bottom_sheet.dart';
 export 'otp_widgets.dart';
 export 'role_switch_footer.dart';
+export 'access_support_dialog.dart';
 
 /// Claymorphic card — the signature DineIn interactive surface.
 ///

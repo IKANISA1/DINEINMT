@@ -69,6 +69,12 @@ const orderPaymentStatuses = new Set([
 const accessVerificationMethods = new Set(["otp", "admin_override"]);
 const menuImageStatuses = new Set(["pending", "generating", "ready", "failed"]);
 const menuImageSources = new Set(["manual", "ai_gemini"]);
+const ANONYMOUS_WAVE_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+const ANONYMOUS_WAVE_RATE_LIMIT_MAX_REQUESTS = 3;
+const GOOGLE_MAPS_SEARCH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const GOOGLE_MAPS_SEARCH_RATE_LIMIT_MAX_REQUESTS = 20;
+const anonymousWaveRateLimitBuckets = new Map<string, number[]>();
+const googleMapsSearchRateLimitBuckets = new Map<string, number[]>();
 
 type JsonRecord = Record<string, unknown>;
 
@@ -207,6 +213,154 @@ function booleanValue(value: unknown): boolean | undefined {
   return undefined;
 }
 
+export function normalizeWaveTableNumber(value: unknown): string {
+  const raw = stringValue(value)?.replaceAll(/\s+/g, "");
+  if (!raw || !/^\d{1,4}$/.test(raw)) {
+    throw new HttpError(
+      400,
+      "Table number must be 1 to 4 digits.",
+      { code: "invalid_table_number" },
+    );
+  }
+
+  const normalized = Number.parseInt(raw, 10);
+  if (!Number.isFinite(normalized) || normalized < 1) {
+    throw new HttpError(
+      400,
+      "Table number must be 1 to 4 digits.",
+      { code: "invalid_table_number" },
+    );
+  }
+
+  return String(normalized);
+}
+
+function clientIpAddress(req: Request): string | null {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+
+  return req.headers.get("cf-connecting-ip")?.trim() ??
+    req.headers.get("x-real-ip")?.trim() ??
+    null;
+}
+
+function anonymousWaveRateLimitKey(
+  req: Request,
+  venueId: string,
+): string | null {
+  const ip = clientIpAddress(req);
+  if (!ip) return null;
+
+  const userAgent = req.headers.get("user-agent")?.trim() ?? "unknown";
+  return `${venueId}:${ip}:${userAgent.slice(0, 160)}`;
+}
+
+function pruneAnonymousWaveRateLimitBucket(
+  key: string,
+  nowMs: number,
+): number[] {
+  const windowStart = nowMs - ANONYMOUS_WAVE_RATE_LIMIT_WINDOW_MS;
+  const recent = (anonymousWaveRateLimitBuckets.get(key) ?? []).filter((
+    timestamp,
+  ) => timestamp >= windowStart);
+
+  if (recent.length == 0) {
+    anonymousWaveRateLimitBuckets.delete(key);
+  } else {
+    anonymousWaveRateLimitBuckets.set(key, recent);
+  }
+
+  return recent;
+}
+
+function assertAnonymousWaveRateLimit(
+  req: Request,
+  venueId: string,
+  nowMs: number,
+): string | null {
+  const key = anonymousWaveRateLimitKey(req, venueId);
+  if (!key) return null;
+
+  const recent = pruneAnonymousWaveRateLimitBucket(key, nowMs);
+  if (recent.length >= ANONYMOUS_WAVE_RATE_LIMIT_MAX_REQUESTS) {
+    throw new HttpError(
+      429,
+      "Too many staff requests from this device. Please wait a moment and try again.",
+      { code: "wave_rate_limited" },
+    );
+  }
+
+  return key;
+}
+
+function recordAnonymousWaveRateLimit(key: string, nowMs: number): void {
+  const recent = pruneAnonymousWaveRateLimitBucket(key, nowMs);
+  recent.push(nowMs);
+  anonymousWaveRateLimitBuckets.set(key, recent);
+}
+
+export function resetWaveRateLimitState(): void {
+  anonymousWaveRateLimitBuckets.clear();
+}
+
+function googleMapsSearchRateLimitKey(req: Request): string | null {
+  const ip = clientIpAddress(req);
+  if (!ip) return null;
+
+  const userAgent = req.headers.get("user-agent")?.trim() ?? "unknown";
+  return `${ip}:${userAgent.slice(0, 160)}`;
+}
+
+function pruneGoogleMapsSearchRateLimitBucket(
+  key: string,
+  nowMs: number,
+): number[] {
+  const windowStart = nowMs - GOOGLE_MAPS_SEARCH_RATE_LIMIT_WINDOW_MS;
+  const recent = (googleMapsSearchRateLimitBuckets.get(key) ?? []).filter((
+    timestamp,
+  ) => timestamp >= windowStart);
+
+  if (recent.length == 0) {
+    googleMapsSearchRateLimitBuckets.delete(key);
+  } else {
+    googleMapsSearchRateLimitBuckets.set(key, recent);
+  }
+
+  return recent;
+}
+
+function assertGoogleMapsSearchRateLimit(
+  req: Request,
+  nowMs: number,
+): string | null {
+  const key = googleMapsSearchRateLimitKey(req);
+  if (!key) return null;
+
+  const recent = pruneGoogleMapsSearchRateLimitBucket(key, nowMs);
+  if (recent.length >= GOOGLE_MAPS_SEARCH_RATE_LIMIT_MAX_REQUESTS) {
+    throw new HttpError(
+      429,
+      "Too many venue search requests from this device. Please wait a moment and try again.",
+      { code: "google_maps_search_rate_limited" },
+    );
+  }
+
+  return key;
+}
+
+function recordGoogleMapsSearchRateLimit(key: string, nowMs: number): void {
+  const recent = pruneGoogleMapsSearchRateLimitBucket(key, nowMs);
+  recent.push(nowMs);
+  googleMapsSearchRateLimitBuckets.set(key, recent);
+}
+
+export function resetGoogleMapsSearchRateLimitState(): void {
+  googleMapsSearchRateLimitBuckets.clear();
+}
+
 function normalizeListLimit(value: unknown, max = 100): number | null {
   const raw = numberValue(value);
   if (raw == undefined) return null;
@@ -305,6 +459,26 @@ export function normalizeVenueSupportedPaymentMethods(
   }
 
   return [...new Set(normalized)];
+}
+
+export function shouldGenerateAiVenueProfileImage(rawVenue: unknown): boolean {
+  const venue = asRecord(rawVenue);
+  if (booleanValue(venue.image_locked) ?? false) {
+    return false;
+  }
+
+  const imageSource = stringValue(venue.image_source) ?? null;
+  const hasImage = Boolean(stringValue(venue.image_url));
+
+  if (imageSource == "manual") {
+    return false;
+  }
+
+  if (!hasImage) {
+    return true;
+  }
+
+  return imageSource != "ai_gemini";
 }
 
 export function venueOrderingReadiness(rawVenue: unknown): {
@@ -1777,6 +1951,27 @@ function sanitizeStorageFileName(fileName: string): string {
   return sanitized.length == 0 ? "menu-upload" : sanitized;
 }
 
+function normalizeHighlightRank(
+  value: unknown,
+  { allowNull = false }: { allowNull?: boolean } = {},
+): number | null | undefined {
+  if (value === null) {
+    return allowNull ? null : undefined;
+  }
+
+  const rank = numberValue(value);
+  if (rank == undefined) {
+    return undefined;
+  }
+
+  const rounded = Math.round(rank);
+  if (rounded < 1 || rounded > 3) {
+    throw new HttpError(400, "Highlight rank must be between 1 and 3.");
+  }
+
+  return rounded;
+}
+
 function sanitizeMenuItemInsert(
   rawItem: unknown,
   venueId?: string,
@@ -1804,6 +1999,19 @@ function sanitizeMenuItemInsert(
 
   const sortOrder = numberValue(item.sort_order);
   if (sortOrder != undefined) sanitized.sort_order = Math.round(sortOrder);
+
+  if ("highlight_rank" in item || "highlightRank" in item) {
+    const rawHighlightRank = "highlight_rank" in item
+      ? item.highlight_rank
+      : item.highlightRank;
+    const highlightRank = normalizeHighlightRank(
+      rawHighlightRank,
+      { allowNull: true },
+    );
+    if (highlightRank !== undefined) {
+      sanitized.highlight_rank = highlightRank;
+    }
+  }
 
   const imageSource = stringValue(item.image_source);
   if (imageSource && menuImageSources.has(imageSource)) {
@@ -1873,6 +2081,19 @@ function sanitizeMenuItemUpdates(rawUpdates: unknown): JsonRecord {
 
   const sortOrder = numberValue(updates.sort_order);
   if (sortOrder != undefined) sanitized.sort_order = Math.round(sortOrder);
+
+  if ("highlight_rank" in updates || "highlightRank" in updates) {
+    const rawHighlightRank = "highlight_rank" in updates
+      ? updates.highlight_rank
+      : updates.highlightRank;
+    const highlightRank = normalizeHighlightRank(
+      rawHighlightRank,
+      { allowNull: true },
+    );
+    if (highlightRank !== undefined) {
+      sanitized.highlight_rank = highlightRank;
+    }
+  }
 
   const imageSource = stringValue(updates.image_source);
   if (imageSource && menuImageSources.has(imageSource)) {
@@ -2542,9 +2763,14 @@ async function handleUpdateVenue(
     return ok(true);
   }
 
+  const currentVenue = mode == "admin" || "status" in updates
+    ? await venueSnapshot(supabase, venueId)
+    : null;
+
   if (mode == "admin") {
-    const currentVenue = await venueSnapshot(supabase, venueId);
-    const nextVenue = { ...currentVenue, ...updates };
+    const persistedVenue = currentVenue ??
+      await venueSnapshot(supabase, venueId);
+    const nextVenue = { ...persistedVenue, ...updates };
     const readiness = venueOrderingReadiness(nextVenue);
     const explicitEnable = updates.ordering_enabled === true;
 
@@ -2560,10 +2786,25 @@ async function handleUpdateVenue(
     }
 
     if (
-      (booleanValue(currentVenue.ordering_enabled) ?? false) &&
+      (booleanValue(persistedVenue.ordering_enabled) ?? false) &&
       !readiness.ready
     ) {
       updates.ordering_enabled = false;
+    }
+  }
+
+  if (mode == "venue" && currentVenue != null && "status" in updates) {
+    const nextStatus = stringValue(updates.status) ?? venueStatus(currentVenue);
+    if (nextStatus != "active") {
+      updates.ordering_enabled = false;
+    } else {
+      const readiness = venueOrderingReadiness({
+        ...currentVenue,
+        ...updates,
+        status: "active",
+        ordering_enabled: true,
+      });
+      updates.ordering_enabled = readiness.ready;
     }
   }
 
@@ -3070,6 +3311,93 @@ async function handleDeleteMenuItem(
   return ok(true);
 }
 
+async function handleSetMenuItemHighlights(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const venueId = requireString(body, "venueId", "venue_id");
+  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+
+  const rawItemIds = Array.isArray(body.itemIds)
+    ? body.itemIds
+    : Array.isArray(body.item_ids)
+    ? body.item_ids
+    : [];
+  const itemIds = rawItemIds
+    .map((value) => stringValue(value)?.trim() ?? "")
+    .filter(Boolean)
+    .filter((value, index, values) => values.indexOf(value) == index);
+
+  if (itemIds.length > 3) {
+    throw new HttpError(400, "You can select at most 3 highlighted items.");
+  }
+
+  if (itemIds.length > 0) {
+    const { data: existingItems, error: validateError } = await supabase
+      .from("dinein_menu_items")
+      .select("id")
+      .eq("venue_id", venueId)
+      .in("id", itemIds);
+
+    if (validateError) {
+      console.error(
+        "[dinein-api] validate menu item highlights failed",
+        validateError,
+      );
+      throw new HttpError(500, "Could not validate highlighted menu items.");
+    }
+
+    if ((existingItems ?? []).length != itemIds.length) {
+      throw new HttpError(
+        400,
+        "Highlighted items must belong to the current venue.",
+      );
+    }
+  }
+
+  const { error: clearError } = await supabase
+    .from("dinein_menu_items")
+    .update({ highlight_rank: null })
+    .eq("venue_id", venueId);
+
+  if (clearError) {
+    console.error("[dinein-api] clear menu item highlights failed", clearError);
+    throw new HttpError(500, "Could not reset highlighted menu items.");
+  }
+
+  for (const [index, itemId] of itemIds.entries()) {
+    const { error: updateError } = await supabase
+      .from("dinein_menu_items")
+      .update({ highlight_rank: index + 1 })
+      .eq("venue_id", venueId)
+      .eq("id", itemId);
+
+    if (updateError) {
+      console.error(
+        "[dinein-api] set menu item highlight failed",
+        updateError,
+      );
+      throw new HttpError(500, "Could not update highlighted menu items.");
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("dinein_menu_items")
+    .select("*")
+    .eq("venue_id", venueId)
+    .order("highlight_rank", { ascending: true, nullsFirst: false })
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("[dinein-api] reload menu item highlights failed", error);
+    throw new HttpError(500, "Could not reload the updated menu items.");
+  }
+
+  return ok(data ?? []);
+}
+
 async function handleImportDraftItems(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
@@ -3420,6 +3748,12 @@ async function handleEnrichVenueProfile(
   const overwriteExisting = booleanValue(body.overwriteExisting) ?? false;
   const forcePlaceRefresh = booleanValue(body.forcePlaceRefresh) ?? false;
   const skipSearchGrounding = booleanValue(body.skipSearchGrounding) ?? false;
+  const generateProfileImage = booleanValue(
+    body.generateProfileImage ?? body.generate_profile_image,
+  ) ?? true;
+  const forceImageRegenerate = booleanValue(
+    body.forceImageRegenerate ?? body.force_image_regenerate,
+  ) ?? false;
   const enrichmentClient = supabase as unknown as ReturnType<
     typeof createVenueEnrichmentAdminClient
   >;
@@ -3434,7 +3768,34 @@ async function handleEnrichVenueProfile(
     skipSearchGrounding,
   });
 
-  return ok(result);
+  let profileImageResult: JsonRecord | null = null;
+  let profileImageError: string | null = null;
+  try {
+    profileImageResult = await maybeGenerateVenueProfileImageAfterEnrichment(
+      supabase,
+      venueId,
+      {
+        generateProfileImage,
+        forceImageRegenerate,
+        forceGroundingRefresh: false,
+        skipSearchGrounding,
+      },
+    );
+  } catch (error) {
+    profileImageError = error instanceof Error ? error.message : String(error);
+  }
+
+  return ok({
+    ...(result as unknown as JsonRecord),
+    ...(profileImageResult == null ? {} : {
+      profile_image: profileImageResult,
+      profileImage: profileImageResult,
+    }),
+    ...(profileImageError == null ? {} : {
+      profile_image_error: profileImageError,
+      profileImageError,
+    }),
+  });
 }
 
 async function handleBackfillVenueProfiles(
@@ -3458,6 +3819,12 @@ async function handleBackfillVenueProfiles(
   const overwriteExisting = booleanValue(body.overwriteExisting) ?? false;
   const forcePlaceRefresh = booleanValue(body.forcePlaceRefresh) ?? false;
   const skipSearchGrounding = booleanValue(body.skipSearchGrounding) ?? false;
+  const generateProfileImage = booleanValue(
+    body.generateProfileImage ?? body.generate_profile_image,
+  ) ?? true;
+  const forceImageRegenerate = booleanValue(
+    body.forceImageRegenerate ?? body.force_image_regenerate,
+  ) ?? false;
   const limit = normalizeVenueEnrichmentLimit(body.limit);
   const enrichmentClient = supabase as unknown as ReturnType<
     typeof createVenueEnrichmentAdminClient
@@ -3474,6 +3841,9 @@ async function handleBackfillVenueProfiles(
   let enriched = 0;
   let skipped = 0;
   let failed = 0;
+  let imagesGenerated = 0;
+  let imagesSkipped = 0;
+  let imagesFailed = 0;
 
   for (const venue of venues) {
     try {
@@ -3485,7 +3855,45 @@ async function handleBackfillVenueProfiles(
         forcePlaceRefresh,
         skipSearchGrounding,
       });
-      results.push(result as unknown as JsonRecord);
+      let profileImageResult: JsonRecord | null = null;
+      let profileImageError: string | null = null;
+      try {
+        profileImageResult =
+          await maybeGenerateVenueProfileImageAfterEnrichment(
+            supabase,
+            venue.id,
+            {
+              generateProfileImage,
+              forceImageRegenerate,
+              forceGroundingRefresh: false,
+              skipSearchGrounding,
+            },
+          );
+        if (profileImageResult == null) {
+          imagesSkipped += 1;
+        } else if (stringValue(profileImageResult.status) == "success") {
+          imagesGenerated += 1;
+        } else {
+          imagesSkipped += 1;
+        }
+      } catch (error) {
+        imagesFailed += 1;
+        profileImageError = error instanceof Error
+          ? error.message
+          : String(error);
+      }
+
+      results.push({
+        ...(result as unknown as JsonRecord),
+        ...(profileImageResult == null ? {} : {
+          profile_image: profileImageResult,
+          profileImage: profileImageResult,
+        }),
+        ...(profileImageError == null ? {} : {
+          profile_image_error: profileImageError,
+          profileImageError,
+        }),
+      });
       if (result.status == "success") {
         enriched += 1;
       } else {
@@ -3508,6 +3916,12 @@ async function handleBackfillVenueProfiles(
     enriched,
     skipped,
     failed,
+    images_generated: imagesGenerated,
+    imagesGenerated,
+    images_skipped: imagesSkipped,
+    imagesSkipped,
+    images_failed: imagesFailed,
+    imagesFailed,
     results,
   });
 }
@@ -3689,6 +4103,54 @@ async function loadVenuesForVenueImageBackfill(
     .slice(0, limit);
 }
 
+async function maybeGenerateVenueProfileImageAfterEnrichment(
+  supabase: ReturnType<typeof adminClient>,
+  venueId: string,
+  options?: {
+    generateProfileImage?: boolean;
+    forceImageRegenerate?: boolean;
+    forceGroundingRefresh?: boolean;
+    skipSearchGrounding?: boolean;
+  },
+): Promise<JsonRecord | null> {
+  if (options?.generateProfileImage === false) {
+    return null;
+  }
+
+  const imageClient = supabase as unknown as ReturnType<
+    typeof createVenueProfileImageAdminClient
+  >;
+  const venue = await fetchVenueForEnrichment(
+    imageClient as unknown as ReturnType<
+      typeof createVenueEnrichmentAdminClient
+    >,
+    venueId,
+  );
+
+  if (
+    !shouldGenerateAiVenueProfileImage(venue) &&
+    !(options?.forceImageRegenerate ?? false)
+  ) {
+    return null;
+  }
+
+  const imageSource = stringValue(venue.image_source) ?? null;
+  const hasImage = Boolean(stringValue(venue.image_url));
+  const shouldForceRegenerate = (options?.forceImageRegenerate ?? false) ||
+    (hasImage && imageSource != "ai_gemini" && imageSource != "manual");
+
+  const result = await processVenueProfileImageGeneration({
+    adminClient: imageClient,
+    env: getVenueProfileImageEnv(),
+    venue,
+    forceRegenerate: shouldForceRegenerate,
+    forceGroundingRefresh: options?.forceGroundingRefresh ?? false,
+    skipSearchGrounding: options?.skipSearchGrounding ?? false,
+  });
+
+  return result as unknown as JsonRecord;
+}
+
 async function handleUploadMenuFile(
   supabase: ReturnType<typeof adminClient>,
   _req: Request,
@@ -3770,9 +4232,12 @@ async function handleUploadMenuFile(
   }, 201);
 }
 
-async function handleSearchGoogleMaps(body: JsonRecord): Promise<Response> {
-  const query = requireString(body, "query");
-  if (query.trim().length < 2) {
+async function handleSearchGoogleMaps(
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const query = requireString(body, "query").trim();
+  if (query.length < 2) {
     return ok([]);
   }
 
@@ -3781,7 +4246,15 @@ async function handleSearchGoogleMaps(body: JsonRecord): Promise<Response> {
     return ok([]);
   }
 
-  const country = stringValue(body.country) ?? "Malta";
+  const nowMs = Date.now();
+  const rateLimitKey = assertGoogleMapsSearchRateLimit(req, nowMs);
+  if (rateLimitKey) {
+    recordGoogleMapsSearchRateLimit(rateLimitKey, nowMs);
+  }
+
+  // Keep the public onboarding search scoped to Malta to reduce abuse and
+  // accidental cross-market matches.
+  const country = "Malta";
   const models = (
     Deno.env.get("GEMINI_VENUE_MODELS") ??
       "gemini-2.5-flash,gemini-2.5-flash-lite"
@@ -3895,7 +4368,9 @@ async function handleSendWave(
   body: JsonRecord,
 ): Promise<Response> {
   const venueId = requireString(body, "venueId", "venue_id");
-  const tableNumber = requireString(body, "tableNumber", "table_number").trim();
+  const tableNumber = normalizeWaveTableNumber(
+    body.tableNumber ?? body.table_number,
+  );
 
   // Verify the venue exists and is active before accepting a wave
   const { data: venueCheck, error: venueCheckError } = await supabase
@@ -3933,6 +4408,10 @@ async function handleSendWave(
     return ok(existing, 200);
   }
 
+  const anonymousRateLimitKey = user == null
+    ? assertAnonymousWaveRateLimit(req, venueId, now.getTime())
+    : null;
+
   const { data, error } = await supabase
     .from("bell_requests")
     .insert({
@@ -3945,6 +4424,10 @@ async function handleSendWave(
   if (error) {
     console.error("[dinein-api] wave insert failed", error);
     throw new HttpError(500, "Could not create the wave request.");
+  }
+
+  if (anonymousRateLimitKey != null) {
+    recordAnonymousWaveRateLimit(anonymousRateLimitKey, now.getTime());
   }
 
   return ok(data, 201);
@@ -4149,8 +4632,57 @@ async function handlePlaceOrder(
 
   return ok({
     ...orderData,
+    venue_image_url: stringValue(venue.image_url) ?? null,
     ...(receiptToken == null ? {} : { receipt_token: receiptToken }),
   }, 201);
+}
+
+async function attachVenueImagesToOrders(
+  supabase: ReturnType<typeof adminClient>,
+  orders: unknown[],
+): Promise<JsonRecord[]> {
+  const normalizedOrders = orders.map((order) => asRecord(order));
+  const venueIds = [
+    ...new Set(
+      normalizedOrders
+        .map((order) => stringValue(order.venue_id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
+
+  if (venueIds.length == 0) {
+    return normalizedOrders;
+  }
+
+  const { data, error } = await supabase
+    .from("dinein_venues")
+    .select("id, image_url")
+    .in("id", venueIds);
+
+  if (error) {
+    console.error("[dinein-api] order venue image lookup failed", error);
+    return normalizedOrders;
+  }
+
+  const imageByVenueId = new Map<string, string | null>();
+  for (const entry of (data ?? [])) {
+    const venue = asRecord(entry);
+    const venueId = stringValue(venue.id);
+    if (!venueId) continue;
+    imageByVenueId.set(venueId, stringValue(venue.image_url) ?? null);
+  }
+
+  return normalizedOrders.map((order) => {
+    const venueId = stringValue(order.venue_id);
+    return {
+      ...order,
+      venue_image_url: venueId == null
+        ? stringValue(order.venue_image_url) ?? null
+        : imageByVenueId.get(venueId) ??
+          stringValue(order.venue_image_url) ??
+          null,
+    };
+  });
 }
 
 async function handleGetOrdersForVenue(
@@ -4172,7 +4704,7 @@ async function handleGetOrdersForVenue(
     throw new HttpError(500, "Could not load venue orders.");
   }
 
-  return ok(data ?? []);
+  return ok(await attachVenueImagesToOrders(supabase, data ?? []));
 }
 
 async function handleGetOrdersForUser(
@@ -4194,7 +4726,7 @@ async function handleGetOrdersForUser(
     throw new HttpError(500, "Could not load the user's orders.");
   }
 
-  return ok(data ?? []);
+  return ok(await attachVenueImagesToOrders(supabase, data ?? []));
 }
 
 async function handleImageHealth(
@@ -4255,7 +4787,7 @@ async function handleGetAllOrders(
     throw new HttpError(500, "Could not load orders.");
   }
 
-  return ok(data ?? []);
+  return ok(await attachVenueImagesToOrders(supabase, data ?? []));
 }
 
 async function handleGetOrderById(
@@ -4283,17 +4815,17 @@ async function handleGetOrderById(
   }
 
   if (receiptToken && await verifyOrderReceiptToken(receiptToken, orderId)) {
-    return ok(data);
+    return ok((await attachVenueImagesToOrders(supabase, [data]))[0] ?? data);
   }
 
   if (await adminUserId(supabase, req)) {
-    return ok(data);
+    return ok((await attachVenueImagesToOrders(supabase, [data]))[0] ?? data);
   }
 
   const order = asRecord(data);
   const user = await currentUser(req);
   if (user && stringValue(order.user_id) == user.id) {
-    return ok(data);
+    return ok((await attachVenueImagesToOrders(supabase, [data]))[0] ?? data);
   }
 
   const venueClaims = await venueSessionClaims(req);
@@ -4301,7 +4833,7 @@ async function handleGetOrderById(
     stringValue(venueClaims?.venue_id) != undefined &&
     stringValue(venueClaims?.venue_id) == stringValue(order.venue_id)
   ) {
-    return ok(data);
+    return ok((await attachVenueImagesToOrders(supabase, [data]))[0] ?? data);
   }
 
   throw new HttpError(403, "You are not allowed to access this order.");
@@ -4550,6 +5082,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleUpdateMenuItem(supabase, req, body);
       case "delete_menu_item":
         return await handleDeleteMenuItem(supabase, req, body);
+      case "set_menu_item_highlights":
+        return await handleSetMenuItemHighlights(supabase, req, body);
       case "import_draft_items":
         return await handleImportDraftItems(supabase, req, body);
       case "generate_menu_item_image":
@@ -4587,7 +5121,7 @@ export async function handleAppRequest(req: Request): Promise<Response> {
       case "issue_venue_token":
         return await handleIssueVenueToken(supabase, req, body);
       case "search_google_maps":
-        return await handleSearchGoogleMaps(body);
+        return await handleSearchGoogleMaps(req, body);
       case "ocr_extract_menu":
         return await handleOcrExtractMenu(supabase, req, body);
       case "replace_venue_menu":

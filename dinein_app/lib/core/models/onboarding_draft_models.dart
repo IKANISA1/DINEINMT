@@ -9,6 +9,7 @@ class ClaimedVenueDraft {
   final String? imageUrl;
   final String? contactPhone;
   final String? contactEmail;
+  final String? websiteUrl;
   final bool claimSubmitted;
 
   const ClaimedVenueDraft({
@@ -20,6 +21,7 @@ class ClaimedVenueDraft {
     this.imageUrl,
     this.contactPhone,
     this.contactEmail,
+    this.websiteUrl,
     this.claimSubmitted = false,
   });
 
@@ -33,6 +35,7 @@ class ClaimedVenueDraft {
       imageUrl: venue.imageUrl,
       contactPhone: venue.phone,
       contactEmail: venue.email,
+      websiteUrl: null,
     );
   }
 
@@ -46,6 +49,7 @@ class ClaimedVenueDraft {
       imageUrl: json['image_url'] as String?,
       contactPhone: json['contact_phone'] as String?,
       contactEmail: json['contact_email'] as String?,
+      websiteUrl: json['website_url'] as String?,
       claimSubmitted: json['claim_submitted'] as bool? ?? false,
     );
   }
@@ -59,6 +63,7 @@ class ClaimedVenueDraft {
     'image_url': imageUrl,
     'contact_phone': contactPhone,
     'contact_email': contactEmail,
+    'website_url': websiteUrl,
     'claim_submitted': claimSubmitted,
   };
 
@@ -71,6 +76,7 @@ class ClaimedVenueDraft {
     String? imageUrl,
     String? contactPhone,
     String? contactEmail,
+    String? websiteUrl,
     bool? claimSubmitted,
   }) {
     return ClaimedVenueDraft(
@@ -82,6 +88,7 @@ class ClaimedVenueDraft {
       imageUrl: imageUrl ?? this.imageUrl,
       contactPhone: contactPhone ?? this.contactPhone,
       contactEmail: contactEmail ?? this.contactEmail,
+      websiteUrl: websiteUrl ?? this.websiteUrl,
       claimSubmitted: claimSubmitted ?? this.claimSubmitted,
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/models.dart';
@@ -24,66 +25,144 @@ class MenuScreen extends ConsumerStatefulWidget {
 }
 
 class _MenuScreenState extends ConsumerState<MenuScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   TabController? _tabController;
-  final Map<String, GlobalKey> _categoryKeys = {};
+  final TextEditingController _searchController = TextEditingController();
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final ItemPositionsListener _itemPositionsListener =
+      ItemPositionsListener.create();
   bool _isAutoScrolling = false;
 
   List<String> _categories = [];
+  List<_MenuListEntry> _entries = const [];
+  Map<String, int> _categoryHeaderIndexes = const {};
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _itemPositionsListener.itemPositions.addListener(_syncActiveTabWithScroll);
+  }
 
   @override
   void dispose() {
+    _itemPositionsListener.itemPositions.removeListener(
+      _syncActiveTabWithScroll,
+    );
+    _searchController.dispose();
     _tabController?.dispose();
     super.dispose();
   }
 
-  List<MenuItem> _itemsForCategory(String category, List<MenuItem> allItems) =>
-      allItems.where((i) => i.category == category).toList();
-
   void _rebuildTabs(List<String> categories) {
+    if (categories.isEmpty) {
+      _tabController?.dispose();
+      _tabController = null;
+      _categories = const [];
+      return;
+    }
+
     if (categories.length != _categories.length ||
         !categories.every((c) => _categories.contains(c))) {
       _tabController?.dispose();
       _categories = categories;
       _tabController = TabController(length: categories.length, vsync: this);
-      _categoryKeys.clear();
-      for (final c in categories) {
-        _categoryKeys[c] = GlobalKey();
-      }
     }
   }
 
-  bool _onScroll(ScrollNotification notification) {
-    if (_isAutoScrolling || _categoryKeys.isEmpty || _tabController == null) {
-      return false;
-    }
+  void _rebuildEntries(List<String> categories, List<MenuItem> items) {
+    final nextEntries = <_MenuListEntry>[];
+    final nextHeaderIndexes = <String, int>{};
 
-    int activeIndex = 0;
-    double minDistance = double.infinity;
+    for (final category in categories) {
+      final categoryItems = items
+          .where((item) => item.category == category && item.isAvailable)
+          .toList(growable: false);
+      if (categoryItems.isEmpty) continue;
 
-    for (int i = 0; i < _categories.length; i++) {
-      final key = _categoryKeys[_categories[i]];
-      if (key?.currentContext != null) {
-        final box = key!.currentContext!.findRenderObject() as RenderBox;
-        final position = box.localToGlobal(
-          Offset.zero,
-          ancestor: context.findRenderObject(),
-        );
-        // Calculate distance to a point slightly below the AppBar (approx 120px)
-        final distance = (position.dy - 120).abs();
-        if (distance < minDistance) {
-          minDistance = distance;
-          activeIndex = i;
-        }
+      nextHeaderIndexes[category] = nextEntries.length;
+      nextEntries.add(_MenuListEntry.header(category: category));
+      for (final item in categoryItems) {
+        nextEntries.add(_MenuListEntry.item(category: category, item: item));
       }
     }
+
+    nextEntries.add(const _MenuListEntry.spacer());
+    _entries = nextEntries;
+    _categoryHeaderIndexes = nextHeaderIndexes;
+  }
+
+  List<MenuItem> _filterItems(List<MenuItem> items) {
+    final availableItems = items.where((item) => item.isAvailable);
+    if (_query.isEmpty) {
+      return availableItems.toList(growable: false);
+    }
+
+    final needle = _query.toLowerCase();
+    return availableItems
+        .where((item) {
+          final haystack =
+              '${item.name} ${item.description} ${item.category} ${item.tags.join(' ')}'
+                  .toLowerCase();
+          return haystack.contains(needle);
+        })
+        .toList(growable: false);
+  }
+
+  void _syncMenuToTop() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_itemScrollController.isAttached || _entries.isEmpty) {
+        return;
+      }
+
+      _isAutoScrolling = true;
+      _itemScrollController.jumpTo(index: 0, alignment: 0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _isAutoScrolling = false;
+      });
+    });
+  }
+
+  void _onSearchChanged(String value) {
+    final normalized = value.trim();
+    if (_query == normalized) return;
+    setState(() => _query = normalized);
+    _syncMenuToTop();
+  }
+
+  void _clearSearch() {
+    if (_query.isEmpty && _searchController.text.isEmpty) return;
+    _searchController.clear();
+    setState(() => _query = '');
+    _syncMenuToTop();
+  }
+
+  void _syncActiveTabWithScroll() {
+    if (_isAutoScrolling || _entries.isEmpty || _tabController == null) {
+      return;
+    }
+
+    final positions = _itemPositionsListener.itemPositions.value;
+    if (positions.isEmpty) return;
+
+    final visible = positions.where(
+      (position) => position.itemTrailingEdge > 0,
+    );
+    if (visible.isEmpty) return;
+
+    final topmost = visible.reduce((current, next) {
+      return next.itemLeadingEdge < current.itemLeadingEdge ? next : current;
+    });
+
+    final activeCategory = _entries[topmost.index].category;
+    final activeIndex = _categories.indexOf(activeCategory);
+    if (activeIndex == -1) return;
 
     if (_tabController!.index != activeIndex &&
         !_tabController!.indexIsChanging) {
       _tabController!.animateTo(activeIndex);
     }
-
-    return false;
   }
 
   @override
@@ -91,8 +170,30 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final menuAsync = ref.watch(menuItemsProvider(widget.venueId));
+    final venueAsync = ref.watch(venueByIdProvider(widget.venueId));
     final cart = ref.watch(cartProvider);
     final cartNotifier = ref.read(cartProvider.notifier);
+    final venue = venueAsync.asData?.value;
+
+    if (venue != null &&
+        (cart.venueId != venue.id ||
+            cart.venueName != venue.name ||
+            cart.venueCountry != venue.country ||
+            cart.venueRevolutUrl != venue.revolutUrl)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref
+            .read(cartProvider.notifier)
+            .setVenue(
+              venueId: venue.id,
+              venueSlug: venue.slug,
+              venueName: venue.name,
+              venueRevolutUrl: venue.revolutUrl,
+              venueCountry: venue.country,
+              tableNumber: cart.tableNumber,
+            );
+      });
+    }
 
     return menuAsync.when(
       loading: () => Scaffold(
@@ -140,7 +241,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                   padding: const EdgeInsets.all(8),
                   child: IconButton(
                     icon: Icon(LucideIcons.hand, color: cs.primary),
-                    onPressed: () => WaveBottomSheet.show(context, widget.venueId),
+                    onPressed: () =>
+                        WaveBottomSheet.show(context, widget.venueId),
                   ),
                 ),
               ],
@@ -154,16 +256,23 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
           );
         }
 
-        // Derive categories from items (preserving order)
-        final categories = items.map((i) => i.category).toSet().toList();
+        final filteredItems = _filterItems(items);
+
+        // Derive visible categories from filtered available items while
+        // preserving insertion order.
+        final categories = filteredItems
+            .map((item) => item.category)
+            .toSet()
+            .toList();
 
         _rebuildTabs(categories);
+        _rebuildEntries(categories, filteredItems);
 
         return _buildMenu(
           context,
           cs,
           tt,
-          items,
+          venue,
           categories,
           cart,
           cartNotifier,
@@ -176,7 +285,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
     BuildContext context,
     ColorScheme cs,
     TextTheme tt,
-    List<MenuItem> items,
+    Venue? venue,
     List<String> categories,
     CartState cart,
     CartNotifier cartNotifier,
@@ -192,7 +301,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  cart.venueName ?? 'Menu',
+                  venue?.name ?? cart.venueName ?? 'Menu',
                   style: tt.titleLarge, // text-lg font-black
                 ),
                 Text(
@@ -211,57 +320,148 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                 padding: const EdgeInsets.all(8),
                 child: IconButton(
                   icon: Icon(LucideIcons.hand, color: cs.primary),
-                  onPressed: () => WaveBottomSheet.show(context, widget.venueId),
+                  onPressed: () =>
+                      WaveBottomSheet.show(context, widget.venueId),
                 ),
               ),
             ],
-            bottom: TabBar(
-              controller: _tabController,
-              onTap: (index) async {
-                final key = _categoryKeys[categories[index]];
-                if (key?.currentContext != null) {
-                  _isAutoScrolling = true;
-                  await Scrollable.ensureVisible(
-                    key!.currentContext!,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOut,
-                  );
-                  _isAutoScrolling = false;
-                }
-              },
-              isScrollable: true,
-              labelColor: cs.primary,
-              unselectedLabelColor: cs.onSurfaceVariant,
-              labelStyle: tt.labelMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
+            bottom: PreferredSize(
+              preferredSize: Size.fromHeight(categories.isEmpty ? 76 : 132),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppTheme.space4,
+                      0,
+                      AppTheme.space4,
+                      AppTheme.space3,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            LucideIcons.search,
+                            size: 18,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.68),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              onChanged: _onSearchChanged,
+                              textInputAction: TextInputAction.search,
+                              style: tt.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                filled: false,
+                                hintText: 'Search menu items...',
+                                hintStyle: tt.bodyLarge?.copyWith(
+                                  color: cs.onSurfaceVariant.withValues(
+                                    alpha: 0.40,
+                                  ),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (_query.isNotEmpty)
+                            PressableScale(
+                              onTap: _clearSearch,
+                              minTouchTargetSize: const Size(44, 44),
+                              child: Icon(
+                                LucideIcons.x,
+                                size: 18,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (categories.isNotEmpty && _tabController != null)
+                    TabBar(
+                      controller: _tabController,
+                      onTap: (index) {
+                        final targetIndex =
+                            _categoryHeaderIndexes[categories[index]];
+                        if (targetIndex == null ||
+                            !_itemScrollController.isAttached) {
+                          return;
+                        }
+
+                        _isAutoScrolling = true;
+                        _itemScrollController.jumpTo(
+                          index: targetIndex,
+                          alignment: 0,
+                        );
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (!mounted) return;
+                          _isAutoScrolling = false;
+                        });
+                      },
+                      isScrollable: true,
+                      labelColor: cs.primary,
+                      unselectedLabelColor: cs.onSurfaceVariant,
+                      labelStyle: tt.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.5,
+                      ),
+                      unselectedLabelStyle: tt.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      indicatorSize: TabBarIndicatorSize.label,
+                      indicatorColor: cs.primary,
+                      indicatorWeight: 3,
+                      dividerColor: Colors.transparent,
+                      tabAlignment: TabAlignment.start,
+                      tabs: categories
+                          .map((c) => Tab(text: c.toUpperCase()))
+                          .toList(),
+                    ),
+                ],
               ),
-              unselectedLabelStyle: tt.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-              indicatorSize: TabBarIndicatorSize.label,
-              indicatorColor: cs.primary,
-              indicatorWeight: 3,
-              dividerColor: Colors.transparent,
-              tabAlignment: TabAlignment.start,
-              tabs: categories.map((c) => Tab(text: c.toUpperCase())).toList(),
             ),
           ),
         ],
-        body: NotificationListener<ScrollNotification>(
-          onNotification: _onScroll,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 120),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: categories.map((category) {
-                final catItems = _itemsForCategory(category, items);
-                // We use RepaintBoundary or just wrap it directly.
-                return Column(
-                  key: _categoryKeys[category],
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
+        body: categories.isEmpty
+            ? CustomScrollView(
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppTheme.space6),
+                      child: EmptyState(
+                        icon: LucideIcons.search,
+                        title: 'No Menu Items Found',
+                        subtitle: _query.isEmpty
+                            ? 'This venue has no searchable items right now.'
+                            : 'Try a different item name, category, or keyword.',
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : ScrollablePositionedList.builder(
+                itemCount: _entries.length,
+                itemScrollController: _itemScrollController,
+                itemPositionsListener: _itemPositionsListener,
+                padding: const EdgeInsets.only(bottom: 120),
+                itemBuilder: (context, index) {
+                  final entry = _entries[index];
+
+                  return switch (entry.type) {
+                    _MenuListEntryType.header => Padding(
                       padding: const EdgeInsets.fromLTRB(
                         AppTheme.space6,
                         AppTheme.space8,
@@ -269,7 +469,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                         AppTheme.space4,
                       ),
                       child: Text(
-                        category.toUpperCase(),
+                        entry.category.toUpperCase(),
                         style: tt.titleMedium?.copyWith(
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1.2,
@@ -277,34 +477,29 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                         ),
                       ),
                     ),
-                    ...catItems.map((item) {
-                      final qty = cartNotifier.quantityOf(item.id);
-                      return Padding(
-                        padding: const EdgeInsets.only(
-                          left: AppTheme.space5,
-                          right: AppTheme.space5,
-                          bottom: AppTheme.space4,
+                    _MenuListEntryType.item => Padding(
+                      padding: const EdgeInsets.only(
+                        left: AppTheme.space5,
+                        right: AppTheme.space5,
+                        bottom: AppTheme.space4,
+                      ),
+                      child: _MenuItemCard(
+                        item: entry.item!,
+                        quantity: cartNotifier.quantityOf(entry.item!.id),
+                        currencySymbol: cart.currencySymbol,
+                        onAdd: () => cartNotifier.addItem(entry.item!),
+                        onRemove: () => cartNotifier.removeItem(entry.item!.id),
+                        onTap: () => context.pushNamed(
+                          AppRouteNames.itemDetail,
+                          pathParameters: {AppRouteParams.id: entry.item!.id},
+                          extra: entry.item,
                         ),
-                        child: _MenuItemCard(
-                          item: item,
-                          quantity: qty,
-                          currencySymbol: cart.currencySymbol,
-                          onAdd: () => cartNotifier.addItem(item),
-                          onRemove: () => cartNotifier.removeItem(item.id),
-                          onTap: () => context.pushNamed(
-                            AppRouteNames.itemDetail,
-                            pathParameters: {AppRouteParams.id: item.id},
-                            extra: item,
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-        ),
+                      ),
+                    ),
+                    _MenuListEntryType.spacer => const SizedBox.shrink(),
+                  };
+                },
+              ),
       ),
 
       // ─── Sticky Cart Pill ───
@@ -391,6 +586,29 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
           : null,
     );
   }
+}
+
+enum _MenuListEntryType { header, item, spacer }
+
+class _MenuListEntry {
+  final _MenuListEntryType type;
+  final String category;
+  final MenuItem? item;
+
+  const _MenuListEntry._({
+    required this.type,
+    required this.category,
+    this.item,
+  });
+
+  const _MenuListEntry.header({required String category})
+    : this._(type: _MenuListEntryType.header, category: category);
+
+  const _MenuListEntry.item({required String category, required MenuItem item})
+    : this._(type: _MenuListEntryType.item, category: category, item: item);
+
+  const _MenuListEntry.spacer()
+    : this._(type: _MenuListEntryType.spacer, category: '');
 }
 
 /// Menu item card with inline +/- stepper.
@@ -540,6 +758,7 @@ class _MenuItemCard extends StatelessWidget {
                       ),
                       _QuantityStepper(
                         quantity: quantity,
+                        enabled: item.isAvailable,
                         onAdd: onAdd,
                         onRemove: onRemove,
                       ),
@@ -558,11 +777,13 @@ class _MenuItemCard extends StatelessWidget {
 /// Inline +/- quantity stepper.
 class _QuantityStepper extends StatelessWidget {
   final int quantity;
+  final bool enabled;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
 
   const _QuantityStepper({
     required this.quantity,
+    required this.enabled,
     required this.onAdd,
     required this.onRemove,
   });
@@ -571,9 +792,26 @@ class _QuantityStepper extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
+    if (!enabled) {
+      return Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        ),
+        child: Icon(
+          LucideIcons.plus,
+          size: 18,
+          color: cs.onSurfaceVariant.withValues(alpha: 0.45),
+        ),
+      );
+    }
+
     if (quantity == 0) {
-      return GestureDetector(
+      return PressableScale(
         onTap: onAdd,
+        minTouchTargetSize: const Size(44, 44),
         child: Container(
           width: 40,
           height: 40,
@@ -594,8 +832,9 @@ class _QuantityStepper extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          GestureDetector(
+          PressableScale(
             onTap: onRemove,
+            minTouchTargetSize: const Size(44, 44),
             child: Container(
               width: 36,
               height: 36,
@@ -616,8 +855,9 @@ class _QuantityStepper extends StatelessWidget {
               ),
             ),
           ),
-          GestureDetector(
+          PressableScale(
             onTap: onAdd,
+            minTouchTargetSize: const Size(44, 44),
             child: Container(
               width: 36,
               height: 36,

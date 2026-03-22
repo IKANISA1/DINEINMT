@@ -160,7 +160,8 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
         ? orders
         : orders.where((o) {
             final q = _query.toLowerCase();
-            return o.id.toLowerCase().contains(q) ||
+            return o.displayNumber.toLowerCase().contains(q) ||
+                o.id.toLowerCase().contains(q) ||
                 o.venueName.toLowerCase().contains(q);
           }).toList();
     final visibleOrders = filtered.where(_matchesFilter).toList();
@@ -539,7 +540,7 @@ class _OrderFeedCard extends StatelessWidget {
               children: [
                 // Order ID badge
                 Container(
-                  width: 64,
+                  width: 92,
                   height: 64,
                   decoration: BoxDecoration(
                     color: cs.surfaceContainerHigh,
@@ -547,10 +548,10 @@ class _OrderFeedCard extends StatelessWidget {
                   ),
                   child: Center(
                     child: Text(
-                      '#${order.id.substring(0, 4).toUpperCase()}',
+                      '#${order.displayNumber}',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
-                        fontSize: 14,
+                        fontSize: 13,
                         color: cs.onSurface.withValues(alpha: 0.30),
                       ),
                     ),

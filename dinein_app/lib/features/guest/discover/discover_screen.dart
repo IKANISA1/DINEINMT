@@ -1,18 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_theme.dart';
+
 import '../../../core/models/models.dart';
-import '../../../core/constants/enums.dart';
 import '../../../core/providers/providers.dart';
+import '../../../core/router/app_routes.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
+const _discoverHeroImageUrl =
+    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80';
 
-/// Discover screen — database-based venue discovery + promos.
-/// Per DineIn rules: NO maps, NO geolocation, NO "near me".
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
 
@@ -21,49 +24,102 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 }
 
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
+  static const _searchDebounce = Duration(milliseconds: 180);
+
   final _searchController = TextEditingController();
+  Timer? _queryDebounce;
   String _query = '';
 
   @override
   void dispose() {
+    _queryDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  /// Filter venues by name or category (case-insensitive).
+  void _onSearchChanged(String value) {
+    final normalized = value.trim();
+    _queryDebounce?.cancel();
+
+    if (normalized.isEmpty) {
+      if (_query.isNotEmpty) {
+        setState(() => _query = '');
+      }
+      return;
+    }
+
+    _queryDebounce = Timer(_searchDebounce, () {
+      if (!mounted || _query == normalized) return;
+      setState(() => _query = normalized);
+    });
+  }
+
   List<Venue> _filterVenues(List<Venue> venues) {
     if (_query.isEmpty) return venues;
-    final q = _query.toLowerCase();
-    return venues.where((v) {
-      final haystack = '${v.name} ${v.category} ${v.description} ${v.address}'
-          .toLowerCase();
-      return haystack.contains(q);
-    }).toList();
+    final needle = _query.toLowerCase();
+    return venues
+        .where((venue) {
+          final haystack =
+              '${venue.name} ${venue.category} ${venue.description} ${venue.address}'
+                  .toLowerCase();
+          return haystack.contains(needle);
+        })
+        .toList(growable: false);
   }
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final venuesAsync = ref.watch(venuesProvider);
 
     return venuesAsync.when(
       loading: () => const Center(
-        child: SkeletonLoader(width: double.infinity, height: 200),
+        child: SkeletonLoader(width: double.infinity, height: 320),
       ),
-      error: (err, _) => ErrorState(
+      error: (error, stackTrace) => ErrorState(
         message: 'Check your connection and try again.',
         onRetry: () => ref.invalidate(venuesProvider),
       ),
-      data: (venues) => _buildContent(context, cs, tt, venues),
+      data: (venues) => _DiscoverBody(
+        query: _query,
+        controller: _searchController,
+        venues: venues,
+        filteredVenues: _filterVenues(venues),
+        onQueryChanged: _onSearchChanged,
+        onClearQuery: () {
+          _queryDebounce?.cancel();
+          _searchController.clear();
+          if (_query.isNotEmpty) {
+            setState(() => _query = '');
+          }
+        },
+      ),
     );
   }
+}
 
-  Widget _buildContent(
-    BuildContext context,
-    ColorScheme cs,
-    TextTheme tt,
-    List<Venue> venues,
-  ) {
+class _DiscoverBody extends StatelessWidget {
+  final String query;
+  final TextEditingController controller;
+  final List<Venue> venues;
+  final List<Venue> filteredVenues;
+  final ValueChanged<String> onQueryChanged;
+  final VoidCallback onClearQuery;
+
+  const _DiscoverBody({
+    required this.query,
+    required this.controller,
+    required this.venues,
+    required this.filteredVenues,
+    required this.onQueryChanged,
+    required this.onClearQuery,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final featuredVenues = venues.take(6).toList(growable: false);
+    final results = filteredVenues;
+    final shouldAnimateResults = query.isEmpty;
+
     if (venues.isEmpty) {
       return const EmptyState(
         icon: LucideIcons.store,
@@ -72,14 +128,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       );
     }
 
-    final filtered = _filterVenues(venues);
-    final allActiveVenues = venues
-        .where((v) => v.status == VenueStatus.active)
-        .toList();
-
     return CustomScrollView(
       slivers: [
-        // ─── Hero Search Section ───
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -88,290 +138,232 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               AppTheme.space6,
               0,
             ),
-            child: _buildHeroSearch(context, cs, tt, venues),
+            child: _DiscoverHero(
+              controller: controller,
+              query: query,
+              onChanged: onQueryChanged,
+              onClear: onClearQuery,
+            ),
           ),
         ),
-
-        // ─── Featured Venues (horizontal scroll) — shown only when not searching ───
-        if (_query.isEmpty && allActiveVenues.isNotEmpty)
+        if (query.isEmpty && featuredVenues.isNotEmpty)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(top: AppTheme.space12),
-              child: _buildFeaturedSection(context, cs, tt, allActiveVenues),
+              child: _SectionHeader(
+                title: 'Featured',
+                actionLabel: 'View All',
+                onTap: () => context.pushNamed(AppRouteNames.venuesBrowse),
+              ),
             ),
           ),
-
-        // ─── Venue List ───
+        if (query.isEmpty && featuredVenues.isNotEmpty)
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 382,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.space6,
+                  AppTheme.space4,
+                  AppTheme.space6,
+                  0,
+                ),
+                itemBuilder: (context, index) =>
+                    _FeaturedVenueCard(venue: featuredVenues[index]),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(width: AppTheme.space6),
+                itemCount: featuredVenues.length,
+              ),
+            ),
+          ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.only(
-              left: AppTheme.space6,
-              right: AppTheme.space6,
-              top: AppTheme.space12,
+            padding: EdgeInsets.only(
+              top: query.isEmpty ? AppTheme.space10 : AppTheme.space12,
             ),
-            child: Text(
-              _query.isEmpty ? 'Active Venues' : 'Results',
-              style: tt.headlineLarge,
+            child: _SectionHeader(
+              title: query.isEmpty ? 'All Venues' : 'Results',
             ),
           ),
         ),
-
-        if (filtered.isEmpty)
+        if (results.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
-            child: EmptyState(
-              icon: LucideIcons.searchX,
-              title: 'No matches',
-              subtitle: 'Try a different search term.',
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.space6),
+              child: const EmptyState(
+                icon: LucideIcons.search,
+                title: 'No Venues Found',
+                subtitle: 'Try adjusting your search.',
+              ),
             ),
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.all(AppTheme.space6),
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.space6,
+              AppTheme.space4,
+              AppTheme.space6,
+              0,
+            ),
             sliver: SliverList.separated(
-              itemCount: filtered.length,
+              itemCount: results.length,
               separatorBuilder: (_, _) =>
                   const SizedBox(height: AppTheme.space4),
               itemBuilder: (context, index) {
-                final venue = filtered[index];
-                return _VenueListTile(venue: venue)
-                    .animate(delay: (100 * index).ms)
-                    .fadeIn(duration: 400.ms)
-                    .slideX(begin: 0.05, end: 0);
+                final venue = results[index];
+                final card = _NearbyVenueCard(venue: venue);
+                if (!shouldAnimateResults) return card;
+
+                return card
+                    .animate(delay: (50 * index).ms)
+                    .fadeIn(duration: 350.ms)
+                    .slideY(begin: 0.08, end: 0);
               },
             ),
           ),
-
-        // ─── Bottom CTA (hidden when searching) ───
-        if (_query.isEmpty)
+        if (query.isEmpty)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppTheme.space6,
-                0,
+                AppTheme.space12,
                 AppTheme.space6,
                 AppTheme.space24,
               ),
-              child: _buildBottomCta(context, cs, tt),
+              child: _DiscoverCta(
+                onTap: () => context.pushNamed(AppRouteNames.venuesBrowse),
+              ),
             ),
           ),
       ],
     );
   }
+}
 
-  Widget _buildHeroSearch(
-    BuildContext context,
-    ColorScheme cs,
-    TextTheme tt,
-    List<Venue> venues,
-  ) {
-    return Stack(
-      children: [
-        // Ambient glow blob (matching React)
-        Positioned(
-          top: -40,
-          right: -40,
-          child: Container(
-            width: 320,
-            height: 320,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  cs.primary.withValues(alpha: 0.10),
-                  cs.primary.withValues(alpha: 0),
-                ],
+class _DiscoverHero extends StatelessWidget {
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _DiscoverHero({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 340),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppTheme.radius3xl),
+        border: Border.all(color: AppColors.white5),
+        boxShadow: AppTheme.elevatedShadow,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: DineInImage(
+              imageUrl: _discoverHeroImageUrl,
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.18),
+                    Colors.black.withValues(alpha: 0.54),
+                    Theme.of(context).colorScheme.surfaceContainerHigh,
+                  ],
+                  stops: const [0.0, 0.38, 1.0],
+                ),
               ),
             ),
           ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(AppTheme.space8),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(AppTheme.radius3xl),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-            boxShadow: AppTheme.elevatedShadow,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              RichText(
-                text: TextSpan(
-                  style: tt.displayMedium?.copyWith(height: 0.9),
-                  children: [
-                    const TextSpan(text: 'FIND YOUR\n'),
-                    TextSpan(
-                      text: 'FLAVOR',
-                      style: TextStyle(color: cs.primary),
+          Padding(
+            padding: const EdgeInsets.all(AppTheme.space8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    style: tt.displayMedium?.copyWith(
+                      height: 0.84,
+                      letterSpacing: -2.2,
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppTheme.space8),
-
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: cs.surface,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.10),
+                    children: [
+                      const TextSpan(text: 'FIND YOUR\n'),
+                      TextSpan(
+                        text: 'FLAVOR',
+                        style: TextStyle(color: cs.primary),
+                      ),
+                    ],
                   ),
-                  boxShadow: AppTheme.ambientShadow,
                 ),
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12),
-                      child: Icon(
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  decoration: BoxDecoration(
+                    color: cs.surface.withValues(alpha: 0.96),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                    border: Border.all(color: AppColors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
                         LucideIcons.search,
                         size: 20,
-                        color: cs.onSurfaceVariant,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.68),
                       ),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _query = value.trim()),
-                        textInputAction: TextInputAction.search,
-                        decoration: InputDecoration(
-                          hintText: 'Search venues...',
-                          border: InputBorder.none,
-                          filled: false,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          onChanged: onChanged,
+                          textInputAction: TextInputAction.search,
+                          style: tt.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
                           ),
-                          hintStyle: tt.bodyMedium?.copyWith(
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.30),
-                            fontWeight: FontWeight.w700,
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            filled: false,
+                            hintText: 'Search venues...',
+                            hintStyle: tt.bodyLarge?.copyWith(
+                              color: cs.onSurfaceVariant.withValues(
+                                alpha: 0.30,
+                              ),
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                          suffixIcon: _query.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(
-                                    LucideIcons.x,
-                                    size: 18,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _query = '');
-                                  },
-                                )
-                              : null,
                         ),
                       ),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => FocusScope.of(context).unfocus(),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 14,
+                      if (query.isNotEmpty)
+                        PressableScale(
+                          onTap: onClear,
+                          minTouchTargetSize: const Size(44, 44),
+                          child: Icon(
+                            LucideIcons.x,
+                            size: 18,
+                            color: cs.onSurfaceVariant,
+                          ),
                         ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'GO',
-                        style: tt.labelSmall?.copyWith(
-                          color: cs.onPrimary,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeaturedSection(
-    BuildContext context,
-    ColorScheme cs,
-    TextTheme tt,
-    List<Venue> activeVenues,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Featured', style: tt.headlineLarge),
-              TextButton.icon(
-                onPressed: () => context.pushNamed(AppRouteNames.venuesBrowse),
-                icon: Text(
-                  'VIEW ALL',
-                  style: tt.labelSmall?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                    ],
                   ),
-                ),
-                label: Icon(
-                  LucideIcons.chevronRight,
-                  size: 16,
-                  color: cs.primary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppTheme.space4),
-
-        SizedBox(
-          height: 360,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
-            itemCount: activeVenues.length,
-            separatorBuilder: (_, _) => const SizedBox(width: AppTheme.space6),
-            itemBuilder: (context, index) {
-              return _FeaturedVenueCard(venue: activeVenues[index]);
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomCta(BuildContext context, ColorScheme cs, TextTheme tt) {
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.space8),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-      ),
-      child: Column(
-        children: [
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: tt.headlineLarge,
-              children: [
-                const TextSpan(text: 'STILL LOOKING FOR THE\n'),
-                TextSpan(
-                  text: 'PERFECT SPOT?',
-                  style: TextStyle(color: cs.primary),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: AppTheme.space6),
-          ElevatedButton.icon(
-            onPressed: () => context.pushNamed(AppRouteNames.venuesBrowse),
-            icon: const Text('BROWSE ALL'),
-            label: const Icon(LucideIcons.chevronRight, size: 18),
           ),
         ],
       ),
@@ -379,7 +371,49 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   }
 }
 
-// ─── Featured Venue Card (large, image-based) ───
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onTap;
+
+  const _SectionHeader({required this.title, this.actionLabel, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+      child: Row(
+        children: [
+          Expanded(child: Text(title, style: tt.headlineLarge)),
+          if (actionLabel != null && onTap != null)
+            PressableScale(
+              onTap: onTap,
+              minTouchTargetSize: const Size(96, 44),
+              child: Row(
+                children: [
+                  Text(
+                    actionLabel!.toUpperCase(),
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.6,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(LucideIcons.chevronRight, size: 18, color: cs.primary),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _FeaturedVenueCard extends StatelessWidget {
   final Venue venue;
 
@@ -395,52 +429,67 @@ class _FeaturedVenueCard extends StatelessWidget {
         AppRouteNames.venueDetail,
         pathParameters: {AppRouteParams.slug: venue.slug},
       ),
-      child: Container(
-        width: 280,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-          boxShadow: AppTheme.clayShadow,
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+      child: SizedBox(
+        width: 288,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+            border: Border.all(color: AppColors.white10),
+            boxShadow: AppTheme.ambientShadow,
+          ),
+          clipBehavior: Clip.antiAlias,
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              // Full-bleed venue image with gradient overlay
+              DineInImage(imageUrl: venue.imageUrl, fit: BoxFit.cover),
               Positioned.fill(
-                child: DineInImage(
-                  imageUrl: venue.imageUrl,
-                  fit: BoxFit.cover,
-                  showGradientOverlay: true,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.14),
+                        Colors.black.withValues(alpha: 0.94),
+                      ],
+                      stops: const [0.0, 0.38, 1.0],
+                    ),
+                  ),
                 ),
               ),
-              // Content overlay at bottom
               Positioned(
-                bottom: 24,
-                left: 24,
-                right: 24,
+                left: 28,
+                right: 28,
+                bottom: 28,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       venue.name,
-                      style: tt.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        height: 1.1,
-                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
+                      style: tt.headlineMedium?.copyWith(
+                        color: Colors.white,
+                        letterSpacing: -1.1,
+                        height: 1,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(LucideIcons.star, size: 16, color: cs.primary),
+                        Icon(LucideIcons.star, size: 15, color: cs.primary),
                         const SizedBox(width: 6),
                         Text(
-                          '${venue.rating}',
-                          style: tt.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
+                          venue.rating.toStringAsFixed(
+                            venue.rating.truncateToDouble() == venue.rating
+                                ? 0
+                                : 1,
+                          ),
+                          style: TextStyle(
                             color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
                       ],
@@ -456,11 +505,10 @@ class _FeaturedVenueCard extends StatelessWidget {
   }
 }
 
-// ─── Venue List Tile (compact row) ───
-class _VenueListTile extends StatelessWidget {
+class _NearbyVenueCard extends StatelessWidget {
   final Venue venue;
 
-  const _VenueListTile({required this.venue});
+  const _NearbyVenueCard({required this.venue});
 
   @override
   Widget build(BuildContext context) {
@@ -473,54 +521,54 @@ class _VenueListTile extends StatelessWidget {
         pathParameters: {AppRouteParams.slug: venue.slug},
       ),
       child: Container(
-        padding: const EdgeInsets.all(AppTheme.space5),
+        padding: const EdgeInsets.all(AppTheme.space6),
         decoration: BoxDecoration(
           color: cs.surfaceContainerLow,
           borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          border: Border.all(color: AppColors.white5),
+          boxShadow: AppTheme.ambientShadow,
         ),
         child: Row(
           children: [
-            // Venue thumbnail
             ClipRRect(
               borderRadius: BorderRadius.circular(AppTheme.radiusLg),
               child: SizedBox(
-                width: 80,
-                height: 80,
+                width: 96,
+                height: 96,
                 child: DineInImage(
                   imageUrl: venue.imageUrl,
-                  width: 80,
-                  height: 80,
                   fit: BoxFit.cover,
+                  fallbackIcon: LucideIcons.store,
                 ),
               ),
             ),
-            const SizedBox(width: AppTheme.space5),
-
-            // Info
+            const SizedBox(width: AppTheme.space6),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     venue.name,
-                    style: tt.titleMedium,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                    style: tt.headlineSmall?.copyWith(letterSpacing: -0.8),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Icon(
-                        LucideIcons.clock,
-                        size: 14,
+                        LucideIcons.clock3,
+                        size: 15,
                         color: cs.onSurfaceVariant,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 6),
                       Text(
-                        venue.isOpen ? 'Open Now' : 'Closed',
-                        style: tt.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant,
+                        venue.isOpen ? 'OPEN NOW' : 'CLOSED',
+                        style: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.72),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2.2,
                         ),
                       ),
                     ],
@@ -528,8 +576,6 @@ class _VenueListTile extends StatelessWidget {
                 ],
               ),
             ),
-
-            // Chevron
             Container(
               width: 40,
               height: 40,
@@ -545,6 +591,84 @@ class _VenueListTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DiscoverCta extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _DiscoverCta({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.space6,
+        vertical: AppTheme.space12,
+      ),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(AppTheme.radius3xl),
+        border: Border.all(color: AppColors.white5),
+      ),
+      child: Column(
+        children: [
+          Text.rich(
+            TextSpan(
+              style: tt.headlineLarge?.copyWith(height: 1.05),
+              children: [
+                const TextSpan(text: 'STILL LOOKING FOR THE\n'),
+                TextSpan(
+                  text: 'PERFECT SPOT?',
+                  style: TextStyle(color: cs.primary),
+                ),
+              ],
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppTheme.space6),
+          PressableScale(
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.space8,
+                vertical: AppTheme.space5,
+              ),
+              decoration: BoxDecoration(
+                color: cs.primary,
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.primary.withValues(alpha: 0.30),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'BROWSE ALL',
+                    style: TextStyle(
+                      color: cs.onPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.6,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(LucideIcons.chevronRight, size: 20, color: cs.onPrimary),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

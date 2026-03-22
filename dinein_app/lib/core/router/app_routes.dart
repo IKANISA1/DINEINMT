@@ -27,6 +27,7 @@ abstract final class AppRouteNames {
   static const venueSettings = 'venueSettings';
   static const venueItemReport = 'venueItemReport';
   static const venueProfile = 'venueProfile';
+  static const venueTableQr = 'venueTableQr';
   static const venueHours = 'venueHours';
   static const venueNotifications = 'venueNotifications';
   static const venueLanguageRegion = 'venueLanguageRegion';
@@ -49,11 +50,13 @@ abstract final class AppRouteNames {
 
 abstract final class AppRouteParams {
   static const id = 'id';
+  static const orderNumber = 'orderNumber';
   static const slug = 'slug';
   static const table = 't';
   static const manual = 'manual';
   static const source = 'source';
   static const venueId = 'venueId';
+  static const returnTo = 'returnTo';
 }
 
 abstract final class AppRoutePaths {
@@ -85,6 +88,7 @@ abstract final class AppRoutePaths {
   static const venueSettings = '/venue/settings';
   static const venueItemReport = '/venue/item-report';
   static const venueProfile = '/venue/profile';
+  static const venueTableQr = '/venue/table-qr';
   static const venueHours = '/venue/hours';
   static const venueNotifications = '/venue/notifications';
   static const venueLanguageRegion = '/venue/language-region';

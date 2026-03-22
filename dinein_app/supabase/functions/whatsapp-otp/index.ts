@@ -711,7 +711,9 @@ async function handleSend(
     );
   }
 
-  if (appScope !== "venue" && appScope !== "admin") {
+  if (
+    appScope !== "venue" && appScope !== "admin" && appScope !== "onboarding"
+  ) {
     return errorResponse("Unsupported appScope.", 400);
   }
 
@@ -723,6 +725,18 @@ async function handleSend(
     if (!adminProfile) {
       return errorResponse(
         "This WhatsApp number is not registered for admin console access.",
+        403,
+      );
+    }
+  } else if (appScope === "venue") {
+    const approvedClaim = await getLatestVenueClaimByPhone(
+      supabase,
+      normalizedPhone,
+      "approved",
+    );
+    if (!approvedClaim) {
+      return errorResponse(
+        "This WhatsApp number is not linked to a validated venue account.",
         403,
       );
     }
@@ -1036,6 +1050,13 @@ async function handleVerify(
       claimStatus = pendingClaim ? "pending" : "not_found";
     }
 
+    try {
+      onboardingMenuToken = await buildOnboardingMenuToken(normalizedPhone);
+    } catch (error) {
+      console.error("[whatsapp-otp] onboarding token build failed", error);
+      return errorResponse("Onboarding token is not configured.", 500);
+    }
+  } else if (data.app_scope === "onboarding") {
     try {
       onboardingMenuToken = await buildOnboardingMenuToken(normalizedPhone);
     } catch (error) {

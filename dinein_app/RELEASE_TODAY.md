@@ -32,7 +32,6 @@ Verified secret names include:
 - `WHATSAPP_TEMPLATE_NAME`
 - `WHATSAPP_TEMPLATE_LANGUAGE`
 - `WHATSAPP_OTP_PEPPER`
-- `GOOGLE_MAPS_API_KEY`
 - `GEMINI_API_KEY`
 - `VENUE_ENRICHMENT_CRON_SECRET`
 - `MENU_IMAGE_CRON_SECRET`
@@ -76,12 +75,14 @@ You can satisfy the second requirement with environment variables instead:
 The repo now includes iOS entitlements, native Firebase config, and release
 validation. The remaining external artifacts are:
 
-- published `.well-known/assetlinks.json` with the real Play App Signing SHA-256
-- published `.well-known/apple-app-site-association` with the real Apple Team ID
+- rendered `landing/.well-known/assetlinks.json` with the real Play App Signing SHA-256
+- rendered `landing/.well-known/apple-app-site-association` with the real Apple Team ID
+- published those files to `https://dineinmalta.com/.well-known/`
 
 Validate these before store submission with:
 
 ```bash
+PLAY_APP_SIGNING_SHA256="AA:BB:..." APPLE_TEAM_ID="ABCDE12345" ./scripts/render_app_links.sh
 ./scripts/validate_release_integrations.sh
 ```
 

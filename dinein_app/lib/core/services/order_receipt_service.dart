@@ -25,6 +25,19 @@ class OrderReceiptService {
     return value.trim();
   }
 
+  Future<List<String>> getTrackedOrderIds() async {
+    final prefs = await SharedPreferences.getInstance();
+    final orderIds =
+        prefs
+            .getKeys()
+            .where((key) => key.startsWith(_receiptKeyPrefix))
+            .map((key) => key.substring(_receiptKeyPrefix.length).trim())
+            .where((orderId) => orderId.isNotEmpty)
+            .toList()
+          ..sort();
+    return orderIds;
+  }
+
   Future<void> clearReceiptToken(String orderId) async {
     if (orderId.trim().isEmpty) return;
     final prefs = await SharedPreferences.getInstance();

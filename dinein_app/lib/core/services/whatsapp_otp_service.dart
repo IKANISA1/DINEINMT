@@ -81,8 +81,8 @@ class WhatsAppOtpService {
 
     try {
       return await _sendRemote(normalizedPhone, appScope: appScope);
-    } catch (_) {
-      if (!_allowLocalMock) rethrow;
+    } catch (error) {
+      if (!_allowLocalMock || _shouldRethrowSendError(error)) rethrow;
     }
 
     return _sendMock(normalizedPhone);
@@ -162,6 +162,12 @@ class WhatsAppOtpService {
       debugCode: json['debugCode'] as String? ?? json['debug_code'] as String?,
       usesMock: false,
     );
+  }
+
+  bool _shouldRethrowSendError(Object error) {
+    final raw = error.toString().toLowerCase();
+    return raw.contains('not registered for admin') ||
+        raw.contains('not linked to a validated venue');
   }
 
   Future<WhatsAppOtpVerificationResult> _verifyRemote({

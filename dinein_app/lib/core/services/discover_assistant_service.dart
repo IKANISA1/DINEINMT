@@ -1,4 +1,3 @@
-import '../constants/enums.dart';
 import '../models/models.dart';
 import 'google_places_service.dart';
 
@@ -164,7 +163,7 @@ class DiscoverAssistantService {
     List<Venue> venues,
   ) {
     final activeVenues = venues
-        .where((venue) => venue.status == VenueStatus.active)
+        .where((venue) => venue.isOpen)
         .toList(growable: false);
     final scored = activeVenues
         .map((venue) => _ScoredVenue(venue, _scoreVenue(venue, query)))
@@ -218,7 +217,7 @@ class DiscoverAssistantService {
       if (_normalize(venue.address).contains(token)) score += 1;
     }
 
-    if (_isOpenIntent(normalizedQuery) && venue.isOpen) {
+    if (_isOpenIntent(normalizedQuery) && venue.canAcceptGuestOrders) {
       score += 3;
     }
 

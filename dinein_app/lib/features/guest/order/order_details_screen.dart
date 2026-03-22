@@ -119,7 +119,7 @@ class OrderDetailsScreen extends ConsumerWidget {
                         style: tt.headlineMedium?.copyWith(height: 1),
                       ),
                       Text(
-                        '#${order.id}',
+                        '#${order.displayNumber}',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w900,

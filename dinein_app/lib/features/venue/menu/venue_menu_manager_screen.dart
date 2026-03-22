@@ -78,7 +78,7 @@ class _VenueMenuManagerScreenState
   }
 }
 
-class _MenuBody extends ConsumerWidget {
+class _MenuBody extends ConsumerStatefulWidget {
   final String venueId;
   final String currencySymbol;
   final String searchQuery;
@@ -104,10 +104,77 @@ class _MenuBody extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MenuBody> createState() => _MenuBodyState();
+}
+
+class _MenuBodyState extends ConsumerState<_MenuBody> {
+  bool _isSavingHighlights = false;
+
+  List<MenuItem> _selectedHighlights(List<MenuItem> items) {
+    final selected = items.where((item) => item.highlightRank != null).toList()
+      ..sort(
+        (a, b) => (a.highlightRank ?? 99).compareTo(b.highlightRank ?? 99),
+      );
+    return selected.take(3).toList(growable: false);
+  }
+
+  Future<void> _toggleHighlight(List<MenuItem> items, MenuItem item) async {
+    if (_isSavingHighlights) return;
+
+    final selected = _selectedHighlights(items);
+    final isSelected = item.highlightRank != null;
+    final nextIds = isSelected
+        ? selected
+              .where((entry) => entry.id != item.id)
+              .map((entry) => entry.id)
+              .toList()
+        : <String>[...selected.map((entry) => entry.id), item.id];
+
+    if (!isSelected && selected.length >= 3) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'You can choose up to 3 guest highlights. Remove one first.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSavingHighlights = true);
+    try {
+      await MenuRepository.instance.setMenuItemHighlights(
+        widget.venueId,
+        nextIds,
+      );
+      if (!mounted) return;
+      ref.invalidate(menuItemsProvider(widget.venueId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isSelected
+                ? '${item.name} removed from guest highlights.'
+                : '${item.name} added to guest highlights.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update guest highlights: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingHighlights = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final menuAsync = ref.watch(menuItemsProvider(venueId));
+    final menuAsync = ref.watch(menuItemsProvider(widget.venueId));
 
     return menuAsync.when(
       loading: () => const Center(
@@ -115,9 +182,11 @@ class _MenuBody extends ConsumerWidget {
       ),
       error: (_, _) => ErrorState(
         message: 'Could not load menu items.',
-        onRetry: () => ref.invalidate(menuItemsProvider(venueId)),
+        onRetry: () => ref.invalidate(menuItemsProvider(widget.venueId)),
       ),
       data: (items) {
+        final selectedHighlights = _selectedHighlights(items);
+
         // Collect all unique tags/categories
         final allTags = <String>{};
         for (final item in items) {
@@ -128,22 +197,28 @@ class _MenuBody extends ConsumerWidget {
 
         // Apply filters
         var filtered = List<MenuItem>.from(items);
-        if (selectedTag != null) {
+        if (widget.selectedTag != null) {
           filtered = filtered
-              .where((i) =>
-                  i.category.toLowerCase() ==
-                      selectedTag!.toLowerCase() ||
-                  i.tags.any((t) =>
-                      t.toLowerCase() == selectedTag!.toLowerCase()))
+              .where(
+                (i) =>
+                    i.category.toLowerCase() ==
+                        widget.selectedTag!.toLowerCase() ||
+                    i.tags.any(
+                      (t) =>
+                          t.toLowerCase() == widget.selectedTag!.toLowerCase(),
+                    ),
+              )
               .toList();
         }
-        if (searchQuery.isNotEmpty) {
-          final q = searchQuery.toLowerCase();
+        if (widget.searchQuery.isNotEmpty) {
+          final q = widget.searchQuery.toLowerCase();
           filtered = filtered
-              .where((i) =>
-                  i.name.toLowerCase().contains(q) ||
-                  i.category.toLowerCase().contains(q) ||
-                  i.tags.any((t) => t.toLowerCase().contains(q)))
+              .where(
+                (i) =>
+                    i.name.toLowerCase().contains(q) ||
+                    i.category.toLowerCase().contains(q) ||
+                    i.tags.any((t) => t.toLowerCase().contains(q)),
+              )
               .toList();
         }
 
@@ -172,7 +247,7 @@ class _MenuBody extends ConsumerWidget {
                           ),
                         ),
                         PressableScale(
-                          onTap: onAddItem,
+                          onTap: widget.onAddItem,
                           child: Container(
                             width: 44,
                             height: 44,
@@ -181,8 +256,7 @@ class _MenuBody extends ConsumerWidget {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color:
-                                      cs.primary.withValues(alpha: 0.25),
+                                  color: cs.primary.withValues(alpha: 0.25),
                                   blurRadius: 16,
                                   offset: const Offset(0, 4),
                                 ),
@@ -205,38 +279,33 @@ class _MenuBody extends ConsumerWidget {
                         color: cs.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color:
-                              Colors.white.withValues(alpha: 0.05),
+                          color: Colors.white.withValues(alpha: 0.05),
                         ),
                       ),
                       child: TextField(
-                        controller: searchCtrl,
-                        onChanged: onSearch,
+                        controller: widget.searchCtrl,
+                        onChanged: widget.onSearch,
                         style: tt.bodyMedium,
                         decoration: InputDecoration(
                           hintText: 'Search items...',
                           hintStyle: tt.bodyMedium?.copyWith(
-                            color: cs.onSurfaceVariant
-                                .withValues(alpha: 0.40),
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.40),
                           ),
                           prefixIcon: Padding(
-                            padding: const EdgeInsets.only(
-                              left: 16,
-                              right: 10,
-                            ),
+                            padding: const EdgeInsets.only(left: 16, right: 10),
                             child: Icon(
                               LucideIcons.search,
                               size: 18,
                               color: cs.onSurfaceVariant,
                             ),
                           ),
-                          prefixIconConstraints:
-                              const BoxConstraints(minWidth: 0),
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 0,
+                          ),
                           border: InputBorder.none,
-                          contentPadding:
-                              const EdgeInsets.symmetric(
-                                vertical: 16,
-                              ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -244,7 +313,7 @@ class _MenuBody extends ConsumerWidget {
 
                     // ═══ FILTER BY TAGS ═══
                     PressableScale(
-                      onTap: onToggleTagFilter,
+                      onTap: widget.onToggleTagFilter,
                       child: Row(
                         children: [
                           Icon(
@@ -264,9 +333,8 @@ class _MenuBody extends ConsumerWidget {
                           ),
                           const Spacer(),
                           AnimatedRotation(
-                            turns: showTagFilter ? 0.5 : 0,
-                            duration:
-                                const Duration(milliseconds: 200),
+                            turns: widget.showTagFilter ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 200),
                             child: Icon(
                               LucideIcons.chevronDown,
                               size: 16,
@@ -281,7 +349,7 @@ class _MenuBody extends ConsumerWidget {
                     AnimatedSize(
                       duration: const Duration(milliseconds: 250),
                       curve: Curves.easeOutCubic,
-                      child: showTagFilter
+                      child: widget.showTagFilter
                           ? Padding(
                               padding: const EdgeInsets.only(
                                 top: AppTheme.space3,
@@ -295,18 +363,16 @@ class _MenuBody extends ConsumerWidget {
                                       const SizedBox(width: 8),
                                   itemBuilder: (_, i) {
                                     final tag = tagList[i];
-                                    final active = tag.toLowerCase() ==
-                                        selectedTag?.toLowerCase();
+                                    final active =
+                                        tag.toLowerCase() ==
+                                        widget.selectedTag?.toLowerCase();
                                     return PressableScale(
-                                      onTap: () =>
-                                          onSelectTag(tag),
+                                      onTap: () => widget.onSelectTag(tag),
                                       child: AnimatedContainer(
                                         duration: const Duration(
                                           milliseconds: 200,
                                         ),
-                                        padding:
-                                            const EdgeInsets
-                                                .symmetric(
+                                        padding: const EdgeInsets.symmetric(
                                           horizontal: 20,
                                           vertical: 10,
                                         ),
@@ -314,25 +380,22 @@ class _MenuBody extends ConsumerWidget {
                                           color: active
                                               ? cs.primary
                                               : cs.surfaceContainerLow,
-                                          borderRadius:
-                                              BorderRadius.circular(
-                                                20,
-                                              ),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
                                           border: Border.all(
                                             color: active
                                                 ? cs.primary
-                                                : Colors.white
-                                                    .withValues(
-                                                      alpha: 0.05,
-                                                    ),
+                                                : Colors.white.withValues(
+                                                    alpha: 0.05,
+                                                  ),
                                           ),
                                         ),
                                         child: Text(
                                           tag.toUpperCase(),
                                           style: TextStyle(
                                             fontSize: 10,
-                                            fontWeight:
-                                                FontWeight.w800,
+                                            fontWeight: FontWeight.w800,
                                             letterSpacing: 1.5,
                                             color: active
                                                 ? cs.onPrimary
@@ -348,6 +411,108 @@ class _MenuBody extends ConsumerWidget {
                           : const SizedBox.shrink(),
                     ),
                     const SizedBox(height: AppTheme.space5),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppTheme.space5),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.05),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                LucideIcons.star,
+                                size: 16,
+                                color: cs.primary,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Guest Highlights',
+                                  style: tt.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${selectedHighlights.length}/3',
+                                style: tt.labelLarge?.copyWith(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppTheme.space3),
+                          Text(
+                            selectedHighlights.isEmpty
+                                ? 'Choose up to 3 menu items to feature on the guest venue page. Any unused slots still fall back to the current automatic selection.'
+                                : 'Selected items appear first on the guest venue page in this order. Remove and re-add an item to change its position.',
+                            style: tt.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.45,
+                            ),
+                          ),
+                          if (selectedHighlights.isNotEmpty) ...[
+                            const SizedBox(height: AppTheme.space3),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: selectedHighlights.map((item) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: cs.primary.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    '#${item.highlightRank} ${item.name}',
+                                    style: tt.labelMedium?.copyWith(
+                                      color: cs.primary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                          if (_isSavingHighlights) ...[
+                            const SizedBox(height: AppTheme.space3),
+                            Row(
+                              children: [
+                                SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      cs.primary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Saving guest highlights...',
+                                  style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.space5),
                   ],
                 ),
               ),
@@ -360,8 +525,7 @@ class _MenuBody extends ConsumerWidget {
                 child: EmptyState(
                   icon: LucideIcons.utensils,
                   title: 'No menu items',
-                  subtitle:
-                      'Add your first item or adjust your filters.',
+                  subtitle: 'Add your first item or adjust your filters.',
                 ),
               )
             else
@@ -371,50 +535,50 @@ class _MenuBody extends ConsumerWidget {
                   horizontal: AppTheme.space6,
                 ),
                 sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final item = filtered[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: AppTheme.space3,
-                        ),
-                        child: _MenuItemCard(
-                          item: item,
-                          currencySymbol: currencySymbol,
-                          onEdit: () {
-                            context
-                                .pushNamed(
-                                  AppRouteNames.venueEditItem,
-                                  pathParameters: {
-                                    AppRouteParams.id: item.id,
-                                  },
-                                )
-                                .then((_) => ref.invalidate(
-                                    menuItemsProvider(venueId)));
-                          },
-                          onToggleVisibility: () async {
-                            await MenuRepository.instance
-                                .toggleAvailability(
-                              item.id,
-                              !item.isAvailable,
-                            );
-                            ref.invalidate(
-                              menuItemsProvider(venueId),
-                            );
-                          },
-                        )
-                            .animate(delay: (50 * index).ms)
-                            .fadeIn(duration: 200.ms),
-                      );
-                    },
-                    childCount: filtered.length,
-                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final item = filtered[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppTheme.space3),
+                      child:
+                          _MenuItemCard(
+                                item: item,
+                                currencySymbol: widget.currencySymbol,
+                                isSavingHighlights: _isSavingHighlights,
+                                onEdit: () {
+                                  context
+                                      .pushNamed(
+                                        AppRouteNames.venueEditItem,
+                                        pathParameters: {
+                                          AppRouteParams.id: item.id,
+                                        },
+                                      )
+                                      .then(
+                                        (_) => ref.invalidate(
+                                          menuItemsProvider(widget.venueId),
+                                        ),
+                                      );
+                                },
+                                onToggleVisibility: () async {
+                                  await MenuRepository.instance
+                                      .toggleAvailability(
+                                        item.id,
+                                        !item.isAvailable,
+                                      );
+                                  ref.invalidate(
+                                    menuItemsProvider(widget.venueId),
+                                  );
+                                },
+                                onToggleHighlight: () =>
+                                    _toggleHighlight(items, item),
+                              )
+                              .animate(delay: (50 * index).ms)
+                              .fadeIn(duration: 200.ms),
+                    );
+                  }, childCount: filtered.length),
                 ),
               ),
 
-            const SliverPadding(
-              padding: EdgeInsets.only(bottom: 100),
-            ),
+            const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
           ],
         );
       },
@@ -430,14 +594,18 @@ class _MenuBody extends ConsumerWidget {
 class _MenuItemCard extends StatelessWidget {
   final MenuItem item;
   final String currencySymbol;
+  final bool isSavingHighlights;
   final VoidCallback onEdit;
   final VoidCallback onToggleVisibility;
+  final VoidCallback onToggleHighlight;
 
   const _MenuItemCard({
     required this.item,
     required this.currencySymbol,
+    required this.isSavingHighlights,
     required this.onEdit,
     required this.onToggleVisibility,
+    required this.onToggleHighlight,
   });
 
   @override
@@ -450,8 +618,7 @@ class _MenuItemCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
         borderRadius: BorderRadius.circular(24),
-        border:
-            Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         boxShadow: AppTheme.clayShadow,
       ),
       child: Row(
@@ -474,15 +641,13 @@ class _MenuItemCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (item.effectiveImageStatus ==
-                    MenuItemImageStatus.generating)
+                if (item.effectiveImageStatus == MenuItemImageStatus.generating)
                   Positioned(
                     right: 4,
                     bottom: 4,
                     child: _PulsingDot(color: cs.tertiary),
                   ),
-                if (item.effectiveImageStatus ==
-                    MenuItemImageStatus.failed)
+                if (item.effectiveImageStatus == MenuItemImageStatus.failed)
                   Positioned(
                     right: 4,
                     bottom: 4,
@@ -545,11 +710,11 @@ class _MenuItemCard extends StatelessWidget {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
+                    if (item.highlightRank != null)
+                      _TagChip(label: 'Top ${item.highlightRank}'),
                     if (item.category.isNotEmpty)
                       _TagChip(label: item.category),
-                    ...item.tags.take(2).map(
-                          (t) => _TagChip(label: t),
-                        ),
+                    ...item.tags.take(2).map((t) => _TagChip(label: t)),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -561,24 +726,18 @@ class _MenuItemCard extends StatelessWidget {
                       width: 6,
                       height: 6,
                       decoration: BoxDecoration(
-                        color: item.isAvailable
-                            ? cs.primary
-                            : cs.error,
+                        color: item.isAvailable ? cs.primary : cs.error,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      item.isAvailable
-                          ? 'IN STOCK'
-                          : 'OUT OF STOCK',
+                      item.isAvailable ? 'IN STOCK' : 'OUT OF STOCK',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.5,
-                        color: item.isAvailable
-                            ? cs.primary
-                            : cs.error,
+                        color: item.isAvailable ? cs.primary : cs.error,
                       ),
                     ),
                   ],
@@ -590,6 +749,44 @@ class _MenuItemCard extends StatelessWidget {
           // ─── Actions ───
           Column(
             children: [
+              Tooltip(
+                message: item.highlightRank != null
+                    ? 'Remove from guest highlights'
+                    : 'Add to guest highlights',
+                child: PressableScale(
+                  onTap: isSavingHighlights ? null : onToggleHighlight,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: item.highlightRank != null
+                          ? cs.primary.withValues(alpha: 0.14)
+                          : cs.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: item.highlightRank != null
+                        ? Center(
+                            child: Text(
+                              '${item.highlightRank}',
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            LucideIcons.star,
+                            size: 16,
+                            color: isSavingHighlights
+                                ? cs.onSurfaceVariant.withValues(alpha: 0.35)
+                                : cs.onSurfaceVariant,
+                          ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
               // Edit button
               PressableScale(
                 onTap: onEdit,
@@ -622,13 +819,9 @@ class _MenuItemCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    item.isAvailable
-                        ? LucideIcons.eye
-                        : LucideIcons.eyeOff,
+                    item.isAvailable ? LucideIcons.eye : LucideIcons.eyeOff,
                     size: 16,
-                    color: item.isAvailable
-                        ? cs.onSurfaceVariant
-                        : cs.error,
+                    color: item.isAvailable ? cs.onSurfaceVariant : cs.error,
                   ),
                 ),
               ),

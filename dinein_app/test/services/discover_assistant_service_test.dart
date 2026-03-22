@@ -1,3 +1,4 @@
+import 'package:dinein_app/core/constants/enums.dart';
 import 'package:dinein_app/core/models/models.dart';
 import 'package:dinein_app/core/services/discover_assistant_service.dart';
 import 'package:dinein_app/core/services/google_places_service.dart';
@@ -92,6 +93,39 @@ void main() {
         expect(result.dineInMatches, hasLength(1));
         expect(result.googleMapsMatches, isEmpty);
         expect(result.provenanceNote, contains('not configured'));
+      },
+    );
+
+    test(
+      'includes active browse-only venues in local DineIn matches',
+      () async {
+        final sut = DiscoverAssistantService(
+          googleMapsEnabled: false,
+          placesSearch: (_) async => throw Exception('should not be called'),
+        );
+
+        const venues = [
+          Venue(
+            id: 'venue_1',
+            name: 'Preview Lounge',
+            slug: 'preview-lounge',
+            category: 'Cocktail Bar',
+            description: 'Menu preview is live before validation completes.',
+            address: 'Sliema',
+            status: VenueStatus.active,
+            orderingEnabled: false,
+            rating: 4.6,
+            ratingCount: 112,
+          ),
+        ];
+
+        final result = await sut.explore(
+          query: 'preview lounge',
+          venues: venues,
+        );
+
+        expect(result.dineInMatches, hasLength(1));
+        expect(result.dineInMatches.first.title, 'Preview Lounge');
       },
     );
   });

@@ -79,7 +79,11 @@ final List<RouteBase> guestRoutes = [
     name: AppRouteNames.orderSuccess,
     pageBuilder: (context, state) {
       final orderId = state.uri.queryParameters[AppRouteParams.id] ?? '';
-      return buildFadeSlidePage(state, OrderSuccessScreen(orderId: orderId));
+      final orderNumber = state.uri.queryParameters[AppRouteParams.orderNumber];
+      return buildFadeSlidePage(
+        state,
+        OrderSuccessScreen(orderId: orderId, orderNumber: orderNumber),
+      );
     },
   ),
   GoRoute(

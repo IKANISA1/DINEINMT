@@ -1,40 +1,35 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
+
+import '../../core/constants/app_download_links.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/providers/cart_provider.dart';
 import '../../shared/widgets/shared_widgets.dart';
 
-/// Guest shell — matches React GuestLayout.tsx exactly.
-///
-/// Top app bar: D logo + brand name + share/search/cart actions.
-/// Bottom nav:  Discover | Venues | Orders | Profile (4 items)
-/// Active tab:  Primary BG + shadow + translate-y lift.
-class GuestShell extends ConsumerWidget {
+class GuestShell extends StatelessWidget {
   final Widget child;
 
   const GuestShell({super.key, required this.child});
 
-  /// Bottom nav index: 0 = Home (Discover + Venues), 1 = Settings (Profile + Orders)
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith(AppRoutePaths.guestSettings) ||
-        location.startsWith(AppRoutePaths.orderHistory) ||
+    if (location.startsWith(AppRoutePaths.venuesBrowse)) return 1;
+    if (location.startsWith(AppRoutePaths.orderHistory) ||
         location.startsWith(AppRoutePaths.orderBase)) {
-      return 1;
+      return 2;
     }
-    return 0; // /discover, /venues, and everything else
+    if (location.startsWith(AppRoutePaths.guestSettings)) return 3;
+    return 0;
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final index = _currentIndex(context);
-    final cart = ref.watch(cartProvider);
 
     return Scaffold(
       body: Center(
@@ -42,48 +37,41 @@ class GuestShell extends ConsumerWidget {
           constraints: const BoxConstraints(maxWidth: 448),
           child: Column(
             children: [
-              // ─── Top App Bar (premium blur) ───
-              _TopAppBar(
-                cartItemCount: cart.itemCount,
-                cartVenueId: cart.venueId,
-              ),
-
-              // ─── Content ───
+              const _TopAppBar(),
               Expanded(child: child),
             ],
           ),
         ),
       ),
-
-      // ─── Bottom Navigation ───
       bottomNavigationBar: _BottomNav(currentIndex: index),
     );
   }
 }
 
-/// Top app bar matching React GuestLayout:
-/// Left: D logo pill + "DineIn" brand
-/// Right: Wave (Call Staff), Share, Search, Cart
-/// Frosted glass backdrop blur.
 class _TopAppBar extends StatelessWidget {
-  final int cartItemCount;
-  final String? cartVenueId;
+  const _TopAppBar();
 
-  const _TopAppBar({required this.cartItemCount, this.cartVenueId});
+  Future<void> _shareApp() async {
+    await SharePlus.instance.share(
+      ShareParams(
+        title: 'DINEIN Malta',
+        text: 'Discover venues on DINEIN Malta.\nhttps://$dineInSiteHost',
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: 0.60),
-            border: Border(
-              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-            ),
+            color: cs.surface.withValues(alpha: 0.88),
+            border: Border(bottom: BorderSide(color: AppColors.white5)),
           ),
           child: SafeArea(
             bottom: false,
@@ -94,89 +82,36 @@ class _TopAppBar extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                   // ─── Logo + Brand ───
                   PressableScale(
                     onTap: () => context.goNamed(AppRouteNames.discover),
                     child: Row(
                       children: [
                         const BrandMark(
-                          size: 32,
-                          borderRadius: 8,
-                          fontSize: 19,
-                          shadowBlur: 12,
-                          shadowOpacity: 0.20,
+                          size: 40,
+                          borderRadius: AppTheme.radiusFull,
+                          shadowBlur: 18,
+                          shadowOpacity: 0.28,
                         ),
-                        // Logo image contains the text now
+                        const SizedBox(width: 12),
+                        Text(
+                          'DINEIN',
+                          style: tt.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.8,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-
                   const Spacer(),
-
-                  // ─── Action Icons ───
-                  // Wave (Call Staff)
-                  if (cartVenueId != null) ...[
-                    _AppBarIcon(
-                      icon: LucideIcons.hand,
-                      onTap: () {
-                        // Show bottom sheet to capture table number and send wave
-                        WaveBottomSheet.show(context, cartVenueId!);
-                      },
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  // Share
                   _AppBarIcon(
                     icon: LucideIcons.share2,
-                    onTap: () async {
-                      await SharePlus.instance.share(
-                        ShareParams(
-                          title: 'DINEIN - Private Culinary Experiences',
-                          text: 'Check out these exclusive venues on DINEIN!',
-                        ),
-                      );
-                    },
+                    onTap: () => _shareApp(),
                   ),
-                  const SizedBox(width: 4),
-                  // Search
+                  const SizedBox(width: 8),
                   _AppBarIcon(
                     icon: LucideIcons.search,
                     onTap: () => context.goNamed(AppRouteNames.venuesBrowse),
-                  ),
-                  const SizedBox(width: 4),
-                  // Cart
-                  GestureDetector(
-                    onTap: () => context.goNamed(AppRouteNames.cart),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Icon(
-                            LucideIcons.shoppingBag,
-                            size: 20,
-                            color: cs.onSurfaceVariant,
-                          ),
-                          if (cartItemCount > 0)
-                            Positioned(
-                              top: 0,
-                              right: 0,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: cs.surface,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -197,22 +132,19 @@ class _AppBarIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
     return PressableScale(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Icon(icon, size: 20, color: cs.onSurfaceVariant),
+      onTap: () => onTap(),
+      minTouchTargetSize: const Size(44, 44),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Icon(icon, size: 22, color: cs.onSurfaceVariant),
       ),
     );
   }
 }
 
-/// Bottom navigation — 4 items matching React GuestLayout:
-/// Discover (Home) | Venues (Store) | Orders (History) | Profile (User)
-///
-/// Active tab: primary bg, shadow, -translate-y lift.
-/// Label: 9px font-black uppercase.
-/// Frosted glass backdrop blur.
 class _BottomNav extends StatelessWidget {
   final int currentIndex;
 
@@ -221,17 +153,25 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
-    // STARTER RULES §1: Customer bottom nav = EXACTLY 2 items.
-    final items = [
+    final items = const [
       _NavData(
         icon: LucideIcons.home,
-        label: 'Home',
+        label: 'Discover',
         routeName: AppRouteNames.discover,
       ),
       _NavData(
+        icon: LucideIcons.store,
+        label: 'Venues',
+        routeName: AppRouteNames.venuesBrowse,
+      ),
+      _NavData(
+        icon: LucideIcons.history,
+        label: 'Orders',
+        routeName: AppRouteNames.orderHistory,
+      ),
+      _NavData(
         icon: LucideIcons.user,
-        label: 'Settings',
+        label: 'Profile',
         routeName: AppRouteNames.guestSettings,
       ),
     ];
@@ -241,79 +181,79 @@ class _BottomNav extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: Container(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: 0.60),
-            border: Border(
-              top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-            ),
+            color: cs.surface.withValues(alpha: 0.92),
+            border: Border(top: BorderSide(color: AppColors.white5)),
           ),
           child: SafeArea(
+            top: false,
             child: Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppTheme.space6,
-                vertical: 12,
+                vertical: AppTheme.space3,
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(items.length, (i) {
-                  final item = items[i];
-                  final isActive = currentIndex == i;
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(items.length, (index) {
+                  final item = items[index];
+                  final isActive = currentIndex == index;
 
-                  return PressableScale(
-                    onTap: () => context.goNamed(item.routeName),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Icon container — active gets primary bg + shadow + lift
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.all(10),
-                          transform: Matrix4.translationValues(
-                            0,
-                            isActive ? -4 : 0,
-                            0,
+                  return Expanded(
+                    child: PressableScale(
+                      onTap: () => context.goNamed(item.routeName),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeOutCubic,
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: isActive ? cs.primary : Colors.transparent,
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusLg,
+                              ),
+                              boxShadow: isActive
+                                  ? [
+                                      BoxShadow(
+                                        color: cs.primary.withValues(
+                                          alpha: 0.28,
+                                        ),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Transform.translate(
+                              offset: Offset(0, isActive ? -1 : 0),
+                              child: Icon(
+                                item.icon,
+                                size: 24,
+                                color: isActive
+                                    ? cs.onPrimary
+                                    : cs.onSurfaceVariant,
+                              ),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: isActive ? cs.primary : Colors.transparent,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: isActive
-                                ? [
-                                    BoxShadow(
-                                      color: cs.primary.withValues(alpha: 0.30),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ]
-                                : [],
-                          ),
-                          child: Icon(
-                            item.icon,
-                            size: 24,
-                            color: isActive
-                                ? cs.onPrimary
-                                : cs.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        // Label — 9px font-black uppercase
-                        AnimatedOpacity(
-                          duration: const Duration(milliseconds: 300),
-                          opacity: isActive ? 1.0 : 0.4,
-                          child: AnimatedSlide(
-                            duration: const Duration(milliseconds: 300),
-                            offset: Offset(0, isActive ? 0 : 0.2),
+                          const SizedBox(height: 8),
+                          AnimatedOpacity(
+                            duration: const Duration(milliseconds: 250),
+                            opacity: isActive ? 1 : 0.55,
                             child: Text(
                               item.label.toUpperCase(),
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 1.5,
-                                color: cs.onSurface,
+                                letterSpacing: 1.8,
+                                color: isActive
+                                    ? cs.onSurface
+                                    : cs.onSurfaceVariant,
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 }),
@@ -330,6 +270,7 @@ class _NavData {
   final IconData icon;
   final String label;
   final String routeName;
+
   const _NavData({
     required this.icon,
     required this.label,

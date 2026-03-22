@@ -422,3 +422,13 @@ entrypoint = "./functions/enrich-venue-profile/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/backfill-venue-profiles/index.ts"
+
+[functions.generate-venue-profile-image]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/generate-venue-profile-image/index.ts"
+
+[functions.backfill-venue-profile-images]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/backfill-venue-profile-images/index.ts"

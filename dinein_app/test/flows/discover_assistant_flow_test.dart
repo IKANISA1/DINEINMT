@@ -51,17 +51,16 @@ void main() {
       ),
     );
 
-    // Allow async provider to resolve and animations to settle.
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     // Search bar is present in the hero section.
     expect(find.byType(TextField), findsOneWidget);
     // Search hint text is present.
     expect(find.text('Search venues...'), findsOneWidget);
-    // GO button is rendered.
-    expect(find.text('GO'), findsOneWidget);
-    // Active venues header (below featured).
-    expect(find.text('Active Venues'), findsOneWidget);
+    expect(find.text('GO'), findsNothing);
+    expect(find.text('Featured'), findsOneWidget);
+    expect(find.text('All Venues'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));

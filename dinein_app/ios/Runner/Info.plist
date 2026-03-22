@@ -24,6 +24,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>DineIn needs local network access to connect guests to venue WiFi.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>DineIn uses your location permission only to help join a venue WiFi network.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>DineIn needs camera access so venues can capture printed menus for onboarding.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -47,5 +53,7 @@
 	<true/>
 	<key>FlutterDeepLinkingEnabled</key>
 	<true/>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
 </dict>
 </plist>

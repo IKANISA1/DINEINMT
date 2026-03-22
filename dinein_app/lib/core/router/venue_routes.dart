@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 
+import '../services/auth_repository.dart';
 import '../../features/venue/onboarding/venue_onboarding_flow.dart';
 import '../../features/venue/auth/venue_login_screen.dart';
 
@@ -16,6 +17,7 @@ import '../../features/venue/settings/venue_language_region_screen.dart';
 import '../../features/venue/settings/venue_legal_screen.dart';
 import '../../features/venue/settings/venue_notifications_screen.dart';
 import '../../features/venue/settings/venue_profile_screen.dart';
+import '../../features/venue/settings/venue_table_qr_screen.dart';
 import '../../features/venue/settings/venue_wifi_screen.dart';
 import '../../features/venue/settings/venue_settings_screen.dart';
 import '../../features/venue/waves/venue_waves_screen.dart';
@@ -28,6 +30,9 @@ final List<RouteBase> venueRoutes = [
   GoRoute(
     path: AppRoutePaths.venueLogin,
     name: AppRouteNames.venueLogin,
+    redirect: (context, state) => AuthRepository.instance.hasVenueAccess
+        ? AppRoutePaths.venueDashboard
+        : null,
     builder: (context, state) => const VenueLoginScreen(),
   ),
   GoRoute(
@@ -75,12 +80,6 @@ final List<RouteBase> venueRoutes = [
     name: AppRouteNames.venueItemReport,
     redirect: venueAuthGuard,
     builder: (context, state) => const VenueItemReportScreen(),
-  ),
-  GoRoute(
-    path: AppRoutePaths.venueProfile,
-    name: AppRouteNames.venueProfile,
-    redirect: venueAuthGuard,
-    builder: (context, state) => const VenueProfileScreen(),
   ),
   GoRoute(
     path: AppRoutePaths.venueHours,
@@ -148,6 +147,20 @@ final List<RouteBase> venueRoutes = [
         redirect: venueAuthGuard,
         pageBuilder: (context, state) =>
             buildFadeSlidePage(state, const VenueSettingsScreen()),
+      ),
+      GoRoute(
+        path: AppRoutePaths.venueProfile,
+        name: AppRouteNames.venueProfile,
+        redirect: venueAuthGuard,
+        pageBuilder: (context, state) =>
+            buildFadeSlidePage(state, const VenueProfileScreen()),
+      ),
+      GoRoute(
+        path: AppRoutePaths.venueTableQr,
+        name: AppRouteNames.venueTableQr,
+        redirect: venueAuthGuard,
+        pageBuilder: (context, state) =>
+            buildFadeSlidePage(state, const VenueTableQrScreen()),
       ),
     ],
   ),

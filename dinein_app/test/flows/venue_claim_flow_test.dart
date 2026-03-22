@@ -4,6 +4,7 @@ import 'package:dinein_app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -47,6 +48,23 @@ void main() {
       expect(find.byType(Scaffold), findsWidgets);
       await disposeApp(tester);
     });
+
+    testWidgets(
+      'venue claim step one back button returns to guest settings when opened directly',
+      (tester) async {
+        await pumpApp(tester);
+        appRouter.go(AppRoutePaths.venueClaim);
+        await tester.pump();
+        await pumpUntilVisible(tester, find.textContaining('STEP 1 OF 4'));
+
+        await tester.tap(find.byIcon(LucideIcons.chevronLeft).first);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+
+        expect(appRouter.state.uri.path, AppRoutePaths.guestSettings);
+        await disposeApp(tester);
+      },
+    );
   });
 
   group('Venue Login Route (no auth required)', () {

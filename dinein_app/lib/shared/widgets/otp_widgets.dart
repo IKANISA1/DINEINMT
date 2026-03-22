@@ -6,6 +6,44 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import 'pressable_scale.dart';
 
+const _maltaCountryCodeDigits = '356';
+
+String normalizeMaltesePhoneLocalInput(String value) {
+  var digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+  if (digits.startsWith('00$_maltaCountryCodeDigits')) {
+    digits = digits.substring(5);
+  } else if (digits.startsWith(_maltaCountryCodeDigits) && digits.length > 8) {
+    digits = digits.substring(3);
+  }
+
+  if (digits.length > 8) {
+    digits = digits.substring(0, 8);
+  }
+
+  return digits;
+}
+
+bool isValidMaltesePhoneLocalInput(String value) =>
+    normalizeMaltesePhoneLocalInput(value).length == 8 &&
+    !normalizeMaltesePhoneLocalInput(value).startsWith(_maltaCountryCodeDigits);
+
+class MaltesePhoneTextInputFormatter extends TextInputFormatter {
+  const MaltesePhoneTextInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final normalized = normalizeMaltesePhoneLocalInput(newValue.text);
+    return TextEditingValue(
+      text: normalized,
+      selection: TextSelection.collapsed(offset: normalized.length),
+      composing: TextRange.empty,
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // MaltaPhoneInput — 🇲🇹 +356 country code pill + phone field
 // ─────────────────────────────────────────────────────────────
@@ -36,11 +74,13 @@ class MaltaPhoneInput extends StatelessWidget {
       children: [
         // Country code pill
         Container(
-          height: 64,
+          height: 72,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerHigh,
+            color: AppColors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.white5),
+            boxShadow: AppTheme.ambientShadow,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -69,16 +109,17 @@ class MaltaPhoneInput extends StatelessWidget {
         // Phone number field
         Expanded(
           child: Container(
-            height: 64,
+            height: 72,
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerHigh,
+              color: AppColors.surfaceContainerLow,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: controller.text.isNotEmpty
                     ? cs.primary.withValues(alpha: 0.5)
-                    : Colors.transparent,
-                width: 1.5,
+                    : AppColors.white5,
+                width: controller.text.isNotEmpty ? 1.5 : 1,
               ),
+              boxShadow: AppTheme.ambientShadow,
             ),
             child: Center(
               child: TextField(
@@ -93,10 +134,7 @@ class MaltaPhoneInput extends StatelessWidget {
                   fontSize: 22,
                   letterSpacing: 1,
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(8),
-                ],
+                inputFormatters: [const MaltesePhoneTextInputFormatter()],
                 decoration: InputDecoration(
                   hintText: '9912 3456',
                   hintStyle: tt.titleLarge?.copyWith(
@@ -171,52 +209,49 @@ class OtpPillFields extends StatelessWidget {
         final hasValue = controllers[index].text.isNotEmpty;
         final isFocused = focusNodes[index].hasFocus;
 
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(left: index == 0 ? 0 : 10),
-            child: KeyboardListener(
-              focusNode: FocusNode(),
-              onKeyEvent: (event) => _onKeyEvent(index, event),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 56,
-                decoration: BoxDecoration(
-                  color: hasValue
-                      ? AppColors.surfaceContainerHigh
-                      : AppColors.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                  border: Border.all(
-                    color: isFocused
-                        ? cs.primary.withValues(alpha: 0.6)
-                        : hasValue
-                            ? cs.onSurfaceVariant.withValues(alpha: 0.15)
-                            : cs.onSurfaceVariant.withValues(alpha: 0.08),
-                    width: isFocused ? 1.5 : 1,
-                  ),
+        return Padding(
+          padding: EdgeInsets.only(left: index == 0 ? 0 : 10),
+          child: KeyboardListener(
+            focusNode: FocusNode(),
+            onKeyEvent: (event) => _onKeyEvent(index, event),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: hasValue
+                    ? AppColors.surfaceContainerHigh
+                    : AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(27),
+                border: Border.all(
+                  color: isFocused
+                      ? cs.primary.withValues(alpha: 0.75)
+                      : hasValue
+                      ? cs.onSurfaceVariant.withValues(alpha: 0.18)
+                      : cs.onSurfaceVariant.withValues(alpha: 0.10),
+                  width: isFocused ? 1.6 : 1,
                 ),
-                child: Center(
-                  child: TextField(
-                    controller: controllers[index],
-                    focusNode: focusNodes[index],
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    maxLength: 1,
-                    onChanged: (v) => _onDigitChanged(index, v),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                    style: tt.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 22,
-                    ),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      counterText: '',
-                      contentPadding: EdgeInsets.zero,
-                      filled: false,
-                    ),
+              ),
+              child: Center(
+                child: TextField(
+                  controller: controllers[index],
+                  focusNode: focusNodes[index],
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  maxLength: 1,
+                  onChanged: (v) => _onDigitChanged(index, v),
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: tt.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 22,
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    counterText: '',
+                    contentPadding: EdgeInsets.zero,
+                    filled: false,
                   ),
                 ),
               ),
@@ -259,8 +294,8 @@ class OtpActionButton extends StatelessWidget {
     this.icon,
     this.isLoading = false,
     this.onPressed,
-  })  : color = AppColors.primary,
-        textColor = AppColors.onPrimary;
+  }) : color = AppColors.primary,
+       textColor = AppColors.onPrimary;
 
   /// Green "Submit" / "Verify" style.
   const OtpActionButton.green({
@@ -269,8 +304,8 @@ class OtpActionButton extends StatelessWidget {
     this.icon,
     this.isLoading = false,
     this.onPressed,
-  })  : color = AppColors.secondary,
-        textColor = AppColors.onSecondary;
+  }) : color = AppColors.secondary,
+       textColor = AppColors.onSecondary;
 
   @override
   Widget build(BuildContext context) {
@@ -282,10 +317,10 @@ class OtpActionButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: double.infinity,
-        height: 64,
+        height: 72,
         decoration: BoxDecoration(
           color: isDisabled ? color.withValues(alpha: 0.35) : color,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: isDisabled
               ? []
               : [
@@ -318,13 +353,49 @@ class OtpActionButton extends StatelessWidget {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    if (icon != null) ...[
-                      const SizedBox(width: 12),
-                      icon!,
-                    ],
+                    if (icon != null) ...[const SizedBox(width: 12), icon!],
                   ],
                 ),
         ),
+      ),
+    );
+  }
+}
+
+class OtpInlineNotice extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  final Color color;
+
+  const OtpInlineNotice({
+    super.key,
+    required this.icon,
+    required this.message,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.space4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        border: Border.all(color: color.withValues(alpha: 0.20)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: tt.bodySmall?.copyWith(color: color, height: 1.4),
+            ),
+          ),
+        ],
       ),
     );
   }

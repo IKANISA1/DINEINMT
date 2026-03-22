@@ -4,6 +4,7 @@ This Supabase project now includes two production AI pipelines:
 
 - Gemini-powered menu image generation
 - Gemini Google Maps grounding plus Gemini Search-grounded venue profile enrichment
+- Gemini-powered venue profile image generation
 
 ## What Was Added
 
@@ -14,6 +15,8 @@ This Supabase project now includes two production AI pipelines:
 - A migration that extends `dinein_venues` with Google provider metadata, web links, review snapshots, and enrichment status fields.
 - `enrich-venue-profile` for a single-venue refresh using Gemini Google Maps grounding plus Gemini Google Search grounding.
 - `backfill-venue-profiles` for batch venue enrichment.
+- `generate-venue-profile-image` for single-venue AI profile image generation.
+- `backfill-venue-profile-images` for batch venue image backfill.
 
 ## Required Secrets
 
@@ -24,9 +27,12 @@ supabase secrets set \
   GEMINI_API_KEY=your_google_api_key \
   GEMINI_IMAGE_MODELS=gemini-3.1-flash-image-preview,gemini-2.5-flash-image \
   GEMINI_VENUE_MODELS=gemini-2.5-flash,gemini-2.5-flash-lite \
+  GEMINI_VENUE_IMAGE_MODELS=gemini-2.5-flash-image \
   MENU_IMAGE_BUCKET=menu-images \
   MENU_IMAGE_CRON_SECRET=choose-a-long-random-secret \
-  VENUE_ENRICHMENT_CRON_SECRET=choose-a-second-long-random-secret
+  VENUE_ENRICHMENT_CRON_SECRET=choose-a-second-long-random-secret \
+  VENUE_IMAGE_BUCKET=venue-images \
+  VENUE_IMAGE_CRON_SECRET=choose-a-third-long-random-secret
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are provided by the Supabase runtime.
@@ -45,6 +51,8 @@ supabase functions deploy generate-menu-item-image
 supabase functions deploy backfill-menu-images
 supabase functions deploy enrich-venue-profile
 supabase functions deploy backfill-venue-profiles
+supabase functions deploy generate-venue-profile-image
+supabase functions deploy backfill-venue-profile-images
 ```
 
 If the linked project has drifted migration history, repair or align the remote
@@ -76,18 +84,23 @@ migration with the actual deployed secret value for the target project.
 
 The checked-in migration
 `20260321040000_venue_profile_backfill_automation.sql`
-creates a 15-minute cron job that posts to `dinein-api` with
-`action=backfill_venue_profiles`. It uses `x-cron-secret` instead of a service
-role token because `dinein-api` is the production path already verified on the
-linked project.
+is intentionally a no-op. It only enables `pg_net` and `pg_cron`; the actual
+HTTP cron job must be provisioned manually per environment because the required
+cron secret or service-role bearer token must not be committed to source
+control.
 
-For venue enrichment, keep the batch size very small. Grounded Google Maps plus
-Search enrichment is materially heavier than the old provider-only path, so a
-`limit` of `1` is the safe default for scheduled runs on Supabase Edge
-Functions.
+For venue enrichment and venue profile image generation, keep the batch size
+small. Grounded Google Maps plus Search enrichment is materially heavier than
+the old provider-only path, so a `limit` of `1` is the safe default for
+scheduled runs on Supabase Edge Functions. The venue image batch can run with a
+slightly higher limit once grounding data exists, but it can also self-enrich
+missing venues if needed.
 
-Before applying it, replace the placeholder `VENUE_ENRICHMENT_CRON_SECRET` in
-that migration with the actual deployed secret value for the target project.
+Recommended production setup:
+
+- Schedule `backfill_venue_profiles` every 10 to 15 minutes with a small batch.
+- Schedule `backfill_venue_profile_images` every 10 to 15 minutes with a small batch.
+- If you are only running the checked-in ops script, let it invoke both actions in sequence.
 
 ## Venue Enrichment Notes
 
@@ -124,6 +137,10 @@ ITERATIONS=6 \
 SLEEP_SEC=60 \
 scripts/venue_profile_backfill.sh
 ```
+
+`scripts/venue_profile_backfill.sh` now chains the venue image backfill after
+the venue enrichment pass by default, so one operator run refreshes both the
+grounded venue metadata and the persisted AI profile images.
 
 `PARTITION=even` and `PARTITION=odd` can be used to run multiple representative-generation workers in parallel.
 

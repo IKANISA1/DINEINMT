@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,6 +12,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/constants/enums.dart';
 
+import '../../../core/providers/permission_providers.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/models/models.dart';
 import '../../../core/models/onboarding_draft_models.dart';
@@ -27,13 +29,16 @@ import '../../../shared/widgets/shared_widgets.dart';
 // ─── FLOW PHASES ───
 enum _Phase { step1, building, step2, step3, step4 }
 
-class VenueOnboardingFlow extends StatefulWidget {
+enum _Step2MenuAction { photo, upload, manual }
+
+class VenueOnboardingFlow extends ConsumerStatefulWidget {
   const VenueOnboardingFlow({super.key});
   @override
-  State<VenueOnboardingFlow> createState() => _VenueOnboardingFlowState();
+  ConsumerState<VenueOnboardingFlow> createState() =>
+      _VenueOnboardingFlowState();
 }
 
-class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
+class _VenueOnboardingFlowState extends ConsumerState<VenueOnboardingFlow>
     with TickerProviderStateMixin {
   _Phase _phase = _Phase.step1;
 
@@ -41,10 +46,15 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   final _searchCtrl = TextEditingController();
   List<Map<String, dynamic>> _venueResults = [];
   bool _isSearching = false;
+  bool _isSearchingGoogleMaps = false;
   bool _hasSearchedWithNoResults = false;
   String _lastSearchQuery = '';
+  OnboardingVenueSearchBlock? _blockedVenueMatch;
   List<Map<String, dynamic>> _featuredVenues = [];
   bool _isFeaturedLoading = true;
+  bool _showingGoogleMapsResults = false;
+  String? _step1Notice;
+  bool _step1NoticeIsError = false;
   Timer? _debounce;
 
   // Building loader
@@ -53,7 +63,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   static const _buildStatuses = [
     'INFERRING IDENTITY…',
     'ENRICHING MAPS DATA…',
-    'PREPARING VENUE…',
+    'AUTO-BUILDING MENU…',
   ];
 
   // Step 2 / 3
@@ -63,6 +73,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   String _ocrStatusMessage = 'UPLOADING FILE…';
   String? _onboardingMenuToken;
   bool _returnToMenuAfterVerification = false;
+  _Step2MenuAction? _selectedMenuAction;
 
   // Step 4
   final _phoneCtrl = TextEditingController();
@@ -119,7 +130,9 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
 
   Future<void> _loadFeaturedVenues() async {
     try {
-      final venues = await VenueRepository.instance.getVenues(limit: 6);
+      final venues = await VenueRepository.instance.getClaimableVenues(
+        limit: 6,
+      );
       if (!mounted) return;
       setState(() {
         _featuredVenues = venues
@@ -185,13 +198,21 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   void _goBack() {
     switch (_phase) {
       case _Phase.step1:
-        context.pop();
+        if (GoRouter.of(context).canPop()) {
+          context.pop();
+        } else {
+          context.goNamed(AppRouteNames.guestSettings);
+        }
+        return;
       case _Phase.building:
         setState(() => _phase = _Phase.step1);
+        return;
       case _Phase.step2:
         setState(() => _phase = _Phase.step1);
+        return;
       case _Phase.step3:
         setState(() => _phase = _Phase.step2);
+        return;
       case _Phase.step4:
         if (_otpStep == 'otp') {
           setState(() {
@@ -200,11 +221,14 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
           });
         } else {
           setState(() {
-            _phase = _returnToMenuAfterVerification ? _Phase.step2 : _Phase.step3;
+            _phase = _returnToMenuAfterVerification
+                ? _Phase.step2
+                : _Phase.step3;
             _returnToMenuAfterVerification = false;
             _info = null;
           });
         }
+        return;
     }
   }
 
@@ -215,11 +239,20 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       setState(() {
         _venueResults = [];
         _isSearching = false;
+        _isSearchingGoogleMaps = false;
         _hasSearchedWithNoResults = false;
+        _blockedVenueMatch = null;
+        _showingGoogleMapsResults = false;
+        _step1Notice = null;
       });
       return;
     }
-    setState(() => _isSearching = true);
+    setState(() {
+      _isSearching = true;
+      _showingGoogleMapsResults = false;
+      _step1Notice = null;
+      _blockedVenueMatch = null;
+    });
     _debounce = Timer(
       const Duration(milliseconds: 400),
       () => _searchVenues(query.trim()),
@@ -228,20 +261,13 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
 
   Future<void> _searchVenues(String query) async {
     try {
-      final allVenues = await VenueRepository.instance.getVenues();
+      final search = await VenueRepository.instance.searchOnboardingVenues(
+        query,
+        limit: 10,
+      );
       if (!mounted) return;
-      final lowerQuery = query.toLowerCase();
-      final filtered = allVenues
-          .where(
-            (v) =>
-                v.name.toLowerCase().contains(lowerQuery) ||
-                v.address.toLowerCase().contains(lowerQuery) ||
-                v.category.toLowerCase().contains(lowerQuery),
-          )
-          .take(10)
-          .toList();
       setState(() {
-        _venueResults = filtered
+        _venueResults = search.venues
             .map(
               (v) => {
                 'id': v.id,
@@ -254,12 +280,76 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
             )
             .toList();
         _isSearching = false;
-        _hasSearchedWithNoResults = filtered.isEmpty;
+        _hasSearchedWithNoResults =
+            search.venues.isEmpty && search.blockedMatch == null;
+        _blockedVenueMatch = search.blockedMatch;
         _lastSearchQuery = query;
+        _showingGoogleMapsResults = false;
+        _step1Notice = null;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isSearching = false);
+      setState(() {
+        _isSearching = false;
+        _blockedVenueMatch = null;
+        _showingGoogleMapsResults = false;
+        _step1Notice = 'Primary venue search failed. Please retry.';
+        _step1NoticeIsError = true;
+      });
+    }
+  }
+
+  Future<void> _searchGoogleMaps() async {
+    final query = _lastSearchQuery.trim().isNotEmpty
+        ? _lastSearchQuery.trim()
+        : _searchCtrl.text.trim();
+    if (query.length < 2) return;
+
+    setState(() {
+      _isSearchingGoogleMaps = true;
+      _step1Notice = null;
+      _step1NoticeIsError = false;
+      _blockedVenueMatch = null;
+    });
+
+    try {
+      final results = await VenueRepository.instance.searchGoogleMaps(query);
+      if (!mounted) return;
+      setState(() {
+        _venueResults = results
+            .map(
+              (venue) => <String, dynamic>{
+                'id': null,
+                'source': 'google_maps',
+                'name': venue['name'] as String? ?? '',
+                'address': venue['address'] as String? ?? '',
+                'category': venue['category'] as String? ?? 'Restaurants',
+                'rating': venue['rating'],
+                'ratingCount': venue['ratingCount'],
+                'image_url': venue['image_url'],
+                'phone': venue['phone'],
+                'website_url': venue['website'],
+                'place_id': venue['placeId'],
+              },
+            )
+            .toList(growable: false);
+        _isSearchingGoogleMaps = false;
+        _showingGoogleMapsResults = true;
+        _hasSearchedWithNoResults = _venueResults.isEmpty;
+        _step1Notice = _venueResults.isEmpty
+            ? 'No Google Maps matches were found for "$query".'
+            : 'Showing grounded Google Maps matches for "$query".';
+        _step1NoticeIsError = _venueResults.isEmpty;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isSearchingGoogleMaps = false;
+        _showingGoogleMapsResults = false;
+        _step1Notice =
+            'Google Maps search is currently unavailable. You can still continue with direct menu upload.';
+        _step1NoticeIsError = true;
+      });
     }
   }
 
@@ -270,12 +360,16 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       address: venue['address'] as String? ?? '',
       category: venue['category'] as String? ?? 'Restaurants',
       description: '',
+      imageUrl: venue['image_url'] as String?,
+      contactPhone: venue['phone'] as String?,
+      websiteUrl: venue['website_url'] as String?,
     );
     await OnboardingDraftService.saveClaimedVenue(draft);
     if (!mounted) return;
     setState(() {
       _claimedVenue = draft;
       _phase = _Phase.building;
+      _selectedMenuAction = null;
     });
     _runBuildingAnimation();
   }
@@ -317,6 +411,25 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
 
   Future<void> _takePhoto() async {
     if (!_ensureMenuUploadAccess()) return;
+    final action = await PermissionAccessDialog.show(
+      context,
+      config: PermissionAccessDialogConfig.venueCamera(),
+    );
+    if (!mounted || action != PermissionAccessDialogAction.grantAccess) return;
+
+    final hasCameraAccess = await ref
+        .read(appPermissionServiceProvider)
+        .ensureVenueCameraAccess();
+    if (!hasCameraAccess || !mounted) {
+      if (!hasCameraAccess) {
+        setState(() {
+          _isProcessingOcr = false;
+          _error = 'Camera access is required to take a photo.';
+        });
+      }
+      return;
+    }
+
     try {
       final picker = ImagePicker();
       final image = await picker.pickImage(
@@ -336,6 +449,25 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
 
   Future<void> _uploadFile() async {
     if (!_ensureMenuUploadAccess()) return;
+    final action = await PermissionAccessDialog.show(
+      context,
+      config: PermissionAccessDialogConfig.venuePhotos(),
+    );
+    if (!mounted || action != PermissionAccessDialogAction.grantAccess) return;
+
+    final hasPhotoAccess = await ref
+        .read(appPermissionServiceProvider)
+        .ensureVenuePhotoAccess();
+    if (!hasPhotoAccess || !mounted) {
+      if (!hasPhotoAccess) {
+        setState(() {
+          _isProcessingOcr = false;
+          _error = 'Photo library access is required to upload menu images.';
+        });
+      }
+      return;
+    }
+
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -349,7 +481,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       if (!mounted) return;
       setState(() {
         _isProcessingOcr = false;
-        _error = 'File selection failed. Please try again.';
+        _error = 'File selection failed. Check photo access and try again.';
       });
     }
   }
@@ -439,6 +571,19 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
     setState(() => _phase = _Phase.step3);
   }
 
+  Future<void> _submitSelectedMenuAction() async {
+    final action = _selectedMenuAction ?? _Step2MenuAction.manual;
+    switch (action) {
+      case _Step2MenuAction.photo:
+        return _takePhoto();
+      case _Step2MenuAction.upload:
+        return _uploadFile();
+      case _Step2MenuAction.manual:
+        _addManually();
+        return;
+    }
+  }
+
   // ─── STEP 3 ACTIONS ───
   void _approveAll() {
     setState(() {
@@ -455,9 +600,23 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   }
 
   void _showAddItemDialog() {
-    final nameCtrl = TextEditingController();
-    final priceCtrl = TextEditingController();
-    final catCtrl = TextEditingController(text: 'General');
+    _showItemEditorSheet();
+  }
+
+  void _showEditItemDialog(int index) {
+    _showItemEditorSheet(index: index);
+  }
+
+  void _showItemEditorSheet({int? index}) {
+    final existing = index != null ? _draftItems[index] : null;
+    final nameCtrl = TextEditingController(text: existing?.name ?? 'New Item');
+    final priceCtrl = TextEditingController(
+      text: existing == null ? '0' : existing.price.toStringAsFixed(2),
+    );
+    final catCtrl = TextEditingController(
+      text: existing?.category ?? 'General',
+    );
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -467,173 +626,109 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
         final tt = Theme.of(ctx).textTheme;
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: AppTheme.space4,
+            right: AppTheme.space4,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + AppTheme.space4,
           ),
-          child: Container(
-            margin: const EdgeInsets.all(16),
+          child: _OnboardingPanel(
+            radius: 32,
             padding: const EdgeInsets.all(AppTheme.space8),
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-            ),
+            backgroundColor: cs.surfaceContainerLow,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ADD ITEM',
-                  style: tt.labelSmall?.copyWith(
-                    color: cs.primary,
-                    letterSpacing: 3,
+                  index == null ? 'ADD ITEM' : 'EDIT ITEM',
+                  style: tt.displaySmall?.copyWith(
                     fontWeight: FontWeight.w900,
+                    fontSize: 24,
                   ),
+                ),
+                const SizedBox(height: AppTheme.space2),
+                Text(
+                  'Refine your menu details.',
+                  style: tt.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: AppTheme.space6),
-                TextField(
+                _EditorFieldLabel(label: 'Item Name'),
+                const SizedBox(height: AppTheme.space2),
+                _OnboardingTextField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(hintText: 'Item Name'),
+                  hintText: 'New Item',
                 ),
-                const SizedBox(height: AppTheme.space4),
-                TextField(
-                  controller: priceCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    hintText: 'Price (${Country.mt.currencySymbol})',
-                    prefixText: '${Country.mt.currencySymbol} ',
-                  ),
-                ),
-                const SizedBox(height: AppTheme.space4),
-                TextField(
-                  controller: catCtrl,
-                  decoration: const InputDecoration(hintText: 'Category'),
-                ),
-                const SizedBox(height: AppTheme.space8),
+                const SizedBox(height: AppTheme.space5),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _EditorFieldLabel(label: 'Price (€)'),
+                          const SizedBox(height: AppTheme.space2),
+                          _OnboardingTextField(
+                            controller: priceCtrl,
+                            hintText: '0',
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: AppTheme.space4),
                     Expanded(
-                      child: PremiumButton(
-                        label: 'Save',
-                        onPressed: () {
-                          final name = nameCtrl.text.trim();
-                          final price =
-                              double.tryParse(priceCtrl.text.trim()) ?? 0;
-                          if (name.isEmpty) return;
-                          setState(
-                            () => _draftItems.add(
-                              OcrDraftMenuItem(
-                                name: name,
-                                description: '',
-                                price: price,
-                                category: catCtrl.text.trim(),
-                              ),
-                            ),
-                          );
-                          OnboardingDraftService.saveMenuDraftItems(
-                            _draftItems,
-                          );
-                          Navigator.pop(ctx);
-                        },
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _EditorFieldLabel(label: 'Category'),
+                          const SizedBox(height: AppTheme.space2),
+                          _OnboardingTextField(
+                            controller: catCtrl,
+                            hintText: 'General',
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showEditItemDialog(int index) {
-    final item = _draftItems[index];
-    final nameCtrl = TextEditingController(text: item.name);
-    final priceCtrl = TextEditingController(
-      text: item.price.toStringAsFixed(2),
-    );
-    final catCtrl = TextEditingController(text: item.category);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        final tt = Theme.of(ctx).textTheme;
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(AppTheme.space8),
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'EDIT ITEM',
-                  style: tt.labelSmall?.copyWith(
-                    color: cs.primary,
-                    letterSpacing: 3,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
                 const SizedBox(height: AppTheme.space6),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(hintText: 'Item Name'),
-                ),
-                const SizedBox(height: AppTheme.space4),
-                TextField(
-                  controller: priceCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    hintText: 'Price (${Country.mt.currencySymbol})',
-                    prefixText: '${Country.mt.currencySymbol} ',
-                  ),
-                ),
-                const SizedBox(height: AppTheme.space4),
-                TextField(
-                  controller: catCtrl,
-                  decoration: const InputDecoration(hintText: 'Category'),
-                ),
-                const SizedBox(height: AppTheme.space8),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('Cancel'),
+                      child: _SheetActionButton(
+                        label: 'Cancel',
+                        onTap: () => Navigator.pop(ctx),
                       ),
                     ),
                     const SizedBox(width: AppTheme.space4),
                     Expanded(
-                      child: PremiumButton(
+                      child: _SheetActionButton(
                         label: 'Save',
-                        onPressed: () {
+                        emphasized: true,
+                        onTap: () {
                           final name = nameCtrl.text.trim();
                           final price =
                               double.tryParse(priceCtrl.text.trim()) ?? 0;
+                          final category = catCtrl.text.trim().isEmpty
+                              ? 'General'
+                              : catCtrl.text.trim();
                           if (name.isEmpty) return;
-                          setState(
-                            () => _draftItems[index] = item.copyWith(
+                          setState(() {
+                            final nextItem = OcrDraftMenuItem(
                               name: name,
+                              description: existing?.description ?? '',
                               price: price,
-                              category: catCtrl.text.trim(),
+                              category: category,
+                              tags: existing?.tags ?? const [],
                               requiresReview: false,
-                            ),
-                          );
+                            );
+                            if (index == null) {
+                              _draftItems.add(nextItem);
+                            } else {
+                              _draftItems[index] = nextItem;
+                            }
+                          });
                           OnboardingDraftService.saveMenuDraftItems(
                             _draftItems,
                           );
@@ -652,25 +747,36 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
   }
 
   // ─── STEP 4: OTP ───
+  String get _localPhone => normalizeMaltesePhoneLocalInput(_phoneCtrl.text);
+
   String get _normalizedPhone {
-    final local = _phoneCtrl.text.trim();
+    final local = _localPhone;
     if (local.isEmpty) return '';
-    final digits = local.replaceAll(RegExp(r'[^0-9]'), '');
-    if (local.startsWith('+')) return '+$digits';
     final cc = _countryCode.replaceAll(RegExp(r'[^0-9]'), '');
-    return '+$cc$digits';
+    return '+$cc$local';
   }
 
+  bool get _canSendOtp => !_isLoading && _localPhone.length == 8;
+
   Future<void> _sendOtp() async {
+    if (!_canSendOtp) {
+      setState(() {
+        _error = 'Enter your 8-digit Maltese phone number.';
+      });
+      return;
+    }
+
     final phone = _normalizedPhone;
-    if (phone.length < 8) return;
     setState(() {
       _isLoading = true;
       _error = null;
       _info = null;
     });
     try {
-      final challenge = await WhatsAppOtpService.instance.sendOtp(phone);
+      final challenge = await WhatsAppOtpService.instance.sendOtp(
+        phone,
+        appScope: 'onboarding',
+      );
       if (!mounted) return;
       setState(() {
         _challenge = challenge;
@@ -720,6 +826,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       phone: _normalizedPhone,
       verificationId: challenge.verificationId,
       code: code,
+      appScope: 'onboarding',
     );
     if (!result.verified) {
       if (!mounted) return;
@@ -814,10 +921,11 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
     try {
       resolved = await _ensureVenueRecord(claimedVenue);
     } catch (e) {
+      final message = _errorMessageFrom(e);
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = 'Could not register venue. Please try again.';
+        _error = message ?? 'Could not register venue. Please try again.';
       });
       return;
     }
@@ -863,6 +971,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       }
       if (!mounted) return;
       await OnboardingDraftService.clearOnboardingMenuToken();
+      if (!mounted) return;
       context.goNamed(AppRouteNames.venueDashboard);
       return;
     }
@@ -899,6 +1008,45 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
     final persisted = submissionDraft.copyWith(venueId: venue.id);
     await OnboardingDraftService.saveClaimedVenue(persisted);
     return persisted;
+  }
+
+  String? _errorMessageFrom(Object error) {
+    final raw = error.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+    final message = raw.trim();
+    return message.isEmpty ? null : message;
+  }
+
+  String _blockedVenueTitle(OnboardingVenueSearchBlock match) {
+    switch (match.reason) {
+      case 'already_live':
+        return 'Already Live';
+      case 'already_onboarding':
+        return 'Already In Review';
+      default:
+        return 'Unavailable';
+    }
+  }
+
+  String _blockedVenueCardHeading(OnboardingVenueSearchBlock match) {
+    switch (match.reason) {
+      case 'already_live':
+        return 'VENUE\nALREADY\nLIVE';
+      case 'already_onboarding':
+        return 'CLAIM\nALREADY\nSTARTED';
+      default:
+        return 'VENUE\nUNAVAILABLE';
+    }
+  }
+
+  String _blockedVenueMessage(OnboardingVenueSearchBlock match) {
+    switch (match.reason) {
+      case 'already_live':
+        return '${match.name} is already live on DineIn and has been claimed, so it is hidden from onboarding search.';
+      case 'already_onboarding':
+        return '${match.name} already has an onboarding or activation flow in progress, so a new onboarding entry cannot be created.';
+      default:
+        return '${match.name} is not available for onboarding from this search.';
+    }
   }
 
   // ═══════════════════════════════════════════
@@ -961,9 +1109,10 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                   ),
                 ] else ...[
                   Text(
-                    _stepTitle,
+                    _stepTitle.toUpperCase(),
                     style: tt.displaySmall?.copyWith(
                       fontWeight: FontWeight.w900,
+                      height: 1.02,
                     ),
                   ),
                 ],
@@ -1007,6 +1156,11 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
             ? const SizedBox.shrink()
             : Column(
                 children: [
+                  _OnboardingPrimaryButton(
+                    label: 'Submit',
+                    icon: LucideIcons.arrowRight,
+                    onPressed: _submitSelectedMenuAction,
+                  ),
                   const SizedBox(height: AppTheme.space3),
                   Center(
                     child: TextButton(
@@ -1026,15 +1180,10 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       case _Phase.step3:
         return Column(
           children: [
-            SizedBox(
-              width: double.infinity,
-              child: PremiumButton(
-                label: _hasVerifiedMenuAccess
-                    ? 'Review Claim'
-                    : 'Verify & Continue',
-                icon: LucideIcons.arrowRight,
-                onPressed: () => setState(() => _phase = _Phase.step4),
-              ),
+            _OnboardingPrimaryButton(
+              label: 'Submit Menu',
+              icon: LucideIcons.arrowRight,
+              onPressed: () => setState(() => _phase = _Phase.step4),
             ),
             const SizedBox(height: AppTheme.space3),
             Center(
@@ -1122,6 +1271,9 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                       setState(() {
                         _venueResults = [];
                         _hasSearchedWithNoResults = false;
+                        _blockedVenueMatch = null;
+                        _showingGoogleMapsResults = false;
+                        _step1Notice = null;
                       });
                     },
                     child: Container(
@@ -1143,7 +1295,29 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
           ),
           const SizedBox(height: AppTheme.space8),
 
-          if (_isSearching)
+          if (_step1Notice != null) ...[
+            _InlineNotice(
+              icon: _step1NoticeIsError
+                  ? LucideIcons.alertCircle
+                  : LucideIcons.sparkles,
+              title: _step1NoticeIsError ? 'Search Update' : 'Google Maps',
+              message: _step1Notice!,
+              color: _step1NoticeIsError ? cs.error : cs.primary,
+            ),
+            const SizedBox(height: AppTheme.space4),
+          ],
+
+          if (_blockedVenueMatch != null && _venueResults.isNotEmpty) ...[
+            _InlineNotice(
+              icon: LucideIcons.shieldAlert,
+              title: _blockedVenueTitle(_blockedVenueMatch!),
+              message: _blockedVenueMessage(_blockedVenueMatch!),
+              color: AppColors.warning,
+            ),
+            const SizedBox(height: AppTheme.space4),
+          ],
+
+          if (_isSearching || _isSearchingGoogleMaps)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(32),
@@ -1152,7 +1326,9 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
             )
           else if (_venueResults.isNotEmpty) ...[
             Text(
-              'SEARCH RESULTS',
+              _showingGoogleMapsResults
+                  ? 'GOOGLE MAPS RESULTS'
+                  : 'SEARCH RESULTS',
               style: tt.labelSmall?.copyWith(
                 color: cs.onSurfaceVariant.withValues(alpha: 0.5),
                 letterSpacing: 3,
@@ -1166,10 +1342,51 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                 child: _VenueSearchCard(venue: v, onTap: () => _selectVenue(v)),
               ),
             ),
+          ] else if (_blockedVenueMatch != null) ...[
+            _VenueUnavailableCard(
+              title: _blockedVenueCardHeading(_blockedVenueMatch!),
+              message: _blockedVenueMessage(_blockedVenueMatch!),
+            ),
+            const SizedBox(height: AppTheme.space8),
+            Center(
+              child: TextButton(
+                onPressed: () {
+                  _searchCtrl.clear();
+                  setState(() {
+                    _venueResults = [];
+                    _blockedVenueMatch = null;
+                    _hasSearchedWithNoResults = false;
+                  });
+                },
+                child: Text(
+                  'RETURN TO PRIMARY SEARCH',
+                  style: tt.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.35),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+            ),
           ] else if (_hasSearchedWithNoResults) ...[
             // ─ VENUE NOT FOUND ─
             const _VenueNotFoundCard(),
-            const SizedBox(height: AppTheme.space8),
+            const SizedBox(height: AppTheme.space6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _isSearchingGoogleMaps ? null : _searchGoogleMaps,
+                icon: Icon(LucideIcons.search, size: 16, color: cs.primary),
+                label: Text(
+                  'SEARCH ON GOOGLE MAPS',
+                  style: tt.labelSmall?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: AppTheme.space8),
             // ─ OR divider ─
             Row(
@@ -1213,6 +1430,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                 setState(() {
                   _claimedVenue = draft;
                   _phase = _Phase.step2;
+                  _selectedMenuAction = _Step2MenuAction.manual;
                 });
               },
               child: Container(
@@ -1266,6 +1484,8 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                   setState(() {
                     _venueResults = [];
                     _hasSearchedWithNoResults = false;
+                    _showingGoogleMapsResults = false;
+                    _step1Notice = null;
                   });
                 },
                 child: Text(
@@ -1347,10 +1567,20 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                     ),
                 const SizedBox(height: AppTheme.space10),
                 Text(
-                  'BUILDING VENUE...',
-                  style: tt.titleLarge?.copyWith(
+                  'BUILDING\nVENUE...',
+                  textAlign: TextAlign.center,
+                  style: tt.displaySmall?.copyWith(
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.space4),
+                Text(
+                  'AI is inferring your identity, enriching with Maps data, and building your entire menu.',
+                  textAlign: TextAlign.center,
+                  style: tt.bodyLarge?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    height: 1.5,
                   ),
                 ),
                 const SizedBox(height: AppTheme.space8),
@@ -1371,34 +1601,20 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                   _buildStatuses.length,
                   (i) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          i < _buildStatusIndex
-                              ? LucideIcons.checkCircle2
-                              : i == _buildStatusIndex
-                              ? LucideIcons.loader2
-                              : LucideIcons.circle,
-                          size: 14,
-                          color: i <= _buildStatusIndex
-                              ? cs.primary
-                              : cs.onSurfaceVariant.withValues(alpha: 0.3),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _buildStatuses[i],
-                          style: tt.labelSmall?.copyWith(
-                            color: i <= _buildStatusIndex
-                                ? cs.onSurface
-                                : cs.onSurfaceVariant.withValues(alpha: 0.3),
-                            fontWeight: i == _buildStatusIndex
-                                ? FontWeight.w800
-                                : FontWeight.w500,
-                            letterSpacing: 2,
+                    child: Text(
+                      _buildStatuses[i],
+                      textAlign: TextAlign.center,
+                      style: tt.labelMedium?.copyWith(
+                        color: switch (i) {
+                          0 => cs.primary,
+                          1 when _buildStatusIndex >= 1 => cs.secondary,
+                          _ => cs.onSurfaceVariant.withValues(
+                            alpha: i <= _buildStatusIndex ? 0.65 : 0.35,
                           ),
-                        ),
-                      ],
+                        },
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2,
+                      ),
                     ),
                   ),
                 ),
@@ -1464,30 +1680,23 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
 
           // Venue identified card
           if (_claimedVenue != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppTheme.space6),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                border: Border.all(color: AppColors.white5),
-              ),
+            _OnboardingPanel(
               child: Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 64,
+                    height: 64,
                     decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      color: cs.primary.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: Icon(
                       LucideIcons.mapPin,
                       color: cs.primary,
-                      size: 22,
+                      size: 30,
                     ),
                   ),
-                  const SizedBox(width: AppTheme.space4),
+                  const SizedBox(width: AppTheme.space5),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1500,14 +1709,20 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(_claimedVenue!.name, style: tt.titleMedium),
+                        const SizedBox(height: AppTheme.space2),
                         Text(
-                          _claimedVenue!.address,
-                          style: tt.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
+                          _claimedVenue!.name,
+                          style: tt.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
+                        if (_claimedVenue!.address.isNotEmpty)
+                          Text(
+                            _claimedVenue!.address,
+                            style: tt.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -1522,7 +1737,9 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
             icon: LucideIcons.camera,
             title: 'Take Photo',
             subtitle: 'USE YOUR CAMERA',
-            onTap: _takePhoto,
+            selected: _selectedMenuAction == _Step2MenuAction.photo,
+            onTap: () =>
+                setState(() => _selectedMenuAction = _Step2MenuAction.photo),
           ),
           const SizedBox(height: AppTheme.space4),
           _DashedOptionCard(
@@ -1530,15 +1747,19 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
             iconColor: AppColors.secondary,
             title: 'Upload PDF / Image',
             subtitle: 'FROM YOUR DEVICE',
-            onTap: _uploadFile,
+            selected: _selectedMenuAction == _Step2MenuAction.upload,
+            onTap: () =>
+                setState(() => _selectedMenuAction = _Step2MenuAction.upload),
           ),
           const SizedBox(height: AppTheme.space4),
           _DashedOptionCard(
             icon: LucideIcons.fileText,
-            iconColor: cs.onSurfaceVariant,
+            iconColor: AppColors.tertiary,
             title: 'Add Manually',
             subtitle: 'TYPE YOUR MENU ITEMS',
-            onTap: _addManually,
+            selected: _selectedMenuAction == _Step2MenuAction.manual,
+            onTap: () =>
+                setState(() => _selectedMenuAction = _Step2MenuAction.manual),
           ),
         ],
       ),
@@ -1553,22 +1774,21 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (reviewCount > 0)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(LucideIcons.sparkles, size: 16, color: cs.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Review Needed',
-                      style: tt.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+          if (reviewCount > 0) ...[
+            _SectionEyebrow(
+              icon: LucideIcons.sparkles,
+              label: 'Review Exceptions',
+            ),
+            const SizedBox(height: AppTheme.space3),
+          ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Menu Items',
+                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              if (reviewCount > 0)
                 TextButton(
                   onPressed: _approveAll,
                   child: Text(
@@ -1576,13 +1796,13 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                     style: tt.labelSmall?.copyWith(
                       color: cs.primary,
                       fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
+                      letterSpacing: 1.5,
                     ),
                   ),
                 ),
-              ],
-            ),
-          if (reviewCount > 0) const SizedBox(height: AppTheme.space4),
+            ],
+          ),
+          const SizedBox(height: AppTheme.space4),
           if (_draftItems.isEmpty)
             const EmptyState(
               icon: LucideIcons.utensils,
@@ -1593,7 +1813,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
             final i = entry.key;
             final item = entry.value;
             return Padding(
-              padding: const EdgeInsets.only(bottom: AppTheme.space3),
+              padding: const EdgeInsets.only(bottom: AppTheme.space4),
               child: _MenuItemCard(
                 item: item,
                 onEdit: () => _showEditItemDialog(i),
@@ -1657,13 +1877,17 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
           ),
         ),
         const SizedBox(height: AppTheme.space4),
-        MaltaPhoneInput(controller: _phoneCtrl, onSubmitted: _sendOtp),
+        MaltaPhoneInput(
+          controller: _phoneCtrl,
+          onSubmitted: _canSendOtp ? _sendOtp : null,
+          onChanged: (_) => setState(() {}),
+        ),
         const SizedBox(height: AppTheme.space8),
         OtpActionButton.gold(
           label: 'Get OTP',
           icon: const WhatsAppIcon(),
           isLoading: _isLoading,
-          onPressed: _phoneCtrl.text.trim().length >= 4 ? _sendOtp : null,
+          onPressed: _canSendOtp ? _sendOtp : null,
         ),
       ],
     );
@@ -1673,14 +1897,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppTheme.space6),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-            border: Border.all(color: AppColors.white5),
-          ),
+        _OnboardingPanel(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1693,10 +1910,7 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
                 ),
               ),
               const SizedBox(height: AppTheme.space2),
-              Text(
-                _verifiedContactPhone ?? '',
-                style: tt.titleMedium,
-              ),
+              Text(_verifiedContactPhone ?? '', style: tt.titleMedium),
               const SizedBox(height: AppTheme.space2),
               Text(
                 'Your identity is already verified. Submit the venue claim when you are ready.',
@@ -1832,6 +2046,233 @@ class _VenueOnboardingFlowState extends State<VenueOnboardingFlow>
 // REUSABLE SUB-WIDGETS
 // ════════════════════════════════════════════
 
+class _OnboardingPanel extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double radius;
+  final Color? backgroundColor;
+
+  const _OnboardingPanel({
+    required this.child,
+    this.padding = const EdgeInsets.all(AppTheme.space6),
+    this.radius = AppTheme.radiusXxl,
+    this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: backgroundColor ?? cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: AppColors.white5),
+        boxShadow: AppTheme.ambientShadow,
+      ),
+      child: child,
+    );
+  }
+}
+
+class _OnboardingPrimaryButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  const _OnboardingPrimaryButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final enabled = onPressed != null;
+    return PressableScale(
+      onTap: onPressed,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: double.infinity,
+        height: 74,
+        decoration: BoxDecoration(
+          color: enabled
+              ? AppColors.primary
+              : AppColors.primary.withValues(alpha: 0.38),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.18),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ]
+              : const [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: tt.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: AppColors.onPrimary,
+              ),
+            ),
+            const SizedBox(width: AppTheme.space3),
+            Icon(icon, color: AppColors.onPrimary, size: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionEyebrow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _SectionEyebrow({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: cs.primary),
+        const SizedBox(width: AppTheme.space2),
+        Text(
+          label.toUpperCase(),
+          style: tt.labelSmall?.copyWith(
+            color: cs.primary,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditorFieldLabel extends StatelessWidget {
+  final String label;
+
+  const _EditorFieldLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return Text(
+      label.toUpperCase(),
+      style: tt.labelSmall?.copyWith(
+        color: cs.onSurfaceVariant,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 2,
+      ),
+    );
+  }
+}
+
+class _OnboardingTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final TextInputType? keyboardType;
+
+  const _OnboardingTextField({
+    required this.controller,
+    required this.hintText,
+    this.keyboardType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: tt.titleLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: cs.onSurfaceVariant.withValues(alpha: 0.42),
+        ),
+        filled: true,
+        fillColor: cs.surfaceContainer,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.space5,
+          vertical: AppTheme.space4,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: AppColors.white5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: AppColors.white5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: cs.primary.withValues(alpha: 0.45)),
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetActionButton extends StatelessWidget {
+  final String label;
+  final bool emphasized;
+  final VoidCallback onTap;
+
+  const _SheetActionButton({
+    required this.label,
+    required this.onTap,
+    this.emphasized = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final bg = emphasized ? AppColors.primary : AppColors.surfaceContainer;
+    final fg = emphasized ? AppColors.onPrimary : AppColors.onSurface;
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        height: 62,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: emphasized
+              ? [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.16),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+              : const [],
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: tt.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: fg,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _VenueNotFoundCard extends StatelessWidget {
   const _VenueNotFoundCard();
   @override
@@ -1884,6 +2325,66 @@ class _VenueNotFoundCard extends StatelessWidget {
   }
 }
 
+class _VenueUnavailableCard extends StatelessWidget {
+  final String title;
+  final String message;
+
+  const _VenueUnavailableCard({required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppTheme.space6),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+        border: Border.all(color: AppColors.white5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                ),
+                child: Icon(
+                  LucideIcons.shieldAlert,
+                  size: 20,
+                  color: AppColors.warning,
+                ),
+              ),
+              const SizedBox(width: AppTheme.space4),
+              Text(
+                title,
+                style: tt.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  height: 1.15,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.space5),
+          Text(
+            message,
+            style: tt.bodyMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BackButton extends StatelessWidget {
   final VoidCallback onTap;
   const _BackButton({required this.onTap});
@@ -1914,40 +2415,63 @@ class _VenueSearchCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final source = venue['source'] as String?;
     return PressableScale(
       onTap: onTap,
-      child: ClayCard(
+      child: _OnboardingPanel(
         padding: const EdgeInsets.all(AppTheme.space5),
         child: Row(
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                color: (source == 'google_maps' ? cs.secondary : cs.primary)
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(18),
               ),
-              child: Icon(LucideIcons.store, size: 22, color: cs.primary),
+              child: Icon(
+                source == 'google_maps'
+                    ? LucideIcons.mapPin
+                    : LucideIcons.store,
+                size: 24,
+                color: source == 'google_maps' ? cs.secondary : cs.primary,
+              ),
             ),
             const SizedBox(width: AppTheme.space4),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (source == 'google_maps')
+                    Text(
+                      'GOOGLE MAPS',
+                      style: tt.labelSmall?.copyWith(
+                        color: cs.secondary,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.8,
+                      ),
+                    ),
                   Text(
                     venue['name'] as String? ?? '',
-                    style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    style: tt.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   if (venue['address'] != null)
                     Text(
                       venue['address'] as String,
-                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      style: tt.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                 ],
               ),
             ),
-            if (venue['category'] != null)
-              StatusBadge(label: venue['category'] as String),
+            Icon(
+              LucideIcons.chevronRight,
+              color: cs.onSurfaceVariant.withValues(alpha: 0.45),
+            ),
           ],
         ),
       ),
@@ -1973,7 +2497,7 @@ class _FeaturedVenueCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        height: 140,
+        height: 182,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: cs.surfaceContainerLow,
@@ -2108,7 +2632,7 @@ class _FeaturedVenueCardSkeleton extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      height: 140,
+      height: 182,
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
@@ -2137,12 +2661,14 @@ class _DashedOptionCard extends StatelessWidget {
   final Color? iconColor;
   final String title;
   final String subtitle;
+  final bool selected;
   final VoidCallback onTap;
   const _DashedOptionCard({
     required this.icon,
     this.iconColor,
     required this.title,
     required this.subtitle,
+    this.selected = false,
     required this.onTap,
   });
   @override
@@ -2152,43 +2678,60 @@ class _DashedOptionCard extends StatelessWidget {
     final color = iconColor ?? cs.primary;
     return PressableScale(
       onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppTheme.space6),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: 0.20),
-            style: BorderStyle.solid,
-          ),
+      child: CustomPaint(
+        foregroundPainter: _RoundedDashedBorderPainter(
+          color: selected
+              ? color.withValues(alpha: 0.75)
+              : cs.outlineVariant.withValues(alpha: 0.55),
+          radius: AppTheme.radiusXxl,
         ),
-        child: Column(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppTheme.space6),
+          decoration: BoxDecoration(
+            color: selected
+                ? cs.surfaceContainer.withValues(alpha: 0.98)
+                : cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.12),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : const [],
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(icon, color: color, size: 28),
               ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(height: AppTheme.space4),
-            Text(
-              title,
-              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              style: tt.labelSmall?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                letterSpacing: 2,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: AppTheme.space5),
+              Text(
+                title,
+                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: tt.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.72),
+                  letterSpacing: 2,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2209,11 +2752,20 @@ class _MenuItemCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.all(AppTheme.space5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.space5,
+        vertical: AppTheme.space5,
+      ),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-        border: Border.all(color: AppColors.white5),
+        color: item.requiresReview
+            ? cs.surfaceContainerLow
+            : const Color(0xFF151E17),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: item.requiresReview
+              ? AppColors.white5
+              : AppColors.secondary.withValues(alpha: 0.22),
+        ),
       ),
       child: Row(
         children: [
@@ -2221,58 +2773,44 @@ class _MenuItemCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    StatusBadge(label: item.category),
-                    if (item.requiresReview) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusFull,
-                          ),
-                        ),
-                        child: Text(
-                          'REVIEW NEEDED',
-                          style: tt.labelSmall?.copyWith(
-                            color: AppColors.secondary,
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                Text(
+                  item.category.toUpperCase(),
+                  style: tt.labelSmall?.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   item.name,
-                  style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  style: tt.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 Text(
                   '${Country.mt.currencySymbol}${item.price.toStringAsFixed(2)}',
-                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  style: tt.titleMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            icon: Icon(
-              LucideIcons.pencil,
-              size: 16,
-              color: cs.onSurfaceVariant,
-            ),
-            onPressed: onEdit,
+          const SizedBox(width: AppTheme.space4),
+          _RoundActionButton(
+            icon: LucideIcons.pencil,
+            color: cs.onSurfaceVariant,
+            background: cs.surfaceContainer,
+            onTap: onEdit,
           ),
-          IconButton(
-            icon: Icon(LucideIcons.trash2, size: 16, color: cs.error),
-            onPressed: onDelete,
+          const SizedBox(width: AppTheme.space3),
+          _RoundActionButton(
+            icon: LucideIcons.trash2,
+            color: cs.error,
+            background: const Color(0x332C1A1A),
+            onTap: onDelete,
           ),
         ],
       ),
@@ -2289,33 +2827,120 @@ class _DashedAddButton extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     return PressableScale(
       onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppTheme.space5),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: 0.30),
-            style: BorderStyle.solid,
-          ),
+      child: CustomPaint(
+        foregroundPainter: _RoundedDashedBorderPainter(
+          color: cs.outlineVariant.withValues(alpha: 0.55),
+          radius: AppTheme.radiusXl,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(LucideIcons.plus, size: 18, color: cs.primary),
-            const SizedBox(width: 8),
-            Text(
-              'ADD MANUAL ITEM',
-              style: tt.labelSmall?.copyWith(
-                color: cs.primary,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 2,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppTheme.space5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            color: cs.surfaceContainerLowest,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(LucideIcons.plus, size: 18, color: cs.onSurface),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Text(
+                'ADD MANUAL ITEM',
+                style: tt.titleMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+}
+
+class _RoundActionButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final Color background;
+  final VoidCallback onTap;
+
+  const _RoundActionButton({
+    required this.icon,
+    required this.color,
+    required this.background,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+        child: Icon(icon, size: 18, color: color),
+      ),
+    );
+  }
+}
+
+class _RoundedDashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+  final double strokeWidth;
+  final double dashLength;
+  final double gapLength;
+
+  const _RoundedDashedBorderPainter({
+    required this.color,
+    required this.radius,
+    this.strokeWidth = 1.2,
+    this.dashLength = 7,
+    this.gapLength = 5,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(
+      rect.deflate(strokeWidth / 2),
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = distance + dashLength;
+        final segmentEnd = next > metric.length ? metric.length : next;
+        canvas.drawPath(metric.extractPath(distance, segmentEnd), paint);
+        distance += dashLength + gapLength;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RoundedDashedBorderPainter oldDelegate) {
+    return color != oldDelegate.color ||
+        radius != oldDelegate.radius ||
+        strokeWidth != oldDelegate.strokeWidth ||
+        dashLength != oldDelegate.dashLength ||
+        gapLength != oldDelegate.gapLength;
   }
 }
 

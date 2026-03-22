@@ -69,15 +69,16 @@ class _DashboardBody extends ConsumerStatefulWidget {
 }
 
 class _DashboardBodyState extends ConsumerState<_DashboardBody> {
-  late bool _isActive = widget.venue.status == VenueStatus.active;
+  late bool _isActive = widget.venue.canAcceptGuestOrders;
   bool _isTogglingActivation = false;
 
   @override
   void didUpdateWidget(covariant _DashboardBody oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.venue.id != widget.venue.id ||
-        oldWidget.venue.status != widget.venue.status) {
-      _isActive = widget.venue.status == VenueStatus.active;
+        oldWidget.venue.status != widget.venue.status ||
+        oldWidget.venue.orderingEnabled != widget.venue.orderingEnabled) {
+      _isActive = widget.venue.canAcceptGuestOrders;
     }
   }
 
@@ -1024,7 +1025,7 @@ class _OrderPreview extends StatelessWidget {
           children: [
             // Order ID badge
             Container(
-              width: 40,
+              width: 72,
               height: 40,
               decoration: BoxDecoration(
                 color: cs.primary.withValues(alpha: 0.12),
@@ -1032,9 +1033,9 @@ class _OrderPreview extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  '#${order.id.substring(0, 4).toUpperCase()}',
+                  '#${order.displayNumber}',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: FontWeight.w800,
                     color: cs.primary,
                   ),

@@ -40,7 +40,9 @@ class VenueOrdersScreen extends ConsumerStatefulWidget {
 }
 
 enum _StatusFilter { all, preparing, served, cancelled }
+
 enum _TimePeriod { allTime, today, thisWeek, thisMonth }
+
 enum _SortBy { newestFirst, oldestFirst, highestValue, lowestValue }
 
 class _VenueOrdersScreenState extends ConsumerState<VenueOrdersScreen> {
@@ -145,11 +147,14 @@ class _OrdersBody extends ConsumerWidget {
     // Status filter
     filtered = switch (statusFilter) {
       _StatusFilter.all => filtered,
-      _StatusFilter.preparing => filtered
-          .where((o) =>
-              o.status == OrderStatus.placed ||
-              o.status == OrderStatus.received)
-          .toList(),
+      _StatusFilter.preparing =>
+        filtered
+            .where(
+              (o) =>
+                  o.status == OrderStatus.placed ||
+                  o.status == OrderStatus.received,
+            )
+            .toList(),
       _StatusFilter.served =>
         filtered.where((o) => o.status == OrderStatus.served).toList(),
       _StatusFilter.cancelled =>
@@ -160,28 +165,31 @@ class _OrdersBody extends ConsumerWidget {
     final now = DateTime.now();
     filtered = switch (timePeriod) {
       _TimePeriod.allTime => filtered,
-      _TimePeriod.today => filtered
-          .where((o) =>
-              o.createdAt.day == now.day &&
-              o.createdAt.month == now.month &&
-              o.createdAt.year == now.year)
-          .toList(),
-      _TimePeriod.thisWeek => filtered
-          .where(
-              (o) => now.difference(o.createdAt).inDays < 7)
-          .toList(),
-      _TimePeriod.thisMonth => filtered
-          .where((o) =>
-              o.createdAt.month == now.month &&
-              o.createdAt.year == now.year)
-          .toList(),
+      _TimePeriod.today =>
+        filtered
+            .where(
+              (o) =>
+                  o.createdAt.day == now.day &&
+                  o.createdAt.month == now.month &&
+                  o.createdAt.year == now.year,
+            )
+            .toList(),
+      _TimePeriod.thisWeek =>
+        filtered.where((o) => now.difference(o.createdAt).inDays < 7).toList(),
+      _TimePeriod.thisMonth =>
+        filtered
+            .where(
+              (o) =>
+                  o.createdAt.month == now.month &&
+                  o.createdAt.year == now.year,
+            )
+            .toList(),
     };
 
     // Item filter
     if (itemFilter != 'All Items') {
       filtered = filtered
-          .where(
-              (o) => o.items.any((item) => item.name == itemFilter))
+          .where((o) => o.items.any((item) => item.name == itemFilter))
           .toList();
     }
 
@@ -189,11 +197,11 @@ class _OrdersBody extends ConsumerWidget {
     if (searchQuery.isNotEmpty) {
       final q = searchQuery.toLowerCase();
       filtered = filtered.where((o) {
-        return o.id.toLowerCase().contains(q) ||
+        return o.displayNumber.toLowerCase().contains(q) ||
+            o.id.toLowerCase().contains(q) ||
             (o.userName ?? '').toLowerCase().contains(q) ||
             (o.tableNumber ?? '').toLowerCase().contains(q) ||
-            o.items.any(
-                (item) => item.name.toLowerCase().contains(q));
+            o.items.any((item) => item.name.toLowerCase().contains(q));
       }).toList();
     }
 
@@ -264,8 +272,7 @@ class _OrdersBody extends ConsumerWidget {
                         children: [
                           // ═══ HEADER ═══
                           Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 'Orders',
@@ -277,21 +284,17 @@ class _OrdersBody extends ConsumerWidget {
                               PressableScale(
                                 onTap: onToggleFilter,
                                 child: AnimatedContainer(
-                                  duration: const Duration(
-                                    milliseconds: 200,
-                                  ),
+                                  duration: const Duration(milliseconds: 200),
                                   width: 44,
                                   height: 44,
                                   decoration: BoxDecoration(
                                     color: showFilterPanel
-                                        ? cs.primary
-                                            .withValues(alpha: 0.15)
+                                        ? cs.primary.withValues(alpha: 0.15)
                                         : cs.surfaceContainerLow,
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: showFilterPanel
-                                          ? cs.primary
-                                              .withValues(alpha: 0.3)
+                                          ? cs.primary.withValues(alpha: 0.3)
                                           : Colors.white.withValues(
                                               alpha: 0.05,
                                             ),
@@ -338,38 +341,32 @@ class _OrdersBody extends ConsumerWidget {
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
                               color: cs.surfaceContainerLow,
-                              borderRadius:
-                                  BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: Colors.white
-                                    .withValues(alpha: 0.05),
+                                color: Colors.white.withValues(alpha: 0.05),
                               ),
                             ),
                             child: Row(
                               children: [
                                 _TabChip(
                                   label: 'ALL',
-                                  isSelected: statusFilter ==
-                                      _StatusFilter.all,
-                                  onTap: () => onStatusFilter(
-                                    _StatusFilter.all,
-                                  ),
+                                  isSelected: statusFilter == _StatusFilter.all,
+                                  onTap: () =>
+                                      onStatusFilter(_StatusFilter.all),
                                 ),
                                 _TabChip(
                                   label: 'PREPARING',
-                                  isSelected: statusFilter ==
-                                      _StatusFilter.preparing,
-                                  onTap: () => onStatusFilter(
-                                    _StatusFilter.preparing,
-                                  ),
+                                  isSelected:
+                                      statusFilter == _StatusFilter.preparing,
+                                  onTap: () =>
+                                      onStatusFilter(_StatusFilter.preparing),
                                 ),
                                 _TabChip(
                                   label: 'SERVED',
-                                  isSelected: statusFilter ==
-                                      _StatusFilter.served,
-                                  onTap: () => onStatusFilter(
-                                    _StatusFilter.served,
-                                  ),
+                                  isSelected:
+                                      statusFilter == _StatusFilter.served,
+                                  onTap: () =>
+                                      onStatusFilter(_StatusFilter.served),
                                 ),
                               ],
                             ),
@@ -380,11 +377,9 @@ class _OrdersBody extends ConsumerWidget {
                           Container(
                             decoration: BoxDecoration(
                               color: cs.surfaceContainerLow,
-                              borderRadius:
-                                  BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: Colors.white
-                                    .withValues(alpha: 0.05),
+                                color: Colors.white.withValues(alpha: 0.05),
                               ),
                             ),
                             child: TextField(
@@ -393,12 +388,12 @@ class _OrdersBody extends ConsumerWidget {
                               style: tt.bodyMedium,
                               decoration: InputDecoration(
                                 hintText:
-                                    'Search Order ID, Guest or Item...',
-                                hintStyle:
-                                    tt.bodyMedium?.copyWith(
-                                      color: cs.onSurfaceVariant
-                                          .withValues(alpha: 0.40),
-                                    ),
+                                    'Search Order Number, Guest or Item...',
+                                hintStyle: tt.bodyMedium?.copyWith(
+                                  color: cs.onSurfaceVariant.withValues(
+                                    alpha: 0.40,
+                                  ),
+                                ),
                                 prefixIcon: Padding(
                                   padding: const EdgeInsets.only(
                                     left: 16,
@@ -410,23 +405,20 @@ class _OrdersBody extends ConsumerWidget {
                                     color: cs.onSurfaceVariant,
                                   ),
                                 ),
-                                prefixIconConstraints:
-                                    const BoxConstraints(
-                                      minWidth: 0,
-                                    ),
+                                prefixIconConstraints: const BoxConstraints(
+                                  minWidth: 0,
+                                ),
                                 border: InputBorder.none,
-                                contentPadding:
-                                    const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                    ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                               ),
                             ),
                           ),
 
                           // ═══ FILTER PANEL (collapsible) ═══
                           AnimatedSize(
-                            duration:
-                                const Duration(milliseconds: 300),
+                            duration: const Duration(milliseconds: 300),
                             curve: Curves.easeOutCubic,
                             child: showFilterPanel
                                 ? _FilterPanel(
@@ -438,15 +430,9 @@ class _OrdersBody extends ConsumerWidget {
                                     onSortBy: onSortBy,
                                     onItemFilter: onItemFilter,
                                     onExportPdf: () =>
-                                        _exportPdf(
-                                          context,
-                                          filtered,
-                                        ),
+                                        _exportPdf(context, filtered),
                                     onExportCsv: () =>
-                                        _exportCsv(
-                                          context,
-                                          filtered,
-                                        ),
+                                        _exportCsv(context, filtered),
                                   )
                                 : const SizedBox.shrink(),
                           ),
@@ -475,8 +461,7 @@ class _OrdersBody extends ConsumerWidget {
                       child: EmptyState(
                         icon: LucideIcons.clipboardList,
                         title: 'No orders found',
-                        subtitle:
-                            'Try adjusting your filters or search.',
+                        subtitle: 'Try adjusting your filters or search.',
                       ),
                     )
                   else
@@ -485,36 +470,28 @@ class _OrdersBody extends ConsumerWidget {
                         horizontal: AppTheme.space6,
                       ),
                       sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final order = filtered[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: AppTheme.space4,
-                              ),
-                              child: _OrderCard(
-                                order: order,
-                                currencySymbol: currencySymbol,
-                                onAdvance: () => _advanceStatus(
-                                  ref,
-                                  order,
-                                ),
-                              )
-                                  .animate(
-                                    delay: (60 * index).ms,
-                                  )
-                                  .fadeIn(duration: 250.ms),
-                            );
-                          },
-                          childCount: filtered.length,
-                        ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final order = filtered[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppTheme.space4,
+                            ),
+                            child:
+                                _OrderCard(
+                                      order: order,
+                                      currencySymbol: currencySymbol,
+                                      onAdvance: () =>
+                                          _advanceStatus(ref, order),
+                                    )
+                                    .animate(delay: (60 * index).ms)
+                                    .fadeIn(duration: 250.ms),
+                          );
+                        }, childCount: filtered.length),
                       ),
                     ),
 
                   // Bottom padding
-                  const SliverPadding(
-                    padding: EdgeInsets.only(bottom: 100),
-                  ),
+                  const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
                 ],
               ),
             ),
@@ -532,21 +509,14 @@ class _OrdersBody extends ConsumerWidget {
     };
     if (nextStatus == null) return;
     try {
-      await OrderRepository.instance.updateOrderStatus(
-        order.id,
-        nextStatus,
-      );
+      await OrderRepository.instance.updateOrderStatus(order.id, nextStatus);
       ref.invalidate(venueOrdersProvider(venueId));
     } catch (_) {}
   }
 
-  Future<void> _exportPdf(
-    BuildContext context,
-    List<Order> orders,
-  ) async {
+  Future<void> _exportPdf(BuildContext context, List<Order> orders) async {
     final doc = pw.Document();
-    final dateLabel =
-        DateFormat('MMMM d, yyyy').format(DateTime.now());
+    final dateLabel = DateFormat('MMMM d, yyyy').format(DateTime.now());
 
     doc.addPage(
       pw.MultiPage(
@@ -570,28 +540,26 @@ class _OrdersBody extends ConsumerWidget {
                   style: const pw.TextStyle(fontSize: 12),
                 ),
                 pw.SizedBox(height: 8),
-                pw.Row(children: [
-                  pw.Text(
-                    'Total Orders: ${orders.length}',
-                    style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                pw.Row(
+                  children: [
+                    pw.Text(
+                      'Total Orders: ${orders.length}',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                     ),
-                  ),
-                  pw.SizedBox(width: 24),
-                  pw.Text(
-                    'Revenue: $currencySymbol${orders.fold<double>(0, (s, o) => s + o.total).toStringAsFixed(2)}',
-                    style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
+                    pw.SizedBox(width: 24),
+                    pw.Text(
+                      'Revenue: $currencySymbol${orders.fold<double>(0, (s, o) => s + o.total).toStringAsFixed(2)}',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                     ),
-                  ),
-                ]),
+                  ],
+                ),
               ],
             ),
           ),
           pw.SizedBox(height: 12),
           pw.TableHelper.fromTextArray(
             headers: [
-              'Order ID',
+              'Order Number',
               'Guest',
               'Table',
               'Items',
@@ -602,14 +570,13 @@ class _OrdersBody extends ConsumerWidget {
             data: orders
                 .map(
                   (o) => [
-                    '#${o.id.substring(0, 8).toUpperCase()}',
+                    '#${o.displayNumber}',
                     o.userName ?? '—',
                     o.tableNumber ?? '—',
                     '${o.itemCount}',
                     '$currencySymbol${o.total.toStringAsFixed(2)}',
                     o.status.label,
-                    DateFormat('dd/MM/yy HH:mm')
-                        .format(o.createdAt),
+                    DateFormat('dd/MM/yy HH:mm').format(o.createdAt),
                   ],
                 )
                 .toList(),
@@ -631,19 +598,14 @@ class _OrdersBody extends ConsumerWidget {
     await file.writeAsBytes(await doc.save());
 
     if (context.mounted) {
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(file.path)]),
-      );
+      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
     }
   }
 
-  Future<void> _exportCsv(
-    BuildContext context,
-    List<Order> orders,
-  ) async {
+  Future<void> _exportCsv(BuildContext context, List<Order> orders) async {
     final rows = <List<String>>[
       [
-        'Order ID',
+        'Order Number',
         'Guest',
         'Table',
         'Items',
@@ -655,13 +617,11 @@ class _OrdersBody extends ConsumerWidget {
       ],
       ...orders.map(
         (o) => [
-          '#${o.id.substring(0, 8).toUpperCase()}',
+          '#${o.displayNumber}',
           o.userName ?? '—',
           o.tableNumber ?? '—',
           '${o.itemCount}',
-          o.items
-              .map((i) => '${i.quantity}x ${i.name}')
-              .join('; '),
+          o.items.map((i) => '${i.quantity}x ${i.name}').join('; '),
           '$currencySymbol${o.total.toStringAsFixed(2)}',
           o.status.label,
           o.paymentMethod.label,
@@ -670,7 +630,9 @@ class _OrdersBody extends ConsumerWidget {
       ),
     ];
 
-    final csvData = CsvEncoder().convert(rows.map((r) => r.map((c) => c.toString()).toList()).toList());
+    final csvData = CsvEncoder().convert(
+      rows.map((r) => r.map((c) => c.toString()).toList()).toList(),
+    );
     final dir = await getTemporaryDirectory();
     final file = File(
       '${dir.path}/orders_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv',
@@ -678,9 +640,7 @@ class _OrdersBody extends ConsumerWidget {
     await file.writeAsString(csvData);
 
     if (context.mounted) {
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(file.path)]),
-      );
+      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
     }
   }
 }
@@ -710,8 +670,7 @@ class _MiniStatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
         borderRadius: BorderRadius.circular(24),
-        border:
-            Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         boxShadow: AppTheme.clayShadow,
       ),
       child: Column(
@@ -797,9 +756,7 @@ class _TabChip extends StatelessWidget {
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.5,
-                color: isSelected
-                    ? cs.onPrimary
-                    : cs.onSurfaceVariant,
+                color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -834,18 +791,18 @@ class _FilterPanel extends StatelessWidget {
   });
 
   String _timePeriodLabel(_TimePeriod p) => switch (p) {
-        _TimePeriod.allTime => 'All Time',
-        _TimePeriod.today => 'Today',
-        _TimePeriod.thisWeek => 'This Week',
-        _TimePeriod.thisMonth => 'This Month',
-      };
+    _TimePeriod.allTime => 'All Time',
+    _TimePeriod.today => 'Today',
+    _TimePeriod.thisWeek => 'This Week',
+    _TimePeriod.thisMonth => 'This Month',
+  };
 
   String _sortByLabel(_SortBy s) => switch (s) {
-        _SortBy.newestFirst => 'Newest First',
-        _SortBy.oldestFirst => 'Oldest First',
-        _SortBy.highestValue => 'Highest Value',
-        _SortBy.lowestValue => 'Lowest Value',
-      };
+    _SortBy.newestFirst => 'Newest First',
+    _SortBy.oldestFirst => 'Oldest First',
+    _SortBy.highestValue => 'Highest Value',
+    _SortBy.lowestValue => 'Lowest Value',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -858,8 +815,7 @@ class _FilterPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
         borderRadius: BorderRadius.circular(24),
-        border:
-            Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         boxShadow: AppTheme.clayShadow,
       ),
       child: Column(
@@ -896,11 +852,7 @@ class _FilterPanel extends StatelessWidget {
           // Filter by Item
           Row(
             children: [
-              Icon(
-                LucideIcons.tag,
-                size: 12,
-                color: cs.onSurfaceVariant,
-              ),
+              Icon(LucideIcons.tag, size: 12, color: cs.onSurfaceVariant),
               const SizedBox(width: 6),
               Text(
                 'FILTER BY ITEM',
@@ -916,10 +868,7 @@ class _FilterPanel extends StatelessWidget {
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 4,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
               color: cs.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(14),
@@ -931,9 +880,7 @@ class _FilterPanel extends StatelessWidget {
                     : 'All Items',
                 isExpanded: true,
                 dropdownColor: cs.surfaceContainerHigh,
-                style: tt.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 items: [
                   const DropdownMenuItem(
                     value: 'All Items',
@@ -942,10 +889,7 @@ class _FilterPanel extends StatelessWidget {
                   ...itemNames.map(
                     (name) => DropdownMenuItem(
                       value: name,
-                      child: Text(
-                        name,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      child: Text(name, overflow: TextOverflow.ellipsis),
                     ),
                   ),
                 ],
@@ -1030,10 +974,7 @@ class _FilterDropdown<T> extends StatelessWidget {
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 4,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           decoration: BoxDecoration(
             color: cs.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(14),
@@ -1043,9 +984,7 @@ class _FilterDropdown<T> extends StatelessWidget {
               value: value,
               isExpanded: true,
               dropdownColor: cs.surfaceContainerHigh,
-              style: tt.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               items: items
                   .map(
                     (item) => DropdownMenuItem(
@@ -1091,16 +1030,11 @@ class _ExportButton extends StatelessWidget {
     return PressableScale(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: textColor.withValues(alpha: 0.15),
-          ),
+          border: Border.all(color: textColor.withValues(alpha: 0.15)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1177,9 +1111,7 @@ class _OrderCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: cs.surfaceContainerLow,
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.05),
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           boxShadow: AppTheme.clayShadow,
         ),
         child: Column(
@@ -1190,7 +1122,7 @@ class _OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'ORDER #ORD-${order.id.substring(0, 4).toUpperCase()}',
+                  'ORDER #${order.displayNumber}',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -1210,11 +1142,7 @@ class _OrderCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        statusIcon(),
-                        size: 12,
-                        color: statusColor(),
-                      ),
+                      Icon(statusIcon(), size: 12, color: statusColor()),
                       const SizedBox(width: 5),
                       Text(
                         statusLabel(),

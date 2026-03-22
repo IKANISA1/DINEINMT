@@ -14,6 +14,7 @@ class PressableScale extends StatefulWidget {
   final double scaleFactor;
   final Duration duration;
   final String? semanticLabel;
+  final Size? minTouchTargetSize;
 
   const PressableScale({
     super.key,
@@ -22,6 +23,7 @@ class PressableScale extends StatefulWidget {
     this.scaleFactor = 0.95,
     this.duration = const Duration(milliseconds: 150),
     this.semanticLabel,
+    this.minTouchTargetSize,
   });
 
   @override
@@ -84,6 +86,20 @@ class _PressableScaleState extends State<PressableScale>
       return widget.child;
     }
 
+    final constrainedChild = widget.minTouchTargetSize == null
+        ? widget.child
+        : ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: widget.minTouchTargetSize!.width,
+              minHeight: widget.minTouchTargetSize!.height,
+            ),
+            child: Center(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: widget.child,
+            ),
+          );
+
     return Semantics(
       button: true,
       enabled: true,
@@ -117,7 +133,7 @@ class _PressableScaleState extends State<PressableScale>
                 : null,
             child: ScaleTransition(
               scale: _scaleAnimation,
-              child: widget.child,
+              child: constrainedChild,
             ),
           ),
         ),
@@ -125,4 +141,3 @@ class _PressableScaleState extends State<PressableScale>
     );
   }
 }
-

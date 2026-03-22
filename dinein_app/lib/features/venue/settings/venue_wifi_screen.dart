@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -13,8 +12,7 @@ import '../../../shared/widgets/shared_widgets.dart';
 
 /// WiFi Settings — full-page screen for managing venue WiFi credentials.
 ///
-/// Layout: Header → SSID field → Password field (with toggle) →
-///         Security dropdown → Info note → Floating SAVE button.
+/// Layout: Header → Network configuration card → fixed SAVE button.
 class VenueWifiScreen extends ConsumerStatefulWidget {
   const VenueWifiScreen({super.key});
 
@@ -30,6 +28,18 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
   bool _obscurePass = true;
   String _security = 'WPA';
   String? _seededId;
+
+  String get _securityLabel {
+    switch (_security) {
+      case 'WEP':
+        return 'WEP';
+      case 'Open':
+        return 'Open Network';
+      case 'WPA':
+      default:
+        return 'WPA/WPA2/WPA3';
+    }
+  }
 
   @override
   void dispose() {
@@ -62,9 +72,9 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
       });
       ref.invalidate(currentVenueProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('WiFi settings saved.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('WiFi settings saved.')));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,14 +99,14 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
       _passCtrl.clear();
       _security = 'WPA';
       _seededId = null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('WiFi removed.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('WiFi removed.')));
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not remove WiFi.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not remove WiFi.')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -107,11 +117,14 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final venueAsync = ref.watch(currentVenueProvider);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: venueAsync.when(
         loading: () => const Center(
-            child: SkeletonLoader(width: double.infinity, height: 200)),
+          child: SkeletonLoader(width: double.infinity, height: 200),
+        ),
         error: (_, _) => ErrorState(
           message: 'Could not load venue.',
           onRetry: () => ref.invalidate(currentVenueProvider),
@@ -125,343 +138,224 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
             );
           }
           _seed(venue);
-          return Stack(
-            children: [
-              ListView(
-                padding: const EdgeInsets.fromLTRB(
-                    AppTheme.space6, AppTheme.space6, AppTheme.space6, 120),
-                children: [
-                  // ─── Header ───
-                  Row(
-                    children: [
-                      PressableScale(
-                        onTap: () => context.pop(),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerLow,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                                color:
-                                    Colors.white.withValues(alpha: 0.05)),
-                          ),
-                          child: Icon(LucideIcons.chevronLeft,
-                              size: 18, color: cs.onSurface),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('WiFi Sharing',
-                              style: tt.headlineMedium?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -0.5)),
-                          Text('VENUE CONFIGURATION',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2,
-                                color: cs.onSurfaceVariant,
-                              )),
-                        ],
-                      ),
-                    ],
+          return SafeArea(
+            child: Stack(
+              children: [
+                ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppTheme.space6,
+                    AppTheme.space6,
+                    AppTheme.space6,
+                    220,
                   ),
-                  const SizedBox(height: AppTheme.space6),
-
-                  // ─── WiFi Icon Hero ───
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          cs.primary.withValues(alpha: 0.12),
-                          cs.primary.withValues(alpha: 0.04),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                          color: cs.primary.withValues(alpha: 0.12)),
-                    ),
-                    child: Column(
+                  children: [
+                    Row(
                       children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: cs.primary.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
+                        PressableScale(
+                          onTap: () => context.pop(),
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusXl,
+                              ),
+                              border: Border.all(color: AppColors.white5),
+                            ),
+                            child: Icon(
+                              LucideIcons.chevronLeft,
+                              size: 24,
+                              color: cs.onSurface,
+                            ),
                           ),
-                          child: Icon(LucideIcons.wifi,
-                              size: 28, color: cs.primary),
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          venue.hasWifi ? 'SHARING ENABLED' : 'NOT CONFIGURED',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 3,
-                            color: venue.hasWifi
-                                ? AppColors.success
-                                : cs.onSurfaceVariant.withValues(alpha: 0.50),
-                          ),
+                        const SizedBox(width: AppTheme.space4),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Wifi Sharing',
+                              style: tt.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.6,
+                              ),
+                            ),
+                            const SizedBox(height: AppTheme.space1),
+                            Text(
+                              'VENUE MANAGEMENT',
+                              style: tt.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2.2,
+                                color: cs.onSurfaceVariant.withValues(
+                                  alpha: 0.72,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ).animate().fadeIn(duration: 300.ms),
-                  const SizedBox(height: AppTheme.space6),
-
-                  // ─── SSID Field ───
-                  _WifiField(
-                    icon: LucideIcons.wifi,
-                    label: 'NETWORK NAME (SSID)',
-                    controller: _ssidCtrl,
-                    hint: 'MyVenueWiFi',
-                  ),
-
-                  // ─── Password Field with Toggle ───
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppTheme.space3),
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
+                    const SizedBox(height: AppTheme.space10),
+                    Container(
+                      padding: const EdgeInsets.all(AppTheme.space6),
                       decoration: BoxDecoration(
                         color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.05)),
-                        boxShadow: AppTheme.clayShadow,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(LucideIcons.lock, size: 13,
-                                  color: AppColors.secondary
-                                      .withValues(alpha: 0.70)),
-                              const SizedBox(width: 8),
-                              Text('PASSWORD',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 2,
-                                    color: AppColors.secondary
-                                        .withValues(alpha: 0.70),
-                                  )),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _passCtrl,
-                            obscureText: _obscurePass,
-                            decoration: InputDecoration(
-                              hintText: '••••••••',
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                              suffixIcon: PressableScale(
-                                onTap: () => setState(
-                                    () => _obscurePass = !_obscurePass),
-                                child: Icon(
-                                  _obscurePass
-                                      ? LucideIcons.eyeOff
-                                      : LucideIcons.eye,
-                                  size: 18,
-                                  color: cs.onSurfaceVariant,
-                                ),
-                              ),
-                              suffixIconConstraints: const BoxConstraints(
-                                  minHeight: 24, minWidth: 24),
-                            ),
-                            style: tt.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface,
-                            ),
+                        borderRadius: BorderRadius.circular(34),
+                        border: Border.all(color: AppColors.white5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.36),
+                            blurRadius: 32,
+                            offset: const Offset(0, 18),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-
-                  // ─── Security Type ───
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppTheme.space3),
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.05)),
-                        boxShadow: AppTheme.clayShadow,
-                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(LucideIcons.shieldCheck, size: 13,
-                                  color: AppColors.secondary
-                                      .withValues(alpha: 0.70)),
-                              const SizedBox(width: 8),
-                              Text('SECURITY TYPE',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 2,
-                                    color: AppColors.secondary
-                                        .withValues(alpha: 0.70),
-                                  )),
+                              Icon(
+                                LucideIcons.wifi,
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: AppTheme.space3),
+                              Text(
+                                'NETWORK CONFIGURATION',
+                                style: tt.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.9,
+                                  color: AppColors.primary,
+                                ),
+                              ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          DropdownButton<String>(
+                          const SizedBox(height: AppTheme.space6),
+                          _WifiField(
+                            label: 'NETWORK NAME (SSID)',
+                            controller: _ssidCtrl,
+                            hint: 'e.g. Lumina_Guest_Wifi',
+                            onChanged: (_) => setState(() {}),
+                          ),
+                          const SizedBox(height: AppTheme.space5),
+                          _WifiField(
+                            label: 'PASSWORD',
+                            controller: _passCtrl,
+                            hint: 'Network Password',
+                            obscureText: _obscurePass,
+                            onChanged: (_) => setState(() {}),
+                            trailing: _passCtrl.text.trim().isEmpty
+                                ? null
+                                : PressableScale(
+                                    onTap: () => setState(
+                                      () => _obscurePass = !_obscurePass,
+                                    ),
+                                    child: Icon(
+                                      _obscurePass
+                                          ? LucideIcons.eyeOff
+                                          : LucideIcons.eye,
+                                      size: 18,
+                                      color: cs.onSurfaceVariant.withValues(
+                                        alpha: 0.7,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(height: AppTheme.space5),
+                          _WifiDropdownField(
+                            label: 'SECURITY TYPE',
                             value: _security,
-                            isExpanded: true,
-                            underline: const SizedBox.shrink(),
-                            dropdownColor: cs.surfaceContainerHigh,
-                            style: tt.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurface,
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                  value: 'WPA',
-                                  child: Text('WPA / WPA2 / WPA3')),
-                              DropdownMenuItem(
-                                  value: 'WEP', child: Text('WEP')),
-                              DropdownMenuItem(
-                                  value: 'Open',
-                                  child: Text('Open (No Password)')),
-                            ],
-                            onChanged: (v) {
-                              if (v != null) setState(() => _security = v);
+                            displayValue: _securityLabel,
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _security = value);
+                              }
                             },
                           ),
                         ],
                       ),
                     ),
-                  ),
-
-                  // ─── Info Note ───
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(LucideIcons.info,
-                            size: 16,
-                            color: cs.primary.withValues(alpha: 0.7)),
-                        const SizedBox(width: 12),
-                        Expanded(
+                  ],
+                ),
+                Positioned(
+                  left: AppTheme.space6,
+                  right: AppTheme.space6,
+                  bottom: bottomInset + AppTheme.space6,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (venue.hasWifi) ...[
+                        TextButton(
+                          onPressed: _saving ? null : () => _clearWifi(venue),
                           child: Text(
-                            'Guests will see a WiFi icon on your venue page. They can tap to copy the password or scan a QR code to connect instantly.',
-                            style: tt.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant
-                                  .withValues(alpha: 0.7),
-                              height: 1.5,
+                            'CLEAR SAVED WIFI',
+                            style: tt.labelSmall?.copyWith(
+                              color: cs.error.withValues(alpha: 0.9),
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.8,
                             ),
                           ),
                         ),
+                        const SizedBox(height: AppTheme.space3),
                       ],
-                    ),
-                  ).animate().fadeIn(delay: 150.ms, duration: 300.ms),
-                  const SizedBox(height: AppTheme.space4),
-
-                  // ─── Remove WiFi (if exists) ───
-                  if (venue.hasWifi)
-                    PressableScale(
-                      onTap: _saving ? null : () => _clearWifi(venue),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: BoxDecoration(
-                          color: cs.error.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: cs.error.withValues(alpha: 0.15)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(LucideIcons.trash2,
-                                size: 14, color: cs.error),
-                            const SizedBox(width: 8),
-                            Text('REMOVE WIFI',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 2,
-                                  color: cs.error,
-                                )),
-                          ],
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-
-              // ─── Floating Save Button ───
-              Positioned(
-                bottom: 100,
-                left: AppTheme.space6,
-                right: AppTheme.space6,
-                child: PressableScale(
-                  onTap: _saving ? null : () => _save(venue),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.secondary.withValues(alpha: 0.30),
-                          AppColors.secondary.withValues(alpha: 0.15),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                          color:
-                              AppColors.secondary.withValues(alpha: 0.30)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (_saving)
-                          SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: cs.onSurface,
+                      PressableScale(
+                        onTap: _saving ? null : () => _save(venue),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radius3xl,
                             ),
-                          )
-                        else
-                          Icon(LucideIcons.save, size: 16,
-                              color: cs.onSurface),
-                        const SizedBox(width: 10),
-                        Text('SAVE WIFI',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 3,
-                              color: cs.onSurface,
-                            )),
-                      ],
-                    ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.18,
+                                ),
+                                blurRadius: 28,
+                                offset: const Offset(0, 14),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (_saving)
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: AppColors.onPrimary,
+                                  ),
+                                )
+                              else
+                                Icon(
+                                  LucideIcons.save,
+                                  size: 16,
+                                  color: AppColors.onPrimary,
+                                ),
+                              const SizedBox(width: AppTheme.space3),
+                              Text(
+                                'SAVE WIFI SETTINGS',
+                                style: tt.labelLarge?.copyWith(
+                                  color: AppColors.onPrimary,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -472,16 +366,20 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
 // ─── Private Widgets ───
 
 class _WifiField extends StatelessWidget {
-  final IconData icon;
   final String label;
   final TextEditingController controller;
   final String hint;
+  final bool obscureText;
+  final Widget? trailing;
+  final ValueChanged<String>? onChanged;
 
   const _WifiField({
-    required this.icon,
     required this.label,
     required this.controller,
     required this.hint,
+    this.obscureText = false,
+    this.trailing,
+    this.onChanged,
   });
 
   @override
@@ -489,45 +387,127 @@ class _WifiField extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppTheme.space3),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          boxShadow: AppTheme.clayShadow,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: tt.labelSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.68),
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 13,
-                    color: AppColors.secondary.withValues(alpha: 0.70)),
-                const SizedBox(width: 8),
-                Text(label,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                      color: AppColors.secondary.withValues(alpha: 0.70),
-                    )),
-              ],
+        const SizedBox(height: AppTheme.space3),
+        Container(
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            border: Border.all(color: AppColors.white5),
+          ),
+          child: TextField(
+            controller: controller,
+            onChanged: onChanged,
+            obscureText: obscureText,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: tt.titleMedium?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.42),
+                fontWeight: FontWeight.w600,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.space5,
+                vertical: 20,
+              ),
+              suffixIcon: trailing == null
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsets.only(right: AppTheme.space4),
+                      child: trailing,
+                    ),
+              suffixIconConstraints: const BoxConstraints(
+                minHeight: 24,
+                minWidth: 24,
+              ),
             ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: controller,
-              decoration: InputDecoration.collapsed(hintText: hint),
+            style: tt.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WifiDropdownField extends StatelessWidget {
+  final String label;
+  final String value;
+  final String displayValue;
+  final ValueChanged<String?> onChanged;
+
+  const _WifiDropdownField({
+    required this.label,
+    required this.value,
+    required this.displayValue,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: tt.labelSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.68),
+          ),
+        ),
+        const SizedBox(height: AppTheme.space3),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppTheme.space5),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHigh.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            border: Border.all(color: AppColors.white5),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              icon: Icon(
+                LucideIcons.chevronDown,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              dropdownColor: cs.surfaceContainerHigh,
               style: tt.titleMedium?.copyWith(
                 fontWeight: FontWeight.w700,
                 color: cs.onSurface,
               ),
+              items: const [
+                DropdownMenuItem(value: 'WPA', child: Text('WPA/WPA2/WPA3')),
+                DropdownMenuItem(value: 'WEP', child: Text('WEP')),
+                DropdownMenuItem(value: 'Open', child: Text('Open Network')),
+              ],
+              onChanged: onChanged,
+              selectedItemBuilder: (context) => [
+                Text(displayValue),
+                Text(displayValue),
+                Text(displayValue),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }

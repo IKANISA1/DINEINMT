@@ -283,8 +283,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                                     : 0,
                               ),
                               child: _ExceptionRow(
-                                label:
-                                    '${o.venueName} — #${o.id.substring(0, 6).toUpperCase()}',
+                                label: '${o.venueName} — #${o.displayNumber}',
                                 severity: 'Cancelled',
                                 severityColor: cs.error,
                               ),
@@ -395,109 +394,114 @@ class AdminDashboardScreen extends ConsumerWidget {
                   const SizedBox(height: AppTheme.space4),
 
                   // Image Generation Health
-                  ref.watch(imageHealthProvider).when(
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, _) => const SizedBox.shrink(),
-                    data: (stats) {
-                      final pct = stats.readyPercent.round();
-                      return _SystemHealthCard(
-                        title: 'Image Generation',
-                        icon: LucideIcons.image,
-                        iconColor: cs.primary,
-                        child: Column(
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  ref
+                      .watch(imageHealthProvider)
+                      .when(
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
+                        data: (stats) {
+                          final pct = stats.readyPercent.round();
+                          return _SystemHealthCard(
+                            title: 'Image Generation',
+                            icon: LucideIcons.image,
+                            iconColor: cs.primary,
+                            child: Column(
                               children: [
-                                Text(
-                                  '$pct% Ready',
-                                  style: tt.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                Text(
-                                  '${stats.ready}/${stats.total} IMAGES',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 2,
-                                    color: cs.onSurfaceVariant.withValues(
-                                      alpha: 0.20,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: AppTheme.space3),
-                            // Progress bar
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: SizedBox(
-                                height: 8,
-                                child: Stack(
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.05,
+                                    Text(
+                                      '$pct% Ready',
+                                      style: tt.headlineSmall?.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${stats.ready}/${stats.total} IMAGES',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 2,
+                                        color: cs.onSurfaceVariant.withValues(
+                                          alpha: 0.20,
                                         ),
                                       ),
                                     ),
-                                    FractionallySizedBox(
-                                          widthFactor: pct / 100.0,
-                                          child: Container(
-                                            decoration: BoxDecoration(
-                                              color: cs.primary,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: cs.primary
-                                                      .withValues(alpha: 0.40),
-                                                  blurRadius: 20,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        )
-                                        .animate(delay: 500.ms)
-                                        .slideX(
-                                          begin: -1,
-                                          end: 0,
-                                          duration: 1500.ms,
-                                          curve: Curves.easeOutCubic,
-                                        ),
                                   ],
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: AppTheme.space4),
-                            // Status chips row
-                            Row(
-                              children: [
-                                _ImageStatChip(
-                                  label: 'Pending',
-                                  count: stats.pending,
-                                  color: AppColors.warning,
+                                const SizedBox(height: AppTheme.space3),
+                                // Progress bar
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: SizedBox(
+                                    height: 8,
+                                    child: Stack(
+                                      children: [
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.05,
+                                            ),
+                                          ),
+                                        ),
+                                        FractionallySizedBox(
+                                              widthFactor: pct / 100.0,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: cs.primary,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: cs.primary
+                                                          .withValues(
+                                                            alpha: 0.40,
+                                                          ),
+                                                      blurRadius: 20,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            )
+                                            .animate(delay: 500.ms)
+                                            .slideX(
+                                              begin: -1,
+                                              end: 0,
+                                              duration: 1500.ms,
+                                              curve: Curves.easeOutCubic,
+                                            ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(width: AppTheme.space2),
-                                _ImageStatChip(
-                                  label: 'Generating',
-                                  count: stats.generating,
-                                  color: cs.tertiary,
-                                ),
-                                const SizedBox(width: AppTheme.space2),
-                                _ImageStatChip(
-                                  label: 'Failed',
-                                  count: stats.failed,
-                                  color: cs.error,
+                                const SizedBox(height: AppTheme.space4),
+                                // Status chips row
+                                Row(
+                                  children: [
+                                    _ImageStatChip(
+                                      label: 'Pending',
+                                      count: stats.pending,
+                                      color: AppColors.warning,
+                                    ),
+                                    const SizedBox(width: AppTheme.space2),
+                                    _ImageStatChip(
+                                      label: 'Generating',
+                                      count: stats.generating,
+                                      color: cs.tertiary,
+                                    ),
+                                    const SizedBox(width: AppTheme.space2),
+                                    _ImageStatChip(
+                                      label: 'Failed',
+                                      count: stats.failed,
+                                      color: cs.error,
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
-                      ).animate(delay: 800.ms).fadeIn(duration: 400.ms);
-                    },
-                  ),
+                          ).animate(delay: 800.ms).fadeIn(duration: 400.ms);
+                        },
+                      ),
                 ],
               ),
             ),

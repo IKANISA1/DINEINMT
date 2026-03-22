@@ -42,16 +42,19 @@ void main() {
           builder: (_, _) => const Scaffold(body: Text('WiFi Screen')),
         ),
         GoRoute(
+          path: AppRoutePaths.venueTableQr,
+          name: AppRouteNames.venueTableQr,
+          builder: (_, _) => const Scaffold(body: Text('Table QR Screen')),
+        ),
+        GoRoute(
           path: AppRoutePaths.venueNotifications,
           name: AppRouteNames.venueNotifications,
-          builder: (_, _) =>
-              const Scaffold(body: Text('Notifications Screen')),
+          builder: (_, _) => const Scaffold(body: Text('Notifications Screen')),
         ),
         GoRoute(
           path: AppRoutePaths.venueLanguageRegion,
           name: AppRouteNames.venueLanguageRegion,
-          builder: (_, _) =>
-              const Scaffold(body: Text('Language Screen')),
+          builder: (_, _) => const Scaffold(body: Text('Language Screen')),
         ),
         GoRoute(
           path: AppRoutePaths.venueLegal,
@@ -72,8 +75,53 @@ void main() {
   }
 
   testWidgets(
-      'venue settings renders section headers and key configuration tiles',
-      (tester) async {
+    'venue settings renders section headers and key configuration tiles',
+    (tester) async {
+      const venue = Venue(
+        id: 'venue_1',
+        name: 'Harbor Table',
+        slug: 'harbor-table',
+        category: 'Mediterranean',
+        description: 'Seafront dining.',
+        address: 'Valletta Waterfront',
+        phone: '+35679991234',
+        email: 'concierge@harbortable.mt',
+      );
+
+      await tester.pumpWidget(buildScreen(venue));
+      await tester.pump();
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+
+      // Page header
+      expect(find.text('Settings'), findsOneWidget);
+      expect(find.text('VENUE MANAGEMENT'), findsOneWidget);
+
+      // First section header
+      expect(find.text('VENUE CONFIGURATION'), findsOneWidget);
+
+      // Key tiles in the first section
+      expect(find.text('Venue Profile'), findsOneWidget);
+      expect(find.text('Opening Hours'), findsOneWidget);
+      expect(find.text('Table QR Code'), findsOneWidget);
+
+      // Owner card shows venue name
+      expect(find.text('Harbor Table'), findsAtLeast(1));
+
+      // Scroll down to reveal more tiles
+      await tester.drag(find.byType(ListView), const Offset(0, -400));
+      await tester.pumpAndSettle();
+
+      // WiFi tile should be visible
+      expect(find.text('WiFi Sharing'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle(const Duration(seconds: 2));
+    },
+  );
+
+  testWidgets('venue settings table QR tile navigates to QR screen', (
+    tester,
+  ) async {
     const venue = Venue(
       id: 'venue_1',
       name: 'Harbor Table',
@@ -89,33 +137,15 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    // Page header
-    expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('VENUE MANAGEMENT'), findsOneWidget);
-
-    // First section header
-    expect(find.text('VENUE CONFIGURATION'), findsOneWidget);
-
-    // Key tiles in the first section
-    expect(find.text('Venue Profile'), findsOneWidget);
-    expect(find.text('Opening Hours'), findsOneWidget);
-
-    // Owner card shows venue name
-    expect(find.text('Harbor Table'), findsAtLeast(1));
-
-    // Scroll down to reveal more tiles
-    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.tap(find.text('Table QR Code'));
     await tester.pumpAndSettle();
 
-    // WiFi tile should be visible
-    expect(find.text('WiFi Sharing'), findsOneWidget);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    expect(find.text('Table QR Screen'), findsOneWidget);
   });
 
-  testWidgets('venue settings WiFi tile navigates to WiFi screen',
-      (tester) async {
+  testWidgets('venue settings WiFi tile navigates to WiFi screen', (
+    tester,
+  ) async {
     const venue = Venue(
       id: 'venue_1',
       name: 'Harbor Table',

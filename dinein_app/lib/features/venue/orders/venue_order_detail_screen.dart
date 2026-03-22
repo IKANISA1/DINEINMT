@@ -102,7 +102,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            'ORDER #${order.id.substring(0, 8).toUpperCase()}',
+                            'ORDER #${order.displayNumber}',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w900,

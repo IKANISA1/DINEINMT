@@ -14,12 +14,22 @@ export interface VenueRecord {
   id: string;
   name: string;
   slug: string;
+  updated_at?: string | null;
   category: string | null;
   description: string | null;
   address: string | null;
   phone: string | null;
   email: string | null;
   image_url: string | null;
+  image_source: string | null;
+  image_status: string | null;
+  image_model: string | null;
+  image_prompt: string | null;
+  image_generated_at: string | null;
+  image_error: string | null;
+  image_attempts: number | null;
+  image_locked: boolean | null;
+  image_storage_path: string | null;
   status: string | null;
   rating: number | null;
   rating_count: number | null;
@@ -136,7 +146,7 @@ interface WebsiteMetadata {
 }
 
 const venueSelect =
-  "id, name, slug, category, description, address, phone, email, image_url, status, rating, rating_count, country, opening_hours, owner_id, website_url, reservation_url, social_links, reviews, google_place_id, google_place_resource_name, google_maps_uri, google_maps_links, google_primary_type, google_types, google_business_status, google_location, google_opening_hours, google_price_level, google_review_summary, google_review_summary_disclosure, google_review_summary_uri, google_place_summary, google_place_summary_disclosure, google_photos, google_attributions, search_summary, search_sources, search_queries, enrichment_status, enrichment_error, enrichment_attempts, enrichment_locked, last_enriched_at, enrichment_confidence, category_source";
+  "id, name, slug, updated_at, category, description, address, phone, email, image_url, image_source, image_status, image_model, image_prompt, image_generated_at, image_error, image_attempts, image_locked, image_storage_path, status, rating, rating_count, country, opening_hours, owner_id, website_url, reservation_url, social_links, reviews, google_place_id, google_place_resource_name, google_maps_uri, google_maps_links, google_primary_type, google_types, google_business_status, google_location, google_opening_hours, google_price_level, google_review_summary, google_review_summary_disclosure, google_review_summary_uri, google_place_summary, google_place_summary_disclosure, google_photos, google_attributions, search_summary, search_sources, search_queries, enrichment_status, enrichment_error, enrichment_attempts, enrichment_locked, last_enriched_at, enrichment_confidence, category_source";
 
 const googleSearchSchema = {
   type: "object",
@@ -619,8 +629,12 @@ function buildVenueUpdate(
     update.social_links = socialLinks;
   }
 
-  if (primaryPhoto && shouldWriteText(venue.image_url, overwriteExisting)) {
+  if (
+    primaryPhoto && shouldWriteDiscoveredVenueImage(venue, overwriteExisting)
+  ) {
     update.image_url = primaryPhoto;
+    update.image_status = "ready";
+    update.image_error = null;
   }
 
   if (
@@ -1286,9 +1300,11 @@ function buildSearchOnlyVenueUpdate(
 
   if (
     websiteMetadata?.imageUrl &&
-    shouldWriteText(venue.image_url, overwriteExisting)
+    shouldWriteDiscoveredVenueImage(venue, overwriteExisting)
   ) {
     update.image_url = websiteMetadata.imageUrl;
+    update.image_status = "ready";
+    update.image_error = null;
   }
 
   return update;
@@ -1696,6 +1712,17 @@ function shouldWriteText(
   overwrite: boolean,
 ): boolean {
   return overwrite || isBlankString(current);
+}
+
+function shouldWriteDiscoveredVenueImage(
+  venue: VenueRecord,
+  overwrite: boolean,
+): boolean {
+  if (venue.image_locked) return false;
+  if (venue.image_source === "manual" || venue.image_source === "ai_gemini") {
+    return false;
+  }
+  return shouldWriteText(venue.image_url, overwrite);
 }
 
 function isCanonicalCategory(value: string | null | undefined): boolean {

@@ -1,19 +1,9 @@
 create extension if not exists pg_net;
 create extension if not exists pg_cron;
 
-select cron.unschedule(jobid)
-from cron.job
-where jobname = 'venue-profile-backfill-every-15-minutes';
-
-select cron.schedule(
-  'venue-profile-backfill-every-15-minutes',
-  '*/15 * * * *',
-  $$
-  select net.http_post(
-    url := 'https://uskfnszcdqpcfrhjxitl.supabase.co/functions/v1/dinein-api',
-    body := '{"action":"backfill_venue_profiles","limit":4}'::jsonb,
-    headers := '{"Content-Type":"application/json","x-cron-secret":"VENUE_ENRICHMENT_CRON_SECRET"}'::jsonb,
-    timeout_milliseconds := 20000
-  );
-  $$
-);
+-- Intentionally left as a no-op.
+--
+-- The venue profile backfill job requires a per-project secret or service-role
+-- bearer token in the HTTP headers. That credential must not be committed to
+-- source control, so the actual cron schedule must be provisioned manually in
+-- each environment after deployment.

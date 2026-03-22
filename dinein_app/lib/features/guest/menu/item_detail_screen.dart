@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/cart_provider.dart';
+import '../../../core/providers/providers.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
 /// Full-page item detail screen — exact match of React ItemDetail.tsx.
@@ -50,7 +51,8 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
         title: '${item.name} on DineIn',
         text:
             'Check out ${item.name} on DineIn Malta.\n'
-            '${item.description}\nPrice: ${ref.read(cartProvider).currencySymbol}${item.price.toStringAsFixed(2)}',
+            '${item.description}\n'
+            'Price: ${ref.read(cartProvider).currencySymbol}${item.price.toStringAsFixed(2)}',
       ),
     );
   }
@@ -78,7 +80,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
     final extra = GoRouterState.of(context).extra;
     final MenuItem? item = extra is MenuItem ? extra : null;
 
-    if (item == null) {
+    if (item == null || !item.isAvailable) {
       return Scaffold(
         body: Center(
           child: Column(
@@ -92,6 +94,12 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
               const SizedBox(height: 16),
               Text('Item not found', style: tt.headlineSmall),
               const SizedBox(height: 8),
+              Text(
+                'This item is no longer on the menu.',
+                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
               TextButton(
                 onPressed: () => context.pop(),
                 child: const Text('Go Back'),
@@ -238,7 +246,6 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                               height: 1.5,
                             ),
                           ),
-
 
                           const SizedBox(height: AppTheme.space6),
 

@@ -7,8 +7,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_routes.dart';
 import '../../../core/services/auth_repository.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/brand_mark.dart';
+
+const _splashWordmarkGold = Color(0xFF624A1F);
 
 /// DineIn animated splash screen.
 ///
@@ -85,10 +86,7 @@ class _SplashScreenState extends State<SplashScreen>
         animation: _exitController,
         builder: (context, child) => Opacity(
           opacity: _exitOpacity.value,
-          child: Transform.scale(
-            scale: _exitScale.value,
-            child: child,
-          ),
+          child: Transform.scale(scale: _exitScale.value, child: child),
         ),
         child: Stack(
           children: [
@@ -99,10 +97,7 @@ class _SplashScreenState extends State<SplashScreen>
                   gradient: RadialGradient(
                     center: Alignment.center,
                     radius: 0.9,
-                    colors: [
-                      const Color(0xFF1A1A18),
-                      const Color(0xFF0A0A0A),
-                    ],
+                    colors: [const Color(0xFF1A1A18), const Color(0xFF0A0A0A)],
                     stops: const [0.0, 1.0],
                   ),
                 ),
@@ -115,58 +110,25 @@ class _SplashScreenState extends State<SplashScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Push content up from center
-                  SizedBox(height: screenHeight * 0.05),
+                  SizedBox(height: screenHeight * 0.10),
 
-                  // ─── Animated Brand Mark "D" blob ───
-                  const BrandMark(
-                    size: 100,
-                    borderRadius: 36,
-                    fontSize: 48,
-                    shadowBlur: 80,
-                    shadowOpacity: 0.25,
-                  )
-                      .animate()
-                      .fadeIn(
-                        duration: 700.ms,
-                        curve: Curves.easeOutCubic,
+                  // ─── Single splash wordmark ───
+                  const DineInLogoText(
+                        fontSize: 72,
+                        dineColor: _splashWordmarkGold,
+                        inColor: Colors.white,
+                        letterSpacing: -2,
                       )
+                      .animate()
+                      .fadeIn(duration: 700.ms, curve: Curves.easeOutCubic)
                       .scale(
-                        begin: const Offset(0.6, 0.6),
+                        begin: const Offset(0.72, 0.72),
                         end: const Offset(1.0, 1.0),
                         duration: 900.ms,
                         curve: Curves.easeOutBack,
-                      ),
-
-                  const SizedBox(height: 32),
-
-                  // ─── "DINEIN" brand text ───
-                  RichText(
-                    text: const TextSpan(
-                      style: TextStyle(
-                        fontSize: 56,
-                        fontWeight: FontWeight.w900,
-                        height: 1,
-                        letterSpacing: -1.5,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: 'DINE',
-                          style: TextStyle(color: AppColors.brandGold),
-                        ),
-                        TextSpan(
-                          text: 'IN',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  )
-                      .animate(delay: 300.ms)
-                      .fadeIn(
-                        duration: 700.ms,
-                        curve: Curves.easeOut,
                       )
                       .slideY(
-                        begin: 0.4,
+                        begin: 0.12,
                         end: 0,
                         duration: 700.ms,
                         curve: Curves.easeOutCubic,
@@ -177,10 +139,10 @@ class _SplashScreenState extends State<SplashScreen>
 
                   // ─── Divider line ───
                   Container(
-                    width: 32,
-                    height: 1,
-                    color: Colors.white.withValues(alpha: 0.12),
-                  )
+                        width: 32,
+                        height: 1,
+                        color: Colors.white.withValues(alpha: 0.12),
+                      )
                       .animate(delay: 700.ms)
                       .fadeIn(duration: 500.ms)
                       .scaleX(
@@ -194,20 +156,17 @@ class _SplashScreenState extends State<SplashScreen>
 
                   // ─── Tagline: "DINE IN, STAND OUT." ───
                   Text(
-                    'DINE IN, STAND OUT.',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.30),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 5,
-                      height: 1,
-                    ),
-                  )
+                        'DINE IN, STAND OUT.',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.30),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 5,
+                          height: 1,
+                        ),
+                      )
                       .animate(delay: 900.ms)
-                      .fadeIn(
-                        duration: 600.ms,
-                        curve: Curves.easeOut,
-                      ),
+                      .fadeIn(duration: 600.ms, curve: Curves.easeOut),
                 ],
               ),
             ),

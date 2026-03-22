@@ -11,8 +11,19 @@ import '../../../core/theme/app_theme.dart';
 /// Matches React OrderSuccess.tsx.
 class OrderSuccessScreen extends StatelessWidget {
   final String orderId;
+  final String? orderNumber;
 
-  const OrderSuccessScreen({super.key, required this.orderId});
+  const OrderSuccessScreen({
+    super.key,
+    required this.orderId,
+    this.orderNumber,
+  });
+
+  String get _displayOrderNumber {
+    final explicit = orderNumber?.trim();
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+    return orderId.trim();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +94,7 @@ class OrderSuccessScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'ORDER ID',
+                              'ORDER NUMBER',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,
@@ -94,7 +105,7 @@ class OrderSuccessScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              '#$orderId',
+                              '#$_displayOrderNumber',
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontWeight: FontWeight.w900,

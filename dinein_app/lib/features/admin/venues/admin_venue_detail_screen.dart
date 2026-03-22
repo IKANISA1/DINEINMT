@@ -197,7 +197,9 @@ class AdminVenueDetailScreen extends ConsumerWidget {
                       Switch(
                         value: venue.isOpen,
                         onChanged: (_) async {
-                          final newStatus = venue.isOpen ? 'inactive' : 'active';
+                          final newStatus = venue.isOpen
+                              ? 'inactive'
+                              : 'active';
                           try {
                             await VenueRepository.instance.updateVenueStatus(
                               venue.id,
@@ -227,6 +229,79 @@ class AdminVenueDetailScreen extends ConsumerWidget {
                   ),
                 ),
 
+                const SizedBox(height: AppTheme.space4),
+
+                Container(
+                  padding: const EdgeInsets.all(AppTheme.space6),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+                    border: Border.all(color: AppColors.white5),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Guest Ordering Validation',
+                              style: tt.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              venue.orderingEnabled
+                                  ? 'Guests can place orders for this venue'
+                                  : 'Guests can browse only until validation is complete',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                                color: venue.orderingEnabled
+                                    ? cs.secondary
+                                    : cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: venue.orderingEnabled,
+                        onChanged: (_) async {
+                          try {
+                            await VenueRepository.instance
+                                .updateVenueOrderingEnabled(
+                                  venue.id,
+                                  !venue.orderingEnabled,
+                                );
+                            ref.invalidate(allVenuesProvider);
+                            ref.invalidate(venueByIdProvider(venue.id));
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    venue.orderingEnabled
+                                        ? 'Guest ordering disabled'
+                                        : 'Guest ordering enabled',
+                                  ),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Update failed: $e')),
+                              );
+                            }
+                          }
+                        },
+                        activeThumbColor: cs.secondary,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

@@ -65,8 +65,15 @@ the environment variables `ANDROID_KEYSTORE_FILE`,
 `ANDROID_KEY_PASSWORD`.
 
 The production deep-link host is `https://dineinmalta.com/v/{slug}`. Publish
-the app-link artifacts from `docs/release/app-links/` to the domain's
-`.well-known/` directory before testing verified links on devices.
+the app-link artifacts from `landing/.well-known/` to the domain's
+`.well-known/` directory before testing verified links on devices. Generate
+those files with:
+
+```bash
+PLAY_APP_SIGNING_SHA256="AA:BB:..." \
+APPLE_TEAM_ID="ABCDE12345" \
+./scripts/render_app_links.sh
+```
 
 ## Supabase Backend
 

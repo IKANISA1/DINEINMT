@@ -39,6 +39,13 @@ class DineInImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget child;
+    final devicePixelRatio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 1;
+    final memCacheWidth = width != null
+        ? (width! * devicePixelRatio).round()
+        : null;
+    final memCacheHeight = height != null
+        ? (height! * devicePixelRatio).round()
+        : null;
 
     if (imageUrl != null && imageUrl!.isNotEmpty) {
       final inlineBytes = _tryDecodeInlineImage(imageUrl!);
@@ -58,8 +65,10 @@ class DineInImage extends StatelessWidget {
           width: width,
           height: height,
           fit: fit,
-          maxWidthDiskCache: 800,
-          maxHeightDiskCache: 800,
+          memCacheWidth: memCacheWidth,
+          memCacheHeight: memCacheHeight,
+          maxWidthDiskCache: memCacheWidth ?? 800,
+          maxHeightDiskCache: memCacheHeight ?? 800,
           fadeInDuration: const Duration(milliseconds: 200),
           fadeOutDuration: const Duration(milliseconds: 100),
           placeholder: (context, url) => _Shimmer(

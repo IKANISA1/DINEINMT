@@ -9,6 +9,10 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Authenticated users can upload menu files" ON storage.objects;
+DROP POLICY IF EXISTS "Service role can read menu uploads" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete their own uploads" ON storage.objects;
+
 -- Allow authenticated users to upload to menu-uploads bucket
 CREATE POLICY "Authenticated users can upload menu files"
 ON storage.objects FOR INSERT

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildGeminiImageGenerationConfig } from "./gemini-image-config.ts";
 
 export interface FunctionEnv {
   supabaseUrl: string;
@@ -290,6 +291,7 @@ export async function processMenuItemImageGeneration(
   }
 
   if (hasExistingImage && imageSource === "manual") {
+    await normalizeExistingMenuImageState(adminClient, item);
     return {
       status: "skipped",
       itemId: item.id,
@@ -322,6 +324,7 @@ export async function processMenuItemImageGeneration(
     imageSource === "ai_gemini" &&
     !forceRegenerate
   ) {
+    await normalizeExistingMenuImageState(adminClient, item);
     return {
       status: "skipped",
       itemId: item.id,
@@ -332,6 +335,21 @@ export async function processMenuItemImageGeneration(
       storagePath: item.image_storage_path,
       model: item.image_model,
       reason: "ai_image_exists",
+    };
+  }
+
+  if (hasExistingImage && !forceRegenerate) {
+    await normalizeExistingMenuImageState(adminClient, item);
+    return {
+      status: "skipped",
+      itemId: item.id,
+      venueId: item.venue_id,
+      imageStatus: "ready",
+      imageSource: normalizeImageSource(imageSource),
+      imageUrl: item.image_url,
+      storagePath: item.image_storage_path,
+      model: item.image_model,
+      reason: "existing_image_exists",
     };
   }
 
@@ -726,6 +744,23 @@ async function updateGenerationState(
   }
 }
 
+async function normalizeExistingMenuImageState(
+  adminClient: ReturnType<typeof createAdminClient>,
+  item: MenuItemRecord,
+): Promise<void> {
+  if (
+    normalizeImageStatus(item.image_status) === "ready" && !item.image_error
+  ) {
+    return;
+  }
+
+  await updateGenerationState(adminClient, item.id, {
+    image_status: "ready",
+    image_error: null,
+    updated_at: new Date().toISOString(),
+  });
+}
+
 function buildMenuImagePrompt(
   item: MenuItemRecord,
   venue: VenueRecord,
@@ -750,15 +785,17 @@ Create a photorealistic premium menu image for a luxury dark-mode hospitality mo
 ═══ ITEM TYPE CLASSIFICATION (MOST CRITICAL RULE) ═══
 This item is classified as: ${typeLabel}
 Visual kind: ${visualKind}
-${isDrink
-    ? `THIS IS A DRINK. You MUST show a beverage — a glass, bottle, cup, or can.
+${
+    isDrink
+      ? `THIS IS A DRINK. You MUST show a beverage — a glass, bottle, cup, or can.
    You MUST NOT show any plated food, dishes, bowls of food, or meal presentations.
    If the name says "Cisk Lager", show a beer. If it says "Mojito", show a cocktail.
    NEVER show food when the item is a drink. This is the #1 rule.`
-    : `THIS IS FOOD. You MUST show a plated dish or dessert.
+      : `THIS IS FOOD. You MUST show a plated dish or dessert.
    You MUST NOT show drinks as the hero subject.
    If the name says "Margherita Pizza", show a pizza. If it says "Ftira", show Maltese ftira bread.
-   The food must be the unmistakable hero of the image.`}
+   The food must be the unmistakable hero of the image.`
+  }
 
 ═══ PRIMARY SUBJECT (ground truth — do not deviate) ═══
 Dish/drink name: "${item.name}"
@@ -804,9 +841,11 @@ ${cuisineHint ? `- Cuisine styling: ${cuisineHint}` : ""}
 - Use realistic scale, believable texture, and credible hospitality presentation.
 
 ═══ HARD EXCLUSIONS (never violate) ═══
-${isDrink
-    ? "- ABSOLUTELY NO FOOD. No plates, no bowls, no plated dishes, no side dishes, no garnish plates."
-    : "- ABSOLUTELY NO DRINKS as the hero subject. No glasses, bottles, or cups as the main focus."}
+${
+    isDrink
+      ? "- ABSOLUTELY NO FOOD. No plates, no bowls, no plated dishes, no side dishes, no garnish plates."
+      : "- ABSOLUTELY NO DRINKS as the hero subject. No glasses, bottles, or cups as the main focus."
+  }
 - No text overlays, watermarks, logos, borders, price tags, menus, or collage layouts.
 - No people, hands, phones, cash, receipts, or table clutter.
 - No cartoon styling, surreal plating, AI artifacts, or oversaturated neon color.
@@ -1125,7 +1164,20 @@ function classifyMenuVisualKind(
     return "coffee";
   }
 
-  if (matchesAny(context, ["tea", "matcha", "chai", "earl grey", "herbal", "green tea", "oolong", "chamomile", "peppermint", "infusion"])) {
+  if (
+    matchesAny(context, [
+      "tea",
+      "matcha",
+      "chai",
+      "earl grey",
+      "herbal",
+      "green tea",
+      "oolong",
+      "chamomile",
+      "peppermint",
+      "infusion",
+    ])
+  ) {
     return "tea";
   }
 
@@ -1393,14 +1445,10 @@ async function generateGeminiImage({
               ],
             },
           ],
-          generationConfig: {
-            responseModalities: ["IMAGE"],
-            outputMimeType: "image/jpeg",
-            imageConfig: {
-              aspectRatio: "1:1",
-              imageSize: "1K",
-            },
-          },
+          generationConfig: buildGeminiImageGenerationConfig({
+            aspectRatio: "1:1",
+            imageSize: "1K",
+          }),
         }),
       },
     );

@@ -1,5 +1,6 @@
 import 'package:dinein_app/core/constants/enums.dart';
 import 'package:dinein_app/core/models/models.dart';
+import 'package:dinein_app/core/models/onboarding_draft_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -18,10 +19,19 @@ void main() {
         'email': 'hello@harbor.mt',
         'image_url': 'https://example.com/venue.png',
         'status': 'active',
+        'ordering_enabled': true,
         'rating': 4.8,
         'rating_count': 210,
         'country': 'MT',
+        'website_url': 'https://harbortable.mt',
+        'supported_payment_methods': ['cash', 'revolut_link'],
+        'opening_hours': {
+          'Monday': {'is_open': true, 'open': '09:00', 'close': '22:00'},
+        },
         'owner_id': 'owner_1',
+        'wifi_ssid': 'HarborGuest',
+        'wifi_password': 'seaside123',
+        'wifi_security': 'WPA',
       };
 
       final venue = Venue.fromJson(json);
@@ -31,12 +41,21 @@ void main() {
       expect(output['name'], 'Harbor Table');
       expect(output['slug'], 'harbor-table');
       expect(output['status'], 'active');
+      expect(output['ordering_enabled'], isTrue);
       expect(output['rating'], 4.8);
       expect(output['rating_count'], 210);
       expect(output['country'], 'MT');
+      expect(output['website_url'], 'https://harbortable.mt');
+      expect(output['supported_payment_methods'], ['cash', 'revolut_link']);
+      expect(output['opening_hours'], {
+        'Monday': {'is_open': true, 'open': '09:00', 'close': '22:00'},
+      });
       expect(output['owner_id'], 'owner_1');
       expect(output['phone'], '+356 9999 1111');
       expect(output['email'], 'hello@harbor.mt');
+      expect(output['wifi_ssid'], 'HarborGuest');
+      expect(output['wifi_password'], 'seaside123');
+      expect(output['wifi_security'], 'WPA');
     });
 
     test('fromJson handles missing optional fields gracefully', () {
@@ -54,17 +73,23 @@ void main() {
       expect(venue.email, isNull);
       expect(venue.imageUrl, isNull);
       expect(venue.status, VenueStatus.active);
+      expect(venue.orderingEnabled, isFalse);
       expect(venue.rating, 0.0);
       expect(venue.ratingCount, 0);
       expect(venue.country, Country.mt);
       expect(venue.ownerId, isNull);
+      expect(venue.supportedPaymentMethods, [PaymentMethod.cash]);
     });
 
     test('normalizeVenueCategoryLabel maps variants correctly', () {
       expect(normalizeVenueCategoryLabel('hotel'), 'Hotels');
-      expect(normalizeVenueCategoryLabel('Bar & Restaurant'), 'Bar & Restaurants');
+      expect(
+        normalizeVenueCategoryLabel('Bar & Restaurant'),
+        'Bar & Restaurants',
+      );
       expect(normalizeVenueCategoryLabel('bar'), 'Bar');
       expect(normalizeVenueCategoryLabel('restaurant'), 'Restaurants');
+      expect(normalizeVenueCategoryLabel('seafood'), 'Seafood');
       expect(normalizeVenueCategoryLabel(null), 'Restaurants');
       expect(normalizeVenueCategoryLabel(''), 'Restaurants');
       expect(normalizeVenueCategoryLabel('  '), 'Restaurants');
@@ -72,17 +97,71 @@ void main() {
 
     test('isOpen reflects active status', () {
       const active = Venue(
-        id: '1', name: 'A', slug: 'a', category: 'C',
-        description: '', address: '', status: VenueStatus.active,
+        id: '1',
+        name: 'A',
+        slug: 'a',
+        category: 'C',
+        description: '',
+        address: '',
+        status: VenueStatus.active,
       );
       const inactive = Venue(
-        id: '2', name: 'B', slug: 'b', category: 'C',
-        description: '', address: '', status: VenueStatus.inactive,
+        id: '2',
+        name: 'B',
+        slug: 'b',
+        category: 'C',
+        description: '',
+        address: '',
+        status: VenueStatus.inactive,
       );
 
       expect(active.isOpen, isTrue);
       expect(inactive.isOpen, isFalse);
     });
+
+    test('guest orderability is tracked separately from status', () {
+      const browseOnly = Venue(
+        id: '1',
+        name: 'A',
+        slug: 'a',
+        category: 'C',
+        description: '',
+        address: '',
+        status: VenueStatus.active,
+      );
+      const validated = Venue(
+        id: '2',
+        name: 'B',
+        slug: 'b',
+        category: 'C',
+        description: '',
+        address: '',
+        status: VenueStatus.active,
+        orderingEnabled: true,
+      );
+
+      expect(browseOnly.canAcceptGuestOrders, isFalse);
+      expect(browseOnly.shouldHideGuestPricing, isTrue);
+      expect(browseOnly.guestAvailabilityLabel, 'Browse Menu');
+      expect(validated.canAcceptGuestOrders, isTrue);
+      expect(validated.guestAvailabilityLabel, 'Available');
+    });
+
+    test(
+      'supported payment methods are parsed without degrading unknown values',
+      () {
+        final venue = Venue.fromJson({
+          'id': 'venue_3',
+          'name': 'Revolut First',
+          'slug': 'revolut-first',
+          'supported_payment_methods': ['revolut_link', 'momo_ussd'],
+        });
+
+        expect(venue.supportedPaymentMethods, [PaymentMethod.revolutLink]);
+        expect(venue.supportsPaymentMethod(PaymentMethod.cash), isFalse);
+        expect(venue.supportsPaymentMethod(PaymentMethod.revolutLink), isTrue);
+      },
+    );
   });
 
   // ─── Review ───
@@ -126,6 +205,8 @@ void main() {
         'image_locked': true,
         'image_storage_path': 'menu-items/venue_1/item_1/generated-123.png',
         'image_attempts': 2,
+        'price_hidden': true,
+        'highlight_rank': 2,
         'is_available': true,
         'tags': ['GF', "Chef's Choice"],
       };
@@ -140,14 +221,24 @@ void main() {
       expect(item.imageLocked, isTrue);
       expect(item.imageSource, MenuItemImageSource.manual);
       expect(item.imageStatus, MenuItemImageStatus.ready);
-      expect(item.imageStoragePath, 'menu-items/venue_1/item_1/generated-123.png');
+      expect(
+        item.imageStoragePath,
+        'menu-items/venue_1/item_1/generated-123.png',
+      );
       expect(item.imageAttempts, 2);
+      expect(item.priceHidden, isTrue);
+      expect(item.highlightRank, 2);
       expect(output['venue_id'], 'venue_1');
       expect(output['name'], 'Dry-Aged Ribeye');
       expect(output['price'], 48.0);
       expect(output['image_locked'], isTrue);
-      expect(output['image_storage_path'], 'menu-items/venue_1/item_1/generated-123.png');
+      expect(
+        output['image_storage_path'],
+        'menu-items/venue_1/item_1/generated-123.png',
+      );
       expect(output['image_attempts'], 2);
+      expect(output['price_hidden'], isTrue);
+      expect(output['highlight_rank'], 2);
     });
 
     test('fromJson handles missing optional fields', () {
@@ -159,6 +250,8 @@ void main() {
       });
 
       expect(item.description, '');
+      expect(item.priceHidden, isFalse);
+      expect(item.highlightRank, isNull);
       expect(item.category, 'Uncategorized');
       expect(item.imageUrl, isNull);
       expect(item.imageSource, MenuItemImageSource.unknown);
@@ -172,29 +265,49 @@ void main() {
 
     test('copyWith creates independent copy with overrides', () {
       const original = MenuItem(
-        id: 'item_1', venueId: 'v1', name: 'X', description: 'D',
-        price: 10, category: 'C',
+        id: 'item_1',
+        venueId: 'v1',
+        name: 'X',
+        description: 'D',
+        price: 10,
+        category: 'C',
+        highlightRank: 1,
       );
-      final copy = original.copyWith(price: 20, name: 'Y');
+      final copy = original.copyWith(price: 20, name: 'Y', highlightRank: null);
 
       expect(copy.price, 20);
       expect(copy.name, 'Y');
       expect(copy.id, 'item_1');
       expect(copy.description, 'D');
+      expect(copy.highlightRank, isNull);
     });
 
     test('hasImage returns true only for non-empty imageUrl', () {
       const withImage = MenuItem(
-        id: '1', venueId: 'v', name: 'X', description: '',
-        price: 5, category: 'C', imageUrl: 'https://x.com/img.jpg',
+        id: '1',
+        venueId: 'v',
+        name: 'X',
+        description: '',
+        price: 5,
+        category: 'C',
+        imageUrl: 'https://x.com/img.jpg',
       );
       const withEmpty = MenuItem(
-        id: '2', venueId: 'v', name: 'Y', description: '',
-        price: 5, category: 'C', imageUrl: '  ',
+        id: '2',
+        venueId: 'v',
+        name: 'Y',
+        description: '',
+        price: 5,
+        category: 'C',
+        imageUrl: '  ',
       );
       const withNull = MenuItem(
-        id: '3', venueId: 'v', name: 'Z', description: '',
-        price: 5, category: 'C',
+        id: '3',
+        venueId: 'v',
+        name: 'Z',
+        description: '',
+        price: 5,
+        category: 'C',
       );
 
       expect(withImage.hasImage, isTrue);
@@ -204,12 +317,21 @@ void main() {
 
     test('needsGeneratedImage is true when no image and not locked', () {
       const item = MenuItem(
-        id: '1', venueId: 'v', name: 'X', description: '',
-        price: 10, category: 'C',
+        id: '1',
+        venueId: 'v',
+        name: 'X',
+        description: '',
+        price: 10,
+        category: 'C',
       );
       const locked = MenuItem(
-        id: '2', venueId: 'v', name: 'Y', description: '',
-        price: 10, category: 'C', imageLocked: true,
+        id: '2',
+        venueId: 'v',
+        name: 'Y',
+        description: '',
+        price: 10,
+        category: 'C',
+        imageLocked: true,
       );
 
       expect(item.needsGeneratedImage, isTrue);
@@ -240,7 +362,10 @@ void main() {
 
     test('copyWith overrides quantity and note', () {
       const item = OrderItem(
-        menuItemId: 'm1', name: 'X', price: 10, quantity: 1,
+        menuItemId: 'm1',
+        name: 'X',
+        price: 10,
+        quantity: 1,
       );
       final copy = item.copyWith(quantity: 3, note: 'No salt');
 
@@ -256,8 +381,10 @@ void main() {
     test('fromJson parses all fields including dual-key receipt token', () {
       final json = {
         'id': 'ORD-001',
+        'order_number': '12345678',
         'venue_id': 'v1',
         'venue_name': 'Harbor Table',
+        'venue_image_url': 'https://example.com/venue.jpg',
         'user_id': 'u1',
         'user_name': 'Alex',
         'items': [
@@ -277,8 +404,11 @@ void main() {
       final order = Order.fromJson(json);
 
       expect(order.id, 'ORD-001');
+      expect(order.orderNumber, '12345678');
+      expect(order.displayNumber, '12345678');
       expect(order.venueId, 'v1');
       expect(order.venueName, 'Harbor Table');
+      expect(order.venueImageUrl, 'https://example.com/venue.jpg');
       expect(order.userId, 'u1');
       expect(order.status, OrderStatus.received);
       expect(order.paymentMethod, PaymentMethod.revolutLink);
@@ -289,6 +419,9 @@ void main() {
       expect(order.serviceFee, 1.0);
       expect(order.total, 21.0);
       expect(order.itemCount, 2);
+
+      final output = order.toJson();
+      expect(output['venue_image_url'], 'https://example.com/venue.jpg');
     });
 
     test('fromJson reads guest_receipt_token as fallback', () {
@@ -304,6 +437,7 @@ void main() {
 
       final order = Order.fromJson(json);
       expect(order.guestReceiptToken, 'fallback-token');
+      expect(order.displayNumber, 'ORD-002');
     });
 
     test('computed subtotal sums items when subtotalAmount is null', () {
@@ -470,6 +604,31 @@ void main() {
 
       final claim = VenueClaim.fromJson(json);
       expect(claim.displayName, 'jean');
+    });
+  });
+
+  group('ClaimedVenueDraft serialization', () {
+    test('round-trip preserves onboarding source metadata', () {
+      const draft = ClaimedVenueDraft(
+        name: 'Ocean Pearl',
+        address: '45 Tower Rd, Sliema, Malta',
+        category: 'Restaurants',
+        description: '',
+        imageUrl: 'https://example.com/venue.png',
+        contactPhone: '+35699123456',
+        websiteUrl: 'https://oceanpearl.mt',
+        claimSubmitted: true,
+      );
+
+      final json = draft.toJson();
+      final restored = ClaimedVenueDraft.fromJson(json);
+
+      expect(restored.name, 'Ocean Pearl');
+      expect(restored.address, '45 Tower Rd, Sliema, Malta');
+      expect(restored.imageUrl, 'https://example.com/venue.png');
+      expect(restored.contactPhone, '+35699123456');
+      expect(restored.websiteUrl, 'https://oceanpearl.mt');
+      expect(restored.claimSubmitted, isTrue);
     });
   });
 }

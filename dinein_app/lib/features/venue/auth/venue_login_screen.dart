@@ -76,15 +76,47 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
   }
 
   bool get _isCoolingDown => _cooldownSeconds > 0;
-  String get _fullPhone => '+356${_phoneController.text.trim()}';
+  String get _localPhone =>
+      normalizeMaltesePhoneLocalInput(_phoneController.text);
+  String get _fullPhone => _localPhone.isEmpty ? '' : '+356$_localPhone';
   String get _otpCode => _otpControllers.map((c) => c.text).join();
+  bool get _canSendOtp =>
+      !_isLoading &&
+      !_isCoolingDown &&
+      isValidMaltesePhoneLocalInput(_phoneController.text);
+
+  String _entryReturnPath(BuildContext context) {
+    final candidate = GoRouterState.of(
+      context,
+    ).uri.queryParameters[AppRouteParams.returnTo];
+    switch (candidate) {
+      case AppRoutePaths.guestSettings:
+      case AppRoutePaths.venueSettings:
+      case AppRoutePaths.adminSettings:
+        return candidate!;
+      default:
+        return AppRoutePaths.splash;
+    }
+  }
+
+  bool _requiresSupportContact(Object error) {
+    final raw = error.toString().toLowerCase();
+    return raw.contains('not linked to a validated venue') ||
+        raw.contains('not registered for venue');
+  }
+
+  Future<void> _showVenueSupportDialog({
+    required String title,
+    required String message,
+  }) {
+    return showAccessSupportDialog(context, title: title, message: message);
+  }
 
   // ─── Send OTP ───
 
   Future<void> _sendOtp() async {
     if (_isCoolingDown) return;
-    final local = _phoneController.text.trim();
-    if (local.length < 7) {
+    if (!isValidMaltesePhoneLocalInput(_phoneController.text)) {
       setState(() => _error = 'Enter your 8-digit Maltese phone number.');
       return;
     }
@@ -96,7 +128,10 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
     });
 
     try {
-      final challenge = await WhatsAppOtpService.instance.sendOtp(_fullPhone);
+      final challenge = await WhatsAppOtpService.instance.sendOtp(
+        _fullPhone,
+        appScope: 'venue',
+      );
       if (!mounted) return;
       _startCooldown();
 
@@ -109,8 +144,8 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         _isLoading = false;
         _info =
             !kReleaseMode && challenge.usesMock && challenge.debugCode != null
-                ? 'Dev code: ${challenge.debugCode}'
-                : null;
+            ? 'Dev code: ${challenge.debugCode}'
+            : null;
       });
 
       _fadeController.forward();
@@ -118,8 +153,20 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _otpFocusNodes[0].requestFocus();
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
+      if (_requiresSupportContact(error)) {
+        setState(() {
+          _isLoading = false;
+          _error = null;
+        });
+        await _showVenueSupportDialog(
+          title: 'Venue Access Not Found',
+          message:
+              'This WhatsApp number is not linked to a validated venue account. Contact support to activate or recover venue access.',
+        );
+        return;
+      }
       setState(() {
         _isLoading = false;
         _error = 'Could not send code. Check the number and retry.';
@@ -169,18 +216,32 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error =
-            'Your venue claim is still under review. Try again after approval.';
+        _error = null;
       });
+      await _showVenueSupportDialog(
+        title: 'Venue Access Pending',
+        message:
+            'This WhatsApp number is linked to a venue that is not validated yet. Contact support if you need help completing access.',
+      );
       return;
     }
 
     if (!mounted) return;
+    if (result.claimStatus == 'not_found') {
+      setState(() {
+        _isLoading = false;
+        _error = null;
+      });
+      await _showVenueSupportDialog(
+        title: 'Venue Access Not Found',
+        message:
+            'This WhatsApp number is not linked to a validated venue account. Contact support to activate or recover venue access.',
+      );
+      return;
+    }
     setState(() {
       _isLoading = false;
-      _error = result.claimStatus == 'not_found'
-          ? 'No approved venue found for this number. Claim your venue first.'
-          : 'Verified, but no session was issued. Request a fresh code.';
+      _error = 'Verified, but no session was issued. Request a fresh code.';
     });
   }
 
@@ -224,9 +285,12 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       children: [
-        _buildBackButton(context, onTap: () {
-          context.goNamed(AppRouteNames.splash);
-        }),
+        _buildBackButton(
+          context,
+          onTap: () {
+            context.go(_entryReturnPath(context));
+          },
+        ),
 
         const SizedBox(height: 48),
 
@@ -281,13 +345,13 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
 
         MaltaPhoneInput(
           controller: _phoneController,
-          onSubmitted: _isLoading ? null : _sendOtp,
+          onSubmitted: _canSendOtp ? _sendOtp : null,
           onChanged: (_) => setState(() {}),
         ),
 
         if (_error != null) ...[
           const SizedBox(height: 16),
-          _InlineNotice(
+          OtpInlineNotice(
             icon: LucideIcons.alertCircle,
             message: _error!,
             color: cs.error,
@@ -295,7 +359,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         ],
         if (_info != null) ...[
           const SizedBox(height: 16),
-          _InlineNotice(
+          OtpInlineNotice(
             icon: LucideIcons.messageSquare,
             message: _info!,
             color: cs.secondary,
@@ -308,11 +372,11 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
           label: _isLoading
               ? 'Sending...'
               : _isCoolingDown
-                  ? 'Wait ${_cooldownSeconds}s'
-                  : 'Get OTP',
+              ? 'Wait ${_cooldownSeconds}s'
+              : 'Get OTP',
           icon: _isLoading ? null : const WhatsAppIcon(),
           isLoading: _isLoading,
-          onPressed: (_isLoading || _isCoolingDown) ? null : _sendOtp,
+          onPressed: _canSendOtp ? _sendOtp : null,
         ),
 
         const SizedBox(height: 32),
@@ -398,7 +462,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
 
         if (_error != null) ...[
           const SizedBox(height: 20),
-          _InlineNotice(
+          OtpInlineNotice(
             icon: LucideIcons.alertCircle,
             message: _error!,
             color: cs.error,
@@ -411,7 +475,11 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
           label: _isLoading ? 'Verifying...' : 'Submit',
           icon: _isLoading
               ? null
-              : Icon(LucideIcons.checkCircle, size: 22, color: AppColors.onSecondary),
+              : Icon(
+                  LucideIcons.checkCircle,
+                  size: 22,
+                  color: AppColors.onSecondary,
+                ),
           isLoading: _isLoading,
           onPressed: _isLoading || _otpCode.length != 6 ? null : _verifyOtp,
         ),
@@ -456,46 +524,6 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
           ),
           child: const Icon(LucideIcons.chevronLeft, size: 24),
         ),
-      ),
-    );
-  }
-}
-
-// ─── Inline Notice (error / info) ───
-
-class _InlineNotice extends StatelessWidget {
-  final IconData icon;
-  final String message;
-  final Color color;
-
-  const _InlineNotice({
-    required this.icon,
-    required this.message,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.space4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        border: Border.all(color: color.withValues(alpha: 0.20)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: tt.bodySmall?.copyWith(color: color, height: 1.4),
-            ),
-          ),
-        ],
       ),
     );
   }
