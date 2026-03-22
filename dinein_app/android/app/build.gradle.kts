@@ -81,6 +81,12 @@ android {
                     "Set up key.properties or the ANDROID_KEYSTORE_* env vars."
                 )
             }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
