@@ -1416,3 +1416,258 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "get_venue_notification_settings returns defaults when no row exists",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    mockFetch(async (req) => {
+      if (
+        req.url.includes("/rest/v1/dinein_venue_notification_settings") &&
+        req.method === "GET"
+      ) {
+        return new Response("null", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleJwt}`,
+        },
+        body: JSON.stringify({
+          action: "get_venue_notification_settings",
+          venueId: "venue-123",
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+      const body = await res.json();
+      assertEquals(body.data?.order_push_enabled, true);
+      assertEquals(body.data?.whatsapp_updates_enabled, true);
+    } finally {
+      restoreFetch();
+    }
+  },
+});
+
+Deno.test({
+  name:
+    "update_venue_notification_settings persists settings and syncs venue registrations",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    let savedSettings: Record<string, unknown> | null = null;
+    let registrationUpdate: Record<string, unknown> | null = null;
+
+    mockFetch(async (req) => {
+      if (
+        req.url.includes("/rest/v1/dinein_venue_notification_settings") &&
+        req.method === "POST"
+      ) {
+        savedSettings = await req.json();
+        return new Response(
+          JSON.stringify({
+            order_push_enabled: false,
+            whatsapp_updates_enabled: true,
+          }),
+          { status: 201 },
+        );
+      }
+
+      if (
+        req.url.includes("/rest/v1/dinein_push_registrations") &&
+        req.method === "PATCH"
+      ) {
+        registrationUpdate = await req.json();
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleJwt}`,
+        },
+        body: JSON.stringify({
+          action: "update_venue_notification_settings",
+          venueId: "venue-123",
+          settings: {
+            orderPushEnabled: false,
+            whatsAppUpdatesEnabled: true,
+          },
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+      const body = await res.json();
+      const saved = (savedSettings ?? {}) as Record<string, unknown>;
+      const synced = (registrationUpdate ?? {}) as Record<string, unknown>;
+      assertEquals(body.data?.order_push_enabled, false);
+      assertEquals(body.data?.whatsapp_updates_enabled, true);
+      assertEquals(saved["venue_id"], "venue-123");
+      assertEquals(saved["order_push_enabled"], false);
+      assertEquals(saved["whatsapp_updates_enabled"], true);
+      assertEquals(synced["notifications_enabled"], false);
+    } finally {
+      restoreFetch();
+    }
+  },
+});
+
+Deno.test({
+  name: "register_push_device upserts an authenticated venue push token",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    const cleanupUrls: string[] = [];
+    let registrationPayload: Record<string, unknown> | null = null;
+
+    mockFetch(async (req) => {
+      if (
+        req.url.includes("/rest/v1/dinein_venue_notification_settings") &&
+        req.method === "GET"
+      ) {
+        return new Response(
+          JSON.stringify({
+            order_push_enabled: true,
+            whatsapp_updates_enabled: false,
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (
+        req.url.includes("/rest/v1/dinein_push_registrations") &&
+        req.method === "DELETE"
+      ) {
+        cleanupUrls.push(decodeURIComponent(req.url));
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+
+      if (
+        req.url.includes("/rest/v1/dinein_push_registrations") &&
+        req.method === "POST"
+      ) {
+        registrationPayload = await req.json();
+        return new Response(
+          JSON.stringify({
+            id: "reg-123",
+            venue_id: "venue-123",
+            device_key: "device-1",
+            push_token: "a".repeat(64),
+            platform: "android",
+            notifications_enabled: true,
+            last_seen_at: "2026-03-22T12:00:00.000Z",
+          }),
+          { status: 201 },
+        );
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleJwt}`,
+        },
+        body: JSON.stringify({
+          action: "register_push_device",
+          venueId: "venue-123",
+          deviceKey: "device-1",
+          pushToken: "a".repeat(64),
+          platform: "android",
+          locale: "en-MT",
+          timeZone: "Europe/Malta",
+          venue_session: {
+            contact_phone: "+35699123456",
+          },
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+      const body = await res.json();
+      const saved = (registrationPayload ?? {}) as Record<string, unknown>;
+      assertEquals(body.data?.id, "reg-123");
+      assertEquals(saved["venue_id"], "venue-123");
+      assertEquals(saved["device_key"], "device-1");
+      assertEquals(saved["push_token"], "a".repeat(64));
+      assertEquals(saved["platform"], "android");
+      assertEquals(saved["contact_phone"], "+35699123456");
+      assertEquals(saved["notifications_enabled"], true);
+      assertEquals(cleanupUrls.length, 2);
+      assertEquals(
+        cleanupUrls.some((url) => url.includes("push_token=eq.")),
+        true,
+      );
+      assertEquals(
+        cleanupUrls.some((url) => url.includes("device_key=eq.device-1")),
+        true,
+      );
+    } finally {
+      restoreFetch();
+    }
+  },
+});
+
+Deno.test({
+  name: "unregister_push_device removes the device registration for a venue",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    let deleteUrl: string | null = null;
+
+    mockFetch(async (req) => {
+      if (
+        req.url.includes("/rest/v1/dinein_push_registrations") &&
+        req.method === "DELETE"
+      ) {
+        deleteUrl = decodeURIComponent(req.url);
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleJwt}`,
+        },
+        body: JSON.stringify({
+          action: "unregister_push_device",
+          venueId: "venue-123",
+          deviceKey: "device-1",
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+      assertEquals(deleteUrl == null, false);
+      assertStringIncludes(deleteUrl ?? "", "venue_id=eq.venue-123");
+      assertStringIncludes(deleteUrl ?? "", "device_key=eq.device-1");
+    } finally {
+      restoreFetch();
+    }
+  },
+});

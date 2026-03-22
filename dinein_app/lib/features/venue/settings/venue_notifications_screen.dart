@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import '../../../core/models/models.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
+import '../../../core/services/venue_notification_repository.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
 /// Venue Notifications settings — full-page screen.
@@ -14,7 +18,6 @@ import '../../../shared/widgets/shared_widgets.dart';
 ///   Back + Header → ORDER ALERTS section →
 ///   "New Order Push" toggle → "WhatsApp Updates" toggle
 ///
-/// Preferences are local-only for now (not persisted to Supabase).
 class VenueNotificationsScreen extends ConsumerStatefulWidget {
   const VenueNotificationsScreen({super.key});
 
@@ -27,6 +30,72 @@ class _VenueNotificationsScreenState
     extends ConsumerState<VenueNotificationsScreen> {
   bool _orderPush = true;
   bool _whatsAppUpdates = true;
+  bool _isLoadingSettings = false;
+  bool _isSavingSettings = false;
+  String? _loadedVenueId;
+
+  Future<void> _loadSettings(String venueId) async {
+    if (_isLoadingSettings && _loadedVenueId == venueId) return;
+    setState(() {
+      _isLoadingSettings = true;
+      _loadedVenueId = venueId;
+    });
+
+    try {
+      final settings = await VenueNotificationRepository.instance.getSettings(
+        venueId,
+      );
+      if (!mounted || _loadedVenueId != venueId) return;
+      setState(() {
+        _orderPush = settings.orderPushEnabled;
+        _whatsAppUpdates = settings.whatsAppUpdatesEnabled;
+        _isLoadingSettings = false;
+      });
+    } catch (_) {
+      if (!mounted || _loadedVenueId != venueId) return;
+      setState(() {
+        _isLoadingSettings = false;
+      });
+    }
+  }
+
+  Future<void> _persistSettings(
+    String venueId, {
+    required bool orderPushEnabled,
+    required bool whatsAppUpdatesEnabled,
+  }) async {
+    final previousOrderPush = _orderPush;
+    final previousWhatsAppUpdates = _whatsAppUpdates;
+
+    setState(() {
+      _orderPush = orderPushEnabled;
+      _whatsAppUpdates = whatsAppUpdatesEnabled;
+      _isSavingSettings = true;
+    });
+
+    try {
+      final saved = await VenueNotificationRepository.instance.updateSettings(
+        venueId,
+        VenueNotificationSettings(
+          orderPushEnabled: orderPushEnabled,
+          whatsAppUpdatesEnabled: whatsAppUpdatesEnabled,
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _orderPush = saved.orderPushEnabled;
+        _whatsAppUpdates = saved.whatsAppUpdatesEnabled;
+        _isSavingSettings = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _orderPush = previousOrderPush;
+        _whatsAppUpdates = previousWhatsAppUpdates;
+        _isSavingSettings = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +120,16 @@ class _VenueNotificationsScreenState
               subtitle: 'Claim a venue first.',
             );
           }
+
+          if (_loadedVenueId != venue.id && !_isLoadingSettings) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                unawaited(_loadSettings(venue.id));
+              }
+            });
+          }
+
+          final canEditToggles = !_isLoadingSettings && !_isSavingSettings;
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -130,7 +209,13 @@ class _VenueNotificationsScreenState
                     title: 'New Order Push',
                     subtitle: 'INSTANT MOBILE NOTIFICATIONS',
                     value: _orderPush,
-                    onChanged: (v) => setState(() => _orderPush = v),
+                    onChanged: canEditToggles
+                        ? (v) => _persistSettings(
+                            venue.id,
+                            orderPushEnabled: v,
+                            whatsAppUpdatesEnabled: _whatsAppUpdates,
+                          )
+                        : null,
                   )
                   .animate()
                   .fadeIn(duration: 300.ms)
@@ -144,7 +229,13 @@ class _VenueNotificationsScreenState
                     title: 'WhatsApp Updates',
                     subtitle: 'RECEIVE ORDER SUMMARIES',
                     value: _whatsAppUpdates,
-                    onChanged: (v) => setState(() => _whatsAppUpdates = v),
+                    onChanged: canEditToggles
+                        ? (v) => _persistSettings(
+                            venue.id,
+                            orderPushEnabled: _orderPush,
+                            whatsAppUpdatesEnabled: v,
+                          )
+                        : null,
                   )
                   .animate()
                   .fadeIn(duration: 300.ms, delay: 100.ms)
@@ -165,7 +256,7 @@ class _ToggleTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   const _ToggleTile({
     required this.icon,

@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { JWT } from "npm:google-auth-library@9";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   createAdminClient as createMenuImageAdminClient,
@@ -69,14 +70,28 @@ const orderPaymentStatuses = new Set([
 const accessVerificationMethods = new Set(["otp", "admin_override"]);
 const menuImageStatuses = new Set(["pending", "generating", "ready", "failed"]);
 const menuImageSources = new Set(["manual", "ai_gemini"]);
+const pushPlatforms = new Set(["android", "ios"]);
+const FIREBASE_MESSAGING_SCOPE =
+  "https://www.googleapis.com/auth/firebase.messaging";
+const VENUE_PUSH_ALERT_ROUTE_ORDERS = "/venue/orders";
+const VENUE_PUSH_ALERT_ROUTE_WAVES = "/venue/waves";
 const ANONYMOUS_WAVE_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 const ANONYMOUS_WAVE_RATE_LIMIT_MAX_REQUESTS = 3;
 const GOOGLE_MAPS_SEARCH_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const GOOGLE_MAPS_SEARCH_RATE_LIMIT_MAX_REQUESTS = 20;
 const anonymousWaveRateLimitBuckets = new Map<string, number[]>();
 const googleMapsSearchRateLimitBuckets = new Map<string, number[]>();
+let firebaseMessagingAccessTokenCache:
+  | { accessToken: string; expiresAt: number }
+  | null = null;
+let missingFirebaseMessagingConfigLogged = false;
 
 type JsonRecord = Record<string, unknown>;
+type VenuePushNotificationPayload = {
+  title: string;
+  body: string;
+  data: Record<string, string>;
+};
 
 class HttpError extends Error {
   status: number;
@@ -375,6 +390,215 @@ function normalizeListOffset(value: unknown): number {
 
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function normalizePushPlatform(value: unknown): string {
+  const normalized = (stringValue(value) ?? "").trim().toLowerCase();
+  if (!pushPlatforms.has(normalized)) {
+    throw new HttpError(400, `Unsupported push platform: ${value}`);
+  }
+  return normalized;
+}
+
+function sanitizePushToken(value: unknown): string {
+  const token = requireString({ value }, "value").trim();
+  if (token.length < 32) {
+    throw new HttpError(400, "Push token is invalid.");
+  }
+  return token;
+}
+
+function defaultVenueNotificationSettings(): JsonRecord {
+  return {
+    order_push_enabled: true,
+    whatsapp_updates_enabled: true,
+  };
+}
+
+function normalizeVenueNotificationSettingsInput(value: unknown): JsonRecord {
+  const settings = asRecord(value);
+  return {
+    order_push_enabled:
+      booleanValue(settings.order_push_enabled ?? settings.orderPushEnabled) ??
+        true,
+    whatsapp_updates_enabled: booleanValue(
+      settings.whatsapp_updates_enabled ??
+        settings.whatsAppUpdatesEnabled ??
+        settings.whatsappUpdatesEnabled,
+    ) ?? true,
+  };
+}
+
+function notificationData(
+  values: Record<string, unknown>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(values)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => [
+        key,
+        typeof value == "string" ? value : JSON.stringify(value),
+      ]),
+  );
+}
+
+function firebaseMessagingConfig(): {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+} | null {
+  const projectId = optionalEnv("FIREBASE_PROJECT_ID") ??
+    optionalEnv("GOOGLE_CLOUD_PROJECT") ??
+    optionalEnv("GCLOUD_PROJECT");
+  const clientEmail = optionalEnv("FIREBASE_CLIENT_EMAIL");
+  const privateKey = optionalEnv("FIREBASE_PRIVATE_KEY");
+
+  if (!projectId || !clientEmail || !privateKey) {
+    if (!missingFirebaseMessagingConfigLogged) {
+      console.warn(
+        "[dinein-api] Firebase Messaging is not configured; venue push alerts are disabled.",
+      );
+      missingFirebaseMessagingConfigLogged = true;
+    }
+    return null;
+  }
+
+  return {
+    projectId,
+    clientEmail,
+    privateKey: privateKey.replace(/\\n/g, "\n"),
+  };
+}
+
+async function firebaseMessagingAccessToken(): Promise<
+  {
+    projectId: string;
+    accessToken: string;
+  } | null
+> {
+  const config = firebaseMessagingConfig();
+  if (!config) return null;
+
+  const now = Date.now();
+  if (
+    firebaseMessagingAccessTokenCache &&
+    firebaseMessagingAccessTokenCache.expiresAt > now + 60_000
+  ) {
+    return {
+      projectId: config.projectId,
+      accessToken: firebaseMessagingAccessTokenCache.accessToken,
+    };
+  }
+
+  const client = new JWT({
+    email: config.clientEmail,
+    key: config.privateKey,
+    scopes: [FIREBASE_MESSAGING_SCOPE],
+  });
+  const tokens = await client.authorize();
+  const accessToken = stringValue(tokens.access_token);
+  if (!accessToken) {
+    throw new Error("Could not authorize Firebase Messaging.");
+  }
+
+  firebaseMessagingAccessTokenCache = {
+    accessToken,
+    expiresAt: numberValue(tokens.expiry_date) ?? (now + 45 * 60_000),
+  };
+
+  return {
+    projectId: config.projectId,
+    accessToken,
+  };
+}
+
+function isInvalidPushTokenError(value: unknown): boolean {
+  const error = asRecord(asRecord(value).error);
+  const status = (stringValue(error.status) ?? "").toUpperCase();
+  if (status == "NOT_FOUND") return true;
+
+  const message = (stringValue(error.message) ?? "").toUpperCase();
+  if (
+    message.includes("UNREGISTERED") ||
+    message.includes("REGISTRATION TOKEN") ||
+    message.includes("REQUESTED ENTITY WAS NOT FOUND")
+  ) {
+    return true;
+  }
+
+  const details = Array.isArray(error.details) ? error.details : [];
+  for (const detail of details) {
+    const errorCode = (stringValue(asRecord(detail).errorCode) ?? "")
+      .toUpperCase();
+    if (errorCode == "UNREGISTERED" || errorCode == "INVALID_ARGUMENT") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function orderItemCount(value: unknown): number {
+  if (!Array.isArray(value)) return 0;
+  return value.reduce((total, item) => {
+    const quantity = numberValue(asRecord(item).quantity) ?? 0;
+    return total + Math.max(0, Math.trunc(quantity));
+  }, 0);
+}
+
+function formatOrderTotal(value: unknown): string | null {
+  const amount = numberValue(value);
+  return amount == undefined ? null : `EUR ${amount.toFixed(2)}`;
+}
+
+function buildNewOrderPushNotification(
+  order: JsonRecord,
+): VenuePushNotificationPayload {
+  const venueId = stringValue(order.venue_id);
+  const orderId = stringValue(order.id);
+  const orderNumber = stringValue(order.order_number) ?? "New";
+  const tableNumber = stringValue(order.table_number) ?? "unknown";
+  const itemCount = Math.max(1, orderItemCount(order.items));
+  const totalLabel = formatOrderTotal(order.total);
+
+  return {
+    title: `New order for table ${tableNumber}`,
+    body: [
+      `Order ${orderNumber}`,
+      itemCount == 1 ? "1 item" : `${itemCount} items`,
+      ...(totalLabel ? [totalLabel] : []),
+    ].join(" - "),
+    data: notificationData({
+      event_type: "new_order",
+      route: VENUE_PUSH_ALERT_ROUTE_ORDERS,
+      venue_id: venueId,
+      order_id: orderId,
+      order_number: orderNumber,
+      table_number: tableNumber,
+    }),
+  };
+}
+
+function buildBellRequestPushNotification(
+  venue: JsonRecord,
+  bellRequest: JsonRecord,
+): VenuePushNotificationPayload {
+  const venueId = stringValue(venue.id);
+  const venueName = stringValue(venue.name) ?? "your venue";
+  const requestId = stringValue(bellRequest.id);
+  const tableNumber = stringValue(bellRequest.table_number) ?? "unknown";
+
+  return {
+    title: `Table ${tableNumber} requested service`,
+    body: `A guest tapped the bell at ${venueName}.`,
+    data: notificationData({
+      event_type: "bell_request",
+      route: VENUE_PUSH_ALERT_ROUTE_WAVES,
+      venue_id: venueId,
+      bell_request_id: requestId,
+      table_number: tableNumber,
+    }),
+  };
 }
 
 export function generateOrderNumber(): string {
@@ -1491,6 +1715,246 @@ async function authorizeVenueMutation(
 
   await authorizeVenueSession(req, supabase, venueSession, venueId);
   return "venue";
+}
+
+async function venueNotificationSettingsSnapshot(
+  supabase: ReturnType<typeof adminClient>,
+  venueId: string,
+): Promise<JsonRecord> {
+  const { data, error } = await supabase
+    .from("dinein_venue_notification_settings")
+    .select("order_push_enabled, whatsapp_updates_enabled")
+    .eq("venue_id", venueId)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      "[dinein-api] venue notification settings lookup failed",
+      error,
+    );
+    throw new HttpError(500, "Could not load notification settings.");
+  }
+
+  return {
+    ...defaultVenueNotificationSettings(),
+    ...asRecord(data),
+  };
+}
+
+async function upsertVenueNotificationSettings(
+  supabase: ReturnType<typeof adminClient>,
+  venueId: string,
+  settingsInput: unknown,
+): Promise<JsonRecord> {
+  const settings = normalizeVenueNotificationSettingsInput(settingsInput);
+  const { data, error } = await supabase
+    .from("dinein_venue_notification_settings")
+    .upsert(
+      {
+        venue_id: venueId,
+        ...settings,
+      },
+      { onConflict: "venue_id" },
+    )
+    .select("order_push_enabled, whatsapp_updates_enabled")
+    .single();
+
+  if (error) {
+    console.error(
+      "[dinein-api] venue notification settings upsert failed",
+      error,
+    );
+    throw new HttpError(500, "Could not save notification settings.");
+  }
+
+  return {
+    ...defaultVenueNotificationSettings(),
+    ...asRecord(data),
+  };
+}
+
+async function syncVenuePushRegistrationFlags(
+  supabase: ReturnType<typeof adminClient>,
+  venueId: string,
+  notificationsEnabled: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from("dinein_push_registrations")
+    .update({ notifications_enabled: notificationsEnabled })
+    .eq("venue_id", venueId);
+
+  if (error) {
+    console.error(
+      "[dinein-api] venue push registration settings sync failed",
+      error,
+    );
+  }
+}
+
+async function resolveVenueNotificationContactPhone(
+  supabase: ReturnType<typeof adminClient>,
+  venueId: string,
+  body: JsonRecord,
+): Promise<string | null> {
+  const directPhone = stringValue(body.contactPhone) ??
+    stringValue(body.contact_phone);
+  if (directPhone) return directPhone;
+
+  const session = asRecord(body.venue_session);
+  const sessionPhone = stringValue(session.contact_phone) ??
+    stringValue(session.contactPhone);
+  if (sessionPhone) return sessionPhone;
+
+  const venue = await venueSnapshot(supabase, venueId);
+  return stringValue(venue.owner_whatsapp_number) ??
+    stringValue(venue.owner_contact_phone) ??
+    stringValue(venue.phone) ??
+    null;
+}
+
+async function activeVenuePushRegistrations(
+  supabase: ReturnType<typeof adminClient>,
+  venueId: string,
+): Promise<JsonRecord[]> {
+  const settings = await venueNotificationSettingsSnapshot(supabase, venueId);
+  if (booleanValue(settings.order_push_enabled) == false) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("dinein_push_registrations")
+    .select("id, push_token, platform, device_key")
+    .eq("venue_id", venueId)
+    .eq("provider", "fcm")
+    .eq("notifications_enabled", true)
+    .order("last_seen_at", { ascending: false })
+    .limit(25);
+
+  if (error) {
+    console.error("[dinein-api] venue push registration lookup failed", error);
+    throw new HttpError(500, "Could not load push registrations.");
+  }
+
+  return (data ?? [])
+    .map((entry) => asRecord(entry))
+    .filter((entry) => {
+      const token = stringValue(entry.push_token);
+      const platform = (stringValue(entry.platform) ?? "").toLowerCase();
+      return Boolean(token) && pushPlatforms.has(platform);
+    });
+}
+
+async function sendVenuePushNotification(
+  auth: { projectId: string; accessToken: string },
+  registration: JsonRecord,
+  payload: VenuePushNotificationPayload,
+): Promise<"sent" | "invalid_token"> {
+  const pushToken = requireString(registration, "push_token");
+  const response = await fetch(
+    `https://fcm.googleapis.com/v1/projects/${auth.projectId}/messages:send`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${auth.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          token: pushToken,
+          notification: {
+            title: payload.title,
+            body: payload.body,
+          },
+          data: payload.data,
+          android: {
+            priority: "high",
+            notification: {
+              channel_id: "venue_operational_alerts",
+              sound: "default",
+              click_action: "FLUTTER_NOTIFICATION_CLICK",
+            },
+          },
+          apns: {
+            headers: { "apns-priority": "10" },
+            payload: {
+              aps: {
+                sound: "default",
+              },
+            },
+          },
+        },
+      }),
+    },
+  );
+
+  if (response.ok) {
+    return "sent";
+  }
+
+  const errorBody = await response.json().catch(() => null);
+  if (isInvalidPushTokenError(errorBody)) {
+    return "invalid_token";
+  }
+
+  throw new Error(
+    `FCM send failed with status ${response.status}: ${
+      JSON.stringify(errorBody)
+    }`,
+  );
+}
+
+async function prunePushRegistrations(
+  supabase: ReturnType<typeof adminClient>,
+  registrationIds: string[],
+): Promise<void> {
+  if (registrationIds.length == 0) return;
+
+  const { error } = await supabase
+    .from("dinein_push_registrations")
+    .delete()
+    .in("id", registrationIds);
+
+  if (error) {
+    console.error("[dinein-api] push registration prune failed", error);
+  }
+}
+
+async function dispatchVenueOperationalAlert(
+  supabase: ReturnType<typeof adminClient>,
+  venueId: string,
+  payload: VenuePushNotificationPayload,
+): Promise<void> {
+  const auth = await firebaseMessagingAccessToken();
+  if (!auth) return;
+
+  const registrations = await activeVenuePushRegistrations(supabase, venueId);
+  if (registrations.length == 0) return;
+
+  const results = await Promise.allSettled(
+    registrations.map(async (registration) => {
+      const registrationId = requireString(registration, "id");
+      const outcome = await sendVenuePushNotification(
+        auth,
+        registration,
+        payload,
+      );
+      return { registrationId, outcome };
+    }),
+  );
+
+  const invalidRegistrationIds: string[] = [];
+  for (const result of results) {
+    if (result.status == "fulfilled") {
+      if (result.value.outcome == "invalid_token") {
+        invalidRegistrationIds.push(result.value.registrationId);
+      }
+      continue;
+    }
+
+    console.error("[dinein-api] venue push delivery failed", result.reason);
+  }
+
+  await prunePushRegistrations(supabase, invalidRegistrationIds);
 }
 
 async function latestClaimByContact(
@@ -4341,6 +4805,154 @@ async function handleSearchGoogleMaps(
   return ok([]);
 }
 
+async function handleGetVenueNotificationSettings(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const venueId = requireString(body, "venueId", "venue_id");
+  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+  return ok(await venueNotificationSettingsSnapshot(supabase, venueId));
+}
+
+async function handleUpdateVenueNotificationSettings(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const venueId = requireString(body, "venueId", "venue_id");
+  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+
+  const settings = await upsertVenueNotificationSettings(
+    supabase,
+    venueId,
+    body.settings ?? body,
+  );
+  await syncVenuePushRegistrationFlags(
+    supabase,
+    venueId,
+    booleanValue(settings.order_push_enabled) ?? true,
+  );
+  return ok(settings);
+}
+
+async function handleRegisterPushDevice(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const venueId = requireString(body, "venueId", "venue_id");
+  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+
+  const deviceKey = requireString(body, "deviceKey", "device_key");
+  const pushToken = sanitizePushToken(body.pushToken ?? body.push_token);
+  const platform = normalizePushPlatform(body.platform);
+  const settings = await venueNotificationSettingsSnapshot(supabase, venueId);
+  const notificationsEnabled =
+    booleanValue(body.notificationsEnabled ?? body.notifications_enabled) ??
+      (booleanValue(settings.order_push_enabled) ?? true);
+  const contactPhone = await resolveVenueNotificationContactPhone(
+    supabase,
+    venueId,
+    body,
+  );
+
+  const cleanupByToken = await supabase
+    .from("dinein_push_registrations")
+    .delete()
+    .eq("push_token", pushToken);
+  if (cleanupByToken.error) {
+    console.error(
+      "[dinein-api] push registration token cleanup failed",
+      cleanupByToken.error,
+    );
+    throw new HttpError(500, "Could not register the push device.");
+  }
+
+  const cleanupByDevice = await supabase
+    .from("dinein_push_registrations")
+    .delete()
+    .eq("device_key", deviceKey)
+    .neq("venue_id", venueId);
+  if (cleanupByDevice.error) {
+    console.error(
+      "[dinein-api] push registration device cleanup failed",
+      cleanupByDevice.error,
+    );
+    throw new HttpError(500, "Could not register the push device.");
+  }
+
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("dinein_push_registrations")
+    .upsert(
+      {
+        venue_id: venueId,
+        contact_phone: contactPhone,
+        device_key: deviceKey,
+        push_token: pushToken,
+        platform,
+        provider: "fcm",
+        notifications_enabled: notificationsEnabled,
+        app_version: stringValue(body.appVersion) ??
+          stringValue(body.app_version) ??
+          null,
+        locale: stringValue(body.locale) ?? null,
+        time_zone: stringValue(body.timeZone) ??
+          stringValue(body.time_zone) ??
+          null,
+        last_seen_at: now,
+      },
+      { onConflict: "venue_id,device_key" },
+    )
+    .select(
+      "id, venue_id, device_key, push_token, platform, notifications_enabled, last_seen_at",
+    )
+    .single();
+
+  if (error) {
+    console.error("[dinein-api] register push device failed", error);
+    throw new HttpError(500, "Could not register the push device.");
+  }
+
+  return ok(asRecord(data));
+}
+
+async function handleUnregisterPushDevice(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const venueId = requireString(body, "venueId", "venue_id");
+  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+
+  const deviceKey = stringValue(body.deviceKey) ?? stringValue(body.device_key);
+  const pushToken = stringValue(body.pushToken) ?? stringValue(body.push_token);
+  if (!deviceKey && !pushToken) {
+    throw new HttpError(
+      400,
+      "Device key or push token is required to unregister a push device.",
+    );
+  }
+
+  let query = supabase
+    .from("dinein_push_registrations")
+    .delete()
+    .eq("venue_id", venueId);
+  query = deviceKey ? query.eq("device_key", deviceKey) : query.eq(
+    "push_token",
+    pushToken!,
+  );
+
+  const { error } = await query;
+  if (error) {
+    console.error("[dinein-api] unregister push device failed", error);
+    throw new HttpError(500, "Could not unregister the push device.");
+  }
+
+  return ok(true);
+}
+
 async function bellRequestVenueId(
   supabase: ReturnType<typeof adminClient>,
   requestId: string,
@@ -4375,7 +4987,7 @@ async function handleSendWave(
   // Verify the venue exists and is active before accepting a wave
   const { data: venueCheck, error: venueCheckError } = await supabase
     .from("dinein_venues")
-    .select("id,status")
+    .select("id, name, status")
     .eq("id", venueId)
     .maybeSingle();
   if (venueCheckError) {
@@ -4428,6 +5040,16 @@ async function handleSendWave(
 
   if (anonymousRateLimitKey != null) {
     recordAnonymousWaveRateLimit(anonymousRateLimitKey, now.getTime());
+  }
+
+  try {
+    await dispatchVenueOperationalAlert(
+      supabase,
+      venueId,
+      buildBellRequestPushNotification(asRecord(venueCheck), asRecord(data)),
+    );
+  } catch (error) {
+    console.error("[dinein-api] bell request push dispatch failed", error);
   }
 
   return ok(data, 201);
@@ -4629,6 +5251,16 @@ async function handlePlaceOrder(
   const receiptToken = orderId
     ? await issueOrderReceiptToken(orderId, venueId)
     : null;
+
+  try {
+    await dispatchVenueOperationalAlert(
+      supabase,
+      venueId,
+      buildNewOrderPushNotification(orderData),
+    );
+  } catch (error) {
+    console.error("[dinein-api] order push dispatch failed", error);
+  }
 
   return ok({
     ...orderData,
@@ -5098,6 +5730,14 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleGenerateVenueProfileImage(supabase, req, body);
       case "backfill_venue_profile_images":
         return await handleBackfillVenueProfileImages(supabase, req, body);
+      case "get_venue_notification_settings":
+        return await handleGetVenueNotificationSettings(supabase, req, body);
+      case "update_venue_notification_settings":
+        return await handleUpdateVenueNotificationSettings(supabase, req, body);
+      case "register_push_device":
+        return await handleRegisterPushDevice(supabase, req, body);
+      case "unregister_push_device":
+        return await handleUnregisterPushDevice(supabase, req, body);
       case "place_order":
         return await handlePlaceOrder(supabase, req, body);
       case "send_wave":

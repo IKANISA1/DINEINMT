@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
+import '../services/app_notification_service.dart';
 import '../services/dinein_api_service.dart';
 import '../services/supabase_config.dart';
 
@@ -155,6 +157,7 @@ class AuthRepository {
   Future<void> saveVenueSession(VenueAccessSession session) async {
     _venueSession = session;
     await _writeSessionValue(_venueSessionKey, jsonEncode(session.toJson()));
+    unawaited(AppNotificationService.handleVenueSessionUpdated(session));
   }
 
   /// Persist an admin console session after OTP verification.
@@ -165,8 +168,12 @@ class AuthRepository {
 
   /// Clear the venue-owner session only.
   Future<void> clearVenueSession() async {
+    final session = _venueSession;
     _venueSession = null;
     await _deleteSessionValue(_venueSessionKey);
+    if (session != null) {
+      unawaited(AppNotificationService.handleVenueSessionCleared(session));
+    }
   }
 
   /// Clear the admin console session only.

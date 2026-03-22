@@ -1,8 +1,7 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../firebase_options.dart';
+import 'firebase_runtime_service.dart';
 
 /// Initializes production telemetry without blocking app startup when provider
 /// credentials are missing or still carry placeholder values.
@@ -18,19 +17,12 @@ class AppTelemetryService {
     if (_initialized) return;
     _initialized = true;
 
-    if (!DefaultFirebaseOptions.hasCurrentPlatformConfig) {
-      debugPrint(
-        '[telemetry] Firebase disabled: platform config is missing or still '
-        'contains placeholder values.',
-      );
+    final firebaseReady = await FirebaseRuntimeService.ensureInitialized();
+    if (!firebaseReady) {
       return;
     }
 
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-
       final crashlytics = FirebaseCrashlytics.instance;
       await crashlytics.setCrashlyticsCollectionEnabled(kReleaseMode);
 

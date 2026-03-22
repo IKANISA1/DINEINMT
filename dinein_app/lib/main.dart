@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'features/guest/permissions/guest_location_permission_host.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'core/services/app_notification_service.dart';
 import 'core/services/app_telemetry_service.dart';
 import 'core/services/auth_repository.dart';
 import 'core/services/supabase_config.dart';
@@ -16,10 +17,15 @@ Future<void> main() async {
     SupabaseConfig.initialize(),
     AuthRepository.instance.restoreVenueSession(),
     AuthRepository.instance.restoreAdminSession(),
+    AppNotificationService.initialize(),
   ]);
   runApp(const ProviderScope(child: DineInApp()));
   WidgetsBinding.instance.addPostFrameCallback((_) {
     unawaited(AppTelemetryService.initialize());
+    final venueSession = AuthRepository.instance.currentVenueSession;
+    if (venueSession != null) {
+      unawaited(AppNotificationService.handleVenueSessionUpdated(venueSession));
+    }
   });
 }
 

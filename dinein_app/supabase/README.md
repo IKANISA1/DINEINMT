@@ -5,6 +5,7 @@ This Supabase project now includes two production AI pipelines:
 - Gemini-powered menu image generation
 - Gemini Google Maps grounding plus Gemini Search-grounded venue profile enrichment
 - Gemini-powered venue profile image generation
+- Firebase Cloud Messaging delivery for venue operational push alerts
 
 ## What Was Added
 
@@ -28,6 +29,9 @@ supabase secrets set \
   GEMINI_IMAGE_MODELS=gemini-3.1-flash-image-preview,gemini-2.5-flash-image \
   GEMINI_VENUE_MODELS=gemini-2.5-flash,gemini-2.5-flash-lite \
   GEMINI_VENUE_IMAGE_MODELS=gemini-2.5-flash-image \
+  FIREBASE_PROJECT_ID=your_firebase_project_id \
+  FIREBASE_CLIENT_EMAIL=your_service_account_email \
+  FIREBASE_PRIVATE_KEY='-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n' \
   MENU_IMAGE_BUCKET=menu-images \
   MENU_IMAGE_CRON_SECRET=choose-a-long-random-secret \
   VENUE_ENRICHMENT_CRON_SECRET=choose-a-second-long-random-secret \
@@ -39,6 +43,10 @@ supabase secrets set \
 
 `GEMINI_API_KEY` must be able to call Gemini image generation, Gemini Google
 Maps grounding, and Gemini Google Search grounding.
+
+`FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` must come from a Firebase
+service account with permission to call the FCM HTTP v1 API for
+`FIREBASE_PROJECT_ID`.
 
 ## Deploy
 

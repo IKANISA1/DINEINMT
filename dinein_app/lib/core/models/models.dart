@@ -268,6 +268,48 @@ class Venue extends Equatable {
   ];
 }
 
+class VenueNotificationSettings extends Equatable {
+  final bool orderPushEnabled;
+  final bool whatsAppUpdatesEnabled;
+
+  const VenueNotificationSettings({
+    this.orderPushEnabled = true,
+    this.whatsAppUpdatesEnabled = true,
+  });
+
+  factory VenueNotificationSettings.fromJson(Map<String, dynamic> json) {
+    return VenueNotificationSettings(
+      orderPushEnabled:
+          json['order_push_enabled'] as bool? ??
+          json['orderPushEnabled'] as bool? ??
+          true,
+      whatsAppUpdatesEnabled:
+          json['whatsapp_updates_enabled'] as bool? ??
+          json['whatsAppUpdatesEnabled'] as bool? ??
+          true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'order_push_enabled': orderPushEnabled,
+    'whatsapp_updates_enabled': whatsAppUpdatesEnabled,
+  };
+
+  VenueNotificationSettings copyWith({
+    bool? orderPushEnabled,
+    bool? whatsAppUpdatesEnabled,
+  }) {
+    return VenueNotificationSettings(
+      orderPushEnabled: orderPushEnabled ?? this.orderPushEnabled,
+      whatsAppUpdatesEnabled:
+          whatsAppUpdatesEnabled ?? this.whatsAppUpdatesEnabled,
+    );
+  }
+
+  @override
+  List<Object?> get props => [orderPushEnabled, whatsAppUpdatesEnabled];
+}
+
 /// A venue review.
 class Review extends Equatable {
   final String author;
