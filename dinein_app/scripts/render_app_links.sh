@@ -5,9 +5,9 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 app_root="$(cd "$script_dir/.." && pwd)"
 template_dir="$app_root/docs/release/app-links"
-site_root="$app_root/../landing"
-well_known_dir="$site_root/.well-known"
+well_known_dir=""
 flavor="mt"
+output_dir_overridden=false
 
 play_sha="${PLAY_APP_SIGNING_SHA256:-}"
 apple_team_id="${APPLE_TEAM_ID:-}"
@@ -20,6 +20,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --output-dir)
       well_known_dir="${2:-}"
+      output_dir_overridden=true
       shift 2
       ;;
     *)
@@ -33,10 +34,16 @@ case "$flavor" in
   mt)
     android_package_id="com.dineinmalta.app"
     ios_bundle_id="com.dineinmalta.app"
+    if [[ "$output_dir_overridden" != "true" ]]; then
+      well_known_dir="$app_root/../landing/.well-known"
+    fi
     ;;
   rw)
     android_package_id="com.dineinrw.app"
     ios_bundle_id="com.dineinrw.app"
+    if [[ "$output_dir_overridden" != "true" ]]; then
+      well_known_dir="$app_root/../landing-rw/.well-known"
+    fi
     ;;
   *)
     echo "Unsupported flavor: $flavor" >&2
@@ -49,7 +56,7 @@ if [[ -z "$play_sha" || -z "$apple_team_id" ]]; then
   cat <<'EOF'
 Usage:
   PLAY_APP_SIGNING_SHA256="AA:BB:..." APPLE_TEAM_ID="ABCDE12345" ./scripts/render_app_links.sh --flavor mt
-  PLAY_APP_SIGNING_SHA256="AA:BB:..." APPLE_TEAM_ID="ABCDE12345" ./scripts/render_app_links.sh --flavor rw --output-dir ../landing-rw/.well-known
+  PLAY_APP_SIGNING_SHA256="AA:BB:..." APPLE_TEAM_ID="ABCDE12345" ./scripts/render_app_links.sh --flavor rw
 
 This renders deployable app-link artifacts into:
   landing/.well-known/assetlinks.json

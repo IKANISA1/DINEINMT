@@ -317,7 +317,7 @@ class _OrderHistoryCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   Text(
                     order.venueName,
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: tt.headlineSmall?.copyWith(
                       letterSpacing: -0.8,
@@ -331,7 +331,7 @@ class _OrderHistoryCard extends StatelessWidget {
                         : itemNames.isEmpty
                         ? '${order.itemCount} items'
                         : itemNames,
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: tt.bodyMedium?.copyWith(
                       color: cs.onSurfaceVariant.withValues(alpha: 0.60),

@@ -2999,15 +2999,16 @@ async function handleGetVenues(
   const { data, error } = await supabase
     .from("dinein_venues")
     .select("*")
-    .eq("country", countryCode)
-    .neq("status", "deleted")
-    .neq("status", "suspended");
+    .eq("country", countryCode);
 
   if (error) {
     console.error("[dinein-api] get venues failed", error);
     throw new HttpError(500, "Could not load venues.");
   }
 
+  // Filter visibility in application code so the guest list works against
+  // both the current text-status schema and legacy deployments that still use
+  // enum-backed status values.
   const venues = (data ?? [])
     .filter((venue) => isGuestVisibleVenue(venue))
     .sort((left, right) => {

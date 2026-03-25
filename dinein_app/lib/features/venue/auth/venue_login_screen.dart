@@ -135,7 +135,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
     )) {
       setState(
         () => _error =
-            'Enter your ${_expectedPhoneLength}-digit ${CountryRuntime.config.country.label} phone number.',
+            'Enter your $_expectedPhoneLength-digit ${CountryRuntime.config.country.label} phone number.',
       );
       return;
     }

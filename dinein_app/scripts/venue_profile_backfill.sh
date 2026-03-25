@@ -125,7 +125,7 @@ for ((ITERATION = 1; ITERATION <= ITERATIONS; ITERATION += 1)); do
     "$PROFILE_SUMMARY" \
     "$(date '+%H:%M:%S')"
 
-  if [ "${GENERATE_PROFILE_IMAGES,,}" = "true" ]; then
+  if [ "$(printf '%s' "$GENERATE_PROFILE_IMAGES" | tr '[:upper:]' '[:lower:]')" = "true" ]; then
     IMAGE_PAYLOAD="$(build_image_payload)"
     IMAGE_RESPONSE="$(invoke_action "$IMAGE_PAYLOAD")"
     IMAGE_SUMMARY="$(summarize_response "backfill_venue_profile_images" "$IMAGE_RESPONSE")"

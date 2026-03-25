@@ -337,7 +337,7 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
                   label: 'ADDRESS',
                   controller: _addressCtrl,
                   hint: '45 Tower Rd, Sliema, Malta',
-                  maxLines: 2,
+                  maxLines: 3,
                 ),
               ],
             ),

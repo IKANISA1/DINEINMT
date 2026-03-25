@@ -5,7 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd "${script_dir}/.." && pwd)"
 flavor="mt"
 release_env_json=""
-project_ref="${SUPABASE_PROJECT_REF:-uskfnszcdqpcfrhjxitl}"
+project_ref="${SUPABASE_PROJECT_REF:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,9 +34,11 @@ fi
 
 case "$flavor" in
   mt)
+    country_code='MT'
     unauthorized_phone='+35699999999'
     ;;
   rw)
+    country_code='RW'
     unauthorized_phone='+250788000000'
     ;;
   *)
@@ -66,6 +68,24 @@ PY
 supabase_url="${SUPABASE_URL:-$(extract_release_value SUPABASE_URL)}"
 supabase_anon_key="${SUPABASE_ANON_KEY:-$(extract_release_value SUPABASE_ANON_KEY)}"
 functions_url="${supabase_url%/}/functions/v1/dinein-api"
+
+derive_project_ref_from_url() {
+  python3 - "$1" <<'PY'
+import sys
+from urllib.parse import urlparse
+
+parsed = urlparse(sys.argv[1])
+host = (parsed.hostname or "").strip().lower()
+prefix = host.split(".supabase.co", 1)[0]
+if not prefix:
+    raise SystemExit(f"Could not derive project ref from {sys.argv[1]!r}")
+print(prefix)
+PY
+}
+
+if [[ -z "${project_ref}" ]]; then
+  project_ref="$(derive_project_ref_from_url "${supabase_url}")"
+fi
 
 pass() {
   printf 'PASS %s\n' "$1"
@@ -166,13 +186,18 @@ echo
 run_check 'health' '{"action":"health"}' '200' 'health' >/dev/null
 pass 'dinein-api health endpoint returned ok'
 
-venue_meta="$(run_check 'get_venues' '{"action":"get_venues"}' '200' 'venues')"
+venue_meta="$(run_check \
+  'get_venues' \
+  "{\"action\":\"get_venues\",\"country\":\"${country_code}\"}" \
+  '200' \
+  'venues'
+)"
 IFS='|' read -r venue_count first_venue_id first_venue_name <<<"${venue_meta}"
 pass "get_venues returned ${venue_count} venues"
 
 menu_count="$(run_check \
   'get_menu_items' \
-  "{\"action\":\"get_menu_items\",\"venueId\":\"${first_venue_id}\"}" \
+  "{\"action\":\"get_menu_items\",\"country\":\"${country_code}\",\"venueId\":\"${first_venue_id}\"}" \
   '200' \
   'menu_items'
 )"

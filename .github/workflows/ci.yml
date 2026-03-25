@@ -68,3 +68,35 @@ jobs:
             --flavor "${{ matrix.flavor }}" \
             --android-only \
             --well-known-dir "${tmp_dir}"
+
+  backend-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dinein_app/supabase/functions
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Run Deno tests
+        env:
+          SUPABASE_URL: https://mock.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: mock-key
+          SUPABASE_ANON_KEY: mock-anon-key
+          BIOPAY_OWNER_TOKEN_SECRET: mock-biopay-secret
+          BIOPAY_MANAGE_CODE_PEPPER: mock-biopay-pepper
+          BIOPAY_RATE_LIMIT_SECRET: mock-rate-limit-secret
+          DINEIN_ADMIN_SESSION_SECRET: mock-admin-secret
+          DINEIN_VENUE_SESSION_SECRET: mock-venue-secret
+        run: |
+          deno test --allow-all biopay-api/index_test.ts
+          deno test --allow-all dinein-api/index_test.ts
+          deno test --allow-all whatsapp-otp/index_test.ts
+          deno test --allow-all _shared/venue-profile-image_test.ts
+          deno test --allow-all _shared/gemini-image-config_test.ts
+          deno test --allow-all dinein-api/security_test.ts

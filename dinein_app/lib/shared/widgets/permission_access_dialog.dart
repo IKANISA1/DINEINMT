@@ -45,6 +45,16 @@ class PermissionAccessDialogConfig {
     );
   }
 
+  factory PermissionAccessDialogConfig.biopayCamera() {
+    return const PermissionAccessDialogConfig(
+      title: 'BIOPAY CAMERA ACCESS',
+      message:
+          'Allow camera access so BioPay can capture your face and create your Rwanda payment profile for secure matching.',
+      icon: LucideIcons.scanFace,
+      iconColor: AppColors.primary,
+    );
+  }
+
   factory PermissionAccessDialogConfig.venuePhotos() {
     return const PermissionAccessDialogConfig(
       title: 'PHOTO LIBRARY',

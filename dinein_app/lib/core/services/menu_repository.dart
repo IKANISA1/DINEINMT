@@ -204,6 +204,7 @@ class MenuRepository {
         'fileName': fileName,
         'contentType': contentType,
         'fileData': base64Encode(bytes),
+        // ignore: use_null_aware_elements
         if (onboardingMenuToken != null)
           'onboarding_menu_token': onboardingMenuToken,
         ..._venueSessionPayload(),
@@ -228,6 +229,7 @@ class MenuRepository {
       'ocr_extract_menu',
       payload: {
         'fileUrl': fileUrl,
+        // ignore: use_null_aware_elements
         if (onboardingMenuToken != null)
           'onboarding_menu_token': onboardingMenuToken,
         ..._venueSessionPayload(),

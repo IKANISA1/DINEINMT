@@ -1,15 +1,31 @@
 import 'package:dinein_app/core/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/services/auth_repository.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../fixtures/mock_secure_storage.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  const channel = MethodChannel('plugins.flutter.io/firebase_core');
+
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (methodCall) async {
+          if (methodCall.method == 'Firebase#initializeApp') {
+            return {
+              'name': methodCall.arguments['appName'],
+              'options': methodCall.arguments['options'],
+              'pluginConstants': {},
+            };
+          }
+          return null;
+        });
+
+    MockSecureStorage.setup();
+    MockSecureStorage.clear();
     await AuthRepository.instance.clearVenueSession();
   });
 

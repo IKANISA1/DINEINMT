@@ -20,7 +20,7 @@ Render Rwanda artifacts into a Rwanda site root with:
 ```bash
 PLAY_APP_SIGNING_SHA256="AA:BB:..." \
 APPLE_TEAM_ID="ABCDE12345" \
-./scripts/render_app_links.sh --flavor rw --output-dir ../landing-rw/.well-known
+./scripts/render_app_links.sh --flavor rw
 ```
 
 Inputs:

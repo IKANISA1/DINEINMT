@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/country_config.dart';
 import '../../../core/config/country_config_provider.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../core/services/support_contact_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/shared_widgets.dart';
@@ -29,24 +30,6 @@ class GuestSettingsScreen extends ConsumerWidget {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Could not open that link.')));
-  }
-
-  Future<void> _openWhatsApp(BuildContext context, CountryConfig config) async {
-    final phoneNumber = config.supportWhatsApp;
-    final appUri = Uri.parse('whatsapp://send?phone=$phoneNumber');
-    final webUri = Uri.parse('https://wa.me/$phoneNumber');
-
-    try {
-      final launched = await launchUrl(
-        appUri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (launched || !context.mounted) return;
-    } catch (_) {
-      if (!context.mounted) return;
-    }
-
-    await _launchExternal(context, webUri);
   }
 
   void _showAboutSheet(BuildContext context, CountryConfig config) {
@@ -144,10 +127,9 @@ class GuestSettingsScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _ProfileHeaderCard(welcomeMessage: config.welcomeMessage)
-              .animate()
-              .fadeIn(duration: 400.ms)
-              .slideY(begin: 0.05),
+          _ProfileHeaderCard(
+            welcomeMessage: config.welcomeMessage,
+          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05),
           const SizedBox(height: AppTheme.space8),
           const _SectionLabel(label: 'QUICK ACTIONS'),
           const SizedBox(height: AppTheme.space4),
@@ -160,6 +142,18 @@ class GuestSettingsScreen extends ConsumerWidget {
               .animate()
               .fadeIn(delay: 100.ms, duration: 320.ms)
               .slideY(begin: 0.05),
+          if (config.hasBioPay) ...[
+            const SizedBox(height: AppTheme.space3),
+            _SettingsTile(
+                  icon: LucideIcons.scanFace,
+                  title: 'BioPay',
+                  subtitle: 'FACE-SCAN PAYMENTS',
+                  onTap: () => context.goNamed(AppRouteNames.biopayHome),
+                )
+                .animate()
+                .fadeIn(delay: 130.ms, duration: 320.ms)
+                .slideY(begin: 0.05),
+          ],
           const SizedBox(height: AppTheme.space8),
           const _SectionLabel(label: 'ACCOUNT'),
           const SizedBox(height: AppTheme.space4),
@@ -175,7 +169,7 @@ class GuestSettingsScreen extends ConsumerWidget {
           _SettingsTile(
                 icon: LucideIcons.messageSquare,
                 title: 'Get in Touch',
-                onTap: () => _openWhatsApp(context, config),
+                onTap: () => SupportContactService.contactSupport(context),
               )
               .animate()
               .fadeIn(delay: 180.ms, duration: 320.ms)

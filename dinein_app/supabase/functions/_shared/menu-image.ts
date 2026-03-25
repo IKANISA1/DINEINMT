@@ -872,16 +872,57 @@ function detectCuisineHint(
   item: MenuItemRecord,
   venue: VenueRecord,
 ): string | null {
+  // Use item-level data primarily; venue context for ambience only
   const context = normalizePromptText(
     [
       item.name,
       item.category,
       item.description,
       (item.tags ?? []).join(" "),
-      venue.category,
-      venue.description,
     ].filter(Boolean).join(" "),
   );
+
+  // Rwandan / East African (must be checked first for RW venues)
+  if (
+    matchesAny(context, [
+      "rwandan",
+      "brochette",
+      "brochettes",
+      "isombe",
+      "ugali",
+      "ubugali",
+      "matoke",
+      "ibitoke",
+      "ibihaza",
+      "sambaza",
+      "agatogo",
+      "igisafuliya",
+      "akabenz",
+      "nyama choma",
+      "kachumbari",
+      "pili pili",
+      "mandazi",
+      "chapati",
+      "mishikaki",
+      "dodo",
+      "amaranth",
+      "cassava",
+      "plantain",
+      "tilapia",
+      "nile perch",
+      "pilau",
+      "groundnut",
+      "peanut stew",
+      "rolex",
+      "east african",
+      "urwagwa",
+      "ikigage",
+      "ubuki",
+      "icyayi",
+    ])
+  ) {
+    return "Rwandan/East African — warm charcoal-grill tones, rustic dark wood or banana-leaf surfaces, generous communal portions, earthy warm palette with green and ochre accents.";
+  }
 
   if (
     matchesAny(context, [
@@ -911,7 +952,6 @@ function detectCuisineHint(
       "bento",
       "miso",
       "katsu",
-      "japanese",
       "thai",
       "pad thai",
       "kimchi",
@@ -1024,20 +1064,49 @@ interface MenuArtDirection {
 
 function classifyMenuVisualKind(
   item: MenuItemRecord,
-  venue: VenueRecord,
+  _venue: VenueRecord,
 ): MenuVisualKind {
   const tags = (item.tags ?? []).join(" ");
+  // IMPORTANT: Only use item-level data for classification.
+  // Including venue.category / venue.description causes
+  // misclassification (e.g. a burger at a "bar" gets tagged as beer).
+  const itemCategory = normalizePromptText(item.category ?? "");
+  const itemName = normalizePromptText(item.name ?? "");
   const context = normalizePromptText(
     [
       item.name,
       item.category,
       item.description,
       tags,
-      venue.category,
-      venue.description,
     ].filter(Boolean).join(" "),
   );
 
+  // ─── CATEGORY-FIRST OVERRIDE ─────────────────────────────────────
+  // Food categories must NEVER be classified as drinks, even when
+  // the description mentions accompaniments like "served with wine sauce"
+  // or "breakfast … juice and coffee".
+  const foodCategoryPrefixes = [
+    "mains", "main", "breakfast", "lunch", "dinner",
+    "soup", "soups", "salad", "salads", "starter", "starters",
+    "appetizer", "appetizers", "sandwich", "sandwiches", "wrap", "wraps",
+    "burger", "burgers", "pizza", "pasta", "grill", "bbq",
+    "sides", "side", "accompaniment", "accompaniments",
+    "rwandan traditional", "hotel buffet", "indian cuisine",
+    "seafood", "fish",
+  ];
+  const dessertCategoryPrefixes = [
+    "dessert", "desserts", "pastry", "pastries", "bakery",
+  ];
+
+  if (dessertCategoryPrefixes.some((p) => itemCategory.startsWith(p) || itemCategory.includes(p))) {
+    return "dessert";
+  }
+
+  if (foodCategoryPrefixes.some((p) => itemCategory.startsWith(p) || itemCategory.includes(p))) {
+    return "plated_food";
+  }
+
+  // ─── DRINK KEYWORD MATCHING (only reached for non-food categories) ─
   if (
     matchesAny(context, [
       "beer",
@@ -1406,7 +1475,14 @@ function normalizePromptText(value: string): string {
 }
 
 function matchesAny(value: string, phrases: string[]): boolean {
-  return phrases.some((phrase) => value.includes(normalizePromptText(phrase)));
+  return phrases.some((phrase) => {
+    const normalized = normalizePromptText(phrase);
+    // Use word-boundary matching to avoid false positives like
+    // "wine sauce" matching "wine" or "chapati" matching "chai"
+    const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const wordBoundaryRegex = new RegExp(`(?:^|\\s|[^a-z0-9])${escaped}(?:\\s|[^a-z0-9]|$)`);
+    return wordBoundaryRegex.test(value);
+  });
 }
 
 interface GeminiImagePayload {

@@ -8,28 +8,47 @@ class SupportContactService {
 
   static String get defaultWhatsAppNumber =>
       CountryRuntime.config.supportWhatsApp;
+  static String get defaultSupportEmail => CountryRuntime.config.supportEmail;
 
   static Future<void> contactSupport(
     BuildContext context, {
     String? whatsAppNumber,
+    String? email,
   }) async {
     final resolvedWhatsAppNumber = whatsAppNumber ?? defaultWhatsAppNumber;
-    final appUri = Uri.parse('whatsapp://send?phone=$resolvedWhatsAppNumber');
-    final webUri = Uri.parse('https://wa.me/$resolvedWhatsAppNumber');
+    final resolvedEmail = email ?? defaultSupportEmail;
 
-    try {
-      final launched = await launchUrl(
-        appUri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (launched || !context.mounted) return;
-    } catch (_) {
-      if (!context.mounted) return;
+    if (resolvedWhatsAppNumber.trim().isNotEmpty) {
+      final appUri = Uri.parse('whatsapp://send?phone=$resolvedWhatsAppNumber');
+      final webUri = Uri.parse('https://wa.me/$resolvedWhatsAppNumber');
+
+      try {
+        final launched = await launchUrl(
+          appUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched || !context.mounted) return;
+      } catch (_) {
+        if (!context.mounted) return;
+      }
+
+      try {
+        final launched = await launchUrl(
+          webUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (launched || !context.mounted) return;
+      } catch (_) {
+        if (!context.mounted) return;
+      }
     }
 
+    final subject = Uri.encodeComponent('DINEIN support request');
+    final mailUri = Uri.parse('mailto:$resolvedEmail?subject=$subject');
+
     try {
       final launched = await launchUrl(
-        webUri,
+        mailUri,
         mode: LaunchMode.externalApplication,
       );
       if (launched || !context.mounted) return;
@@ -38,7 +57,7 @@ class SupportContactService {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not open WhatsApp support.')),
+      const SnackBar(content: Text('Could not open a support contact option.')),
     );
   }
 }

@@ -57,6 +57,13 @@ class AppPermissionService {
     return Future.value(true);
   }
 
+  Future<bool> ensureBiopayCameraAccess() {
+    if (Platform.isAndroid || Platform.isIOS) {
+      return _ensureActionPermission(Permission.camera);
+    }
+    return Future.value(true);
+  }
+
   Future<bool> ensureVenuePhotoAccess() {
     // Venue uploads use system pickers, so no broad media permission is needed.
     return Future.value(true);

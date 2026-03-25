@@ -307,7 +307,7 @@ class _VenueDetailBody extends StatelessWidget {
                             venue.category.toUpperCase(),
                             style: TextStyle(
                               color: cs.onPrimary,
-                              fontSize: 8,
+                              fontSize: 11,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 3,
                             ),
@@ -642,7 +642,7 @@ class _DetailChip extends StatelessWidget {
             label.toUpperCase(),
             style: TextStyle(
               color: textColor,
-              fontSize: 8,
+              fontSize: 11,
               fontWeight: FontWeight.w900,
               letterSpacing: 2,
             ),

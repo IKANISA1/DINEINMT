@@ -3,11 +3,14 @@ import 'package:dinein_app/core/models/models.dart';
 import 'package:dinein_app/core/providers/order_history_loader.dart';
 import 'package:dinein_app/core/services/order_receipt_service.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../fixtures/mock_secure_storage.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    MockSecureStorage.setup();
+    MockSecureStorage.clear();
   });
 
   test(

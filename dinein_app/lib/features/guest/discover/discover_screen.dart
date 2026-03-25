@@ -467,7 +467,7 @@ class _FeaturedVenueCard extends StatelessWidget {
                   children: [
                     Text(
                       venue.name,
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: tt.headlineMedium?.copyWith(
                         color: Colors.white,
@@ -549,7 +549,7 @@ class _NearbyVenueCard extends StatelessWidget {
                 children: [
                   Text(
                     venue.name,
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: tt.headlineSmall?.copyWith(letterSpacing: -0.8),
                   ),

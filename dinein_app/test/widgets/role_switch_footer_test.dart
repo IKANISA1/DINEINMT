@@ -1,6 +1,9 @@
+import 'package:dinein_app/core/config/country_config.dart';
+import 'package:dinein_app/core/config/country_config_provider.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/shared/widgets/role_switch_footer.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,13 +14,13 @@ void main() {
       routes: [
         GoRoute(
           path: '/footer',
-          builder: (_, __) =>
+          builder: (_, _) =>
               Scaffold(body: RoleSwitchFooter(currentRole: currentRole)),
         ),
         GoRoute(
           path: AppRoutePaths.discover,
           name: AppRouteNames.discover,
-          builder: (_, __) => const Scaffold(body: Text('Discover')),
+          builder: (_, _) => const Scaffold(body: Text('Discover')),
         ),
         GoRoute(
           path: AppRoutePaths.venueLogin,
@@ -50,7 +53,10 @@ void main() {
       ],
     );
 
-    return MaterialApp.router(routerConfig: router);
+    return ProviderScope(
+      overrides: [countryConfigProvider.overrideWithValue(CountryConfig.mt)],
+      child: MaterialApp.router(routerConfig: router),
+    );
   }
 
   testWidgets('guest profile footer shows venue and admin icons only', (

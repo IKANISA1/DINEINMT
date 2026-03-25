@@ -26,6 +26,32 @@ flutter run -d android
 flutter run -d ios
 ```
 
+## Supabase Projects
+
+This monorepo connects to **two separate Supabase projects** — one per country:
+
+| | **Rwanda (RW)** | **Malta (MT)** |
+|---|---|---|
+| **Project Ref** | `kczghhipbyykluuiiunp` | `uskfnszcdqpcfrhjxitl` |
+| **Dashboard** | [supabase.com/…/kczghhipbyykluuiiunp](https://supabase.com/dashboard/project/kczghhipbyykluuiiunp) | [supabase.com/…/uskfnszcdqpcfrhjxitl](https://supabase.com/dashboard/project/uskfnszcdqpcfrhjxitl) |
+| **API URL** | `https://kczghhipbyykluuiiunp.supabase.co` | `https://uskfnszcdqpcfrhjxitl.supabase.co` |
+| **Country Code** | `250` | `356` |
+| **Default Currency** | `RWF` | `EUR` |
+| **WhatsApp Template** | `gikundiro` | *(MT template)* |
+| **Flutter env file** | `env/release.rw.json` | `env/release.mt.json` |
+
+> **Important:** Always use `--project-ref` when running Supabase CLI commands to
+> target the correct project. The local `supabase link` can only point to one
+> project at a time.
+
+```bash
+# Link to Rwanda
+supabase link --project-ref kczghhipbyykluuiiunp
+
+# Link to Malta
+supabase link --project-ref uskfnszcdqpcfrhjxitl
+```
+
 ## Release
 
 Create a real Android signing config before store upload:
@@ -103,7 +129,7 @@ APPLE_TEAM_ID="ABCDE12345" \
 
 PLAY_APP_SIGNING_SHA256="AA:BB:..." \
 APPLE_TEAM_ID="ABCDE12345" \
-./scripts/render_app_links.sh --flavor rw --output-dir ../landing-rw/.well-known
+./scripts/render_app_links.sh --flavor rw
 ```
 
 ## Supabase Backend
@@ -112,14 +138,25 @@ APPLE_TEAM_ID="ABCDE12345" \
 >
 > The top-level `supabase.ARCHIVED/` is a stale copy — do NOT deploy from it.
 
-Apply linked schema changes and deploy the required Edge Functions whenever the
-mobile backend changes. Always run from `dinein_app/`:
+Apply schema changes and deploy Edge Functions from `dinein_app/`.
+**Always specify `--project-ref`** to avoid deploying to the wrong project:
 
 ```bash
-supabase db push --linked
-supabase functions deploy whatsapp-otp
-supabase functions deploy dinein-api
+# ── Rwanda (RW) ──
+supabase link --project-ref kczghhipbyykluuiiunp
+supabase db push --password '...'
+supabase functions deploy --project-ref kczghhipbyykluuiiunp
+
+# ── Malta (MT) ──
+supabase link --project-ref uskfnszcdqpcfrhjxitl
+supabase db push --password '...'
+supabase functions deploy --project-ref uskfnszcdqpcfrhjxitl
 ```
+
+> **⚠️ RW database note:** The RW project uses base table names (`venues`,
+> `profiles`, etc.) with `dinein_*` views aliasing them for edge function
+> compatibility. MT uses `dinein_*` as the actual table names. Do not rename
+> tables on either project without updating the corresponding views/functions.
 
 ## Notes
 

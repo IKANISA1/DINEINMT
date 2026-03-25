@@ -774,7 +774,7 @@ class _VenueOnboardingFlowState extends ConsumerState<VenueOnboardingFlow>
     if (!_canSendOtp) {
       setState(() {
         _error =
-            'Enter your ${_expectedPhoneLength}-digit ${CountryRuntime.config.country.label} phone number.';
+            'Enter your $_expectedPhoneLength-digit ${CountryRuntime.config.country.label} phone number.';
       });
       return;
     }
@@ -2698,6 +2698,9 @@ class _DashedOptionCard extends StatelessWidget {
               ? color.withValues(alpha: 0.75)
               : cs.outlineVariant.withValues(alpha: 0.55),
           radius: AppTheme.radiusXxl,
+          strokeWidth: 1.2,
+          dashLength: 7,
+          gapLength: 5,
         ),
         child: Container(
           width: double.infinity,
@@ -2844,8 +2847,12 @@ class _DashedAddButton extends StatelessWidget {
       child: CustomPaint(
         foregroundPainter: _RoundedDashedBorderPainter(
           color: cs.outlineVariant.withValues(alpha: 0.55),
-          radius: AppTheme.radiusXl,
+          radius: AppTheme.radiusXxl,
+          strokeWidth: 1.2,
+          dashLength: 7,
+          gapLength: 5,
         ),
+
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.all(AppTheme.space5),

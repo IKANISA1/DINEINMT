@@ -502,7 +502,7 @@ class _VenueCard extends StatelessWidget {
                           venue.category.toUpperCase(),
                           style: TextStyle(
                             color: cs.primary,
-                            fontSize: 8,
+                            fontSize: 11,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 3,
                           ),

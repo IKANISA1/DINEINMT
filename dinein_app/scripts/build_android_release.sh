@@ -41,11 +41,7 @@ case "$flavor" in
 esac
 
 if [[ -z "$env_file" ]]; then
-  if [[ -f "${project_dir}/env/release.${flavor}.json" ]]; then
-    env_file="${project_dir}/env/release.${flavor}.json"
-  else
-    env_file="${project_dir}/env/release.json"
-  fi
+  env_file="${project_dir}/env/release.${flavor}.json"
 fi
 
 entrypoint="lib/main_${flavor}.dart"
@@ -82,6 +78,8 @@ if [[ "${skip_checks}" != "true" ]]; then
   flutter analyze
   flutter test
 fi
+
+echo "Using env file: ${env_file}"
 
 flutter build apk \
   --release \

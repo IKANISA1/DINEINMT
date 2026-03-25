@@ -6,7 +6,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 app_root="$(cd "$script_dir/.." && pwd)"
 flavor="mt"
 android_only=false
-well_known_dir="$app_root/../landing/.well-known"
+well_known_dir=""
+well_known_dir_overridden=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -20,6 +21,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --well-known-dir)
       well_known_dir="${2:-}"
+      well_known_dir_overridden=true
       shift 2
       ;;
     *)
@@ -35,12 +37,18 @@ case "$flavor" in
     expected_android_package="com.dineinmalta.app"
     expected_ios_bundle="com.dineinmalta.app"
     android_google_services="$app_root/android/app/src/mt/google-services.json"
+    if [[ "$well_known_dir_overridden" != "true" ]]; then
+      well_known_dir="$app_root/../landing/.well-known"
+    fi
     ;;
   rw)
     expected_host="dineinrw.ikanisa.com"
     expected_android_package="com.dineinrw.app"
     expected_ios_bundle="com.dineinrw.app"
     android_google_services="$app_root/android/app/src/rw/google-services.json"
+    if [[ "$well_known_dir_overridden" != "true" ]]; then
+      well_known_dir="$app_root/../landing-rw/.well-known"
+    fi
     ;;
   *)
     echo "Unsupported flavor: $flavor" >&2
@@ -168,10 +176,12 @@ fi
 require_file \
   "$apple_app_site_association_template" \
   'apple-app-site-association template is missing.'
-require_file \
-  "$apple_app_site_association" \
-  'Generated apple-app-site-association file is missing. Run ./scripts/render_app_links.sh.'
-if [[ -f "$apple_app_site_association" ]]; then
+if [[ "$android_only" != "true" ]]; then
+  require_file \
+    "$apple_app_site_association" \
+    'Generated apple-app-site-association file is missing. Run ./scripts/render_app_links.sh.'
+fi
+if [[ "$android_only" != "true" && -f "$apple_app_site_association" ]]; then
   if [[ "$android_only" != "true" ]]; then
     require_contains \
       "$apple_app_site_association" \

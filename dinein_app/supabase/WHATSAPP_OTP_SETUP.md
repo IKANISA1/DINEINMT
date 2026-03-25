@@ -80,21 +80,43 @@ This should be disabled when testing ends.
 
 ## Deployment
 
-Deploy the function:
+Deploy the functions to **both** projects:
 
 ```bash
+# ── Rwanda (RW) — project ref: kczghhipbyykluuiiunp ──
+supabase functions deploy whatsapp-otp --project-ref kczghhipbyykluuiiunp
+supabase functions deploy dinein-api   --project-ref kczghhipbyykluuiiunp
+
+# ── Malta (MT) — project ref: uskfnszcdqpcfrhjxitl ──
 supabase functions deploy whatsapp-otp --project-ref uskfnszcdqpcfrhjxitl
-supabase functions deploy dinein-api --project-ref uskfnszcdqpcfrhjxitl
+supabase functions deploy dinein-api   --project-ref uskfnszcdqpcfrhjxitl
 ```
 
-Apply migrations:
+Apply migrations (link to the target project first):
 
 ```bash
-supabase db push
+# Rwanda
+supabase link --project-ref kczghhipbyykluuiiunp
+supabase db push --password '...'
+
+# Malta
+supabase link --project-ref uskfnszcdqpcfrhjxitl
+supabase db push --password '...'
 ```
 
 Push secrets:
 
 ```bash
+# Rwanda
+supabase secrets set --project-ref kczghhipbyykluuiiunp --env-file supabase/.env.local
+
+# Malta
 supabase secrets set --project-ref uskfnszcdqpcfrhjxitl --env-file supabase/.env.local
 ```
+
+### Country-specific secret differences
+
+| Secret | RW | MT |
+|--------|----|----|
+| `DEFAULT_WHATSAPP_COUNTRY_CODE` | `250` | `356` |
+| `WHATSAPP_TEMPLATE_NAME` | `gikundiro` | *(MT template name)* |

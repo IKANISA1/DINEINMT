@@ -7,6 +7,22 @@ This Supabase project now includes two production AI pipelines:
 - Gemini-powered venue profile image generation
 - Firebase Cloud Messaging delivery for venue operational push alerts
 
+## Project Environments
+
+| | **Rwanda (RW)** | **Malta (MT)** |
+|---|---|---|
+| **Project Ref** | `kczghhipbyykluuiiunp` | `uskfnszcdqpcfrhjxitl` |
+| **API URL** | `https://kczghhipbyykluuiiunp.supabase.co` | `https://uskfnszcdqpcfrhjxitl.supabase.co` |
+| **Country Code** | `250` | `356` |
+| **Default Currency** | `RWF` | `EUR` |
+| **WhatsApp Template** | `gikundiro` | *(MT template)* |
+| **Table Pattern** | Base tables (`venues`) + `dinein_*` views | `dinein_*` tables directly |
+
+> **⚠️ Schema difference:** RW uses base table names (`venues`, `profiles`,
+> `orders`, etc.) with `dinein_*` views aliasing them for edge function
+> compatibility. MT uses `dinein_*` prefixed tables directly. Edge functions
+> reference `dinein_*` names on both projects.
+
 ## What Was Added
 
 - A migration that extends `dinein_menu_items` with AI image metadata and creates the `menu-images` storage bucket.
@@ -21,9 +37,10 @@ This Supabase project now includes two production AI pipelines:
 
 ## Required Secrets
 
-Set these in Supabase before deploying the functions:
+Set these in **each** Supabase project before deploying the functions:
 
 ```bash
+# Replace --project-ref with the target project
 supabase secrets set \
   GEMINI_API_KEY=your_google_api_key \
   GEMINI_IMAGE_MODELS=gemini-3.1-flash-image-preview,gemini-2.5-flash-image \
@@ -36,7 +53,9 @@ supabase secrets set \
   MENU_IMAGE_CRON_SECRET=choose-a-long-random-secret \
   VENUE_ENRICHMENT_CRON_SECRET=choose-a-second-long-random-secret \
   VENUE_IMAGE_BUCKET=venue-images \
-  VENUE_IMAGE_CRON_SECRET=choose-a-third-long-random-secret
+  VENUE_IMAGE_CRON_SECRET=choose-a-third-long-random-secret \
+  DEFAULT_WHATSAPP_COUNTRY_CODE=250 \
+  --project-ref kczghhipbyykluuiiunp   # or uskfnszcdqpcfrhjxitl for MT
 ```
 
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are provided by the Supabase runtime.
@@ -48,24 +67,37 @@ Maps grounding, and Gemini Google Search grounding.
 service account with permission to call the FCM HTTP v1 API for
 `FIREBASE_PROJECT_ID`.
 
-## Deploy
-
-Run from `dinein_app/`:
+For the Rwanda BioPay rollout, also set:
 
 ```bash
-supabase db push
-supabase functions deploy dinein-api
-supabase functions deploy generate-menu-item-image
-supabase functions deploy backfill-menu-images
-supabase functions deploy enrich-venue-profile
-supabase functions deploy backfill-venue-profiles
-supabase functions deploy generate-venue-profile-image
-supabase functions deploy backfill-venue-profile-images
+supabase secrets set \
+  BIOPAY_OWNER_TOKEN_SECRET=choose-a-long-random-secret \
+  BIOPAY_MANAGE_CODE_PEPPER=choose-a-second-long-random-secret \
+  BIOPAY_DEFAULT_MATCH_THRESHOLD=0.72 \
+  BIOPAY_MIN_MATCH_THRESHOLD=0.80 \
+  BIOPAY_DUPLICATE_FACE_THRESHOLD=0.90 \
+  BIOPAY_MATCH_RATE_LIMIT_WINDOW_MINUTES=5 \
+  BIOPAY_MATCH_RATE_LIMIT_MAX_REQUESTS=20 \
+  BIOPAY_RATE_LIMIT_SECRET=choose-a-third-long-random-secret \
+  BIOPAY_ALLOWED_ORIGINS=https://dineinrw.ikanisa.com \
+  --project-ref kczghhipbyykluuiiunp
 ```
 
-If the linked project has drifted migration history, repair or align the remote
-history before pushing. The image metadata and grants migrations are already
-applied on the linked production project.
+`BIOPAY_ALLOWED_ORIGINS` only affects browser-based requests. Native mobile
+calls do not send an `Origin` header, so they continue to work without CORS
+relaxation.
+
+## Deploy
+
+Run from `dinein_app/`. **Always specify `--project-ref`:**
+
+```bash
+# ── Rwanda (RW) ──
+supabase functions deploy --project-ref kczghhipbyykluuiiunp
+
+# ── Malta (MT) ──
+supabase functions deploy --project-ref uskfnszcdqpcfrhjxitl
+```
 
 ## Recommended Schedule
 

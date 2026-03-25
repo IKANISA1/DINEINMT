@@ -28,7 +28,7 @@
   <main class="legal-page">
     <div class="container">
       <h1>Privacy Policy</h1>
-      <p class="legal-meta">Last updated: 22 March 2026</p>
+      <p class="legal-meta">Last updated: 25 March 2026</p>
 
       <div class="legal-content">
 
@@ -45,22 +45,26 @@
           <li><strong>Order Information:</strong> Details of your dine-in orders, including items selected, venue, table number, and order preferences.</li>
           <li><strong>Venue Owner Information:</strong> If you register as a venue owner, we collect your business name, contact details, venue profile data, and menu data.</li>
           <li><strong>Venue Uploads:</strong> Venue users may upload menu photos, PDF documents, and related files, or capture menu images during onboarding for storage and menu extraction/OCR.</li>
+          <li><strong>BioPay Profile Information:</strong> If you enroll in BioPay, we collect your display name, your Rwanda MoMo USSD payment string, your BioPay ID, and related profile-management data such as your management-code hint.</li>
           <li><strong>Communications:</strong> When you contact us, we retain the content of your messages.</li>
         </ul>
         
         <h3>2.2 Information Collected Automatically</h3>
         <ul>
-          <li><strong>Device Information:</strong> Device type, operating system, app version, network state, and device or other identifiers used for service operation and diagnostics, including notification delivery tokens for venue operational alerts.</li>
+          <li><strong>Device Information:</strong> Device type, operating system, app version, network state, and device or other identifiers used for service operation and diagnostics, including notification delivery tokens for venue operational alerts and BioPay client-install identifiers used for abuse prevention and rate limiting.</li>
           <li><strong>Usage and Diagnostic Data:</strong> Pages visited, features used, time spent, tap interactions, crash logs, and diagnostics, including data collected by Firebase Crashlytics in release builds.</li>
+          <li><strong>Security and Abuse-Prevention Records:</strong> For BioPay, we may retain device labels, IP-derived hashes, abuse reports, and audit records associated with enrollment, matching, profile updates, re-enrollment, and deletion requests.</li>
           <li><strong>Cookies & Similar Technologies:</strong> We use essential cookies for session management. We do not use advertising or tracking cookies.</li>
         </ul>
 
         <h3>2.3 Permissions and Sensitive Features</h3>
         <ul>
           <li><strong>Location:</strong> DINEIN requests location only to help guests connect to venue Wi-Fi on the device. We do not use this permission for advertising or venue discovery, and we do not transmit precise device location off the device for this feature.</li>
-          <li><strong>Camera and File Access:</strong> Venue users may choose to capture menu photos with the device camera or upload photos and PDFs for onboarding and OCR/menu setup.</li>
+          <li><strong>Camera and File Access:</strong> Venue users may choose to capture menu photos with the device camera or upload photos and PDFs for onboarding and OCR/menu setup. Temporary local files are deleted after upload.</li>
+          <li><strong>BioPay Camera and Face Matching:</strong> If you use BioPay, DINEIN requests camera access so the app can capture your face in-app for enrollment and payment matching. Raw face captures are processed transiently on your device to create a face embedding. Temporary capture files are deleted after processing. DINEIN stores the resulting face embedding, not the raw photo.</li>
           <li><strong>Notifications:</strong> Venue staff devices may request notification permission so DINEIN can deliver operational alerts such as new-order and table-service notifications.</li>
           <li>We do <strong>not</strong> process or store payment card details. All payments are handled outside the app (cash or MoMo USSD).</li>
+          <li><strong>Restricted Permissions:</strong> DINEIN explicitly strips and does not use the following Android permissions: <code>RECORD_AUDIO</code>, <code>READ_EXTERNAL_STORAGE</code>, and <code>WRITE_EXTERNAL_STORAGE</code>.</li>
         </ul>
 
         <h2>3. How We Use Your Information</h2>
@@ -70,9 +74,11 @@
           <li>Process and fulfil your dine-in orders.</li>
           <li>Authenticate venue and admin access through WhatsApp OTP.</li>
           <li>Store and process venue-uploaded menu files for onboarding and OCR/menu extraction.</li>
+          <li>Create, match, manage, suspend, and delete Rwanda BioPay profiles.</li>
           <li>Send venue operational alerts such as new-order and table-service push notifications.</li>
           <li>Communicate with you about your orders, account, and support requests.</li>
           <li>Improve our Service through aggregated analytics, crash reporting, and diagnostics.</li>
+          <li>Prevent duplicate enrollment, fraud, abuse, and enforce rate limits for matching requests.</li>
           <li>Ensure security and prevent fraud.</li>
           <li>Comply with legal obligations.</li>
         </ul>
@@ -81,12 +87,12 @@
         <p>We do <strong>not</strong> sell your personal data. We may share information with:</p>
         <ul>
           <li><strong>Venue Partners:</strong> Your order details are shared with the restaurant where you place a dine-in order, so they can prepare and serve your food.</li>
-          <li><strong>Service Providers:</strong> Trusted providers that help us operate our Service, including hosting and storage providers, WhatsApp/Meta for OTP delivery, and Firebase services for crash reporting, diagnostics, and operational push notification delivery. These providers are contractually bound to protect your data.</li>
+          <li><strong>Service Providers:</strong> Trusted providers that help us operate our Service, including hosting and storage providers, BioPay infrastructure and security providers, WhatsApp/Meta for OTP delivery, and Firebase services for crash reporting, diagnostics, and operational push notification delivery. These providers are contractually bound to protect your data.</li>
           <li><strong>Legal Requirements:</strong> When required by law, court order, or to protect our rights and safety.</li>
         </ul>
 
         <h2>5. Data Retention</h2>
-        <p>We retain your personal data only for as long as necessary to provide our Service and fulfil the purposes described in this policy. Order history is retained for 12 months. You may request deletion of your account and associated data at any time.</p>
+        <p>We retain your personal data only for as long as necessary to provide our Service and fulfil the purposes described in this policy. Order history is retained for 12 months. If you create a BioPay profile, active BioPay profile data remains until you delete the profile or we must suspend or remove it for security or legal reasons. Security, audit, and abuse-prevention records may be retained longer where reasonably necessary. You may request deletion of your account and associated data at any time.</p>
 
         <h2>6. Your Rights</h2>
         <p>Under applicable Rwandan data protection law, you have the right to:</p>
@@ -98,10 +104,10 @@
           <li><strong>Data portability</strong> — receive your data in a structured, machine-readable format.</li>
           <li><strong>Withdraw consent</strong> at any time, where processing is based on consent.</li>
         </ul>
-        <p>To exercise these rights, contact us at <a href="mailto:privacy@ikanisa.com">privacy@ikanisa.com</a>.</p>
+        <p>To exercise these rights, contact us at <a href="mailto:privacy@ikanisa.com">privacy@ikanisa.com</a>. BioPay users can also delete their BioPay profile from within the app.</p>
 
         <h2>7. Data Security</h2>
-        <p>We implement industry-standard security measures, including encryption in transit (TLS), secure database access controls, and regular security audits. However, no system is 100% secure, and we cannot guarantee absolute security.</p>
+        <p>We implement industry-standard security measures, including encryption in transit (TLS), secure database access controls, hashed BioPay management codes, device-secure local storage for same-device BioPay owner tokens where supported, and regular security audits. However, no system is 100% secure, and we cannot guarantee absolute security.</p>
 
         <h2>8. Children's Privacy</h2>
         <p>DINEIN is not directed at children under the age of 13. We do not knowingly collect personal data from children. If you believe we have collected information from a child, please contact us immediately.</p>

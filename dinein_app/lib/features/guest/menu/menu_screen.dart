@@ -307,7 +307,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                 Text(
                   'DIGITAL MENU',
                   style: TextStyle(
-                    fontSize: 8,
+                    fontSize: 11,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 3.2,
                     color: cs.primary,
@@ -673,7 +673,7 @@ class _MenuItemCard extends StatelessWidget {
                         child: Text(
                           'SOLD OUT',
                           style: TextStyle(
-                            fontSize: 8,
+                            fontSize: 11,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 3.2,
                             color: Colors.white,
@@ -714,7 +714,7 @@ class _MenuItemCard extends StatelessWidget {
                             child: Text(
                               tag.toUpperCase(),
                               style: TextStyle(
-                                fontSize: 8,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 1.5,
                                 color: tag == 'Signature'
@@ -740,7 +740,7 @@ class _MenuItemCard extends StatelessWidget {
                       color: cs.onSurfaceVariant,
                       height: 1.4,
                     ),
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),

@@ -60,17 +60,20 @@ void main() {
   // ─── PaymentMethod ───
 
   group('PaymentMethod', () {
-    test('has exactly 2 values (scope boundary)', () {
-      expect(PaymentMethod.values, hasLength(2));
+    test('has exactly 3 values for the supported markets', () {
+      expect(PaymentMethod.values, hasLength(3));
     });
 
     test('fromString resolves known values', () {
       expect(PaymentMethod.fromString('cash'), PaymentMethod.cash);
-      expect(PaymentMethod.fromString('revolut_link'), PaymentMethod.revolutLink);
+      expect(
+        PaymentMethod.fromString('revolut_link'),
+        PaymentMethod.revolutLink,
+      );
+      expect(PaymentMethod.fromString('momo_ussd'), PaymentMethod.momoUssd);
     });
 
     test('fromString falls back to cash for unknown', () {
-      expect(PaymentMethod.fromString('momo_ussd'), PaymentMethod.cash);
       expect(PaymentMethod.fromString('credit_card'), PaymentMethod.cash);
       expect(PaymentMethod.fromString(''), PaymentMethod.cash);
     });
@@ -84,20 +87,22 @@ void main() {
     test('labels are user-friendly', () {
       expect(PaymentMethod.cash.label, 'Cash');
       expect(PaymentMethod.revolutLink.label, 'Revolut');
+      expect(PaymentMethod.momoUssd.label, 'MoMo');
     });
 
     test('descriptions are meaningful', () {
       expect(PaymentMethod.cash.description, 'Pay at the venue');
       expect(PaymentMethod.revolutLink.description, 'Pay via Revolut link');
+      expect(PaymentMethod.momoUssd.description, 'Pay via MoMo mobile money');
     });
   });
 
   // ─── Country ───
 
   group('Country', () {
-    test('has exactly 1 value: mt (scope boundary)', () {
-      expect(Country.values, hasLength(1));
-      expect(Country.values.first, Country.mt);
+    test('has exactly 2 supported countries', () {
+      expect(Country.values, hasLength(2));
+      expect(Country.values, containsAll([Country.mt, Country.rw]));
     });
 
     test('mt has correct label, code, currency', () {
@@ -107,16 +112,27 @@ void main() {
       expect(Country.mt.currencySymbol, '€');
     });
 
-    test('paymentMethods includes only cash and revolutLink', () {
-      final methods = Country.mt.paymentMethods;
-      expect(methods, hasLength(2));
-      expect(methods, contains(PaymentMethod.cash));
-      expect(methods, contains(PaymentMethod.revolutLink));
+    test('rw has correct label, code, currency', () {
+      expect(Country.rw.label, 'Rwanda');
+      expect(Country.rw.code, 'RW');
+      expect(Country.rw.currency, 'RWF');
+      expect(Country.rw.currencySymbol, 'FRw');
     });
 
-    test('fromCode always returns mt regardless of input', () {
+    test('paymentMethods match each country configuration', () {
+      expect(
+        Country.mt.paymentMethods,
+        equals([PaymentMethod.cash, PaymentMethod.revolutLink]),
+      );
+      expect(
+        Country.rw.paymentMethods,
+        equals([PaymentMethod.cash, PaymentMethod.momoUssd]),
+      );
+    });
+
+    test('fromCode resolves supported country codes and defaults to mt', () {
       expect(Country.fromCode('MT'), Country.mt);
-      expect(Country.fromCode('RW'), Country.mt);
+      expect(Country.fromCode('RW'), Country.rw);
       expect(Country.fromCode(''), Country.mt);
     });
   });
@@ -192,14 +208,29 @@ void main() {
     });
 
     test('fromString resolves known values', () {
-      expect(MenuItemImageStatus.fromString('pending'), MenuItemImageStatus.pending);
-      expect(MenuItemImageStatus.fromString('generating'), MenuItemImageStatus.generating);
-      expect(MenuItemImageStatus.fromString('ready'), MenuItemImageStatus.ready);
-      expect(MenuItemImageStatus.fromString('failed'), MenuItemImageStatus.failed);
+      expect(
+        MenuItemImageStatus.fromString('pending'),
+        MenuItemImageStatus.pending,
+      );
+      expect(
+        MenuItemImageStatus.fromString('generating'),
+        MenuItemImageStatus.generating,
+      );
+      expect(
+        MenuItemImageStatus.fromString('ready'),
+        MenuItemImageStatus.ready,
+      );
+      expect(
+        MenuItemImageStatus.fromString('failed'),
+        MenuItemImageStatus.failed,
+      );
     });
 
     test('fromString falls back to pending for unknown', () {
-      expect(MenuItemImageStatus.fromString('queued'), MenuItemImageStatus.pending);
+      expect(
+        MenuItemImageStatus.fromString('queued'),
+        MenuItemImageStatus.pending,
+      );
     });
 
     test('dbValue round-trips through fromString', () {
@@ -217,13 +248,22 @@ void main() {
     });
 
     test('fromString resolves known values', () {
-      expect(MenuItemImageSource.fromString('manual'), MenuItemImageSource.manual);
-      expect(MenuItemImageSource.fromString('ai_gemini'), MenuItemImageSource.aiGemini);
+      expect(
+        MenuItemImageSource.fromString('manual'),
+        MenuItemImageSource.manual,
+      );
+      expect(
+        MenuItemImageSource.fromString('ai_gemini'),
+        MenuItemImageSource.aiGemini,
+      );
       expect(MenuItemImageSource.fromString(null), MenuItemImageSource.unknown);
     });
 
     test('fromString falls back to unknown', () {
-      expect(MenuItemImageSource.fromString('dalle'), MenuItemImageSource.unknown);
+      expect(
+        MenuItemImageSource.fromString('dalle'),
+        MenuItemImageSource.unknown,
+      );
       expect(MenuItemImageSource.fromString(''), MenuItemImageSource.unknown);
     });
 
@@ -246,17 +286,17 @@ void main() {
       expect(names, isNot(contains('delivered')));
     });
 
-    test('no MoMo payment method exists (Malta-only)', () {
+    test('Rwanda scope includes the MoMo payment method', () {
       final dbValues = PaymentMethod.values.map((e) => e.dbValue).toList();
 
-      expect(dbValues, isNot(contains('momo_ussd')));
+      expect(dbValues, contains('momo_ussd'));
+      expect(dbValues, containsAll(['cash', 'revolut_link']));
     });
 
-    test('no Rwanda country exists (Malta-only)', () {
+    test('scope includes both Malta and Rwanda', () {
       final codes = Country.values.map((e) => e.code).toList();
 
-      expect(codes, isNot(contains('RW')));
-      expect(codes, contains('MT'));
+      expect(codes, containsAll(['MT', 'RW']));
     });
   });
 }

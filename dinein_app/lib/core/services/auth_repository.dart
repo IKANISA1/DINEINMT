@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../services/app_notification_service.dart';
@@ -16,10 +15,8 @@ class AuthRepository {
 
   static const _venueSessionKey = 'dinein.venue_session';
   static const _adminSessionKey = 'dinein.admin_session';
-  static const _secureStorageTimeout = Duration(seconds: 1);
-  static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  static const _secureStorageTimeout = Duration(seconds: 2);
+  static const _secureStorage = FlutterSecureStorage();
 
   VenueAccessSession? _venueSession;
   AdminAccessSession? _adminSession;
@@ -183,41 +180,6 @@ class AuthRepository {
   }
 
   Future<String?> _readSessionValue(String key) async {
-    final secureRaw = await _tryReadSecureValue(key);
-    if (secureRaw != null && secureRaw.isNotEmpty) {
-      return secureRaw;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final legacyRaw = prefs.getString(key);
-    if (legacyRaw == null || legacyRaw.isEmpty) {
-      return null;
-    }
-
-    final migratedToSecureStorage = await _tryWriteSecureValue(key, legacyRaw);
-    if (migratedToSecureStorage) {
-      await prefs.remove(key);
-    }
-    return legacyRaw;
-  }
-
-  Future<void> _writeSessionValue(String key, String value) async {
-    final wroteToSecureStorage = await _tryWriteSecureValue(key, value);
-    final prefs = await SharedPreferences.getInstance();
-    if (wroteToSecureStorage) {
-      await prefs.remove(key);
-    } else {
-      await prefs.setString(key, value);
-    }
-  }
-
-  Future<void> _deleteSessionValue(String key) async {
-    await _tryDeleteSecureValue(key);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(key);
-  }
-
-  Future<String?> _tryReadSecureValue(String key) async {
     try {
       return await _secureStorage.read(key: key).timeout(_secureStorageTimeout);
     } catch (_) {
@@ -225,22 +187,21 @@ class AuthRepository {
     }
   }
 
-  Future<bool> _tryWriteSecureValue(String key, String value) async {
+  Future<void> _writeSessionValue(String key, String value) async {
     try {
       await _secureStorage
           .write(key: key, value: value)
           .timeout(_secureStorageTimeout);
-      return true;
     } catch (_) {
-      return false;
+      // If secure storage fails, we do not fall back to plain preferences.
     }
   }
 
-  Future<void> _tryDeleteSecureValue(String key) async {
+  Future<void> _deleteSessionValue(String key) async {
     try {
       await _secureStorage.delete(key: key).timeout(_secureStorageTimeout);
     } catch (_) {
-      // Ignore secure storage cleanup failures in test environments.
+      // Ignore secure storage cleanup failures.
     }
   }
 

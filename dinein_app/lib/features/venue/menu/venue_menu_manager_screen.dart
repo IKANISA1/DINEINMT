@@ -688,7 +688,7 @@ class _MenuItemCard extends StatelessWidget {
                         ? cs.onSurface
                         : cs.onSurfaceVariant.withValues(alpha: 0.50),
                   ),
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),

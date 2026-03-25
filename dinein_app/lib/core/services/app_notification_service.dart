@@ -27,9 +27,7 @@ class AppNotificationService {
 
   static const _deviceKeyStorageKey = 'dinein.push.device_key';
   static const _secureStorageTimeout = Duration(seconds: 1);
-  static const _secureStorage = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  static const _secureStorage = FlutterSecureStorage();
 
   static const AndroidNotificationChannel _venueAlertChannel =
       AndroidNotificationChannel(
@@ -75,7 +73,7 @@ class AppNotificationService {
       );
 
       await _localNotifications.initialize(
-        initializationSettings,
+        settings: initializationSettings,
         onDidReceiveNotificationResponse: (response) {
           _handleNotificationTapPayload(response.payload);
         },
@@ -217,10 +215,10 @@ class AppNotificationService {
     );
 
     await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
-      title,
-      body,
-      details,
+      id: DateTime.now().millisecondsSinceEpoch.remainder(1 << 31),
+      title: title,
+      body: body,
+      notificationDetails: details,
       payload: payload,
     );
   }

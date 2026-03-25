@@ -12,6 +12,7 @@ class CountryConfig {
   final String siteHost;
   final String playStoreId;
   final String supportWhatsApp;
+  final String supportEmail;
   final String defaultCountryCode;
   final String countryDialCode;
   final String countryFlag;
@@ -20,6 +21,7 @@ class CountryConfig {
   final String privacyPolicyUrl;
   final String? revolutMerchant;
   final String? momoUssdCode;
+  final bool biopayEnabled;
 
   const CountryConfig({
     required this.country,
@@ -28,6 +30,7 @@ class CountryConfig {
     required this.siteHost,
     required this.playStoreId,
     required this.supportWhatsApp,
+    required this.supportEmail,
     required this.defaultCountryCode,
     required this.countryDialCode,
     required this.countryFlag,
@@ -36,6 +39,7 @@ class CountryConfig {
     required this.privacyPolicyUrl,
     this.revolutMerchant,
     this.momoUssdCode,
+    this.biopayEnabled = false,
   });
 
   /// Malta configuration.
@@ -46,6 +50,7 @@ class CountryConfig {
     siteHost: 'dineinmalta.com',
     playStoreId: 'com.dineinmalta.app',
     supportWhatsApp: '35699711145',
+    supportEmail: 'hello@ikanisa.com',
     defaultCountryCode: '356',
     countryDialCode: '+356',
     countryFlag: '🇲🇹',
@@ -53,6 +58,7 @@ class CountryConfig {
     welcomeMessage: 'WELCOME TO DINEIN MALTA',
     privacyPolicyUrl: 'https://dineinmalta.com/privacy.html',
     revolutMerchant: 'dineinmalta',
+    biopayEnabled: false,
   );
 
   /// Rwanda configuration.
@@ -62,7 +68,8 @@ class CountryConfig {
     appTitle: 'DINEIN RW',
     siteHost: 'dineinrw.ikanisa.com',
     playStoreId: 'com.dineinrw.app',
-    supportWhatsApp: '250788000000', // TODO: replace with actual RW support number
+    supportWhatsApp: '',
+    supportEmail: 'hello@ikanisa.com',
     defaultCountryCode: '250',
     countryDialCode: '+250',
     countryFlag: '🇷🇼',
@@ -70,6 +77,7 @@ class CountryConfig {
     welcomeMessage: 'WELCOME TO DINEIN RW',
     privacyPolicyUrl: 'https://dineinrw.ikanisa.com/privacy.html',
     momoUssdCode: '*182*8*1#', // MTN MoMo Rwanda
+    biopayEnabled: true,
   );
 
   /// Play Store URL.
@@ -85,6 +93,12 @@ class CountryConfig {
 
   /// Whether this country uses MoMo USSD.
   bool get hasMomo => momoUssdCode != null;
+
+  /// Whether this country has BioPay face-payment enabled.
+  bool get hasBioPay => biopayEnabled;
+
+  /// Whether direct WhatsApp support is configured for this country.
+  bool get hasWhatsAppSupport => supportWhatsApp.trim().isNotEmpty;
 
   /// Share text for venue discovery.
   String shareText(String content) => '$content\nhttps://$siteHost';
