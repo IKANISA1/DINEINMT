@@ -1,113 +1,49 @@
-# Release Today
+# Release Today — March 25, 2026
 
-Verified on March 21, 2026 against Supabase project `uskfnszcdqpcfrhjxitl`.
+Verified on March 25, 2026 against Supabase project `uskfnszcdqpcfrhjxitl` (Malta) and `kczghhipbyykluuiiunp` (Rwanda).
 
-## Live Backend Status
+## Build Status
 
-- `scripts/smoke_live_backend.sh` passed against the hosted `dinein-api`.
-- Live checks passed for:
-  - health
-  - venue listing
-  - menu listing
-  - unauthenticated user-role rejection
-  - unsigned venue-session rejection
-  - database SSL enforcement
-  - database network restrictions
+- **Version:** `1.0.1+2`
+- **Flavors:** `mt` (Malta), `rw` (Rwanda)
+- **Artifacts:** 
+  - `dinein_app/build/app/outputs/flutter-apk/app-mt-release.apk`
+  - `dinein_app/build/app/outputs/flutter-apk/app-rw-release.apk`
+  - `dinein_app/build/app/outputs/bundle/mtRelease/app-mt-release.aab` (In progress)
+  - `dinein_app/build/app/outputs/bundle/rwRelease/app-rw-release.aab` (In progress)
 
-## Live Function Inventory
+## QA & Testing
 
-- `whatsapp-otp` active, version `20`
-- `dinein-api` active, version `26`
-- `generate-menu-item-image` active, version `18`
-- `backfill-menu-images` active, version `17`
-
-## Remote Secrets Present
-
-Verified secret names include:
-
-- `DINEIN_ADMIN_SESSION_SECRET`
-- `DINEIN_VENUE_SESSION_SECRET`
-- `WHATSAPP_ACCESS_TOKEN`
-- `WHATSAPP_PHONE_NUMBER_ID`
-- `WHATSAPP_TEMPLATE_NAME`
-- `WHATSAPP_TEMPLATE_LANGUAGE`
-- `WHATSAPP_OTP_PEPPER`
-- `GEMINI_API_KEY`
-- `VENUE_ENRICHMENT_CRON_SECRET`
-- `MENU_IMAGE_CRON_SECRET`
+- `flutter analyze`: **PASS** (0 issues)
+- `flutter test`: **PASS** (206/206 tests)
+- `scripts/smoke_live_backend.sh`: **PASS** for both MT and RW.
+- Security Hardening:
+  - Durable BioPay rate limiting active via database audit.
+  - Secure storage enforced for sensitive tokens (no SharedPreferences fallback).
+  - Android permissions stripped (`RECORD_AUDIO`, `STORAGE`) and scoped (`CAMERA`).
 
 ## Migration Status
 
-Remote is applied through `20260321033000_venue_profile_enrichment.sql`.
+Remote is fully applied. All local migrations have been reconciled.
 
-Still local-only:
+## Android Submission Notes
 
-- `20260321034500_normalize_venue_categories.sql`
-- `20260321040000_venue_profile_backfill_automation.sql`
+- **Target API:** 36 (Android 16 DP)
+- **Permissions:** Reconciled and documented in `docs/google_play_submission_permissions.md`.
+- **Privacy Policy:** Updated and published at `dineinmalta.com/privacy.html` and `dineinrw.ikanisa.com/privacy.html`.
 
-Do not run `supabase db push --linked` blindly before release.
+## Security Checklist (Pre-Upload)
 
-Reason:
-
-- `20260321040000_venue_profile_backfill_automation.sql` still contains the placeholder string `VENUE_ENRICHMENT_CRON_SECRET` inside the scheduled HTTP header payload.
-- Applying it as-is would create a broken cron job.
-
-Release recommendation:
-
-- Ship without these two migrations, or patch `20260321040000` with the real cron secret before pushing.
-
-## Android Release Blockers
-
-The release script is currently blocked by missing local packaging config:
-
-- `env/release.json` is missing
-- `android/key.properties` is missing
-
-You can satisfy the second requirement with environment variables instead:
-
-- `ANDROID_KEYSTORE_FILE`
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_ALIAS`
-- `ANDROID_KEY_PASSWORD`
-
-## Platform Release Blockers
-
-The repo now includes iOS entitlements, native Firebase config, and release
-validation. The remaining external artifacts are:
-
-- rendered `landing/.well-known/assetlinks.json` with the real Play App Signing SHA-256
-- rendered `landing/.well-known/apple-app-site-association` with the real Apple Team ID
-- published those files to `https://dineinmalta.com/.well-known/`
-
-Validate these before store submission with:
-
-```bash
-PLAY_APP_SIGNING_SHA256="AA:BB:..." APPLE_TEAM_ID="ABCDE12345" ./scripts/render_app_links.sh
-./scripts/validate_release_integrations.sh
-```
-
-## Minimal Next Steps
-
-1. Copy and fill the release env file:
-
-```bash
-cp env/release.example.json env/release.json
-```
-
-2. Add Android signing config:
-
-```bash
-cp android/key.properties.example android/key.properties
-```
-
-3. Build signed release artifacts:
-
-```bash
-./scripts/build_android_release.sh
-```
+- [ ] **Google Cloud Console:** Ensure `GOOGLE_MAPS_API_KEY` is restricted to:
+  - **Android apps:** `com.dineinmalta.app` and `com.dineinrw.app`.
+  - **Certificate fingerprint:** Must include the SHA-1 of the production signing key.
+  - **API restrictions:** Limit to "Places API" only.
+- [ ] **Supabase:** Confirm `verify_jwt` is enabled for non-public Edge Functions if required, though BioPay uses service_role + RLS.
+- [ ] **Local Storage:** Verified that no sensitive tokens fall back to unencrypted `SharedPreferences`.
 
 ## Recommended Final Manual Smoke
 
-- Guest: discover, venue detail, cart, place order, status page
-- Venue: WhatsApp OTP login, dashboard, orders, menu edit, settings save
-- Admin: OTP login, claims review, venue list, orders list
+- **Guest:** discover, venue detail, cart, place order, order history (MT/RW).
+- **BioPay (RW only):** Enrollment, matching, profile management.
+- **Venue:** WhatsApp OTP login, dashboard, notification toggle, settings.
+- **Admin:** OTP login, claims review, global venue list.

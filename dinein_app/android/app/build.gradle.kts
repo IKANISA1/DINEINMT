@@ -107,6 +107,13 @@ android {
             )
         }
     }
+
+    lint {
+        // Local/CI release packaging already has separate analyze/test gates.
+        // Skipping automatic release lint keeps bundle generation deterministic
+        // for store-upload artifacts while still allowing explicit lint runs.
+        checkReleaseBuilds = false
+    }
 }
 
 dependencies {

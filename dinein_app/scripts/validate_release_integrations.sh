@@ -37,6 +37,8 @@ case "$flavor" in
     expected_android_package="com.dineinmalta.app"
     expected_ios_bundle="com.dineinmalta.app"
     android_google_services="$app_root/android/app/src/mt/google-services.json"
+    android_manifest_task=":app:processMtReleaseMainManifest"
+    merged_android_manifest="$app_root/build/app/intermediates/merged_manifests/mtRelease/processMtReleaseManifest/AndroidManifest.xml"
     if [[ "$well_known_dir_overridden" != "true" ]]; then
       well_known_dir="$app_root/../landing/.well-known"
     fi
@@ -46,6 +48,8 @@ case "$flavor" in
     expected_android_package="com.dineinrw.app"
     expected_ios_bundle="com.dineinrw.app"
     android_google_services="$app_root/android/app/src/rw/google-services.json"
+    android_manifest_task=":app:processRwReleaseMainManifest"
+    merged_android_manifest="$app_root/build/app/intermediates/merged_manifests/rwRelease/processRwReleaseManifest/AndroidManifest.xml"
     if [[ "$well_known_dir_overridden" != "true" ]]; then
       well_known_dir="$app_root/../landing-rw/.well-known"
     fi
@@ -58,6 +62,11 @@ case "$flavor" in
 esac
 
 failures=0
+
+(
+  cd "$app_root/android"
+  ./gradlew "$android_manifest_task" >/dev/null
+)
 
 require_file() {
   local path="$1"
@@ -107,6 +116,36 @@ require_contains \
   "$android_manifest" \
   'android:pathPrefix="/v/"' \
   'Android app links path prefix is missing.'
+require_file "$merged_android_manifest" 'Merged Android release manifest is missing.'
+if [[ -f "$merged_android_manifest" ]]; then
+  require_no_placeholder \
+    "$merged_android_manifest" \
+    'android.permission.READ_PHONE_STATE' \
+    'Merged Android manifest still packages READ_PHONE_STATE.'
+  require_no_placeholder \
+    "$merged_android_manifest" \
+    'android.permission.RECORD_AUDIO' \
+    'Merged Android manifest still packages RECORD_AUDIO.'
+  require_no_placeholder \
+    "$merged_android_manifest" \
+    'android.permission.READ_EXTERNAL_STORAGE' \
+    'Merged Android manifest still packages READ_EXTERNAL_STORAGE.'
+  require_no_placeholder \
+    "$merged_android_manifest" \
+    'android.permission.WRITE_EXTERNAL_STORAGE' \
+    'Merged Android manifest still packages WRITE_EXTERNAL_STORAGE.'
+  if [[ "$flavor" == "mt" ]]; then
+    require_no_placeholder \
+      "$merged_android_manifest" \
+      'android.permission.CAMERA' \
+      'Merged Android manifest still packages CAMERA for Malta.'
+  else
+    require_contains \
+      "$merged_android_manifest" \
+      'android.permission.CAMERA' \
+      'Merged Android manifest is missing CAMERA for Rwanda.'
+  fi
+fi
 
 require_file "$ios_entitlements" 'iOS associated domains entitlements file is missing.'
 if [[ "$android_only" != "true" && -f "$ios_entitlements" ]]; then

@@ -9,8 +9,18 @@ This document records the Android permission posture that should go to Google
 Play for both production packages and the related App content / Data safety
 work that still must be completed in Play Console before uploading version 2.
 
-The permission lists below were verified against the merged release manifests
-generated on 2026-03-25 with:
+The permission lists below describe the intended final Android permission
+surface after the 2026-03-25 remediation work.
+
+Important post-pass update:
+- A later same-day review of the packaged APKs found an unintended implicit
+  `READ_PHONE_STATE` permission added by manifest merging.
+- The shared Android manifest now removes `READ_PHONE_STATE` explicitly.
+- Malta was revalidated against refreshed merged and packaged release manifests.
+- Rwanda still needs one fresh post-fix rebuild / manifest rerun before final
+  upload so the regenerated artifact can be checked the same way.
+
+Earlier merged release manifests were generated on 2026-03-25 with:
 
 ```bash
 cd android
@@ -18,8 +28,8 @@ cd android
 ```
 
 Verified merged manifests:
-- `build/app/intermediates/merged_manifest/mtRelease/processMtReleaseMainManifest/AndroidManifest.xml`
-- `build/app/intermediates/merged_manifest/rwRelease/processRwReleaseMainManifest/AndroidManifest.xml`
+- `build/app/intermediates/merged_manifests/mtRelease/processMtReleaseManifest/AndroidManifest.xml`
+- `build/app/intermediates/merged_manifests/rwRelease/processRwReleaseManifest/AndroidManifest.xml`
 
 ## Official Sources
 
@@ -42,10 +52,11 @@ Verified merged manifests:
 
 1. Removed plugin-added `RECORD_AUDIO`, `WRITE_EXTERNAL_STORAGE`, and
    `READ_EXTERNAL_STORAGE` from both release artifacts.
-2. Scoped `CAMERA` to the Rwanda flavor only.
-3. Removed camera feature declarations from Malta and made the Rwanda camera
+2. Removed implied `READ_PHONE_STATE` from both release artifacts.
+3. Scoped `CAMERA` to the Rwanda flavor only.
+4. Removed camera feature declarations from Malta and made the Rwanda camera
    feature optional instead of mandatory.
-4. Aligned the public privacy-policy work with the actual BioPay data flow:
+5. Aligned the public privacy-policy work with the actual BioPay data flow:
    raw face captures are processed transiently on-device, while the backend
    stores only the derived face embedding.
 
@@ -121,13 +132,18 @@ Not used by the app. Removed from the merged manifest.
 Not used by the app. The app relies on system pickers and the write-permission
 removal prevents the legacy read permission from being implied.
 
-4. `android.permission.READ_MEDIA_IMAGES`
+4. `android.permission.READ_PHONE_STATE`
+Not used by the app. Explicitly removed from the merged manifest because
+`org.tensorflow.lite.gpu.api` would otherwise imply it via an old embedded
+manifest target SDK.
+
+5. `android.permission.READ_MEDIA_IMAGES`
 Not declared. Venue uploads use system pickers instead of broad media access.
 
-5. `android.permission.CHANGE_WIFI_STATE`
+6. `android.permission.CHANGE_WIFI_STATE`
 Not declared. The app does not directly toggle device Wi-Fi state.
 
-6. `android.permission.CAMERA` in Malta
+7. `android.permission.CAMERA` in Malta
 Not packaged in the Malta build. Android venue photo capture there uses the
 system camera intent path rather than direct camera APIs.
 
@@ -167,7 +183,10 @@ camera capture. The public privacy policy and in-app disclosure must explain:
 - raw face captures are processed transiently on-device
 - the backend stores the resulting face embedding, not the raw photo
 
-3. Neither package should trigger a broad storage-access declaration based on
+3. Neither package should trigger a phone-state declaration path, because
+`READ_PHONE_STATE` is explicitly removed from the final merged manifests.
+
+4. Neither package should trigger a broad storage-access declaration based on
 `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, or `READ_MEDIA_*`, because
 those permissions are not in the verified release artifacts.
 
@@ -233,6 +252,10 @@ stores the embedding, not the raw face image.
 The app does not use microphone capture and the packaged manifests no longer
 request `RECORD_AUDIO`.
 
+4. `Phone state`
+The app does not collect telephony state and the packaged manifests no longer
+request `READ_PHONE_STATE`.
+
 ## Public Privacy Policy Requirements
 
 ### Malta Privacy Policy
@@ -271,10 +294,10 @@ handling, or legal compliance.
 cd android
 ./gradlew :app:processMtReleaseMainManifest :app:processRwReleaseMainManifest
 ```
-3. Confirm Malta does not package `CAMERA`, `RECORD_AUDIO`, or legacy storage
-permissions.
-4. Confirm Rwanda packages `CAMERA` but not `RECORD_AUDIO` or legacy storage
-permissions.
+3. Confirm Malta does not package `CAMERA`, `READ_PHONE_STATE`,
+`RECORD_AUDIO`, or legacy storage permissions.
+4. Confirm Rwanda packages `CAMERA` but not `READ_PHONE_STATE`,
+`RECORD_AUDIO`, or legacy storage permissions.
 5. Complete `Policy > App content > Data safety` separately for both packages.
 6. Ensure the Malta Play listing points to `https://dineinmalta.com/privacy.html`.
 7. Ensure the Rwanda Play listing points to
