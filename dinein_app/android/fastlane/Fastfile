@@ -1,0 +1,96 @@
+# Fastlane configuration for DineIn Android apps
+# Handles both Malta (com.dineinmalta.app) and Rwanda (com.dineinrw.app)
+#
+# Service account: play-store-publisher@gen-lang-client-0172279957.iam.gserviceaccount.com
+# Shared from MOBI repo — same Google Cloud project.
+
+default_platform(:android)
+
+PLAY_STORE_KEY = File.join(Dir.pwd, "play-store-service-account.json")
+
+platform :android do
+
+  # ──────────────────────────────────────────────────────────────────
+  #  Malta (com.dineinmalta.app)
+  # ──────────────────────────────────────────────────────────────────
+
+  desc "Upload Malta AAB to Google Play production (draft)"
+  lane :deploy_mt do
+    upload_to_play_store(
+      package_name: "com.dineinmalta.app",
+      aab: "../build/app/outputs/bundle/mtRelease/app-mt-release.aab",
+      track: "production",
+      json_key: PLAY_STORE_KEY,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: false,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      release_status: "draft",
+    )
+  end
+
+  desc "Upload Malta AAB to internal track"
+  lane :upload_mt_internal do
+    upload_to_play_store(
+      package_name: "com.dineinmalta.app",
+      aab: "../build/app/outputs/bundle/mtRelease/app-mt-release.aab",
+      track: "internal",
+      json_key: PLAY_STORE_KEY,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      release_status: "draft",
+    )
+  end
+
+  # ──────────────────────────────────────────────────────────────────
+  #  Rwanda (com.dineinrw.app)
+  # ──────────────────────────────────────────────────────────────────
+
+  desc "Upload Rwanda AAB to Google Play production (draft)"
+  lane :deploy_rw do
+    upload_to_play_store(
+      package_name: "com.dineinrw.app",
+      aab: "../build/app/outputs/bundle/rwRelease/app-rw-release.aab",
+      track: "production",
+      json_key: PLAY_STORE_KEY,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: false,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      release_status: "draft",
+    )
+  end
+
+  desc "Upload Rwanda AAB to internal track"
+  lane :upload_rw_internal do
+    upload_to_play_store(
+      package_name: "com.dineinrw.app",
+      aab: "../build/app/outputs/bundle/rwRelease/app-rw-release.aab",
+      track: "internal",
+      json_key: PLAY_STORE_KEY,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      release_status: "draft",
+    )
+  end
+
+  # ──────────────────────────────────────────────────────────────────
+  #  Both apps
+  # ──────────────────────────────────────────────────────────────────
+
+  desc "Deploy both apps to production (draft)"
+  lane :deploy_all do
+    deploy_mt
+    deploy_rw
+  end
+
+  desc "Upload both apps to internal track"
+  lane :upload_all_internal do
+    upload_mt_internal
+    upload_rw_internal
+  end
+end

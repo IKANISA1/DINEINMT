@@ -71,6 +71,13 @@ android {
         versionName = flutter.versionName
     }
 
+    // ── 16 KB page-size alignment (Google Play mandatory since 2025) ──
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false   // store .so uncompressed + page-aligned
+        }
+    }
+
     flavorDimensions += "country"
 
     productFlavors {
@@ -78,7 +85,7 @@ android {
             dimension = "country"
             applicationId = "com.dineinmalta.app"
             resValue("string", "app_name", "Dinein MT")
-            manifestPlaceholders["appLinkHost"] = "dineinmalta.com"
+            manifestPlaceholders["appLinkHost"] = "dineinmt.ikanisa.com"
         }
         create("rw") {
             dimension = "country"

@@ -47,7 +47,7 @@ class CountryConfig {
     country: Country.mt,
     appName: 'Dinein MT',
     appTitle: 'DINEIN MALTA',
-    siteHost: 'dineinmalta.com',
+    siteHost: 'dineinmt.ikanisa.com',
     playStoreId: 'com.dineinmalta.app',
     supportWhatsApp: '35699711145',
     supportEmail: 'hello@ikanisa.com',
@@ -56,7 +56,7 @@ class CountryConfig {
     countryFlag: '🇲🇹',
     addressHint: '45 Tower Rd, Sliema, Malta',
     welcomeMessage: 'WELCOME TO DINEIN MALTA',
-    privacyPolicyUrl: 'https://dineinmalta.com/privacy.html',
+    privacyPolicyUrl: 'https://dineinmt.ikanisa.com/privacy',
     revolutMerchant: 'dineinmalta',
     biopayEnabled: false,
   );
@@ -75,7 +75,7 @@ class CountryConfig {
     countryFlag: '🇷🇼',
     addressHint: 'KG 9 Ave, Kigali, Rwanda',
     welcomeMessage: 'WELCOME TO DINEIN RW',
-    privacyPolicyUrl: 'https://dineinrw.ikanisa.com/privacy.html',
+    privacyPolicyUrl: 'https://dineinrw.ikanisa.com/privacy',
     momoUssdCode: '*182*8*1#', // MTN MoMo Rwanda
     biopayEnabled: true,
   );

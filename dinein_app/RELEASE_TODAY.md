@@ -30,10 +30,17 @@ Remote is fully applied. All local migrations have been reconciled.
 
 - **Target API:** 36 (Android 16 DP)
 - **Permissions:** Reconciled and documented in `docs/google_play_submission_permissions.md`.
-- **Privacy Policy:** Updated and published at `dineinmalta.com/privacy.html` and `dineinrw.ikanisa.com/privacy.html`.
+- **Privacy Policy:** Updated and published at `dineinmt.ikanisa.com/privacy` and `dineinrw.ikanisa.com/privacy`.
 
 ## Security Checklist (Pre-Upload)
 
+- [ ] **⛔ Supabase Credentials (CRITICAL — build will abort without these):**
+  - [ ] `env/release.mt.json` has real `SUPABASE_URL` (starts with `https://`, ends with `.supabase.co`)
+  - [ ] `env/release.mt.json` has real `SUPABASE_ANON_KEY` (starts with `eyJ`)
+  - [ ] `env/release.rw.json` has real `SUPABASE_URL` (starts with `https://`, ends with `.supabase.co`)
+  - [ ] `env/release.rw.json` has real `SUPABASE_ANON_KEY` (starts with `eyJ`)
+  - [ ] Run `./scripts/build_android_release.sh --flavor mt` — verify ✅ credential check passes
+  - [ ] Run `./scripts/build_android_release.sh --flavor rw` — verify ✅ credential check passes
 - [ ] **Google Cloud Console:** Ensure `GOOGLE_MAPS_API_KEY` is restricted to:
   - **Android apps:** `com.dineinmalta.app` and `com.dineinrw.app`.
   - **Certificate fingerprint:** Must include the SHA-1 of the production signing key.

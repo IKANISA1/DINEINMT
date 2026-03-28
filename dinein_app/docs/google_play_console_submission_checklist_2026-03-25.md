@@ -48,8 +48,8 @@ Verification already completed:
 ## Privacy Policy URLs
 
 Use these exact URLs in Play Console:
-- Malta: `https://dineinmalta.com/privacy.html`
-- Rwanda: `https://dineinrw.ikanisa.com/privacy.html`
+- Malta: `https://dineinmt.ikanisa.com/privacy`
+- Rwanda: `https://dineinrw.ikanisa.com/privacy`
 
 ## Store Listing / App Content Answers
 

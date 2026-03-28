@@ -299,9 +299,9 @@ cd android
 4. Confirm Rwanda packages `CAMERA` but not `READ_PHONE_STATE`,
 `RECORD_AUDIO`, or legacy storage permissions.
 5. Complete `Policy > App content > Data safety` separately for both packages.
-6. Ensure the Malta Play listing points to `https://dineinmalta.com/privacy.html`.
+6. Ensure the Malta Play listing points to `https://dineinmt.ikanisa.com/privacy`.
 7. Ensure the Rwanda Play listing points to
-`https://dineinrw.ikanisa.com/privacy.html`.
+`https://dineinrw.ikanisa.com/privacy`.
 8. Ensure the Rwanda in-app BioPay disclosure appears immediately before the
 camera permission request and offers a decline path.
 9. If Google requests a disclosure video, record the actual permission and

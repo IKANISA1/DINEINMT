@@ -4,8 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsAllowHeaders = "authorization, x-client-info, apikey, content-type";
 const corsAllowMethods = "GET, POST, OPTIONS";
 const defaultBiopayAllowedOrigins = [
-  "https://dineinmalta.com",
-  "https://www.dineinmalta.com",
+  "https://dineinmt.ikanisa.com",
+  "https://www.dineinmt.ikanisa.com",
   "https://dineinrw.ikanisa.com",
   "https://www.dineinrw.ikanisa.com",
 ];

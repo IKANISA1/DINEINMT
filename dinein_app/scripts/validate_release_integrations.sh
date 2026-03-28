@@ -33,7 +33,7 @@ done
 
 case "$flavor" in
   mt)
-    expected_host="dineinmalta.com"
+    expected_host="dineinmt.ikanisa.com"
     expected_android_package="com.dineinmalta.app"
     expected_ios_bundle="com.dineinmalta.app"
     android_google_services="$app_root/android/app/src/mt/google-services.json"
@@ -62,6 +62,33 @@ case "$flavor" in
 esac
 
 failures=0
+
+# ── Supabase credential validation in env file ──────────────────────────────
+env_file="$app_root/env/release.${flavor}.json"
+if [[ ! -f "$env_file" ]]; then
+  echo "FAIL: Missing release env file ($env_file)"
+  failures=$((failures + 1))
+else
+  sb_url=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('SUPABASE_URL',''))" "$env_file" 2>/dev/null || true)
+  sb_key=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('SUPABASE_ANON_KEY',''))" "$env_file" 2>/dev/null || true)
+
+  if [[ -z "$sb_url" ]] || echo "$sb_url" | grep -qiE 'your-project|your-malta|your-rwanda|placeholder'; then
+    echo "FAIL: SUPABASE_URL is missing or contains a placeholder in $env_file"
+    failures=$((failures + 1))
+  elif [[ "$sb_url" != https://* ]] || [[ "$sb_url" != *.supabase.co ]]; then
+    echo "FAIL: SUPABASE_URL does not match expected format (https://*.supabase.co) in $env_file"
+    failures=$((failures + 1))
+  fi
+
+  if [[ -z "$sb_key" ]] || echo "$sb_key" | grep -qiE 'your-.*-key|placeholder|anon-key$'; then
+    echo "FAIL: SUPABASE_ANON_KEY is missing or contains a placeholder in $env_file"
+    failures=$((failures + 1))
+  elif [[ "$sb_key" != eyJ* ]]; then
+    echo "FAIL: SUPABASE_ANON_KEY does not look like a valid JWT in $env_file"
+    failures=$((failures + 1))
+  fi
+fi
+# ─────────────────────────────────────────────────────────────────────────────
 
 (
   cd "$app_root/android"

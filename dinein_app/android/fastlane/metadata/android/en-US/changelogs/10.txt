@@ -1,0 +1,4 @@
+• Domain migration to dineinmt.ikanisa.com
+• Improved 16KB page alignment for Android 16+ devices
+• Privacy policy and deep-link fixes
+• Performance and stability improvements

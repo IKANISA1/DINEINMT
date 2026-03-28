@@ -67,6 +67,16 @@ cp env/release.example.json env/release.json
 flutter build appbundle --release --dart-define-from-file=env/release.json
 ```
 
+> ⛔ **CRITICAL: Before building any APK or AAB, verify that `SUPABASE_URL` and
+> `SUPABASE_ANON_KEY` are set to real project values (not placeholders) in the
+> env file.** The build script will abort if it detects missing or placeholder
+> credentials. A release binary built without valid Supabase credentials will
+> crash on first launch.
+>
+> **Valid values:**
+> - `SUPABASE_URL` — must start with `https://` and end with `.supabase.co`
+> - `SUPABASE_ANON_KEY` — must be a real JWT (starts with `eyJ`)
+
 For flavor-specific builds:
 
 ```bash
@@ -117,7 +127,7 @@ the environment variables `ANDROID_KEYSTORE_FILE`,
 `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and
 `ANDROID_KEY_PASSWORD`.
 
-The production deep-link hosts are `https://dineinmalta.com/v/{slug}` for Malta
+The production deep-link hosts are `https://dineinmt.ikanisa.com/v/{slug}` for Malta
 and `https://dineinrw.ikanisa.com/v/{slug}` for Rwanda. Publish the app-link
 artifacts to each domain's `.well-known/` directory before testing verified
 links on devices. Generate those files with:

@@ -2,8 +2,8 @@
 
 These files are the source templates for the production hosts:
 
-- `https://dineinmalta.com/.well-known/assetlinks.json`
-- `https://dineinmalta.com/.well-known/apple-app-site-association`
+- `https://dineinmt.ikanisa.com/.well-known/assetlinks.json`
+- `https://dineinmt.ikanisa.com/.well-known/apple-app-site-association`
 - `https://dineinrw.ikanisa.com/.well-known/assetlinks.json`
 - `https://dineinrw.ikanisa.com/.well-known/apple-app-site-association`
 
@@ -35,5 +35,5 @@ file extension.
 
 The mobile apps are configured to handle:
 
-- `https://dineinmalta.com/v/{slug}`
+- `https://dineinmt.ikanisa.com/v/{slug}`
 - `https://dineinrw.ikanisa.com/v/{slug}`

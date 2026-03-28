@@ -74,6 +74,48 @@ fi
 
 cd "${project_dir}"
 
+# ── Supabase credential validation (CRITICAL BLOCKER) ───────────────────────
+# Ensures SUPABASE_URL and SUPABASE_ANON_KEY are set to real values in the
+# env file before building.  A release APK/AAB with placeholder or empty
+# credentials will crash on first launch.  This gate is non-negotiable.
+
+supabase_url=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('SUPABASE_URL',''))" "${env_file}" 2>/dev/null || true)
+supabase_anon_key=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('SUPABASE_ANON_KEY',''))" "${env_file}" 2>/dev/null || true)
+
+supabase_cred_ok=true
+
+if [[ -z "${supabase_url}" ]]; then
+  echo "⛔ SUPABASE_URL is missing or empty in ${env_file}" >&2
+  supabase_cred_ok=false
+elif [[ "${supabase_url}" != https://* ]] || [[ "${supabase_url}" != *.supabase.co ]]; then
+  echo "⛔ SUPABASE_URL does not look valid (must start with https:// and end with .supabase.co): ${supabase_url}" >&2
+  supabase_cred_ok=false
+elif echo "${supabase_url}" | grep -qiE 'your-project|your-malta|your-rwanda|placeholder'; then
+  echo "⛔ SUPABASE_URL contains a placeholder value: ${supabase_url}" >&2
+  supabase_cred_ok=false
+fi
+
+if [[ -z "${supabase_anon_key}" ]]; then
+  echo "⛔ SUPABASE_ANON_KEY is missing or empty in ${env_file}" >&2
+  supabase_cred_ok=false
+elif [[ "${supabase_anon_key}" != eyJ* ]]; then
+  echo "⛔ SUPABASE_ANON_KEY does not look like a valid JWT (must start with 'eyJ'): ${supabase_anon_key:0:10}…" >&2
+  supabase_cred_ok=false
+elif echo "${supabase_anon_key}" | grep -qiE 'your-.*-key|placeholder|anon-key$'; then
+  echo "⛔ SUPABASE_ANON_KEY contains a placeholder value in ${env_file}" >&2
+  supabase_cred_ok=false
+fi
+
+if [[ "${supabase_cred_ok}" != "true" ]]; then
+  echo "" >&2
+  echo "BUILD ABORTED: Supabase credentials in ${env_file} are invalid." >&2
+  echo "Update SUPABASE_URL and SUPABASE_ANON_KEY with real project values before building." >&2
+  exit 1
+fi
+
+echo "✅ Supabase credentials validated in ${env_file}"
+# ─────────────────────────────────────────────────────────────────────────────
+
 if [[ "${skip_checks}" != "true" ]]; then
   flutter analyze
   flutter test
