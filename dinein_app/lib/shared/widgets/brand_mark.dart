@@ -45,7 +45,7 @@ class BrandMark extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: Image.asset(
-        'assets/branding/dinein-brand-icon-1024.png',
+        'assets/branding/dinein-brand-icon-512.png',
         width: size,
         height: size,
         fit: BoxFit.cover,

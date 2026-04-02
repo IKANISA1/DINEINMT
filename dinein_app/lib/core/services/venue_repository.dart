@@ -1,22 +1,6 @@
 import '../models/models.dart';
-import '../models/onboarding_draft_models.dart';
-import '../config/country_runtime.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
-
-class OnboardingVenueSearchBlock {
-  final String name;
-  final String reason;
-
-  const OnboardingVenueSearchBlock({required this.name, required this.reason});
-}
-
-class OnboardingVenueSearchResult {
-  final List<Venue> venues;
-  final OnboardingVenueSearchBlock? blockedMatch;
-
-  const OnboardingVenueSearchResult({required this.venues, this.blockedMatch});
-}
 
 /// Repository for venue data access via Supabase.
 class VenueRepository {
@@ -40,62 +24,6 @@ class VenueRepository {
         await DineinApiService.invoke('get_venues', payload: payload)
             as List<dynamic>;
     return data.map((e) => Venue.fromJson(e)).toList();
-  }
-
-  /// Fetch active venues that are not yet claimed by an owner.
-  ///
-  /// Used by venue onboarding so search and featured results only surface
-  /// claimable venues from Supabase.
-  Future<List<Venue>> getClaimableVenues({
-    int? limit,
-    int? offset,
-    String? query,
-  }) async {
-    final normalizedQuery = query?.trim();
-    final payload = <String, dynamic>{
-      'limit': ?limit,
-      'offset': ?offset,
-      'query': ?(normalizedQuery != null && normalizedQuery.isNotEmpty
-          ? normalizedQuery
-          : null),
-    };
-    final data =
-        await DineinApiService.invoke('get_claimable_venues', payload: payload)
-            as List<dynamic>;
-    return data.map((e) => Venue.fromJson(e)).toList();
-  }
-
-  Future<OnboardingVenueSearchResult> searchOnboardingVenues(
-    String query, {
-    int limit = 10,
-  }) async {
-    final normalizedQuery = query.trim();
-    if (normalizedQuery.isEmpty) {
-      return const OnboardingVenueSearchResult(venues: []);
-    }
-
-    final data =
-        await DineinApiService.invoke(
-              'search_onboarding_venues',
-              payload: {'query': normalizedQuery, 'limit': limit},
-            )
-            as Map<String, dynamic>;
-
-    final venues = ((data['results'] as List?) ?? const [])
-        .map((e) => Venue.fromJson(Map<String, dynamic>.from(e as Map)))
-        .toList();
-    final blockedRaw = data['blockedMatch'];
-    final blockedMatch = blockedRaw is Map
-        ? OnboardingVenueSearchBlock(
-            name: blockedRaw['name'] as String? ?? '',
-            reason: blockedRaw['reason'] as String? ?? '',
-          )
-        : null;
-
-    return OnboardingVenueSearchResult(
-      venues: venues,
-      blockedMatch: blockedMatch,
-    );
   }
 
   /// Fetch all venues (admin view — includes inactive and pending).
@@ -148,40 +76,24 @@ class VenueRepository {
     );
   }
 
-  /// Create a pending venue record for claim onboarding flows.
-  Future<Venue> createPendingClaimVenue(ClaimedVenueDraft draft) async {
-    final data = await DineinApiService.invoke(
-      'create_pending_claim_venue',
-      payload: {
-        'draft': {
-          'name': draft.name,
-          'slug': _slugify(draft.name),
-          'category': draft.category,
-          'description': draft.description,
-          'address': draft.address,
-          'image_url': draft.imageUrl,
-          'contact_phone': draft.contactPhone,
-          'website_url': draft.websiteUrl,
-          'country': CountryRuntime.config.country.code,
-        },
-        if (draft.contactPhone != null) 'contactPhone': draft.contactPhone,
-        if (draft.contactEmail != null) 'email': draft.contactEmail,
-      },
-    );
-    return Venue.fromJson(data as Map<String, dynamic>);
-  }
-
-  /// Update the operational status of a venue (admin action).
-  Future<void> updateVenueStatus(String venueId, String status) async {
+  Future<void> updateVenueAsAdmin(
+    String venueId,
+    Map<String, dynamic> updates,
+  ) async {
     await DineinApiService.invoke(
       'update_venue',
       useAdminSession: true,
       payload: {
         'venueId': venueId,
-        'updates': {'status': status},
+        'updates': updates,
         ..._venueSessionPayload(),
       },
     );
+  }
+
+  /// Update the operational status of a venue (admin action).
+  Future<void> updateVenueStatus(String venueId, String status) async {
+    await updateVenueAsAdmin(venueId, {'status': status});
   }
 
   /// Update whether the venue can accept guest orders.
@@ -189,15 +101,7 @@ class VenueRepository {
     String venueId,
     bool orderingEnabled,
   ) async {
-    await DineinApiService.invoke(
-      'update_venue',
-      useAdminSession: true,
-      payload: {
-        'venueId': venueId,
-        'updates': {'ordering_enabled': orderingEnabled},
-        ..._venueSessionPayload(),
-      },
-    );
+    await updateVenueAsAdmin(venueId, {'ordering_enabled': orderingEnabled});
   }
 
   /// Soft-delete a venue by setting its status to 'deleted'.
@@ -258,15 +162,6 @@ class VenueRepository {
       },
     );
     return (data as Map<String, dynamic>?) ?? const {};
-  }
-
-  String _slugify(String value) {
-    final base = value
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-    if (base.isNotEmpty) return base;
-    return 'venue-${DateTime.now().millisecondsSinceEpoch}';
   }
 
   List<Map<String, dynamic>> _normalizeGoogleResults(dynamic data) {

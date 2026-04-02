@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -591,14 +591,18 @@ class _OrdersBody extends ConsumerWidget {
       ),
     );
 
-    final dir = await getTemporaryDirectory();
-    final file = File(
-      '${dir.path}/orders_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
-    );
-    await file.writeAsBytes(await doc.save());
+    final bytes = Uint8List.fromList(await doc.save());
+    final fileName =
+        'orders_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
 
     if (context.mounted) {
-      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(bytes, name: fileName, mimeType: 'application/pdf'),
+          ],
+        ),
+      );
     }
   }
 
@@ -633,14 +637,16 @@ class _OrdersBody extends ConsumerWidget {
     final csvData = CsvEncoder().convert(
       rows.map((r) => r.map((c) => c.toString()).toList()).toList(),
     );
-    final dir = await getTemporaryDirectory();
-    final file = File(
-      '${dir.path}/orders_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv',
-    );
-    await file.writeAsString(csvData);
+    final bytes = Uint8List.fromList(utf8.encode(csvData));
+    final fileName =
+        'orders_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
 
     if (context.mounted) {
-      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile.fromData(bytes, name: fileName, mimeType: 'text/csv')],
+        ),
+      );
     }
   }
 }

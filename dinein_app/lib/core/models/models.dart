@@ -78,11 +78,22 @@ class Venue extends Equatable {
   final String description;
   final String address;
   final String? phone;
+  final String? ownerContactPhone;
+  final String? ownerWhatsAppNumber;
   final String? email;
   final String? imageUrl;
   final String? revolutUrl;
   final VenueStatus status;
   final bool orderingEnabled;
+  final DateTime? approvedAt;
+  final DateTime? accessVerifiedAt;
+  final DateTime? lastAccessTokenIssuedAt;
+  final DateTime? accessNumberUpdatedAt;
+  final String? accessVerificationMethod;
+  final String? accessVerifiedBy;
+  final String? accessVerificationNote;
+  final String? accessNumberUpdatedBy;
+  final String? normalizedAccessPhone;
   final double rating;
   final int ratingCount;
   final Country country;
@@ -103,11 +114,22 @@ class Venue extends Equatable {
     required this.description,
     required this.address,
     this.phone,
+    this.ownerContactPhone,
+    this.ownerWhatsAppNumber,
     this.email,
     this.imageUrl,
     this.revolutUrl,
     this.status = VenueStatus.active,
     this.orderingEnabled = false,
+    this.approvedAt,
+    this.accessVerifiedAt,
+    this.lastAccessTokenIssuedAt,
+    this.accessNumberUpdatedAt,
+    this.accessVerificationMethod,
+    this.accessVerifiedBy,
+    this.accessVerificationNote,
+    this.accessNumberUpdatedBy,
+    this.normalizedAccessPhone,
     this.rating = 0.0,
     this.ratingCount = 0,
     this.country = Country.mt,
@@ -131,6 +153,8 @@ class Venue extends Equatable {
       description: json['description'] as String? ?? '',
       address: json['address'] as String? ?? '',
       phone: json['phone'] as String?,
+      ownerContactPhone: json['owner_contact_phone'] as String?,
+      ownerWhatsAppNumber: json['owner_whatsapp_number'] as String?,
       email: json['email'] as String?,
       imageUrl: json['image_url'] as String?,
       revolutUrl: json['revolut_url'] as String?,
@@ -139,6 +163,31 @@ class Venue extends Equatable {
           json['ordering_enabled'] as bool? ??
           json['orderingEnabled'] as bool? ??
           false,
+      approvedAt: DateTime.tryParse(json['approved_at'] as String? ?? ''),
+      accessVerifiedAt: DateTime.tryParse(
+        json['access_verified_at'] as String? ?? '',
+      ),
+      lastAccessTokenIssuedAt: DateTime.tryParse(
+        json['last_access_token_issued_at'] as String? ?? '',
+      ),
+      accessNumberUpdatedAt: DateTime.tryParse(
+        json['access_number_updated_at'] as String? ?? '',
+      ),
+      accessVerificationMethod:
+          json['access_verification_method'] as String? ??
+          json['accessVerificationMethod'] as String?,
+      accessVerifiedBy:
+          json['access_verified_by'] as String? ??
+          json['accessVerifiedBy'] as String?,
+      accessVerificationNote:
+          json['access_verification_note'] as String? ??
+          json['accessVerificationNote'] as String?,
+      accessNumberUpdatedBy:
+          json['access_number_updated_by'] as String? ??
+          json['accessNumberUpdatedBy'] as String?,
+      normalizedAccessPhone:
+          json['normalized_access_phone'] as String? ??
+          json['normalizedAccessPhone'] as String?,
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
       country: Country.fromCode(json['country'] as String? ?? 'MT'),
@@ -171,11 +220,22 @@ class Venue extends Equatable {
     'description': description,
     'address': address,
     'phone': phone,
+    'owner_contact_phone': ownerContactPhone,
+    'owner_whatsapp_number': ownerWhatsAppNumber,
     'email': email,
     'image_url': imageUrl,
     'revolut_url': revolutUrl,
     'status': status.dbValue,
     'ordering_enabled': orderingEnabled,
+    'approved_at': approvedAt?.toIso8601String(),
+    'access_verified_at': accessVerifiedAt?.toIso8601String(),
+    'last_access_token_issued_at': lastAccessTokenIssuedAt?.toIso8601String(),
+    'access_number_updated_at': accessNumberUpdatedAt?.toIso8601String(),
+    'access_verification_method': accessVerificationMethod,
+    'access_verified_by': accessVerifiedBy,
+    'access_verification_note': accessVerificationNote,
+    'access_number_updated_by': accessNumberUpdatedBy,
+    'normalized_access_phone': normalizedAccessPhone,
     'rating': rating,
     'rating_count': ratingCount,
     'country': country.code,
@@ -195,6 +255,21 @@ class Venue extends Equatable {
   /// Whether this venue is currently accepting orders.
   bool get isOpen => status == VenueStatus.active;
 
+  String? get effectiveAccessPhone {
+    for (final candidate in [phone, ownerWhatsAppNumber, ownerContactPhone]) {
+      final trimmed = candidate?.trim();
+      if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+    }
+    return null;
+  }
+
+  bool get hasAssignedAccessPhone => effectiveAccessPhone != null;
+
+  bool get isAccessVerified => accessVerifiedAt != null;
+
+  bool get isAccessReady =>
+      isOpen && hasAssignedAccessPhone && isAccessVerified;
+
   /// Whether guests can place orders with this venue right now.
   bool get canAcceptGuestOrders => isOpen && orderingEnabled;
 
@@ -205,9 +280,7 @@ class Venue extends Equatable {
   String get guestAvailabilityLabel => canAcceptGuestOrders
       ? 'Available'
       : switch (status) {
-          VenueStatus.active ||
-          VenueStatus.pendingClaim ||
-          VenueStatus.pendingActivation => 'Browse Menu',
+          VenueStatus.active || VenueStatus.pendingActivation => 'Browse Menu',
           VenueStatus.maintenance ||
           VenueStatus.inactive ||
           VenueStatus.suspended ||
@@ -220,7 +293,6 @@ class Venue extends Equatable {
     return switch (status) {
       VenueStatus.maintenance => 'Temporarily unavailable for orders.',
       VenueStatus.inactive => 'Currently unavailable for ordering.',
-      VenueStatus.pendingClaim ||
       VenueStatus.pendingActivation => 'Activation pending. Menu preview only.',
       VenueStatus.suspended ||
       VenueStatus.deleted => 'Currently unavailable for ordering.',
@@ -253,10 +325,22 @@ class Venue extends Equatable {
     name,
     category,
     address,
+    phone,
+    ownerContactPhone,
+    ownerWhatsAppNumber,
     websiteUrl,
     revolutUrl,
     status,
     orderingEnabled,
+    approvedAt,
+    accessVerifiedAt,
+    lastAccessTokenIssuedAt,
+    accessNumberUpdatedAt,
+    accessVerificationMethod,
+    accessVerifiedBy,
+    accessVerificationNote,
+    accessNumberUpdatedBy,
+    normalizedAccessPhone,
     country,
     openingHours,
     ownerId,
@@ -370,6 +454,7 @@ class MenuItem extends Equatable {
   final bool priceHidden;
   final int? highlightRank;
   final String category;
+  final MenuItemClass? itemClass;
   final String? imageUrl;
   final MenuItemImageSource imageSource;
   final MenuItemImageStatus imageStatus;
@@ -391,6 +476,7 @@ class MenuItem extends Equatable {
     this.priceHidden = false,
     this.highlightRank,
     required this.category,
+    this.itemClass,
     this.imageUrl,
     this.imageSource = MenuItemImageSource.unknown,
     this.imageStatus = MenuItemImageStatus.pending,
@@ -416,6 +502,7 @@ class MenuItem extends Equatable {
           (json['highlight_rank'] as num?)?.toInt() ??
           (json['highlightRank'] as num?)?.toInt(),
       category: json['category'] as String? ?? 'Uncategorized',
+      itemClass: MenuItemClass.fromString(json['class'] as String?),
       imageUrl: json['image_url'] as String?,
       imageSource: MenuItemImageSource.fromString(
         json['image_source'] as String?,
@@ -444,6 +531,7 @@ class MenuItem extends Equatable {
     'price_hidden': priceHidden,
     'highlight_rank': highlightRank,
     'category': category,
+    'class': itemClass?.dbValue,
     'image_url': imageUrl,
     'image_source': effectiveImageSource?.dbValue,
     'image_status': effectiveImageStatus.dbValue,
@@ -466,6 +554,7 @@ class MenuItem extends Equatable {
     bool? priceHidden,
     Object? highlightRank = _menuItemNoChange,
     String? category,
+    MenuItemClass? itemClass,
     String? imageUrl,
     MenuItemImageSource? imageSource,
     MenuItemImageStatus? imageStatus,
@@ -489,6 +578,7 @@ class MenuItem extends Equatable {
           ? this.highlightRank
           : highlightRank as int?,
       category: category ?? this.category,
+      itemClass: itemClass ?? this.itemClass,
       imageUrl: imageUrl ?? this.imageUrl,
       imageSource: imageSource ?? this.imageSource,
       imageStatus: imageStatus ?? this.imageStatus,
@@ -534,6 +624,7 @@ class MenuItem extends Equatable {
     priceHidden,
     highlightRank,
     category,
+    itemClass,
     imageUrl,
     imageSource,
     imageStatus,
@@ -871,77 +962,4 @@ class AdminAccessSession extends Equatable {
     expiresAt,
     issuedAt,
   ];
-}
-
-/// A venue ownership claim submitted by a prospective owner.
-class VenueClaim extends Equatable {
-  final String id;
-  final String venueId;
-  final String venueName;
-  final String venueArea;
-  final String contactPhone;
-  final String? claimantName;
-  final ClaimStatus status;
-  final DateTime createdAt;
-
-  const VenueClaim({
-    required this.id,
-    required this.venueId,
-    required this.venueName,
-    required this.venueArea,
-    required this.contactPhone,
-    this.claimantName,
-    this.status = ClaimStatus.pending,
-    required this.createdAt,
-  });
-
-  factory VenueClaim.fromJson(Map<String, dynamic> json) {
-    return VenueClaim(
-      id: json['id'] as String,
-      venueId: json['venue_id'] as String,
-      venueName: json['venue_name'] as String? ?? '',
-      venueArea: json['venue_area'] as String? ?? '',
-      contactPhone:
-          json['whatsapp_number'] as String? ??
-          json['contact_phone'] as String? ??
-          json['email'] as String? ??
-          '',
-      claimantName: json['claimant_name'] as String?,
-      status: ClaimStatus.fromString(json['status'] as String? ?? 'pending'),
-      createdAt: DateTime.parse(json['created_at'] as String),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'venue_id': venueId,
-    'venue_name': venueName,
-    'venue_area': venueArea,
-    'whatsapp_number': contactPhone,
-    'claimant_name': claimantName,
-    'status': status.dbValue,
-  };
-
-  /// Backward-compatible alias used by older admin screens.
-  String get email => contactPhone;
-
-  String get displayName {
-    final explicitName = claimantName?.trim();
-    if (explicitName != null && explicitName.isNotEmpty) {
-      return explicitName;
-    }
-
-    if (contactPhone.contains('@')) {
-      return contactPhone.split('@').first;
-    }
-
-    final digits = contactPhone.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.length >= 4) {
-      return 'Owner ${digits.substring(digits.length - 4)}';
-    }
-
-    return contactPhone;
-  }
-
-  @override
-  List<Object?> get props => [id, venueId, contactPhone, claimantName, status];
 }

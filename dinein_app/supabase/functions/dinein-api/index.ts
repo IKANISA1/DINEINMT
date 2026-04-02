@@ -2,6 +2,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { JWT } from "npm:google-auth-library@9";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
+  buildWhatsAppTemplatePayload,
+  buildWhatsAppTextPayload,
+  postWhatsAppMessage,
+} from "../_shared/whatsapp.ts";
+import {
   createAdminClient as createMenuImageAdminClient,
   type FunctionEnv as MenuImageEnv,
   HttpError as MenuImageHttpError,
@@ -9,6 +14,10 @@ import {
   processMenuItemImageGeneration,
   type VenueRecord,
 } from "../_shared/menu-image.ts";
+import {
+  inferMenuItemClass,
+  normalizeMenuItemClass,
+} from "../_shared/menu-item-context.ts";
 import {
   createVenueAdminClient as createVenueEnrichmentAdminClient,
   fetchVenueForEnrichment,
@@ -49,14 +58,12 @@ const venueStatuses = new Set([
   "maintenance",
   "suspended",
   "deleted",
-  "pending_claim",
   "pending_activation",
 ]);
 const publicVenueStatuses = new Set([
   "active",
   "inactive",
   "maintenance",
-  "pending_claim",
   "pending_activation",
 ]);
 const orderStatuses = new Set(["placed", "received", "served", "cancelled"]);
@@ -764,12 +771,6 @@ export function venueOrderingReadiness(rawVenue: unknown): {
   ) {
     reasons.push("google_business_closed_permanently");
   }
-  if (!stringValue(venue.approved_claim_id)) {
-    reasons.push("approved_claim_required");
-  }
-  if (!stringValue(venue.approved_at)) {
-    reasons.push("approved_at_required");
-  }
   if (!stringValue(venue.access_verified_at)) {
     reasons.push("access_verification_required");
   }
@@ -784,14 +785,6 @@ export function venueOrderingReadiness(rawVenue: unknown): {
   }
   if (!stringValue(venue.image_url)) {
     reasons.push("venue_image_required");
-  }
-  if (
-    !(
-      stringValue(venue.owner_contact_phone) ??
-        stringValue(venue.owner_whatsapp_number)
-    )
-  ) {
-    reasons.push("owner_contact_required");
   }
   if (supportedPaymentMethods.length == 0) {
     if (
@@ -891,65 +884,6 @@ function normalizePhone(raw: string): string {
   }
 
   throw new HttpError(400, "A valid WhatsApp number is required.");
-}
-
-function slugify(value: string): string {
-  const base = value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return base.length > 0 ? base : `venue-${Date.now()}`;
-}
-
-function normalizeVenueSearchQuery(value: unknown): string | null {
-  const raw = stringValue(value);
-  if (!raw) return null;
-  const normalized = raw.replace(/[,%()]/g, " ").replace(/\s+/g, " ").trim();
-  return normalized.length > 0 ? normalized : null;
-}
-
-function buildVenueSearchOrClause(query: string): string {
-  const normalized = normalizeVenueSearchQuery(query) ?? query.trim();
-  const slugTerm = slugify(normalized);
-  const clauses = [
-    `name.ilike.%${normalized}%`,
-    `address.ilike.%${normalized}%`,
-    `category.ilike.%${normalized}%`,
-  ];
-
-  if (!slugTerm.startsWith("venue-")) {
-    clauses.push(`slug.ilike.%${slugTerm}%`);
-  }
-
-  return clauses.join(",");
-}
-
-function buildVenueConflictOrClause(name: string, slug: string): string {
-  const normalizedName = normalizeVenueSearchQuery(name) ?? name.trim();
-  return [`slug.eq.${slug}`, `name.ilike.${normalizedName}`].join(",");
-}
-
-function canonicalVenueLabel(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ")
-    .trim();
-}
-
-function isStrongOnboardingVenueMatch(
-  query: string,
-  rawVenue: unknown,
-): boolean {
-  const venue = asRecord(rawVenue);
-  const normalizedQuery = canonicalVenueLabel(query);
-  if (!normalizedQuery) return false;
-
-  const venueName = canonicalVenueLabel(stringValue(venue.name) ?? "");
-  const querySlug = slugify(query);
-  const venueSlug = slugify(
-    stringValue(venue.slug) ?? stringValue(venue.name) ?? "",
-  );
-
-  return venueName == normalizedQuery || venueSlug == querySlug;
 }
 
 function requireString(body: JsonRecord, ...keys: string[]): string {
@@ -1096,20 +1030,6 @@ async function venueSessionClaims(req: Request): Promise<JsonRecord | null> {
   });
 }
 
-async function onboardingMenuClaims(
-  body: JsonRecord,
-): Promise<JsonRecord | null> {
-  const token = stringValue(body.onboardingMenuToken) ??
-    stringValue(body.onboarding_menu_token);
-  if (!token) return null;
-  return await signedTokenClaims(token, {
-    aud: "dinein-onboarding-menu",
-    role: "onboarding_menu",
-    secret: "DINEIN_ONBOARDING_MENU_SECRET",
-    fallbackSecret: "DINEIN_ADMIN_SESSION_SECRET",
-  });
-}
-
 async function currentUser(req: Request) {
   if (!req.headers.get("Authorization")) {
     return null;
@@ -1202,179 +1122,59 @@ async function requireSelfOrAdmin(
   return user.id;
 }
 
-type ContactLookup =
-  | { kind: "phone"; normalized: string; digits: string }
-  | { kind: "email"; normalized: string };
-
-function buildContactLookup(raw: string): ContactLookup {
-  const trimmed = raw.trim();
-  if (trimmed.includes("@")) {
-    return { kind: "email", normalized: trimmed.toLowerCase() };
-  }
-
-  const normalized = normalizePhone(trimmed);
-  return {
-    kind: "phone",
-    normalized,
-    digits: digitsOnly(normalized),
-  };
-}
-
-function claimContacts(row: JsonRecord): string[] {
-  return [
-    stringValue(row.contact_phone),
-    stringValue(row.whatsapp_number),
-    stringValue(row.email),
-  ].filter((value): value is string => Boolean(value));
-}
-
-function claimMatchesContact(row: JsonRecord, lookup: ContactLookup): boolean {
-  for (const contact of claimContacts(row)) {
-    if (lookup.kind == "email") {
-      if (contact.toLowerCase() == lookup.normalized) {
-        return true;
-      }
-      continue;
-    }
-
-    if (!contact.includes("@") && digitsOnly(contact) == lookup.digits) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function claimContactPhone(claim: JsonRecord): string | null {
-  return stringValue(claim.contact_phone) ??
-    stringValue(claim.whatsapp_number) ??
-    null;
-}
-
-function claimWhatsappNumber(claim: JsonRecord): string | null {
-  return stringValue(claim.whatsapp_number) ??
-    stringValue(claim.contact_phone) ??
-    null;
-}
-
-function venueHasLinkedAccess(row: JsonRecord): boolean {
-  return Boolean(
-    stringValue(row.owner_id) ?? stringValue(row.approved_claim_id),
-  );
-}
-
 function effectiveVenuePhone(rawVenue: unknown): string | null {
   const venue = asRecord(rawVenue);
   return stringValue(venue.phone) ?? stringValue(venue.owner_contact_phone) ??
     stringValue(venue.owner_whatsapp_number) ?? null;
 }
 
-export function buildApprovedClaimUpdate(
-  reviewedAt: string,
-  reviewedBy?: string,
-): JsonRecord {
-  return {
-    status: "approved",
-    reviewed_at: reviewedAt,
-    approved_at: reviewedAt,
-    ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
-  };
+function normalizedVenueAccessPhone(rawVenue: unknown): string | null {
+  const venue = asRecord(rawVenue);
+  const explicit = stringValue(venue.normalized_access_phone);
+  if (explicit) return explicit;
+
+  const phone = effectiveVenuePhone(venue);
+  if (!phone) return null;
+
+  try {
+    return normalizePhone(phone);
+  } catch {
+    return null;
+  }
 }
 
-export function buildApprovedVenueLinkage(
-  claim: JsonRecord,
-  approvedAt: string,
-): JsonRecord {
-  const claimId = stringValue(claim.id);
-  if (!claimId) {
-    throw new HttpError(500, "Approved claim linkage is missing a claim id.");
+async function ensureUniqueVenueAccessPhone(
+  supabase: ReturnType<typeof adminClient>,
+  normalizedPhone: string,
+  venueId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("dinein_venues")
+    .select("id, name, status")
+    .eq("normalized_access_phone", normalizedPhone)
+    .neq("id", venueId)
+    .not("status", "eq", "deleted")
+    .limit(1);
+
+  if (error) {
+    console.error("[dinein-api] venue access duplicate lookup failed", error);
+    throw new HttpError(500, "Could not validate venue access ownership.");
   }
 
-  const claimantId = stringValue(claim.claimant_id);
-  return {
-    approved_claim_id: claimId,
-    approved_at: approvedAt,
-    owner_contact_phone: claimContactPhone(claim),
-    owner_whatsapp_number: claimWhatsappNumber(claim),
-    ...(claimantId ? { owner_id: claimantId } : {}),
-  };
-}
+  const conflict = Array.isArray(data) && data.length > 0
+    ? asRecord(data[0])
+    : null;
+  if (conflict == null) return;
 
-export function buildClaimAccessAuditUpdate(args: {
-  issuedAt: string;
-  verifiedAt?: string;
-  normalizedPhone?: string;
-  challengeId?: string;
-  verificationMethod?: string;
-  verifiedBy?: string;
-  verificationNote?: string | null;
-}): JsonRecord {
-  if (
-    args.verificationMethod &&
-    !accessVerificationMethods.has(args.verificationMethod)
-  ) {
-    throw new HttpError(
-      500,
-      `Unsupported access verification method: ${args.verificationMethod}`,
-    );
-  }
-  return {
-    last_access_token_issued_at: args.issuedAt,
-    ...(args.verifiedAt ? { whatsapp_verified_at: args.verifiedAt } : {}),
-    ...(args.normalizedPhone
-      ? { last_verified_whatsapp_number: args.normalizedPhone }
-      : {}),
-    ...(args.challengeId ? { last_otp_challenge_id: args.challengeId } : {}),
-    ...(args.verifiedAt && args.verificationMethod
-      ? { access_verification_method: args.verificationMethod }
-      : {}),
-    ...(args.verifiedAt && args.verifiedBy
-      ? { access_verified_by: args.verifiedBy }
-      : {}),
-    ...(args.verifiedAt && args.verificationNote !== undefined
-      ? { access_verification_note: args.verificationNote }
-      : {}),
-  };
-}
-
-export function buildVenueAccessAuditUpdate(
-  claim: JsonRecord,
-  args: {
-    issuedAt: string;
-    verifiedAt?: string;
-    approvedAt?: string;
-    verificationMethod?: string;
-    verifiedBy?: string;
-    verificationNote?: string | null;
-  },
-): JsonRecord {
-  if (
-    args.verificationMethod &&
-    !accessVerificationMethods.has(args.verificationMethod)
-  ) {
-    throw new HttpError(
-      500,
-      `Unsupported access verification method: ${args.verificationMethod}`,
-    );
-  }
-  return {
-    ...buildApprovedVenueLinkage(
-      claim,
-      args.approvedAt ?? stringValue(claim.approved_at) ??
-        stringValue(claim.reviewed_at) ?? args.issuedAt,
-    ),
-    last_access_token_issued_at: args.issuedAt,
-    ...(args.verifiedAt ? { access_verified_at: args.verifiedAt } : {}),
-    ...(args.verifiedAt && args.verificationMethod
-      ? { access_verification_method: args.verificationMethod }
-      : {}),
-    ...(args.verifiedAt && args.verifiedBy
-      ? { access_verified_by: args.verifiedBy }
-      : {}),
-    ...(args.verifiedAt && args.verificationNote !== undefined
-      ? { access_verification_note: args.verificationNote }
-      : {}),
-  };
+  throw new HttpError(
+    409,
+    "This WhatsApp number is already assigned to another venue.",
+    {
+      code: "venue_access_phone_in_use",
+      conflicting_venue_id: stringValue(conflict.id),
+      conflicting_venue_name: stringValue(conflict.name),
+    },
+  );
 }
 
 async function venueSnapshot(
@@ -1409,52 +1209,9 @@ function venueTokenSecret(): string {
   );
 }
 
-async function issueVenueToken(
-  venueId: string,
-  contactPhone: string,
-  venueName: string,
-  options?: {
-    claimId?: string;
-    issuedAt?: string;
-  },
-): Promise<{ access_token: string; issued_at: string; expires_at: string }> {
-  const issuedAtDate = options?.issuedAt
-    ? new Date(options.issuedAt)
-    : new Date();
-  const issuedAtMs = Number.isNaN(issuedAtDate.getTime())
-    ? Date.now()
-    : issuedAtDate.getTime();
-  const now = Math.floor(issuedAtMs / 1000);
-  const exp = now + VENUE_TOKEN_TTL_SECONDS;
-
-  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }))
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-
-  const payload = btoa(JSON.stringify({
-    aud: "dinein-venue",
-    sub: options?.claimId ?? venueId,
-    role: "venue_owner",
-    venue_id: venueId,
-    phone: contactPhone,
-    venue_name: venueName,
-    ...(options?.claimId ? { claim_id: options.claimId } : {}),
-    iat: now,
-    exp,
-  })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-
-  const signingInput = `${header}.${payload}`;
-  const signature = await hmacSha256Base64Url(signingInput, venueTokenSecret());
-
-  return {
-    access_token: `${signingInput}.${signature}`,
-    issued_at: new Date(issuedAtMs).toISOString(),
-    expires_at: new Date(exp * 1000).toISOString(),
-  };
-}
-
 async function verifyVenueToken(
   token: string,
-): Promise<{ venueId: string; contactPhone: string; claimId?: string }> {
+): Promise<{ venueId: string; contactPhone: string }> {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new HttpError(403, "Invalid venue access token.");
@@ -1496,7 +1253,6 @@ async function verifyVenueToken(
   return {
     venueId,
     contactPhone: phone,
-    claimId: stringValue(payload.claim_id),
   };
 }
 
@@ -1505,7 +1261,7 @@ async function authorizeVenueSession(
   _supabase: ReturnType<typeof adminClient>,
   rawSession: unknown,
   venueId: string,
-): Promise<{ venueId: string; contactPhone: string; claimId?: string }> {
+): Promise<{ venueId: string; contactPhone: string }> {
   const bearerClaims = await venueSessionClaims(req);
   if (bearerClaims) {
     const tokenVenueId = stringValue(bearerClaims.venue_id);
@@ -1525,7 +1281,6 @@ async function authorizeVenueSession(
     return {
       venueId: tokenVenueId,
       contactPhone: tokenPhone,
-      claimId: stringValue(bearerClaims.claim_id),
     };
   }
 
@@ -1552,173 +1307,6 @@ async function authorizeVenueSession(
   }
 
   throw new HttpError(401, "Venue access token required.");
-}
-
-async function persistApprovedVenueClaim(
-  supabase: ReturnType<typeof adminClient>,
-  claim: JsonRecord,
-  reviewedAt: string,
-  reviewedBy?: string,
-): Promise<void> {
-  const claimId = stringValue(claim.id);
-  if (!claimId) {
-    throw new HttpError(500, "Claim approval is missing a claim id.");
-  }
-
-  const { error } = await supabase
-    .from("dinein_venue_claims")
-    .update(buildApprovedClaimUpdate(reviewedAt, reviewedBy))
-    .eq("id", claimId);
-
-  if (error) {
-    console.error("[dinein-api] approve claim failed", error);
-    throw new HttpError(500, "Could not approve the claim.");
-  }
-}
-
-async function persistApprovedVenueLinkage(
-  supabase: ReturnType<typeof adminClient>,
-  claim: JsonRecord,
-  approvedAt: string,
-  options?: {
-    activateVenue?: boolean;
-  },
-): Promise<void> {
-  const venueId = stringValue(claim.venue_id);
-  if (!venueId) {
-    throw new HttpError(500, "Approved claim is missing a venue id.");
-  }
-
-  const currentVenue = await venueSnapshot(supabase, venueId);
-  const updatePayload: JsonRecord = {
-    ...buildApprovedVenueLinkage(claim, approvedAt),
-  };
-  if (!stringValue(currentVenue.phone) && claimContactPhone(claim)) {
-    updatePayload.phone = claimContactPhone(claim);
-  }
-  if (options?.activateVenue !== false) {
-    updatePayload.status = "active";
-    const nextVenue = {
-      ...currentVenue,
-      ...updatePayload,
-      status: "active",
-    };
-    updatePayload.ordering_enabled = venueOrderingReadiness(nextVenue).ready;
-  }
-
-  const { error } = await supabase
-    .from("dinein_venues")
-    .update(updatePayload)
-    .eq("id", venueId);
-
-  if (error) {
-    console.error("[dinein-api] approved venue linkage update failed", error);
-    throw new HttpError(
-      500,
-      options?.activateVenue === false
-        ? "Could not update the approved venue linkage."
-        : "Claim approved but venue could not be activated.",
-    );
-  }
-}
-
-async function persistVenueAccessAudit(
-  supabase: ReturnType<typeof adminClient>,
-  claim: JsonRecord,
-  args: {
-    issuedAt: string;
-    verifiedAt?: string;
-    normalizedPhone?: string;
-    challengeId?: string;
-    approvedAt?: string;
-    verificationMethod?: string;
-    verifiedBy?: string;
-    verificationNote?: string | null;
-  },
-): Promise<void> {
-  const claimId = stringValue(claim.id);
-  const venueId = stringValue(claim.venue_id);
-  if (!claimId || !venueId) {
-    throw new HttpError(500, "Venue access audit is missing claim linkage.");
-  }
-
-  const { error: claimError } = await supabase
-    .from("dinein_venue_claims")
-    .update(buildClaimAccessAuditUpdate(args))
-    .eq("id", claimId);
-
-  if (claimError) {
-    console.error("[dinein-api] claim access audit update failed", claimError);
-    throw new HttpError(500, "Could not record venue claim access.");
-  }
-
-  const currentVenue = await venueSnapshot(supabase, venueId);
-  const venueAuditUpdate: JsonRecord = {
-    ...buildVenueAccessAuditUpdate(claim, args),
-  };
-  if (!stringValue(currentVenue.phone) && claimContactPhone(claim)) {
-    venueAuditUpdate.phone = claimContactPhone(claim);
-  }
-
-  const { error: venueError } = await supabase
-    .from("dinein_venues")
-    .update(venueAuditUpdate)
-    .eq("id", venueId);
-
-  if (venueError) {
-    console.error("[dinein-api] venue access audit update failed", venueError);
-    throw new HttpError(500, "Could not record venue access linkage.");
-  }
-}
-
-async function upsertVenueOwnerProfileRole(
-  supabase: ReturnType<typeof adminClient>,
-  claimantId: string | undefined,
-): Promise<void> {
-  if (!claimantId) return;
-
-  const { data: profileData, error: profileLookupError } = await supabase
-    .from("dinein_profiles")
-    .select("id")
-    .eq("id", claimantId)
-    .maybeSingle();
-
-  if (profileLookupError) {
-    console.error(
-      "[dinein-api] claimant profile lookup failed",
-      profileLookupError,
-    );
-    return;
-  }
-
-  if (profileData?.id) {
-    const { error: profileUpdateError } = await supabase
-      .from("dinein_profiles")
-      .update({
-        role: "venue_owner",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", claimantId);
-
-    if (profileUpdateError) {
-      console.error(
-        "[dinein-api] claimant profile update failed",
-        profileUpdateError,
-      );
-    }
-    return;
-  }
-
-  const { error: profileInsertError } = await supabase
-    .from("dinein_profiles")
-    .insert({ id: claimantId, role: "venue_owner" });
-
-  if (profileInsertError) {
-    console.error(
-      "[dinein-api] claimant profile insert failed",
-      profileInsertError,
-    );
-  }
 }
 
 async function authorizeVenueMutation(
@@ -1978,36 +1566,65 @@ async function dispatchVenueOperationalAlert(
 
   await prunePushRegistrations(supabase, invalidRegistrationIds);
 }
-
-async function latestClaimByContact(
+async function venueOwnerWhatsAppNumber(
   supabase: ReturnType<typeof adminClient>,
-  lookup: ContactLookup,
-  status?: string,
-  venueId?: string,
-): Promise<JsonRecord | null> {
-  let query = supabase
-    .from("dinein_venue_claims")
-    .select("*")
-    .order("created_at", { ascending: false });
+  venueId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("dinein_venues")
+    .select("owner_whatsapp_number, owner_contact_phone")
+    .eq("id", venueId)
+    .maybeSingle();
 
-  if (status) {
-    query = query.eq("status", status);
-  }
-
-  if (venueId) {
-    query = query.eq("venue_id", venueId);
-  }
-
-  const { data, error } = await query;
   if (error) {
-    console.error("[dinein-api] latest claim lookup failed", error);
-    throw new HttpError(500, "Could not load venue claims.");
+    console.error("[dinein-api] venue owner lookup failed", error);
+    return null;
   }
 
-  const match = (data ?? []).find((claim) =>
-    claimMatchesContact(asRecord(claim), lookup)
-  );
-  return match ? asRecord(match) : null;
+  return stringValue(data?.owner_whatsapp_number) ??
+    stringValue(data?.owner_contact_phone) ??
+    null;
+}
+
+async function dispatchVenueWhatsAppAlert(
+  supabase: ReturnType<typeof adminClient>,
+  venueId: string,
+  messageBody: string,
+): Promise<void> {
+  const settings = await venueNotificationSettingsSnapshot(supabase, venueId);
+  if (!settings.whatsapp_updates_enabled) {
+    return;
+  }
+
+  const phone = await venueOwnerWhatsAppNumber(supabase, venueId);
+  if (!phone) {
+    console.log(
+      "[dinein-api] Skipping WhatsApp alert, no valid phone for venue",
+      venueId,
+    );
+    return;
+  }
+
+  const templateName = Deno.env.get("WHATSAPP_VENUE_ORDER_TEMPLATE");
+  if (templateName) {
+    // Note: Template requires approved WhatsApp Meta Business Template
+    const templatePayload = buildWhatsAppTemplatePayload(
+      phone,
+      templateName,
+      [{ type: "body", parameters: [{ type: "text", text: messageBody }] }],
+    );
+    const result = await postWhatsAppMessage(templatePayload);
+    if (!result.ok) {
+      console.error("[dinein-api] WhatsApp template alert failed", result);
+    }
+  } else {
+    // Fallback to text if testing limits or inside 24-hr session window.
+    const textPayload = buildWhatsAppTextPayload(phone, messageBody);
+    const result = await postWhatsAppMessage(textPayload);
+    if (!result.ok) {
+      console.error("[dinein-api] WhatsApp text alert failed", result);
+    }
+  }
 }
 
 async function menuItemVenueId(
@@ -2130,32 +1747,6 @@ async function verifyOrderReceiptToken(
   return stringValue(claims?.sub) == orderId;
 }
 
-function sanitizeVenueDraft(
-  rawDraft: unknown,
-  fallbackCountry: CountryCode = "MT",
-): JsonRecord {
-  const draft = asRecord(rawDraft);
-  const name = requireString(draft, "name");
-
-  return {
-    name,
-    slug: slugify(stringValue(draft.slug) ?? name),
-    category: stringValue(draft.category) ?? "restaurant",
-    description: stringValue(draft.description) ?? "",
-    address: stringValue(draft.address) ?? "",
-    phone: stringValue(draft.phone) ?? stringValue(draft.contact_phone) ??
-      stringValue(draft.contactPhone) ?? null,
-    email: stringValue(draft.email) ?? stringValue(draft.contact_email) ??
-      stringValue(draft.contactEmail) ?? null,
-    website_url: stringValue(draft.website_url) ??
-      stringValue(draft.websiteUrl) ?? null,
-    image_url: stringValue(draft.image_url) ?? stringValue(draft.imageUrl) ??
-      null,
-    country: normalizeCountryCode(draft.country, fallbackCountry),
-    status: "pending_claim",
-  };
-}
-
 function sanitizeVenueUpdates(
   rawUpdates: unknown,
   allowAdminFields: boolean,
@@ -2173,13 +1764,17 @@ function sanitizeVenueUpdates(
   applyString("category");
   applyString("description");
   applyString("address");
-  applyString("phone");
   applyString("email");
   applyString("website_url");
   applyString("reservation_url");
   applyString("revolut_url");
   applyString("wifi_ssid");
   applyString("wifi_password");
+
+  if ("phone" in updates) {
+    const phone = stringValue(updates.phone);
+    sanitized.phone = phone ? normalizePhone(phone) : null;
+  }
 
   if ("wifi_security" in updates || "wifiSecurity" in updates) {
     const raw = stringValue(updates.wifi_security ?? updates.wifiSecurity);
@@ -2257,7 +1852,10 @@ function sanitizeVenueUpdates(
   }
 
   if ("status" in updates) {
-    const status = requireString(updates, "status");
+    const rawStatus = requireString(updates, "status");
+    const status = rawStatus == "pending_claim"
+      ? "pending_activation"
+      : rawStatus;
     const allowedStatuses = allowAdminFields
       ? venueStatuses
       : new Set(["active", "inactive"]);
@@ -2368,7 +1966,8 @@ function publicVenueDetailPayload(rawVenue: unknown): JsonRecord {
 }
 
 function venueStatus(rawVenue: unknown): string {
-  return stringValue(asRecord(rawVenue).status) ?? "active";
+  const status = stringValue(asRecord(rawVenue).status) ?? "active";
+  return status === "pending_claim" ? "pending_activation" : status;
 }
 
 function venueOrderingEnabled(rawVenue: unknown): boolean {
@@ -2463,25 +2062,42 @@ function sanitizeMenuItemInsert(
   venueId?: string,
 ): JsonRecord {
   const item = asRecord(rawItem);
+  const name = requireString(item, "name");
+  const description = stringValue(item.description) ?? "";
+  const category = stringValue(item.category) ?? "Uncategorized";
+  const tags = Array.isArray(item.tags)
+    ? item.tags.map((tag) => stringValue(tag)).filter((tag): tag is string =>
+      Boolean(tag)
+    )
+    : [];
   const sanitized: JsonRecord = {
     venue_id: venueId ?? requireString(item, "venue_id", "venueId"),
-    name: requireString(item, "name"),
-    description: stringValue(item.description) ?? "",
+    name,
+    description,
     price: numberValue(item.price),
-    category: stringValue(item.category) ?? "Uncategorized",
+    category,
     image_url: stringValue(item.image_url) ?? stringValue(item.imageUrl) ??
       null,
     is_available: booleanValue(item.is_available) ?? true,
-    tags: Array.isArray(item.tags)
-      ? item.tags.map((tag) => stringValue(tag)).filter((tag): tag is string =>
-        Boolean(tag)
-      )
-      : [],
+    tags,
   };
 
   if (sanitized.price == undefined) {
     throw new HttpError(400, "A valid price is required.");
   }
+
+  const explicitClass = normalizeMenuItemClass(item.class);
+  if (item.class != undefined && item.class != null && !explicitClass) {
+    throw new HttpError(400, "Menu item class must be food or drinks.");
+  }
+
+  sanitized.class = explicitClass ?? inferMenuItemClass({
+    name,
+    category,
+    description,
+    tags,
+    class: null,
+  });
 
   const sortOrder = numberValue(item.sort_order);
   if (sortOrder != undefined) sanitized.sort_order = Math.round(sortOrder);
@@ -2565,6 +2181,18 @@ function sanitizeMenuItemUpdates(rawUpdates: unknown): JsonRecord {
       .filter((tag): tag is string => Boolean(tag));
   }
 
+  if ("class" in updates) {
+    const normalizedClass = normalizeMenuItemClass(updates.class);
+    if (
+      updates.class != undefined &&
+      updates.class != null &&
+      !normalizedClass
+    ) {
+      throw new HttpError(400, "Menu item class must be food or drinks.");
+    }
+    if (normalizedClass) sanitized.class = normalizedClass;
+  }
+
   const sortOrder = numberValue(updates.sort_order);
   if (sortOrder != undefined) sanitized.sort_order = Math.round(sortOrder);
 
@@ -2640,6 +2268,13 @@ function menuImageEnv(): MenuImageEnv {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
+    menuItemResearchModels: (
+      Deno.env.get("GEMINI_MENU_ITEM_MODELS") ??
+        "gemini-3-flash-preview,gemini-2.5-flash"
+    )
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
     menuImageBucket: Deno.env.get("MENU_IMAGE_BUCKET")?.trim() ||
       "menu-images",
     cronSecret: Deno.env.get("MENU_IMAGE_CRON_SECRET")?.trim() || null,
@@ -2660,7 +2295,7 @@ async function loadMenuItemForImageGeneration(
   const { data, error } = await supabase
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
     )
     .eq("venue_id", venueId)
     .order("sort_order", { ascending: true })
@@ -2813,135 +2448,6 @@ async function uniqueOrderInsert(
   );
 }
 
-async function uniqueVenueInsert(
-  supabase: ReturnType<typeof adminClient>,
-  draft: JsonRecord,
-): Promise<JsonRecord> {
-  const baseSlug = stringValue(draft.slug) ?? `venue-${Date.now()}`;
-
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const slug = attempt == 0
-      ? baseSlug
-      : `${baseSlug}-${Date.now().toString().slice(-6)}-${attempt}`;
-
-    const { data, error } = await supabase
-      .from("dinein_venues")
-      .insert({ ...draft, slug })
-      .select("*")
-      .single();
-
-    if (!error && data) {
-      return asRecord(data);
-    }
-
-    if (error?.code != "23505") {
-      console.error("[dinein-api] create pending venue failed", error);
-      throw new HttpError(500, "Could not create the pending venue.");
-    }
-  }
-
-  throw new HttpError(409, "Could not allocate a unique venue slug.");
-}
-
-async function assertVenueDraftDoesNotConflict(
-  supabase: ReturnType<typeof adminClient>,
-  draft: JsonRecord,
-): Promise<void> {
-  const draftName = stringValue(draft.name) ?? "This venue";
-  const draftSlug = stringValue(draft.slug) ?? slugify(draftName);
-
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .select("id, name, status, owner_id, approved_claim_id")
-    .in("status", ["active", "pending_claim", "pending_activation"])
-    .or(buildVenueConflictOrClause(draftName, draftSlug))
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  if (error) {
-    console.error("[dinein-api] pending venue conflict lookup failed", error);
-    throw new HttpError(500, "Could not validate the venue before claim.");
-  }
-
-  const rows = Array.isArray(data) ? data : data ? [data] : [];
-  const candidate = rows.find((venue) =>
-    isStrongOnboardingVenueMatch(draftName, venue)
-  );
-  if (!candidate) {
-    return;
-  }
-
-  const venue = asRecord(candidate);
-  const venueName = stringValue(venue.name) ?? draftName;
-  const ownerId = stringValue(venue.owner_id);
-  const status = stringValue(venue.status) ?? "active";
-
-  if (status == "active" && venueHasLinkedAccess(venue)) {
-    throw new HttpError(
-      409,
-      `Venue "${venueName}" is already live on DineIn and cannot be claimed from onboarding.`,
-    );
-  }
-
-  if (status == "active") {
-    throw new HttpError(
-      409,
-      `Venue "${venueName}" already exists on DineIn. Search and select the existing listing instead of creating a new one.`,
-    );
-  }
-
-  throw new HttpError(
-    409,
-    `Venue "${venueName}" already has a pending onboarding record on DineIn.`,
-  );
-}
-
-async function findUnavailableOnboardingVenueMatch(
-  supabase: ReturnType<typeof adminClient>,
-  query: string,
-  countryCode: CountryCode,
-): Promise<JsonRecord | null> {
-  const searchQuery = normalizeVenueSearchQuery(query);
-  if (!searchQuery) return null;
-
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .select("id, name, slug, status, owner_id, approved_claim_id")
-    .eq("country", countryCode)
-    .in("status", ["active", "pending_claim", "pending_activation"])
-    .or(buildVenueSearchOrClause(searchQuery))
-    .order("name", { ascending: true })
-    .limit(10);
-
-  if (error) {
-    console.error(
-      "[dinein-api] onboarding unavailable venue lookup failed",
-      error,
-    );
-    throw new HttpError(500, "Could not validate onboarding venue search.");
-  }
-
-  for (const candidate of data ?? []) {
-    const venue = asRecord(candidate);
-    if (!isStrongOnboardingVenueMatch(searchQuery, venue)) {
-      continue;
-    }
-
-    const status = stringValue(venue.status) ?? "active";
-    const name = stringValue(venue.name) ?? searchQuery;
-
-    if (status == "active" && venueHasLinkedAccess(venue)) {
-      return { name, reason: "already_live", status };
-    }
-
-    if (status == "pending_claim" || status == "pending_activation") {
-      return { name, reason: "already_onboarding", status };
-    }
-  }
-
-  return null;
-}
-
 async function handleCreateProfile(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
@@ -3031,91 +2537,6 @@ async function handleGetVenues(
   const visible = limit == null ? venues : venues.slice(offset, offset + limit);
 
   return ok(visible.map(publicVenueListPayload));
-}
-
-async function handleGetClaimableVenues(
-  supabase: ReturnType<typeof adminClient>,
-  body: JsonRecord,
-): Promise<Response> {
-  const countryCode = requestCountryCode(body);
-  const limit = normalizeListLimit(body.limit);
-  const offset = normalizeListOffset(body.offset);
-  const searchQuery = normalizeVenueSearchQuery(
-    body.query ?? body.search ?? body.term,
-  );
-
-  let query = supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("country", countryCode)
-    .eq("status", "active")
-    .is("owner_id", null)
-    .is("approved_claim_id", null)
-    .order("rating", { ascending: false })
-    .order("rating_count", { ascending: false })
-    .order("name", { ascending: true });
-
-  if (searchQuery) {
-    query = query.or(buildVenueSearchOrClause(searchQuery));
-  }
-
-  if (limit != null) {
-    query = query.range(offset, offset + limit - 1);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error("[dinein-api] get claimable venues failed", error);
-    throw new HttpError(500, "Could not load claimable venues.");
-  }
-
-  return ok((data ?? []).map(publicVenueListPayload));
-}
-
-async function handleSearchOnboardingVenues(
-  supabase: ReturnType<typeof adminClient>,
-  body: JsonRecord,
-): Promise<Response> {
-  const countryCode = requestCountryCode(body);
-  const searchQuery = normalizeVenueSearchQuery(
-    body.query ?? body.search ?? body.term,
-  );
-  if (!searchQuery) {
-    return ok({
-      results: [],
-      blockedMatch: null,
-    });
-  }
-
-  const limit = normalizeListLimit(body.limit, 20) ?? 10;
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("country", countryCode)
-    .eq("status", "active")
-    .is("owner_id", null)
-    .is("approved_claim_id", null)
-    .or(buildVenueSearchOrClause(searchQuery))
-    .order("rating", { ascending: false })
-    .order("rating_count", { ascending: false })
-    .order("name", { ascending: true })
-    .limit(limit);
-
-  if (error) {
-    console.error("[dinein-api] onboarding venue search failed", error);
-    throw new HttpError(500, "Could not search onboarding venues.");
-  }
-
-  const blockedMatch = await findUnavailableOnboardingVenueMatch(
-    supabase,
-    searchQuery,
-    countryCode,
-  );
-
-  return ok({
-    results: (data ?? []).map(publicVenueListPayload),
-    blockedMatch,
-  });
 }
 
 async function handleGetAllVenues(
@@ -3261,8 +2682,16 @@ async function handleUpdateVenue(
     venueId,
     body.venue_session,
   );
+  const adminActorId = mode == "admin"
+    ? (decodeJwtRole(req.headers.get("Authorization")) == "service_role"
+      ? "service_role"
+      : await requireAdmin(supabase, req))
+    : null;
 
   const updates = sanitizeVenueUpdates(body.updates, mode == "admin");
+  if (mode == "venue") {
+    delete updates.phone;
+  }
   if (Object.keys(updates).length == 0) {
     return ok(true);
   }
@@ -3274,6 +2703,34 @@ async function handleUpdateVenue(
   if (mode == "admin") {
     const persistedVenue = currentVenue ??
       await venueSnapshot(supabase, venueId);
+    if ("phone" in updates) {
+      const nextAccessPhone = stringValue(updates.phone);
+      const previousAccessPhone = normalizedVenueAccessPhone(persistedVenue);
+      const accessPhoneChanged = nextAccessPhone != previousAccessPhone;
+
+      if (nextAccessPhone && accessPhoneChanged) {
+        await ensureUniqueVenueAccessPhone(
+          supabase,
+          nextAccessPhone,
+          venueId,
+        );
+      }
+
+      updates.owner_contact_phone = nextAccessPhone;
+      updates.owner_whatsapp_number = nextAccessPhone;
+      updates.normalized_access_phone = nextAccessPhone;
+      updates.access_number_updated_at = new Date().toISOString();
+      updates.access_number_updated_by = adminActorId;
+
+      if (!nextAccessPhone || accessPhoneChanged) {
+        updates.access_verified_at = null;
+        updates.access_verification_method = null;
+        updates.access_verified_by = null;
+        updates.access_verification_note = null;
+        updates.last_access_token_issued_at = null;
+      }
+    }
+
     const nextVenue = { ...persistedVenue, ...updates };
     const readiness = venueOrderingReadiness(nextVenue);
     const explicitEnable = updates.ordering_enabled === true;
@@ -3321,6 +2778,13 @@ async function handleUpdateVenue(
 
   if (error) {
     console.error("[dinein-api] update venue failed", error);
+    if (error.code == "23505") {
+      throw new HttpError(
+        409,
+        "This WhatsApp number is already assigned to another venue.",
+        { code: "venue_access_phone_in_use" },
+      );
+    }
     if (error.code == "23514") {
       throw new HttpError(
         409,
@@ -3338,325 +2802,6 @@ async function handleUpdateVenue(
   }
 
   return ok(data ?? true);
-}
-
-async function handleCreatePendingClaimVenue(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  // Require contact info to prevent anonymous venue creation abuse
-  const draft = asRecord(body.draft);
-  const contactPhone = stringValue(draft.contact_phone) ??
-    stringValue(body.contactPhone) ?? stringValue(body.contact_phone);
-  const contactEmail = stringValue(draft.email) ?? stringValue(body.email);
-  if (!contactPhone && !contactEmail) {
-    throw new HttpError(
-      400,
-      "Contact phone or email is required to create a venue claim.",
-    );
-  }
-
-  const sanitizedDraft = sanitizeVenueDraft(
-    body.draft,
-    requestCountryCode(body),
-  );
-  await assertVenueDraftDoesNotConflict(supabase, sanitizedDraft);
-  const created = await uniqueVenueInsert(supabase, sanitizedDraft);
-  return ok(created, 201);
-}
-
-async function handleSubmitClaim(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  const user = await currentUser(req);
-
-  const rawPhone = stringValue(body.contactPhone) ??
-    stringValue(body.contact_phone) ??
-    stringValue(body.whatsapp_number);
-  const rawEmail = stringValue(body.email);
-
-  const lookup = rawPhone
-    ? buildContactLookup(rawPhone)
-    : rawEmail
-    ? buildContactLookup(rawEmail)
-    : null;
-
-  if (!lookup) {
-    throw new HttpError(400, "Contact phone or email is required.");
-  }
-
-  const existing = await latestClaimByContact(
-    supabase,
-    lookup,
-    "pending",
-    venueId,
-  );
-  if (existing) {
-    return ok(existing);
-  }
-
-  const { data: venueData, error: venueError } = await supabase
-    .from("dinein_venues")
-    .select("name,address,status")
-    .eq("id", venueId)
-    .maybeSingle();
-
-  if (venueError) {
-    console.error("[dinein-api] submit claim venue lookup failed", venueError);
-    throw new HttpError(500, "Could not load the venue for this claim.");
-  }
-
-  if (!venueData) {
-    throw new HttpError(404, "Venue not found.");
-  }
-
-  const venue = asRecord(venueData);
-  const phone = lookup.kind == "phone" ? lookup.normalized : null;
-  const email = rawEmail && rawEmail.includes("@")
-    ? rawEmail.toLowerCase()
-    : null;
-
-  const { data, error } = await supabase
-    .from("dinein_venue_claims")
-    .insert({
-      venue_id: venueId,
-      claimant_id: user?.id ?? null,
-      email,
-      contact_phone: phone,
-      whatsapp_number: phone,
-      venue_name: stringValue(body.venueName) ?? stringValue(venue.name) ?? "",
-      venue_area: stringValue(body.venueArea) ?? stringValue(venue.address) ??
-        "",
-      pin: stringValue(body.pin) ?? null,
-      claimant_name: stringValue(body.claimantName) ??
-        stringValue(body.claimant_name) ?? null,
-      status: "pending",
-    })
-    .select("*")
-    .single();
-
-  if (error) {
-    console.error("[dinein-api] submit claim failed", error);
-    throw new HttpError(500, "Could not submit the venue claim.");
-  }
-
-  if (stringValue(venue.status) == "pending_claim") {
-    const { error: venueStatusError } = await supabase
-      .from("dinein_venues")
-      .update({ status: "pending_activation" })
-      .eq("id", venueId);
-
-    if (venueStatusError) {
-      console.error(
-        "[dinein-api] pending activation update failed",
-        venueStatusError,
-      );
-    }
-  }
-
-  return ok(data, 201);
-}
-
-async function handleGetPendingClaims(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-
-  const { data, error } = await supabase
-    .from("dinein_venue_claims")
-    .select("*")
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("[dinein-api] get pending claims failed", error);
-    throw new HttpError(500, "Could not load venue claims.");
-  }
-
-  return ok(data ?? []);
-}
-
-async function handleGetLatestClaimByContact(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-  const contact = requireString(body, "contactPhone", "contact_phone", "email");
-  const status = stringValue(body.status);
-  const claim = await latestClaimByContact(
-    supabase,
-    buildContactLookup(contact),
-    status,
-  );
-  return ok(claim);
-}
-
-// ─── CLAIM APPROVAL TOKEN ISSUANCE (admin only) ───
-async function handleAutoApproveOnboardingClaim(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const adminId = await requireAdmin(supabase, req);
-  const claimId = requireString(body, "claimId", "claim_id");
-  const venueId = requireString(body, "venueId", "venue_id");
-  const contactPhone = stringValue(body.contactPhone) ??
-    stringValue(body.contact_phone) ?? "";
-
-  // Load the claim
-  const { data: claimData, error: claimError } = await supabase
-    .from("dinein_venue_claims")
-    .select("*")
-    .eq("id", claimId)
-    .maybeSingle();
-
-  if (claimError) {
-    console.error("[dinein-api] auto-approve claim lookup failed", claimError);
-    throw new HttpError(500, "Could not load the claim.");
-  }
-  if (!claimData) {
-    throw new HttpError(404, "Claim not found.");
-  }
-
-  const claim = asRecord(claimData);
-  const claimStatus = stringValue(claim.status);
-  if (claimStatus !== "pending") {
-    throw new HttpError(400, `Claim is already ${claimStatus ?? "processed"}.`);
-  }
-
-  const claimVenueId = stringValue(claim.venue_id);
-  if (claimVenueId && claimVenueId !== venueId) {
-    throw new HttpError(403, "Venue ID does not match the claim.");
-  }
-
-  // Approve the claim
-  const approvedAt = new Date().toISOString();
-  await persistApprovedVenueClaim(supabase, claim, approvedAt, adminId);
-  await persistApprovedVenueLinkage(supabase, claim, approvedAt);
-
-  const claimantId = stringValue(claim.claimant_id);
-  await upsertVenueOwnerProfileRole(supabase, claimantId);
-
-  // Load venue name for token
-  const { data: venueData } = await supabase
-    .from("dinein_venues")
-    .select("name")
-    .eq("id", venueId)
-    .maybeSingle();
-
-  const venueName = stringValue(asRecord(venueData ?? {}).name) ?? "";
-  const phone = contactPhone || stringValue(claim.contact_phone) ||
-    stringValue(claim.whatsapp_number) || "";
-
-  // Issue venue access token
-  const token = await issueVenueToken(venueId, phone, venueName, {
-    claimId,
-  });
-  await persistVenueAccessAudit(supabase, claim, {
-    issuedAt: token.issued_at,
-    approvedAt,
-  });
-
-  return ok({
-    venue_name: venueName,
-    venue_token: token,
-  });
-}
-
-async function handleApproveClaim(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const adminId = await requireAdmin(supabase, req);
-  const claimId = requireString(body, "claimId", "claim_id");
-
-  const { data: claimData, error: claimError } = await supabase
-    .from("dinein_venue_claims")
-    .select("*")
-    .eq("id", claimId)
-    .maybeSingle();
-
-  if (claimError) {
-    console.error("[dinein-api] approve claim lookup failed", claimError);
-    throw new HttpError(500, "Could not load the claim.");
-  }
-
-  if (!claimData) {
-    throw new HttpError(404, "Claim not found.");
-  }
-
-  const claim = asRecord(claimData);
-  const claimStatus = stringValue(claim.status) ?? "pending";
-  if (claimStatus !== "pending") {
-    throw new HttpError(400, `Claim is already ${claimStatus}.`);
-  }
-
-  // F4 fix: always derive venueId from the claim row, never from request body
-  const claimVenueId = stringValue(claim.venue_id);
-  if (!claimVenueId) {
-    throw new HttpError(400, "Claim has no associated venue.");
-  }
-
-  // If caller provided a venueId, verify it matches the claim's venue
-  const requestVenueId = stringValue(body.venueId) ??
-    stringValue(body.venue_id);
-  if (requestVenueId && requestVenueId !== claimVenueId) {
-    throw new HttpError(
-      403,
-      "Venue ID does not match the claim. Ownership transfer rejected.",
-    );
-  }
-
-  const approvedAt = new Date().toISOString();
-  await persistApprovedVenueClaim(supabase, claim, approvedAt, adminId);
-  const claimantId = stringValue(claim.claimant_id);
-  await persistApprovedVenueLinkage(supabase, claim, approvedAt);
-  await upsertVenueOwnerProfileRole(supabase, claimantId);
-
-  return ok({
-    approved: true,
-    activated: true,
-    claim_id: claimId,
-    venue_id: claimVenueId,
-    venue_status: "active",
-    venueStatus: "active",
-    owner_assigned: claimantId != null,
-    ownerAssigned: claimantId != null,
-    claim_linked: true,
-    claimLinked: true,
-  });
-}
-
-async function handleRejectClaim(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const adminId = await requireAdmin(supabase, req);
-  const claimId = requireString(body, "claimId", "claim_id");
-
-  const { error } = await supabase
-    .from("dinein_venue_claims")
-    .update({
-      status: "rejected",
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: adminId,
-    })
-    .eq("id", claimId);
-
-  if (error) {
-    console.error("[dinein-api] reject claim failed", error);
-    throw new HttpError(500, "Could not reject the claim.");
-  }
-
-  return ok(true);
 }
 
 async function handleGetMenuItems(
@@ -3905,232 +3050,6 @@ async function handleSetMenuItemHighlights(
   return ok(data ?? []);
 }
 
-async function handleImportDraftItems(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const items = Array.isArray(body.items) ? body.items : [];
-  const sanitized = items.map((item) => sanitizeMenuItemInsert(item, venueId));
-  if (sanitized.length == 0) {
-    return ok(true);
-  }
-
-  const { error } = await supabase
-    .from("dinein_menu_items")
-    .insert(sanitized);
-
-  if (error) {
-    console.error("[dinein-api] import draft items failed", error);
-    throw new HttpError(500, "Could not import draft menu items.");
-  }
-
-  return ok(true, 201);
-}
-
-async function handleReplaceVenueMenu(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const items = Array.isArray(body.items) ? body.items : [];
-  const sanitized = items.map((item) => sanitizeMenuItemInsert(item, venueId));
-
-  // Delete existing menu items for this venue
-  const { error: deleteError } = await supabase
-    .from("dinein_menu_items")
-    .delete()
-    .eq("venue_id", venueId);
-
-  if (deleteError) {
-    console.error("[dinein-api] delete venue menu items failed", deleteError);
-    throw new HttpError(500, "Could not clear existing menu items.");
-  }
-
-  // Insert new items
-  if (sanitized.length > 0) {
-    const { error: insertError } = await supabase
-      .from("dinein_menu_items")
-      .insert(sanitized);
-
-    if (insertError) {
-      console.error(
-        "[dinein-api] replace venue menu insert failed",
-        insertError,
-      );
-      throw new HttpError(500, "Could not insert replacement menu items.");
-    }
-  }
-
-  return ok(true, 201);
-}
-
-async function handleOcrExtractMenu(
-  supabase: ReturnType<typeof adminClient>,
-  _req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const authHeader = _req.headers.get("Authorization");
-  const isServiceRole = decodeJwtRole(authHeader) === "service_role";
-  let isAuthorized = isServiceRole;
-
-  if (!isAuthorized) {
-    const aid = await adminUserId(supabase, _req).catch(() => null);
-    if (aid) isAuthorized = true;
-  }
-
-  if (!isAuthorized) {
-    const venueClaims = await venueSessionClaims(_req).catch(() => null);
-    if (venueClaims?.venue_id) isAuthorized = true;
-  }
-
-  if (!isAuthorized) {
-    const onboardingClaims = await onboardingMenuClaims(body).catch(() => null);
-    if (onboardingClaims?.phone) isAuthorized = true;
-  }
-
-  if (!isAuthorized) {
-    throw new HttpError(401, "Authentication required to extract menus.");
-  }
-
-  const fileUrl = requireString(body, "fileUrl", "file_url");
-  if (!isAllowedMenuUploadUrl(fileUrl, getEnv("SUPABASE_URL"))) {
-    throw new HttpError(
-      400,
-      "Menu extraction only accepts signed uploads from the menu-uploads bucket.",
-    );
-  }
-  const geminiApiKey = optionalEnv("GEMINI_API_KEY");
-  if (!geminiApiKey) {
-    throw new HttpError(500, "GEMINI_API_KEY is not configured.");
-  }
-
-  // Fetch the file from the URL
-  let fileBytes: Uint8Array;
-  let mimeType = "image/jpeg";
-  try {
-    const fileResponse = await fetch(fileUrl);
-    if (!fileResponse.ok) {
-      throw new HttpError(
-        400,
-        `Could not fetch file: ${fileResponse.statusText}`,
-      );
-    }
-    mimeType = normalizeMenuUploadContentType(
-      fileResponse.headers.get("content-type"),
-    ) ?? "image/jpeg";
-    fileBytes = new Uint8Array(await fileResponse.arrayBuffer());
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    throw new HttpError(400, "Could not download the uploaded file.");
-  }
-  if (fileBytes.byteLength == 0) {
-    throw new HttpError(400, "Uploaded menu file is empty.");
-  }
-  if (fileBytes.byteLength > 10 * 1024 * 1024) {
-    throw new HttpError(413, "Uploaded menu file exceeds the 10MB limit.");
-  }
-
-  // Convert to base64 for Gemini
-  let binaryString = "";
-  for (const byte of fileBytes) {
-    binaryString += String.fromCharCode(byte);
-  }
-  const base64Data = btoa(binaryString);
-
-  const ocrPrompt = `
-Analyze this restaurant menu image or document. Extract ALL menu items into a structured JSON array.
-
-For each item, extract:
-- "name": the dish/drink name (string, required)
-- "description": a brief description if visible (string, can be empty)
-- "price": the price as a number (e.g. 12.50) — use 0 if not visible
-- "category": the menu section/category (e.g. "Starters", "Main Course", "Desserts", "Drinks") — infer from context if not explicitly labeled
-- "requires_review": true (always true — human should verify OCR output)
-
-Rules:
-- Extract EVERY item you can identify, even if partially visible
-- Prices should be numbers without currency symbols
-- Categories should be Title Case
-- If the menu is in a non-English language, translate item names and descriptions to English
-- Return ONLY a valid JSON array, no other text
-
-Example output:
-[{"name":"Grilled Salmon","description":"Fresh Atlantic salmon with lemon butter","price":24.50,"category":"Main Course","requires_review":true}]
-  `.trim();
-
-  // Call Gemini Vision API
-  const geminiModel = "gemini-2.5-flash";
-  const geminiUrl =
-    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiApiKey}`;
-
-  const geminiBody = {
-    contents: [{
-      parts: [
-        { text: ocrPrompt },
-        {
-          inline_data: {
-            mime_type: mimeType.startsWith("application/pdf")
-              ? "application/pdf"
-              : mimeType,
-            data: base64Data,
-          },
-        },
-      ],
-    }],
-    generationConfig: {
-      temperature: 0.1,
-      maxOutputTokens: 8192,
-      responseMimeType: "application/json",
-    },
-  };
-
-  let extractedItems: JsonRecord[] = [];
-  try {
-    const geminiResponse = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(geminiBody),
-    });
-
-    if (!geminiResponse.ok) {
-      const errorBody = await geminiResponse.text();
-      console.error("[dinein-api] Gemini OCR failed", errorBody);
-      throw new HttpError(502, "Menu extraction failed. Please try again.");
-    }
-
-    const geminiData = await geminiResponse.json();
-    const textContent =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
-
-    // Parse the JSON response
-    const parsed = JSON.parse(textContent);
-    extractedItems = Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    if (error instanceof HttpError) throw error;
-    console.error("[dinein-api] OCR extraction error", error);
-    throw new HttpError(502, "Could not extract menu items from the file.");
-  }
-
-  // Normalize extracted items
-  const items = extractedItems.map((item) => ({
-    name: stringValue(item.name) ?? "Unnamed Item",
-    description: stringValue(item.description) ?? "",
-    price: roundCurrency(numberValue(item.price) ?? 0),
-    category: stringValue(item.category) ?? "General",
-    tags: [],
-    requires_review: true,
-  }));
-
-  return ok({ items, count: items.length });
-}
-
 async function handleGenerateMenuItemImage(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
@@ -4178,7 +3097,7 @@ async function handleBackfillMenuImages(
   let query = imageClient
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
     )
     .eq("venue_id", venueId)
     .eq("image_locked", false)
@@ -4656,87 +3575,6 @@ async function maybeGenerateVenueProfileImageAfterEnrichment(
   });
 
   return result as unknown as JsonRecord;
-}
-
-async function handleUploadMenuFile(
-  supabase: ReturnType<typeof adminClient>,
-  _req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const authHeader = _req.headers.get("Authorization");
-  const isServiceRole = decodeJwtRole(authHeader) === "service_role";
-  let isAuthorized = isServiceRole;
-
-  if (!isAuthorized) {
-    const aid = await adminUserId(supabase, _req).catch(() => null);
-    if (aid) isAuthorized = true;
-  }
-
-  if (!isAuthorized) {
-    const venueClaims = await venueSessionClaims(_req).catch(() => null);
-    if (venueClaims?.venue_id) isAuthorized = true;
-  }
-
-  if (!isAuthorized) {
-    const onboardingClaims = await onboardingMenuClaims(body).catch(() => null);
-    if (onboardingClaims?.phone) isAuthorized = true;
-  }
-
-  if (!isAuthorized) {
-    throw new HttpError(401, "Authentication required to upload menu files.");
-  }
-
-  const fileName = sanitizeStorageFileName(
-    stringValue(body.fileName) ?? stringValue(body.file_name) ?? "menu-upload",
-  );
-  const contentType = normalizeMenuUploadContentType(
-    stringValue(body.contentType) ?? stringValue(body.content_type),
-  );
-  if (!contentType) {
-    throw new HttpError(
-      400,
-      "Unsupported file type. Allowed: JPEG, PNG, WebP, HEIC, PDF.",
-    );
-  }
-
-  const fileData = requireString(body, "fileData", "file_data");
-  const bytes = decodeBase64Bytes(fileData);
-  if (bytes.byteLength == 0) {
-    throw new HttpError(400, "Menu upload is empty.");
-  }
-  if (bytes.byteLength > 10 * 1024 * 1024) {
-    throw new HttpError(413, "Menu upload exceeds the 10MB limit.");
-  }
-
-  const storagePath =
-    `uploads/${Date.now()}-${crypto.randomUUID()}-${fileName}`;
-  const { error: uploadError } = await supabase.storage
-    .from("menu-uploads")
-    .upload(storagePath, bytes, {
-      contentType,
-      upsert: false,
-    });
-  if (uploadError) {
-    console.error("[dinein-api] menu upload failed", uploadError);
-    throw new HttpError(500, "Could not upload the menu file.");
-  }
-
-  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-    .from("menu-uploads")
-    .createSignedUrl(storagePath, 600);
-  if (signedUrlError || !signedUrlData?.signedUrl) {
-    console.error(
-      "[dinein-api] menu upload signed url failed",
-      signedUrlError,
-    );
-    throw new HttpError(500, "Could not finalize the menu upload.");
-  }
-
-  return ok({
-    path: storagePath,
-    signed_url: signedUrlData.signedUrl,
-    signedUrl: signedUrlData.signedUrl,
-  }, 201);
 }
 
 async function handleSearchGoogleMaps(
@@ -5303,6 +4141,16 @@ async function handlePlaceOrder(
     console.error("[dinein-api] order push dispatch failed", error);
   }
 
+  try {
+    await dispatchVenueWhatsAppAlert(
+      supabase,
+      venueId,
+      `New Order #${orderData.daily_sequence_number} received! Total: €${orderData.total}`,
+    );
+  } catch (error) {
+    console.error("[dinein-api] venue whatsapp alert dispatch failed", error);
+  }
+
   return ok({
     ...orderData,
     venue_image_url: stringValue(venue.image_url) ?? null,
@@ -5552,150 +4400,6 @@ async function handleUpdateOrderStatus(
   return ok(true);
 }
 
-async function handleIssueVenueToken(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-  const contactPhone = requireString(body, "contactPhone", "contact_phone");
-  const venueId = requireString(body, "venueId", "venue_id");
-
-  // Verify the caller has an approved claim for this venue
-  const lookup = buildContactLookup(contactPhone);
-  if (lookup.kind !== "phone") {
-    throw new HttpError(400, "A valid phone number is required.");
-  }
-
-  const { data, error } = await supabase
-    .from("dinein_venue_claims")
-    .select("*")
-    .eq("venue_id", venueId)
-    .eq("status", "approved")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("[dinein-api] venue token claim lookup failed", error);
-    throw new HttpError(500, "Could not verify venue access.");
-  }
-
-  const approvedClaim = (data ?? []).map(asRecord).find((claim) =>
-    claimMatchesContact(claim, lookup)
-  );
-  if (!approvedClaim) {
-    throw new HttpError(
-      403,
-      "No approved claim found for this venue and phone number.",
-    );
-  }
-
-  // Load venue name for the token payload
-  const { data: venueData } = await supabase
-    .from("dinein_venues")
-    .select("name")
-    .eq("id", venueId)
-    .maybeSingle();
-
-  const venueName = stringValue(asRecord(venueData ?? {}).name) ?? "";
-
-  const token = await issueVenueToken(venueId, lookup.normalized, venueName, {
-    claimId: stringValue(approvedClaim.id),
-  });
-  await persistVenueAccessAudit(supabase, approvedClaim, {
-    issuedAt: token.issued_at,
-  });
-  return ok(token);
-}
-
-async function handleConfirmVenueAccess(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const isServiceRole =
-    decodeJwtRole(req.headers.get("Authorization")) == "service_role";
-  const verifiedBy = isServiceRole
-    ? "service_role"
-    : await requireAdmin(supabase, req);
-
-  const contactPhone = requireString(body, "contactPhone", "contact_phone");
-  const venueId = requireString(body, "venueId", "venue_id");
-  const verificationNote = stringValue(
-    body.verificationNote ?? body.verification_note ?? body.note,
-  ) ?? "Admin confirmed venue access without OTP.";
-  const lookup = buildContactLookup(contactPhone);
-  if (lookup.kind !== "phone") {
-    throw new HttpError(400, "A valid phone number is required.");
-  }
-
-  const { data, error } = await supabase
-    .from("dinein_venue_claims")
-    .select("*")
-    .eq("venue_id", venueId)
-    .eq("status", "approved")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error(
-      "[dinein-api] confirm venue access claim lookup failed",
-      error,
-    );
-    throw new HttpError(500, "Could not verify venue access.");
-  }
-
-  const approvedClaim = (data ?? []).map(asRecord).find((claim) =>
-    claimMatchesContact(claim, lookup)
-  );
-  if (!approvedClaim) {
-    throw new HttpError(
-      404,
-      "No approved claim found for this venue and phone number.",
-    );
-  }
-
-  const { data: venueData, error: venueError } = await supabase
-    .from("dinein_venues")
-    .select("name")
-    .eq("id", venueId)
-    .maybeSingle();
-
-  if (venueError) {
-    console.error(
-      "[dinein-api] confirm venue access venue lookup failed",
-      venueError,
-    );
-    throw new HttpError(500, "Could not load the venue.");
-  }
-
-  const venueName = stringValue(asRecord(venueData ?? {}).name) ?? "";
-  const verifiedAt = new Date().toISOString();
-  const token = await issueVenueToken(venueId, lookup.normalized, venueName, {
-    claimId: stringValue(approvedClaim.id),
-    issuedAt: verifiedAt,
-  });
-  await persistVenueAccessAudit(supabase, approvedClaim, {
-    issuedAt: token.issued_at,
-    verifiedAt,
-    normalizedPhone: lookup.normalized,
-    verificationMethod: "admin_override",
-    verifiedBy,
-    verificationNote,
-  });
-
-  const nextVenue = await venueSnapshot(supabase, venueId);
-  const readiness = venueOrderingReadiness(nextVenue);
-  return ok({
-    venue_token: token,
-    verified_at: verifiedAt,
-    verification_method: "admin_override",
-    verified_by: verifiedBy,
-    verification_note: verificationNote,
-    ordering_ready: readiness.ready,
-    readiness_reasons: readiness.reasons,
-    supported_payment_methods: readiness.supportedPaymentMethods,
-  });
-}
-
 export async function handleAppRequest(req: Request): Promise<Response> {
   if (req.method == "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -5715,10 +4419,6 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleGetUserRole(supabase, req, body);
       case "get_venues":
         return await handleGetVenues(supabase, body);
-      case "get_claimable_venues":
-        return await handleGetClaimableVenues(supabase, body);
-      case "search_onboarding_venues":
-        return await handleSearchOnboardingVenues(supabase, body);
       case "get_all_venues":
         return await handleGetAllVenues(supabase, req, body);
       case "get_venue_by_slug":
@@ -5729,22 +4429,6 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleGetVenueForOwner(supabase, req, body);
       case "update_venue":
         return await handleUpdateVenue(supabase, req, body);
-      case "create_pending_claim_venue":
-        return await handleCreatePendingClaimVenue(supabase, req, body);
-      case "upload_menu_file":
-        return await handleUploadMenuFile(supabase, req, body);
-      case "submit_claim":
-        return await handleSubmitClaim(supabase, req, body);
-      case "get_pending_claims":
-        return await handleGetPendingClaims(supabase, req);
-      case "get_latest_claim_by_contact":
-        return await handleGetLatestClaimByContact(supabase, req, body);
-      case "approve_claim":
-        return await handleApproveClaim(supabase, req, body);
-      case "auto_approve_onboarding_claim":
-        return await handleAutoApproveOnboardingClaim(supabase, req, body);
-      case "reject_claim":
-        return await handleRejectClaim(supabase, req, body);
       case "get_menu_items":
         return await handleGetMenuItems(supabase, req, body);
       case "toggle_menu_item_availability":
@@ -5757,8 +4441,6 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleDeleteMenuItem(supabase, req, body);
       case "set_menu_item_highlights":
         return await handleSetMenuItemHighlights(supabase, req, body);
-      case "import_draft_items":
-        return await handleImportDraftItems(supabase, req, body);
       case "generate_menu_item_image":
         return await handleGenerateMenuItemImage(supabase, req, body);
       case "backfill_menu_images":
@@ -5797,16 +4479,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleGetOrderById(supabase, req, body);
       case "update_order_status":
         return await handleUpdateOrderStatus(supabase, req, body);
-      case "confirm_venue_access":
-        return await handleConfirmVenueAccess(supabase, req, body);
-      case "issue_venue_token":
-        return await handleIssueVenueToken(supabase, req, body);
       case "search_google_maps":
         return await handleSearchGoogleMaps(req, body);
-      case "ocr_extract_menu":
-        return await handleOcrExtractMenu(supabase, req, body);
-      case "replace_venue_menu":
-        return await handleReplaceVenueMenu(supabase, req, body);
       case "image_health":
         return await handleImageHealth(supabase, req);
       default:

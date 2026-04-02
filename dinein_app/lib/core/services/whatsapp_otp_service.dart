@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -28,8 +29,6 @@ class WhatsAppOtpVerificationResult {
   final DateTime? verifiedAt;
   final AdminAccessSession? adminSession;
   final VenueAccessSession? venueSession;
-  final String? onboardingMenuToken;
-  final String? claimStatus;
 
   const WhatsAppOtpVerificationResult({
     required this.verified,
@@ -38,9 +37,23 @@ class WhatsAppOtpVerificationResult {
     this.verifiedAt,
     this.adminSession,
     this.venueSession,
-    this.onboardingMenuToken,
-    this.claimStatus,
   });
+}
+
+@immutable
+class WhatsAppOtpException implements Exception {
+  final String message;
+  final String? reason;
+  final int? statusCode;
+
+  const WhatsAppOtpException({
+    required this.message,
+    this.reason,
+    this.statusCode,
+  });
+
+  @override
+  String toString() => message;
 }
 
 /// WhatsApp OTP transport backed by the Supabase Edge Function `whatsapp-otp`.
@@ -76,7 +89,10 @@ class WhatsAppOtpService {
   }) async {
     final normalizedPhone = _normalizePhone(phone);
     if (normalizedPhone.isEmpty) {
-      throw Exception('A valid WhatsApp number is required.');
+      throw const WhatsAppOtpException(
+        message: 'A valid WhatsApp number is required.',
+        reason: 'invalid_phone',
+      );
     }
 
     try {
@@ -137,34 +153,58 @@ class WhatsAppOtpService {
     String phone, {
     required String appScope,
   }) async {
-    final response = await SupabaseConfig.client.functions.invoke(
-      _functionName,
-      body: {'action': 'send', 'phone': phone, 'appScope': appScope},
-    );
+    try {
+      final response = await SupabaseConfig.client.functions.invoke(
+        _functionName,
+        body: {'action': 'send', 'phone': phone, 'appScope': appScope},
+      );
 
-    final json = _asJson(response.data);
-    if (json['success'] != true) {
-      throw Exception(
-        (json['message'] as String?) ?? 'Supabase OTP request failed.',
+      final json = _asJson(response.data);
+      if (json['success'] != true) {
+        throw WhatsAppOtpException(
+          message:
+              (json['message'] as String?) ?? 'Supabase OTP request failed.',
+          reason: json['reason'] as String? ?? json['code'] as String?,
+          statusCode: response.status,
+        );
+      }
+
+      return WhatsAppOtpChallenge(
+        verificationId:
+            json['verificationId'] as String? ??
+            json['verification_id'] as String? ??
+            '',
+        expiresAt:
+            DateTime.tryParse(
+              json['expiresAt'] as String? ??
+                  json['expires_at'] as String? ??
+                  '',
+            ) ??
+            DateTime.now().add(const Duration(minutes: 10)),
+        debugCode:
+            json['debugCode'] as String? ?? json['debug_code'] as String?,
+        usesMock: false,
+      );
+    } catch (error) {
+      if (error is WhatsAppOtpException) rethrow;
+      throw const WhatsAppOtpException(
+        message: 'Could not send WhatsApp code right now.',
+        reason: 'network_error',
       );
     }
-
-    return WhatsAppOtpChallenge(
-      verificationId:
-          json['verificationId'] as String? ??
-          json['verification_id'] as String? ??
-          '',
-      expiresAt:
-          DateTime.tryParse(
-            json['expiresAt'] as String? ?? json['expires_at'] as String? ?? '',
-          ) ??
-          DateTime.now().add(const Duration(minutes: 10)),
-      debugCode: json['debugCode'] as String? ?? json['debug_code'] as String?,
-      usesMock: false,
-    );
   }
 
   bool _shouldRethrowSendError(Object error) {
+    if (error is WhatsAppOtpException) {
+      return switch (error.reason) {
+        'admin_not_found' || 'venue_not_found' => true,
+        _ =>
+          error.message.toLowerCase().contains('not registered for admin') ||
+              error.message.toLowerCase().contains(
+                'not linked to a validated venue',
+              ),
+      };
+    }
     final raw = error.toString().toLowerCase();
     return raw.contains('not registered for admin') ||
         raw.contains('not linked to a validated venue');
@@ -176,55 +216,64 @@ class WhatsAppOtpService {
     required String code,
     required String appScope,
   }) async {
-    final response = await SupabaseConfig.client.functions.invoke(
-      _functionName,
-      body: {
-        'action': 'verify',
-        'phone': phone,
-        'appScope': appScope,
-        'verificationId': verificationId,
-        'verification_id': verificationId,
-        'code': code,
-      },
-    );
+    try {
+      final response = await SupabaseConfig.client.functions.invoke(
+        _functionName,
+        body: {
+          'action': 'verify',
+          'phone': phone,
+          'appScope': appScope,
+          'verificationId': verificationId,
+          'verification_id': verificationId,
+          'code': code,
+        },
+      );
 
-    final json = _asJson(response.data);
-    if (json['success'] != true) {
-      throw Exception(
-        (json['message'] as String?) ?? 'Supabase OTP verification failed.',
+      final json = _asJson(response.data);
+      if (json['success'] != true) {
+        throw WhatsAppOtpException(
+          message:
+              (json['message'] as String?) ??
+              'Supabase OTP verification failed.',
+          reason: json['reason'] as String? ?? json['code'] as String?,
+          statusCode: response.status,
+        );
+      }
+
+      final adminSessionValue = json['adminSession'] ?? json['admin_session'];
+      final adminSessionRaw = adminSessionValue is Map
+          ? adminSessionValue.map(
+              (key, value) => MapEntry(key.toString(), value),
+            )
+          : null;
+      final venueSessionValue = json['venueSession'] ?? json['venue_session'];
+      final venueSessionRaw = venueSessionValue is Map
+          ? venueSessionValue.map(
+              (key, value) => MapEntry(key.toString(), value),
+            )
+          : null;
+
+      return WhatsAppOtpVerificationResult(
+        verified: json['verified'] == true,
+        reason: json['reason'] as String?,
+        remainingAttempts: (json['remainingAttempts'] as num?)?.toInt(),
+        verifiedAt: DateTime.tryParse(
+          json['verifiedAt'] as String? ?? json['verified_at'] as String? ?? '',
+        ),
+        adminSession: adminSessionRaw == null
+            ? null
+            : AdminAccessSession.fromJson(adminSessionRaw),
+        venueSession: venueSessionRaw == null
+            ? null
+            : VenueAccessSession.fromJson(venueSessionRaw),
+      );
+    } catch (error) {
+      if (error is WhatsAppOtpException) rethrow;
+      throw const WhatsAppOtpException(
+        message: 'Could not verify the WhatsApp code right now.',
+        reason: 'network_error',
       );
     }
-
-    final adminSessionValue = json['adminSession'] ?? json['admin_session'];
-    final adminSessionRaw = adminSessionValue is Map
-        ? adminSessionValue.map((key, value) => MapEntry(key.toString(), value))
-        : null;
-    final venueSessionValue = json['venueSession'] ?? json['venue_session'];
-    final venueSessionRaw = venueSessionValue is Map
-        ? venueSessionValue.map((key, value) => MapEntry(key.toString(), value))
-        : null;
-
-    return WhatsAppOtpVerificationResult(
-      verified: json['verified'] == true,
-      reason: json['reason'] as String?,
-      remainingAttempts: (json['remainingAttempts'] as num?)?.toInt(),
-      verifiedAt: DateTime.tryParse(
-        json['verifiedAt'] as String? ?? json['verified_at'] as String? ?? '',
-      ),
-      adminSession: adminSessionRaw == null
-          ? null
-          : AdminAccessSession.fromJson(adminSessionRaw),
-      venueSession: venueSessionRaw == null
-          ? null
-          : VenueAccessSession.fromJson(venueSessionRaw),
-      onboardingMenuToken:
-          (json['onboardingMenuToken'] as Map?)?['access_token'] as String? ??
-          (json['onboarding_menu_token'] as Map?)?['access_token'] as String? ??
-          json['onboardingMenuToken'] as String? ??
-          json['onboarding_menu_token'] as String?,
-      claimStatus:
-          json['claimStatus'] as String? ?? json['claim_status'] as String?,
-    );
   }
 
   Future<WhatsAppOtpChallenge> _sendMock(String phone) async {

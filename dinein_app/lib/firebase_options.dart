@@ -10,6 +10,7 @@ class DefaultFirebaseOptions {
   /// Returns `true` when the current platform has a real (non-placeholder)
   /// Firebase configuration available.
   static bool get hasCurrentPlatformConfig {
+    if (kIsWeb) return false;
     try {
       final opts = currentPlatform;
       return !opts.apiKey.contains('REPLACE');
@@ -21,8 +22,8 @@ class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web — '
-        'this is a mobile-only app.',
+        'DefaultFirebaseOptions are not configured for web. '
+        'Use the web runtime stubs instead.',
       );
     }
     switch (defaultTargetPlatform) {
@@ -33,7 +34,8 @@ class DefaultFirebaseOptions {
       default:
         throw UnsupportedError(
           'DefaultFirebaseOptions are not configured for '
-          '${defaultTargetPlatform.name}',
+          '${defaultTargetPlatform.name}. Use FirebaseRuntimeService '
+          'for platform-safe initialization.',
         );
     }
   }

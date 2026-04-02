@@ -50,10 +50,7 @@ bool isValidMaltesePhoneLocalInput(String value) =>
 class PhoneTextInputFormatter extends TextInputFormatter {
   final String countryCode;
   final int maxDigits;
-  const PhoneTextInputFormatter({
-    this.countryCode = '356',
-    this.maxDigits = 8,
-  });
+  const PhoneTextInputFormatter({this.countryCode = '356', this.maxDigits = 8});
 
   @override
   TextEditingValue formatEditUpdate(
@@ -283,9 +280,11 @@ class OtpPillFields extends StatelessWidget {
 
         return Padding(
           padding: EdgeInsets.only(left: index == 0 ? 0 : 10),
-          child: KeyboardListener(
-            focusNode: FocusNode(),
-            onKeyEvent: (event) => _onKeyEvent(index, event),
+          child: Focus(
+            onKeyEvent: (_, event) {
+              _onKeyEvent(index, event);
+              return KeyEventResult.ignored;
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               width: 54,

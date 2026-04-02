@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -25,12 +24,17 @@ class AppPermissionService {
   final OpenSettingsCallback _openSettings;
 
   Future<bool> isGuestLocationGranted() async {
+    if (kIsWeb) return true;
     final status = await _safeReadStatus(Permission.locationWhenInUse);
     return status.isGranted;
   }
 
   Future<bool> ensureGuestWifiLocationAccess() async {
-    if (Platform.isAndroid) {
+    if (kIsWeb) {
+      return true;
+    }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
       final hasLocationAccess = await _ensureActionPermission(
         Permission.locationWhenInUse,
       );
@@ -38,27 +42,39 @@ class AppPermissionService {
       return _ensureActionPermission(Permission.nearbyWifiDevices);
     }
 
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       return _ensureActionPermission(Permission.locationWhenInUse);
     }
 
     return true;
   }
 
-  Future<bool> openAppPermissionSettings() => _openSettings();
+  Future<bool> openAppPermissionSettings() {
+    if (kIsWeb) {
+      return Future.value(false);
+    }
+    return _openSettings();
+  }
 
   Future<bool> ensureVenueCameraAccess() {
-    if (Platform.isAndroid) {
+    if (kIsWeb) {
+      return Future.value(false);
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
       return Future.value(true);
     }
-    if (Platform.isIOS) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
       return _ensureActionPermission(Permission.camera);
     }
     return Future.value(true);
   }
 
   Future<bool> ensureBiopayCameraAccess() {
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (kIsWeb) {
+      return Future.value(false);
+    }
+    if (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS) {
       return _ensureActionPermission(Permission.camera);
     }
     return Future.value(true);

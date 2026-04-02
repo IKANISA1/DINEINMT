@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/config/country_runtime.dart';
+import '../../../core/models/models.dart';
 import '../../../core/router/app_routes.dart';
 import '../../../core/services/auth_repository.dart';
 import '../../../core/services/whatsapp_otp_service.dart';
@@ -13,7 +14,24 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
 class VenueLoginScreen extends StatefulWidget {
-  const VenueLoginScreen({super.key});
+  final Future<WhatsAppOtpChallenge> Function(String phone, {String appScope})?
+  sendOtpOverride;
+  final Future<WhatsAppOtpVerificationResult> Function({
+    required String phone,
+    required String verificationId,
+    required String code,
+    String appScope,
+  })?
+  verifyOtpOverride;
+  final Future<void> Function(VenueAccessSession session)?
+  saveVenueSessionOverride;
+
+  const VenueLoginScreen({
+    super.key,
+    this.sendOtpOverride,
+    this.verifyOtpOverride,
+    this.saveVenueSessionOverride,
+  });
 
   @override
   State<VenueLoginScreen> createState() => _VenueLoginScreenState();
@@ -112,16 +130,92 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
   }
 
   bool _requiresSupportContact(Object error) {
+    if (error is WhatsAppOtpException) {
+      return switch (error.reason) {
+        'venue_not_found' => true,
+        _ => error.message.toLowerCase().contains(
+          'not linked to a validated venue',
+        ),
+      };
+    }
     final raw = error.toString().toLowerCase();
     return raw.contains('not linked to a validated venue') ||
         raw.contains('not registered for venue');
+  }
+
+  Future<WhatsAppOtpChallenge> _sendOtpRequest(String phone) {
+    return widget.sendOtpOverride?.call(phone, appScope: 'venue') ??
+        WhatsAppOtpService.instance.sendOtp(phone, appScope: 'venue');
+  }
+
+  Future<WhatsAppOtpVerificationResult> _verifyOtpRequest({
+    required String phone,
+    required String verificationId,
+    required String code,
+  }) {
+    return widget.verifyOtpOverride?.call(
+          phone: phone,
+          verificationId: verificationId,
+          code: code,
+          appScope: 'venue',
+        ) ??
+        WhatsAppOtpService.instance.verifyOtpDetailed(
+          phone: phone,
+          verificationId: verificationId,
+          code: code,
+        );
+  }
+
+  Future<void> _saveVenueSession(VenueAccessSession session) {
+    return widget.saveVenueSessionOverride?.call(session) ??
+        AuthRepository.instance.saveVenueSession(session);
+  }
+
+  String? _postLoginTarget(BuildContext context) {
+    final raw = GoRouterState.of(
+      context,
+    ).uri.queryParameters[AppRouteParams.returnTo];
+    if (raw == null || raw.trim().isEmpty) return null;
+
+    final target = Uri.tryParse(raw);
+    if (target == null || !target.path.startsWith('/venue')) return null;
+    if (target.path == AppRoutePaths.venueLogin) return null;
+    return target.toString();
+  }
+
+  String _verificationFailureMessage(String? reason) {
+    return switch (reason) {
+      'expired' => 'This code expired. Request a fresh code.',
+      'attempts_exceeded' =>
+        'Too many incorrect attempts. Request a fresh code.',
+      'not_found' => 'This code was not recognized. Request a fresh code.',
+      _ => 'That code was not accepted. Request a fresh code.',
+    };
+  }
+
+  String _verificationExceptionMessage(WhatsAppOtpException error) {
+    return switch (error.reason) {
+      'network_error' =>
+        'Could not verify the code right now. Check your connection and retry.',
+      'delivery_failed' =>
+        'WhatsApp delivery is currently unavailable. Request a fresh code shortly.',
+      _ => error.message,
+    };
   }
 
   Future<void> _showVenueSupportDialog({
     required String title,
     required String message,
   }) {
-    return showAccessSupportDialog(context, title: title, message: message);
+    return showAccessSupportDialog(
+      context,
+      title: title,
+      message: message,
+      ctaLabel: 'Contact Admin',
+      showWhatsAppBadge: true,
+      whatsAppNumber: CountryRuntime.config.venueAccessWhatsApp,
+      email: CountryRuntime.config.venueAccessEmail,
+    );
   }
 
   // ─── Send OTP ───
@@ -147,10 +241,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
     });
 
     try {
-      final challenge = await WhatsAppOtpService.instance.sendOtp(
-        _fullPhone,
-        appScope: 'venue',
-      );
+      final challenge = await _sendOtpRequest(_fullPhone);
       if (!mounted) return;
       _startCooldown();
 
@@ -186,9 +277,18 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         );
         return;
       }
+      final message = switch (error) {
+        WhatsAppOtpException(reason: 'network_error') =>
+          'Could not send code right now. Check your connection and retry.',
+        WhatsAppOtpException(reason: 'delivery_failed') =>
+          'WhatsApp delivery failed. Retry in a moment.',
+        WhatsAppOtpException(reason: 'rate_limited') =>
+          'Too many requests. Wait a few minutes.',
+        _ => 'Could not send code. Check the number and retry.',
+      };
       setState(() {
         _isLoading = false;
-        _error = 'Could not send code. Check the number and retry.';
+        _error = message;
       });
     }
   }
@@ -208,56 +308,66 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
       _error = null;
     });
 
-    final result = await WhatsAppOtpService.instance.verifyOtpDetailed(
-      phone: _fullPhone,
-      verificationId: challenge.verificationId,
-      code: code,
-    );
+    late final WhatsAppOtpVerificationResult result;
+    try {
+      result = await _verifyOtpRequest(
+        phone: _fullPhone,
+        verificationId: challenge.verificationId,
+        code: code,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      if (_requiresSupportContact(error)) {
+        setState(() {
+          _isLoading = false;
+          _error = null;
+        });
+        await _showVenueSupportDialog(
+          title: 'Venue Access Not Found',
+          message:
+              'This WhatsApp number is not linked to a validated venue account. Contact support to activate or recover venue access.',
+        );
+        return;
+      }
+      final message = error is WhatsAppOtpException
+          ? _verificationExceptionMessage(error)
+          : 'Could not verify the code right now. Request a fresh code.';
+      setState(() {
+        _isLoading = false;
+        _error = message;
+      });
+      return;
+    }
 
     if (!result.verified) {
       if (!mounted) return;
+      if (result.reason == 'venue_not_found') {
+        setState(() {
+          _isLoading = false;
+          _error = null;
+        });
+        await _showVenueSupportDialog(
+          title: 'Venue Access Not Found',
+          message:
+              'This WhatsApp number is no longer linked to a validated venue account. Contact support to restore venue access.',
+        );
+        return;
+      }
       setState(() {
         _isLoading = false;
-        _error = 'That code was not accepted. Request a fresh code.';
+        _error = _verificationFailureMessage(result.reason);
       });
       return;
     }
 
     final venueSession = result.venueSession;
     if (venueSession != null) {
-      await AuthRepository.instance.saveVenueSession(venueSession);
+      await _saveVenueSession(venueSession);
       if (!mounted) return;
-      context.goNamed(AppRouteNames.venueDashboard);
+      context.go(_postLoginTarget(context) ?? AppRoutePaths.venueDashboard);
       return;
     }
 
-    if (result.claimStatus == 'pending') {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _error = null;
-      });
-      await _showVenueSupportDialog(
-        title: 'Venue Access Pending',
-        message:
-            'This WhatsApp number is linked to a venue that is not validated yet. Contact support if you need help completing access.',
-      );
-      return;
-    }
-
-    if (!mounted) return;
-    if (result.claimStatus == 'not_found') {
-      setState(() {
-        _isLoading = false;
-        _error = null;
-      });
-      await _showVenueSupportDialog(
-        title: 'Venue Access Not Found',
-        message:
-            'This WhatsApp number is not linked to a validated venue account. Contact support to activate or recover venue access.',
-      );
-      return;
-    }
     setState(() {
       _isLoading = false;
       _error = 'Verified, but no session was issued. Request a fresh code.';
@@ -400,20 +510,6 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         ),
 
         const SizedBox(height: 32),
-
-        Center(
-          child: GestureDetector(
-            onTap: () => context.pushNamed(AppRouteNames.venueClaim),
-            child: Text(
-              'CLAIM YOUR VENUE',
-              style: tt.labelSmall?.copyWith(
-                color: cs.primary,
-                letterSpacing: 2,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -507,7 +603,8 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         const SizedBox(height: 20),
 
         Center(
-          child: GestureDetector(
+          child: PressableScale(
+            semanticLabel: 'Resend WhatsApp code',
             onTap: (_isLoading || _isCoolingDown) ? null : _sendOtp,
             child: Text(
               _isCoolingDown
@@ -533,6 +630,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
     return Align(
       alignment: Alignment.centerLeft,
       child: PressableScale(
+        semanticLabel: 'Go back',
         onTap: onTap,
         child: Container(
           width: 48,

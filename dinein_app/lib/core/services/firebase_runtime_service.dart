@@ -18,6 +18,13 @@ class FirebaseRuntimeService {
   }
 
   static Future<bool> _initialize() async {
+    if (kIsWeb) {
+      debugPrint('[firebase] Web runtime uses no-op initialization.');
+      _initialized = true;
+      _initializing = null;
+      return true;
+    }
+
     try {
       await Firebase.initializeApp();
       _initialized = true;

@@ -12,10 +12,10 @@ class FaceDetectionService {
 
   /// Quality thresholds.
   static const double minFaceWidthRatio =
-      0.25; // Face must be ≥25% of frame width
+      0.15; // Face must be ≥15% of frame width (distance scanning)
   static const double maxYawAngle = 20.0; // degrees
   static const double minEyeOpenProbability = 0.5;
-  static const double minBrightness = 0.23;
+  static const double minBrightness = 0.15; // Loosened for low-light scanning
 
   /// Initialize the ML Kit face detector with classification enabled.
   void initialize() {

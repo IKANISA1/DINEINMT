@@ -3,8 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../../features/admin/activation/admin_activation_screen.dart';
 import '../../features/admin/admin_shell.dart';
 import '../../features/admin/auth/admin_login_screen.dart';
-import '../../features/admin/claims/admin_claim_detail_screen.dart';
-import '../../features/admin/claims/admin_claim_review_screen.dart';
 import '../../features/admin/dashboard/admin_dashboard_screen.dart';
 import '../../features/admin/menus/admin_menu_review_screen.dart';
 import '../../features/admin/menus/admin_menus_screen.dart';
@@ -49,22 +47,6 @@ final List<RouteBase> adminRoutes = [
         redirect: adminRoleGuard,
         pageBuilder: (context, state) =>
             buildFadeSlidePage(state, const AdminDashboardScreen()),
-      ),
-      GoRoute(
-        path: AppRoutePaths.adminClaims,
-        name: AppRouteNames.adminClaims,
-        redirect: adminRoleGuard,
-        pageBuilder: (context, state) =>
-            buildFadeSlidePage(state, const AdminClaimReviewScreen()),
-      ),
-      GoRoute(
-        path: AppRoutePaths.adminClaimDetail,
-        name: AppRouteNames.adminClaimDetail,
-        redirect: adminRoleGuard,
-        pageBuilder: (context, state) {
-          final id = state.pathParameters[AppRouteParams.id]!;
-          return buildFadeSlidePage(state, AdminClaimDetailScreen(claimId: id));
-        },
       ),
       GoRoute(
         path: AppRoutePaths.adminVenues,

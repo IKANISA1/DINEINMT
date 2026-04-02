@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -30,17 +29,129 @@ class AdminShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final index = _currentIndex(context);
 
-    return Scaffold(
-      body: Column(
-        children: [
-          // ─── Branded Top Bar ───
-          const _AdminTopBar(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 1040) {
+          return _WideAdminShell(currentIndex: index, child: child);
+        }
 
-          // ─── Content ───
-          Expanded(child: child),
+        return Scaffold(
+          body: Column(
+            children: [
+              // ─── Branded Top Bar ───
+              const _AdminTopBar(),
+
+              // ─── Content ───
+              Expanded(child: child),
+            ],
+          ),
+          bottomNavigationBar: _AdminBottomNav(currentIndex: index),
+        );
+      },
+    );
+  }
+}
+
+class _WideAdminShell extends StatelessWidget {
+  final Widget child;
+  final int currentIndex;
+
+  const _WideAdminShell({required this.child, required this.currentIndex});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      body: Row(
+        children: [
+          SizedBox(
+            width: 292,
+            child: AdaptiveGlassSurface(
+              decoration: BoxDecoration(
+                color: cs.surface.withValues(alpha: 0.92),
+                border: Border(
+                  right: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                ),
+              ),
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: Row(
+                        children: [
+                          const BrandMark(
+                            size: 40,
+                            borderRadius: 12,
+                            fontSize: 24,
+                            shadowBlur: 18,
+                            shadowOpacity: 0.20,
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'HQ',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                              ),
+                              Text(
+                                'ADMIN CONSOLE',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 3,
+                                      color: AppColors.primary,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: NavigationRail(
+                        selectedIndex: currentIndex,
+                        onDestinationSelected: (index) =>
+                            context.goNamed(_adminNavItems[index].routeName),
+                        backgroundColor: Colors.transparent,
+                        labelType: NavigationRailLabelType.all,
+                        destinations: [
+                          for (final item in _adminNavItems)
+                            NavigationRailDestination(
+                              icon: Icon(item.icon),
+                              selectedIcon: Icon(item.icon),
+                              label: Text(item.label),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          VerticalDivider(
+            width: 1,
+            color: Colors.white.withValues(alpha: 0.05),
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                const _AdminTopBar(),
+                Expanded(child: child),
+              ],
+            ),
+          ),
         ],
       ),
-      bottomNavigationBar: _AdminBottomNav(currentIndex: index),
     );
   }
 }
@@ -56,99 +167,94 @@ class _AdminTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: 0.60),
-            border: Border(
-              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-            ),
+    return AdaptiveGlassSurface(
+      decoration: BoxDecoration(
+        color: cs.surface.withValues(alpha: 0.60),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTheme.space6,
+            vertical: AppTheme.space4,
           ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.space6,
-                vertical: AppTheme.space4,
-              ),
-              child: Row(
-                children: [
-                  // ─── Brand Mark + Brand ───
-                  PressableScale(
-                    onTap: () => context.goNamed(AppRouteNames.adminOverview),
-                    child: Row(
+          child: Row(
+            children: [
+              // ─── Brand Mark + Brand ───
+              PressableScale(
+                onTap: () => context.goNamed(AppRouteNames.adminOverview),
+                semanticLabel: 'Open admin overview',
+                child: Row(
+                  children: [
+                    const BrandMark(
+                      size: 40,
+                      borderRadius: 12,
+                      fontSize: 24,
+                      shadowBlur: 18,
+                      shadowOpacity: 0.20,
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const BrandMark(
-                          size: 40,
-                          borderRadius: 12,
-                          fontSize: 24,
-                          shadowBlur: 18,
-                          shadowOpacity: 0.20,
+                        Text(
+                          'HQ',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'HQ',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              'ADMIN CONSOLE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 3,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'ADMIN CONSOLE',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-
-                  const Spacer(),
-
-                  // ─── Avatar ───
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.10),
-                      ),
-                      boxShadow: AppTheme.clayShadow,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'A',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: cs.primary,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+
+              const Spacer(),
+
+              // ─── Avatar ───
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.10),
+                  ),
+                  boxShadow: AppTheme.clayShadow,
+                ),
+                child: Center(
+                  child: Text(
+                    'A',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: cs.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 }
-
 
 /// Bottom nav matching React AdminLayout:
 /// 5 tabs: Overview, Venues, Menus, Orders, Settings
@@ -163,126 +269,94 @@ class _AdminBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final items = [
-      _NavData(
-        icon: LucideIcons.layoutDashboard,
-        label: 'Overview',
-        routeName: AppRouteNames.adminOverview,
+    return AdaptiveGlassSurface(
+      decoration: BoxDecoration(
+        color: cs.surface.withValues(alpha: 0.60),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+        ),
       ),
-      _NavData(
-        icon: LucideIcons.store,
-        label: 'Venues',
-        routeName: AppRouteNames.adminVenues,
-      ),
-      _NavData(
-        icon: LucideIcons.menu,
-        label: 'Menus',
-        routeName: AppRouteNames.adminMenus,
-      ),
-      _NavData(
-        icon: LucideIcons.shoppingBag,
-        label: 'Orders',
-        routeName: AppRouteNames.adminOrders,
-      ),
-      _NavData(
-        icon: LucideIcons.settings,
-        label: 'Settings',
-        routeName: AppRouteNames.adminSettings,
-      ),
-    ];
-
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: 0.60),
-            border: Border(
-              top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
-            ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppTheme.space4,
+            vertical: AppTheme.space4,
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.space4,
-                vertical: AppTheme.space4,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(items.length, (i) {
-                  final item = items[i];
-                  final isActive = currentIndex == i;
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(_adminNavItems.length, (i) {
+              final item = _adminNavItems[i];
+              final isActive = currentIndex == i;
 
-                  return PressableScale(
-                    onTap: () => context.goNamed(item.routeName),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Icon pill — active gets primary bg + shadow
-                        AnimatedContainer(
+              return PressableScale(
+                onTap: () => context.goNamed(item.routeName),
+                semanticLabel: 'Open ${item.label}',
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Icon pill — active gets primary bg + shadow
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      width: 56,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: isActive ? cs.primary : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: isActive ? AppTheme.clayShadow : [],
+                      ),
+                      child: Center(
+                        child: AnimatedScale(
+                          scale: isActive ? 1.1 : 1.0,
                           duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutCubic,
-                          width: 56,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: isActive ? cs.primary : Colors.transparent,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: isActive ? AppTheme.clayShadow : [],
-                          ),
-                          child: Center(
-                            child: AnimatedScale(
-                              scale: isActive ? 1.1 : 1.0,
-                              duration: const Duration(milliseconds: 300),
-                              child: Icon(
-                                item.icon,
-                                size: 20,
-                                color: isActive
-                                    ? cs.onPrimary
-                                    : cs.onSurface.withValues(alpha: 0.40),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        // Label: 9px font-black uppercase
-                        AnimatedDefaultTextStyle(
-                          duration: const Duration(milliseconds: 300),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.5,
+                          child: Icon(
+                            item.icon,
+                            size: 20,
                             color: isActive
-                                ? cs.primary
-                                : cs.onSurface.withValues(alpha: 0.20),
-                          ),
-                          child: Text(item.label.toUpperCase()),
-                        ),
-                        const SizedBox(height: 4),
-                        // ─── Indicator dot ───
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOutCubic,
-                          width: isActive ? 6 : 0,
-                          height: isActive ? 6 : 0,
-                          decoration: BoxDecoration(
-                            color: cs.primary,
-                            shape: BoxShape.circle,
-                            boxShadow: isActive
-                                ? [
-                                    BoxShadow(
-                                      color: cs.primary.withValues(alpha: 0.80),
-                                      blurRadius: 8,
-                                    ),
-                                  ]
-                                : [],
+                                ? cs.onPrimary
+                                : cs.onSurface.withValues(alpha: 0.40),
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  );
-                }),
-              ),
-            ),
+                    const SizedBox(height: 6),
+                    // Label: 9px font-black uppercase
+                    AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 300),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5,
+                        color: isActive
+                            ? cs.primary
+                            : cs.onSurface.withValues(alpha: 0.20),
+                      ),
+                      child: Text(item.label.toUpperCase()),
+                    ),
+                    const SizedBox(height: 4),
+                    // ─── Indicator dot ───
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOutCubic,
+                      width: isActive ? 6 : 0,
+                      height: isActive ? 6 : 0,
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: isActive
+                            ? [
+                                BoxShadow(
+                                  color: cs.primary.withValues(alpha: 0.80),
+                                  blurRadius: 8,
+                                ),
+                              ]
+                            : [],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ),
         ),
       ),
@@ -300,3 +374,31 @@ class _NavData {
     required this.routeName,
   });
 }
+
+const _adminNavItems = [
+  _NavData(
+    icon: LucideIcons.layoutDashboard,
+    label: 'Overview',
+    routeName: AppRouteNames.adminOverview,
+  ),
+  _NavData(
+    icon: LucideIcons.store,
+    label: 'Venues',
+    routeName: AppRouteNames.adminVenues,
+  ),
+  _NavData(
+    icon: LucideIcons.menu,
+    label: 'Menus',
+    routeName: AppRouteNames.adminMenus,
+  ),
+  _NavData(
+    icon: LucideIcons.shoppingBag,
+    label: 'Orders',
+    routeName: AppRouteNames.adminOrders,
+  ),
+  _NavData(
+    icon: LucideIcons.settings,
+    label: 'Settings',
+    routeName: AppRouteNames.adminSettings,
+  ),
+];

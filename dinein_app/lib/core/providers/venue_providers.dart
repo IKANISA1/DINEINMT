@@ -1,9 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../constants/enums.dart';
 import '../models/models.dart';
 import '../services/auth_repository.dart';
-import '../services/onboarding_draft_service.dart';
 import '../services/venue_repository.dart';
 import 'auth_providers.dart';
 
@@ -45,28 +43,6 @@ final currentVenueProvider = FutureProvider<Venue?>((ref) async {
     } catch (_) {
       // Fall through to draft fallback below.
     }
-  }
-
-  final draft = await OnboardingDraftService.loadClaimedVenue();
-  if (draft != null && draft.venueId != null) {
-    try {
-      final venue = await VenueRepository.instance
-          .getVenueById(draft.venueId!)
-          .timeout(_venueBootstrapTimeout);
-      if (venue != null) return venue;
-    } catch (_) {
-      // Fall back to the locally persisted draft if the backend is unavailable.
-    }
-    return Venue(
-      id: draft.venueId!,
-      name: draft.name,
-      slug: draft.name.toLowerCase().replaceAll(' ', '-'),
-      category: draft.category,
-      description: draft.description,
-      address: draft.address,
-      imageUrl: draft.imageUrl,
-      status: VenueStatus.pendingClaim,
-    );
   }
 
   return null;

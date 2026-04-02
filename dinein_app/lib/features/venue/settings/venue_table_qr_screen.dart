@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -7,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -70,16 +68,17 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
       }
 
       final bytes = byteData.buffer.asUint8List();
-      final dir = await getTemporaryDirectory();
-      final file = File(
-        '${dir.path}/table_qr_${venue.slug}_${_tableNumber.toString().padLeft(2, '0')}.png',
-      );
-      await file.writeAsBytes(bytes, flush: true);
-
       if (!mounted) return;
       await SharePlus.instance.share(
         ShareParams(
-          files: [XFile(file.path)],
+          files: [
+            XFile.fromData(
+              bytes,
+              name:
+                  'table_qr_${venue.slug}_${_tableNumber.toString().padLeft(2, '0')}.png',
+              mimeType: 'image/png',
+            ),
+          ],
           subject: '${venue.name} Table $_tableNumber QR',
         ),
       );

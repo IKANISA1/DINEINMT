@@ -3,8 +3,10 @@ import 'core/config/country_config.dart';
 import 'core/config/country_runtime.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/country_config_provider.dart';
-import 'core/services/app_notification_service.dart';
-import 'core/services/app_telemetry_service.dart';
+import 'core/services/app_notification_service.dart'
+    if (dart.library.html) 'core/services/app_notification_service_web.dart';
+import 'core/services/app_telemetry_service.dart'
+    if (dart.library.html) 'core/services/app_telemetry_service_web.dart';
 import 'core/services/auth_repository.dart';
 import 'core/services/supabase_config.dart';
 import 'package:flutter/material.dart';

@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     let query = adminClient
       .from("dinein_menu_items")
       .select(
-        "id, venue_id, name, description, category, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
+        "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
       )
       .eq("image_locked", false)
       .order("id")

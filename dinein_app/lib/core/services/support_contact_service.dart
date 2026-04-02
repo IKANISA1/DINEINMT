@@ -9,6 +9,10 @@ class SupportContactService {
   static String get defaultWhatsAppNumber =>
       CountryRuntime.config.supportWhatsApp;
   static String get defaultSupportEmail => CountryRuntime.config.supportEmail;
+  static String get defaultVenueAccessWhatsApp =>
+      CountryRuntime.config.venueAccessWhatsApp;
+  static String get defaultVenueAccessEmail =>
+      CountryRuntime.config.venueAccessEmail;
 
   static Future<void> contactSupport(
     BuildContext context, {

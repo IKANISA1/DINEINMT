@@ -1,13 +1,11 @@
 import 'package:go_router/go_router.dart';
 
 import '../services/auth_repository.dart';
-import '../../features/venue/onboarding/venue_onboarding_flow.dart';
 import '../../features/venue/auth/venue_login_screen.dart';
 
 import '../../features/venue/dashboard/venue_dashboard_screen.dart';
 import '../../features/venue/menu/venue_edit_item_screen.dart';
 import '../../features/venue/menu/venue_menu_manager_screen.dart';
-import '../../features/venue/menu/venue_ocr_review_screen.dart';
 
 import '../../features/venue/orders/venue_order_detail_screen.dart';
 import '../../features/venue/orders/venue_orders_screen.dart';
@@ -31,14 +29,9 @@ final List<RouteBase> venueRoutes = [
     path: AppRoutePaths.venueLogin,
     name: AppRouteNames.venueLogin,
     redirect: (context, state) => AuthRepository.instance.hasVenueAccess
-        ? AppRoutePaths.venueDashboard
+        ? (resolveVenueReturnToUri(state) ?? AppRoutePaths.venueDashboard)
         : null,
     builder: (context, state) => const VenueLoginScreen(),
-  ),
-  GoRoute(
-    path: AppRoutePaths.venueClaim,
-    name: AppRouteNames.venueClaim,
-    builder: (context, state) => const VenueOnboardingFlow(),
   ),
 
   GoRoute(
@@ -64,16 +57,6 @@ final List<RouteBase> venueRoutes = [
       final id = state.pathParameters[AppRouteParams.id]!;
       return VenueEditItemScreen(itemId: id);
     },
-  ),
-  GoRoute(
-    path: AppRoutePaths.venueOcrReview,
-    name: AppRouteNames.venueOcrReview,
-    redirect: venueOcrGuard,
-    builder: (context, state) => VenueOcrReviewScreen(
-      manualMode: state.uri.queryParameters[AppRouteParams.manual] == 'true',
-      source: state.uri.queryParameters[AppRouteParams.source] ?? 'onboarding',
-      venueId: state.uri.queryParameters[AppRouteParams.venueId],
-    ),
   ),
   GoRoute(
     path: AppRoutePaths.venueItemReport,

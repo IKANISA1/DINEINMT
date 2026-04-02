@@ -140,17 +140,20 @@ void main() {
   // ─── VenueStatus ───
 
   group('VenueStatus', () {
-    test('has exactly 7 values', () {
-      expect(VenueStatus.values, hasLength(7));
+    test('has exactly 6 values', () {
+      expect(VenueStatus.values, hasLength(6));
     });
 
-    test('fromString resolves all 7 known values', () {
+    test('fromString resolves all known values', () {
       expect(VenueStatus.fromString('active'), VenueStatus.active);
       expect(VenueStatus.fromString('inactive'), VenueStatus.inactive);
       expect(VenueStatus.fromString('maintenance'), VenueStatus.maintenance);
       expect(VenueStatus.fromString('suspended'), VenueStatus.suspended);
       expect(VenueStatus.fromString('deleted'), VenueStatus.deleted);
-      expect(VenueStatus.fromString('pending_claim'), VenueStatus.pendingClaim);
+      expect(
+        VenueStatus.fromString('pending_claim'),
+        VenueStatus.pendingActivation,
+      );
       expect(
         VenueStatus.fromString('pending_activation'),
         VenueStatus.pendingActivation,
@@ -170,33 +173,7 @@ void main() {
 
     test('labels are capitalised and human-readable', () {
       expect(VenueStatus.active.label, 'Active');
-      expect(VenueStatus.pendingClaim.label, 'Pending Claim');
       expect(VenueStatus.pendingActivation.label, 'Pending Activation');
-    });
-  });
-
-  // ─── ClaimStatus ───
-
-  group('ClaimStatus', () {
-    test('has exactly 3 values', () {
-      expect(ClaimStatus.values, hasLength(3));
-    });
-
-    test('fromString resolves all known values', () {
-      expect(ClaimStatus.fromString('pending'), ClaimStatus.pending);
-      expect(ClaimStatus.fromString('approved'), ClaimStatus.approved);
-      expect(ClaimStatus.fromString('rejected'), ClaimStatus.rejected);
-    });
-
-    test('fromString falls back to pending', () {
-      expect(ClaimStatus.fromString('unknown'), ClaimStatus.pending);
-      expect(ClaimStatus.fromString(''), ClaimStatus.pending);
-    });
-
-    test('dbValue round-trips through fromString', () {
-      for (final status in ClaimStatus.values) {
-        expect(ClaimStatus.fromString(status.dbValue), status);
-      }
     });
   });
 
@@ -237,6 +214,36 @@ void main() {
       for (final status in MenuItemImageStatus.values) {
         expect(MenuItemImageStatus.fromString(status.dbValue), status);
       }
+    });
+  });
+
+  // ─── MenuItemClass ───
+
+  group('MenuItemClass', () {
+    test('has exactly 2 values', () {
+      expect(MenuItemClass.values, hasLength(2));
+      expect(
+        MenuItemClass.values,
+        containsAll([MenuItemClass.food, MenuItemClass.drinks]),
+      );
+    });
+
+    test('fromString resolves known values and rejects unknown', () {
+      expect(MenuItemClass.fromString('food'), MenuItemClass.food);
+      expect(MenuItemClass.fromString('drinks'), MenuItemClass.drinks);
+      expect(MenuItemClass.fromString('drink'), isNull);
+      expect(MenuItemClass.fromString(null), isNull);
+    });
+
+    test('dbValue round-trips through fromString', () {
+      for (final itemClass in MenuItemClass.values) {
+        expect(MenuItemClass.fromString(itemClass.dbValue), itemClass);
+      }
+    });
+
+    test('labels are human-readable', () {
+      expect(MenuItemClass.food.label, 'Food');
+      expect(MenuItemClass.drinks.label, 'Drinks');
     });
   });
 

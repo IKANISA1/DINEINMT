@@ -1,5 +1,6 @@
 import '../models/models.dart';
-import 'app_notification_service.dart';
+import 'app_notification_service.dart'
+    if (dart.library.html) 'app_notification_service_web.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 

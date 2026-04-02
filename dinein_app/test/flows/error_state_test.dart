@@ -104,7 +104,9 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(430, 932));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
+      await tester.pumpWidget(
+        ProviderScope(child: DineInApp(config: CountryConfig.mt)),
+      );
       await tester.pump();
 
       appRouter.goNamed(
@@ -129,7 +131,9 @@ void main() {
     testWidgets('admin overview redirects to login when not authenticated', (
       tester,
     ) async {
-      await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
+      await tester.pumpWidget(
+        ProviderScope(child: DineInApp(config: CountryConfig.mt)),
+      );
       await tester.pump();
 
       appRouter.go(AppRoutePaths.adminOverview);
@@ -137,23 +141,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
 
       // Without auth should redirect to login
-      expect(appRouter.state.uri.path, AppRoutePaths.adminLogin);
-
-      await tester.pump(const Duration(seconds: 2));
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump(const Duration(seconds: 1));
-    });
-
-    testWidgets('admin claims redirects to login when not authenticated', (
-      tester,
-    ) async {
-      await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
-      await tester.pump();
-
-      appRouter.go(AppRoutePaths.adminClaims);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-
       expect(appRouter.state.uri.path, AppRoutePaths.adminLogin);
 
       await tester.pump(const Duration(seconds: 2));

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { postWhatsAppMessage } from "../_shared/whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,17 +34,17 @@ type AdminProfile = {
   whatsapp_number?: string | null;
 };
 
-type VenueClaimRow = {
+type VenueAccessRow = {
   id: string;
-  venue_id: string;
-  venue_name?: string | null;
-  claimant_id?: string | null;
-  contact_phone?: string | null;
-  whatsapp_number?: string | null;
+  name?: string | null;
+  image_url?: string | null;
   status?: string | null;
   approved_at?: string | null;
-  reviewed_at?: string | null;
-  created_at?: string | null;
+  access_verified_at?: string | null;
+  normalized_access_phone?: string | null;
+  phone?: string | null;
+  owner_contact_phone?: string | null;
+  owner_whatsapp_number?: string | null;
 };
 
 function boolEnv(key: string, fallback: boolean): boolean {
@@ -210,21 +211,6 @@ async function signVenueSessionJwt(payload: JsonRecord): Promise<string> {
   return `${signingInput}.${signature}`;
 }
 
-async function signOnboardingMenuJwt(payload: JsonRecord): Promise<string> {
-  const header = { alg: "HS256", typ: "JWT" };
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  const signingInput = `${encodedHeader}.${encodedPayload}`;
-  const signature = await hmacSha256Base64Url(
-    signingInput,
-    getSigningSecret(
-      "DINEIN_ONBOARDING_MENU_SECRET",
-      "DINEIN_ADMIN_SESSION_SECRET",
-    ),
-  );
-  return `${signingInput}.${signature}`;
-}
-
 async function otpHash(phone: string, code: string): Promise<string> {
   const pepper = Deno.env.get("WHATSAPP_OTP_PEPPER") ?? "";
   return await sha256Hex(`${digitsOnly(phone)}:${code}:${pepper}`);
@@ -259,36 +245,6 @@ function extractMessageId(payload: unknown): string | null {
     return null;
   }
   return messages[0].id;
-}
-
-async function postWhatsAppMessage(payload: JsonRecord) {
-  const phoneNumberId = getEnv("WHATSAPP_PHONE_NUMBER_ID");
-  const accessToken = getEnv("WHATSAPP_ACCESS_TOKEN");
-  const endpoint =
-    `https://graph.facebook.com/${graphApiVersion}/${phoneNumberId}/messages`;
-
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const text = await response.text();
-  let data: unknown = text;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
-  }
-
-  return {
-    ok: response.ok,
-    status: response.status,
-    data,
-  };
 }
 
 async function sendCloudApiOtp(phone: string, code: string) {
@@ -405,66 +361,27 @@ async function getAdminProfileByPhone(
   return null;
 }
 
-function claimMatchesPhone(
-  claim: VenueClaimRow,
+function venueMatchesPhone(
+  venue: VenueAccessRow,
   normalizedPhone: string,
 ): boolean {
   const targetDigits = digitsOnly(normalizedPhone);
+  if (digitsOnly(venue.normalized_access_phone ?? "") === targetDigits) {
+    return true;
+  }
   return [
-    claim.contact_phone,
-    claim.whatsapp_number,
+    venue.phone,
+    venue.owner_contact_phone,
+    venue.owner_whatsapp_number,
   ].some((value) => digitsOnly(value ?? "") === targetDigits);
 }
 
-function claimContactPhone(claim: VenueClaimRow): string | null {
-  return claim.contact_phone?.trim() || claim.whatsapp_number?.trim() || null;
-}
-
-function claimWhatsappNumber(claim: VenueClaimRow): string | null {
-  return claim.whatsapp_number?.trim() || claim.contact_phone?.trim() || null;
-}
-
-export function buildClaimAccessAuditUpdate(args: {
-  issuedAt: string;
-  verifiedAt?: string;
-  normalizedPhone?: string;
-  challengeId?: string;
-  verificationMethod?: string;
-  verifiedBy?: string;
-  verificationNote?: string | null;
-}): JsonRecord {
-  if (
-    args.verificationMethod &&
-    !accessVerificationMethods.has(args.verificationMethod)
-  ) {
-    throw new Error(
-      `Unsupported access verification method: ${args.verificationMethod}`,
-    );
-  }
-  return {
-    last_access_token_issued_at: args.issuedAt,
-    ...(args.verifiedAt ? { whatsapp_verified_at: args.verifiedAt } : {}),
-    ...(args.normalizedPhone
-      ? { last_verified_whatsapp_number: args.normalizedPhone }
-      : {}),
-    ...(args.challengeId ? { last_otp_challenge_id: args.challengeId } : {}),
-    ...(args.verifiedAt && args.verificationMethod
-      ? { access_verification_method: args.verificationMethod }
-      : {}),
-    ...(args.verifiedAt && args.verifiedBy
-      ? { access_verified_by: args.verifiedBy }
-      : {}),
-    ...(args.verifiedAt && args.verificationNote !== undefined
-      ? { access_verification_note: args.verificationNote }
-      : {}),
-  };
-}
-
 export function buildVenueAccessAuditUpdate(
-  claim: VenueClaimRow,
+  venue: VenueAccessRow,
   args: {
     issuedAt: string;
     verifiedAt?: string;
+    normalizedPhone?: string;
     verificationMethod?: string;
     verifiedBy?: string;
     verificationNote?: string | null;
@@ -479,11 +396,13 @@ export function buildVenueAccessAuditUpdate(
     );
   }
   return {
-    approved_claim_id: claim.id,
-    approved_at: claim.approved_at ?? claim.reviewed_at ?? args.issuedAt,
-    owner_contact_phone: claimContactPhone(claim),
-    owner_whatsapp_number: claimWhatsappNumber(claim),
-    ...(claim.claimant_id ? { owner_id: claim.claimant_id } : {}),
+    normalized_access_phone: args.normalizedPhone ?? null,
+    phone: venue.phone?.trim() || args.normalizedPhone || null,
+    owner_contact_phone: venue.owner_contact_phone?.trim() ||
+      args.normalizedPhone || null,
+    owner_whatsapp_number: venue.owner_whatsapp_number?.trim() ||
+      args.normalizedPhone || null,
+    approved_at: venue.approved_at ?? args.verifiedAt ?? args.issuedAt,
     last_access_token_issued_at: args.issuedAt,
     ...(args.verifiedAt ? { access_verified_at: args.verifiedAt } : {}),
     ...(args.verifiedAt && args.verificationMethod
@@ -498,27 +417,48 @@ export function buildVenueAccessAuditUpdate(
   };
 }
 
-async function getLatestVenueClaimByPhone(
+async function getValidatedVenueByPhone(
   supabase: ReturnType<typeof adminClient>,
   normalizedPhone: string,
-  status: "approved" | "pending",
-): Promise<VenueClaimRow | null> {
+): Promise<VenueAccessRow | null> {
+  const selectClause =
+    "id, name, image_url, status, approved_at, access_verified_at, normalized_access_phone, phone, owner_contact_phone, owner_whatsapp_number";
   const { data, error } = await supabase
-    .from("dinein_venue_claims")
-    .select(
-      "id, venue_id, venue_name, claimant_id, contact_phone, whatsapp_number, status, approved_at, reviewed_at, created_at",
-    )
-    .eq("status", status)
-    .order("created_at", { ascending: false });
+    .from("dinein_venues")
+    .select(selectClause)
+    .eq("status", "active")
+    .eq("normalized_access_phone", normalizedPhone)
+    .maybeSingle();
 
-  if (error) {
-    console.error("[whatsapp-otp] venue claim lookup failed", error);
+  if (!error) {
+    return data as VenueAccessRow | null;
+  }
+
+  const missingNormalizedColumn = `${error.message ?? ""} ${
+    error.details ?? ""
+  }`
+    .toLowerCase()
+    .includes("normalized_access_phone");
+  if (!missingNormalizedColumn) {
+    console.error("[whatsapp-otp] venue lookup failed", error);
     throw new Error("Could not verify venue access configuration.");
   }
 
-  for (const claim of (data ?? []) as VenueClaimRow[]) {
-    if (claimMatchesPhone(claim, normalizedPhone)) {
-      return claim;
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("dinein_venues")
+    .select(
+      "id, name, image_url, status, approved_at, access_verified_at, phone, owner_contact_phone, owner_whatsapp_number",
+    )
+    .eq("status", "active");
+
+  if (legacyError) {
+    console.error("[whatsapp-otp] legacy venue lookup failed", legacyError);
+    throw new Error("Could not verify venue access configuration.");
+  }
+
+  for (const venue of (legacyData ?? []) as VenueAccessRow[]) {
+    if (venueMatchesPhone(venue, normalizedPhone)) {
+      return venue;
     }
   }
 
@@ -557,23 +497,11 @@ async function buildAdminSession(
 }
 
 async function buildVenueSession(
-  supabase: ReturnType<typeof adminClient>,
-  claim: VenueClaimRow,
+  venue: VenueAccessRow,
   normalizedPhone: string,
 ) {
-  const { data: venueData, error } = await supabase
-    .from("dinein_venues")
-    .select("id, name, image_url, status")
-    .eq("id", claim.venue_id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[whatsapp-otp] venue session venue lookup failed", error);
-    throw new Error("Could not load the approved venue for this login.");
-  }
-
-  if (!venueData?.id) {
-    throw new Error("The approved venue could not be found.");
+  if (!venue.id) {
+    throw new Error("The validated venue could not be found.");
   }
 
   const issuedAt = new Date();
@@ -583,10 +511,9 @@ async function buildVenueSession(
   const token = await signVenueSessionJwt({
     iss: "dinein-whatsapp-otp",
     aud: "dinein-venue",
-    sub: claim.claimant_id ?? claim.id,
+    sub: venue.id,
     role: "venue_owner",
-    claim_id: claim.id,
-    venue_id: claim.venue_id,
+    venue_id: venue.id,
     phone: normalizedPhone,
     iat: Math.floor(issuedAt.getTime() / 1000),
     exp: Math.floor(expiresAt.getTime() / 1000),
@@ -594,80 +521,43 @@ async function buildVenueSession(
 
   return {
     access_token: token,
-    claim_id: claim.id,
-    venue_id: claim.venue_id,
-    venue_name:
-      (typeof venueData.name === "string" && venueData.name.trim().length > 0)
-        ? venueData.name
-        : claim.venue_name ?? "Venue",
+    venue_id: venue.id,
+    venue_name: (typeof venue.name === "string" && venue.name.trim().length > 0)
+      ? venue.name
+      : "Venue",
     whatsapp_number: normalizedPhone,
-    venue_image_url: typeof venueData.image_url === "string"
-      ? venueData.image_url
+    venue_image_url: typeof venue.image_url === "string"
+      ? venue.image_url
       : null,
     issued_at: issuedAt.toISOString(),
     expires_at: expiresAt.toISOString(),
   };
 }
 
-async function persistVenueClaimVerification(
+async function persistVerifiedVenueAccess(
   supabase: ReturnType<typeof adminClient>,
-  claim: VenueClaimRow,
+  venue: VenueAccessRow,
   args: {
     issuedAt: string;
     verifiedAt: string;
     normalizedPhone: string;
-    challengeId: string;
     verificationMethod: string;
     verifiedBy: string;
     verificationNote?: string | null;
   },
 ): Promise<void> {
-  const { error: claimError } = await supabase
-    .from("dinein_venue_claims")
-    .update(buildClaimAccessAuditUpdate(args))
-    .eq("id", claim.id);
-
-  if (claimError) {
-    console.error(
-      "[whatsapp-otp] claim verification audit update failed",
-      claimError,
-    );
-    throw new Error("Could not persist venue claim verification.");
-  }
-
-  const { error: venueError } = await supabase
+  const { error } = await supabase
     .from("dinein_venues")
-    .update(buildVenueAccessAuditUpdate(claim, args))
-    .eq("id", claim.venue_id);
+    .update(buildVenueAccessAuditUpdate(venue, args))
+    .eq("id", venue.id);
 
-  if (venueError) {
+  if (error) {
     console.error(
-      "[whatsapp-otp] venue verification audit update failed",
-      venueError,
+      "[whatsapp-otp] venue access audit update failed",
+      error,
     );
-    throw new Error("Could not persist venue access linkage.");
+    throw new Error("Could not persist venue access verification.");
   }
-}
-
-async function buildOnboardingMenuToken(normalizedPhone: string) {
-  const issuedAt = new Date();
-  const expiresAt = new Date(issuedAt.getTime() + 15 * 60 * 1000);
-  const token = await signOnboardingMenuJwt({
-    iss: "dinein-whatsapp-otp",
-    aud: "dinein-onboarding-menu",
-    sub: normalizedPhone,
-    role: "onboarding_menu",
-    phone: normalizedPhone,
-    iat: Math.floor(issuedAt.getTime() / 1000),
-    exp: Math.floor(expiresAt.getTime() / 1000),
-  });
-
-  return {
-    access_token: token,
-    phone: normalizedPhone,
-    issued_at: issuedAt.toISOString(),
-    expires_at: expiresAt.toISOString(),
-  };
 }
 
 function testOverrideCode(
@@ -708,13 +598,14 @@ async function handleSend(
     return errorResponse(
       error instanceof Error ? error.message : "Invalid WhatsApp number.",
       400,
+      { reason: "invalid_phone" },
     );
   }
 
-  if (
-    appScope !== "venue" && appScope !== "admin" && appScope !== "onboarding"
-  ) {
-    return errorResponse("Unsupported appScope.", 400);
+  if (appScope !== "venue" && appScope !== "admin") {
+    return errorResponse("Unsupported appScope.", 400, {
+      reason: "unsupported_scope",
+    });
   }
 
   if (appScope === "admin") {
@@ -726,18 +617,19 @@ async function handleSend(
       return errorResponse(
         "This WhatsApp number is not registered for admin console access.",
         403,
+        { reason: "admin_not_found" },
       );
     }
   } else if (appScope === "venue") {
-    const approvedClaim = await getLatestVenueClaimByPhone(
+    const validatedVenue = await getValidatedVenueByPhone(
       supabase,
       normalizedPhone,
-      "approved",
     );
-    if (!approvedClaim) {
+    if (!validatedVenue) {
       return errorResponse(
         "This WhatsApp number is not linked to a validated venue account.",
         403,
+        { reason: "venue_not_found" },
       );
     }
   }
@@ -756,13 +648,16 @@ async function handleSend(
 
   if (rateError) {
     console.error("[whatsapp-otp] rate limit check failed", rateError);
-    return errorResponse("Could not start WhatsApp verification.", 500);
+    return errorResponse("Could not start WhatsApp verification.", 500, {
+      reason: "network_error",
+    });
   }
 
   if ((count ?? 0) >= requestLimit) {
     return errorResponse(
       `Too many code requests. Try again in ${requestWindowMinutes} minutes.`,
       429,
+      { reason: "rate_limited" },
     );
   }
 
@@ -792,6 +687,7 @@ async function handleSend(
     return errorResponse(
       "Could not prepare WhatsApp verification. Apply the OTP migration first.",
       500,
+      { reason: "configuration_missing" },
     );
   }
 
@@ -869,6 +765,7 @@ async function handleSend(
       "WhatsApp OTP delivery failed. Check the Cloud API secrets and template.",
       502,
       {
+        reason: "delivery_failed",
         verificationId,
         deliveryMethod: sendResult.method,
       },
@@ -918,6 +815,7 @@ async function handleVerify(
     return errorResponse(
       error instanceof Error ? error.message : "Invalid WhatsApp number.",
       400,
+      { reason: "invalid_phone" },
     );
   }
 
@@ -933,7 +831,9 @@ async function handleVerify(
 
   if (error) {
     console.error("[whatsapp-otp] verify lookup failed", error);
-    return errorResponse("Could not verify the WhatsApp code.", 500);
+    return errorResponse("Could not verify the WhatsApp code.", 500, {
+      reason: "network_error",
+    });
   }
 
   if (!data) {
@@ -1001,9 +901,7 @@ async function handleVerify(
 
   let adminSession: JsonRecord | null = null;
   let venueSession: JsonRecord | null = null;
-  let onboardingMenuToken: JsonRecord | null = null;
-  let claimStatus: "approved" | "pending" | "not_found" | null = null;
-  let approvedClaim: VenueClaimRow | null = null;
+  let validatedVenue: VenueAccessRow | null = null;
   if (data.app_scope === "admin") {
     const adminProfile = await getAdminProfileByPhone(
       supabase,
@@ -1021,47 +919,33 @@ async function handleVerify(
       adminSession = await buildAdminSession(adminProfile, normalizedPhone);
     } catch (error) {
       console.error("[whatsapp-otp] admin session build failed", error);
-      return errorResponse("Admin OTP session is not configured.", 500);
+      return errorResponse("Admin OTP session is not configured.", 500, {
+        reason: "session_not_configured",
+      });
     }
   } else if (data.app_scope === "venue") {
-    approvedClaim = await getLatestVenueClaimByPhone(
+    validatedVenue = await getValidatedVenueByPhone(
       supabase,
       normalizedPhone,
-      "approved",
     );
-    if (approvedClaim) {
-      try {
-        venueSession = await buildVenueSession(
-          supabase,
-          approvedClaim,
-          normalizedPhone,
-        );
-        claimStatus = "approved";
-      } catch (error) {
-        console.error("[whatsapp-otp] venue session build failed", error);
-        return errorResponse("Venue OTP session is not configured.", 500);
-      }
-    } else {
-      const pendingClaim = await getLatestVenueClaimByPhone(
-        supabase,
-        normalizedPhone,
-        "pending",
-      );
-      claimStatus = pendingClaim ? "pending" : "not_found";
+    if (!validatedVenue) {
+      return jsonResponse(200, {
+        success: true,
+        verified: false,
+        reason: "venue_not_found",
+      });
     }
 
     try {
-      onboardingMenuToken = await buildOnboardingMenuToken(normalizedPhone);
+      venueSession = await buildVenueSession(
+        validatedVenue,
+        normalizedPhone,
+      );
     } catch (error) {
-      console.error("[whatsapp-otp] onboarding token build failed", error);
-      return errorResponse("Onboarding token is not configured.", 500);
-    }
-  } else if (data.app_scope === "onboarding") {
-    try {
-      onboardingMenuToken = await buildOnboardingMenuToken(normalizedPhone);
-    } catch (error) {
-      console.error("[whatsapp-otp] onboarding token build failed", error);
-      return errorResponse("Onboarding token is not configured.", 500);
+      console.error("[whatsapp-otp] venue session build failed", error);
+      return errorResponse("Venue OTP session is not configured.", 500, {
+        reason: "session_not_configured",
+      });
     }
   }
 
@@ -1075,16 +959,17 @@ async function handleVerify(
 
   if (consumeError) {
     console.error("[whatsapp-otp] verify consume update failed", consumeError);
-    return errorResponse("Could not finalize the WhatsApp verification.", 500);
+    return errorResponse("Could not finalize the WhatsApp verification.", 500, {
+      reason: "verification_finalize_failed",
+    });
   }
 
-  if (approvedClaim && venueSession?.issued_at) {
+  if (validatedVenue && venueSession?.issued_at) {
     try {
-      await persistVenueClaimVerification(supabase, approvedClaim, {
+      await persistVerifiedVenueAccess(supabase, validatedVenue, {
         issuedAt: venueSession.issued_at as string,
         verifiedAt,
         normalizedPhone,
-        challengeId: verificationId,
         verificationMethod: "otp",
         verifiedBy: normalizedPhone,
         verificationNote: "Verified via WhatsApp OTP.",
@@ -1094,7 +979,13 @@ async function handleVerify(
         "[whatsapp-otp] venue verification persistence failed",
         error,
       );
-      return errorResponse("Could not persist venue access verification.", 500);
+      return errorResponse(
+        "Could not persist venue access verification.",
+        500,
+        {
+          reason: "verification_persist_failed",
+        },
+      );
     }
   }
 
@@ -1104,8 +995,6 @@ async function handleVerify(
     verifiedAt,
     ...(adminSession == null ? {} : { adminSession }),
     ...(venueSession == null ? {} : { venueSession }),
-    ...(onboardingMenuToken == null ? {} : { onboardingMenuToken }),
-    ...(claimStatus == null ? {} : { claimStatus }),
   });
 }
 

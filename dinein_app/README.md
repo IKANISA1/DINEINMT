@@ -1,13 +1,14 @@
 # DineIn
 
-`dinein_app` is the canonical DineIn mobile application.
+`dinein_app` is the canonical DineIn application family for guest, venue, and
+admin flows across mobile, web, and PWA surfaces.
 
 It consolidates the previous Flutter app and the Kigali React/Vite app into a
 single Flutter codebase with:
 
 - guest, venue, and admin flows
 - merged venue onboarding and OCR menu-review flows
-- Android and iOS mobile targets from one codebase
+- mobile apps plus web/PWA app surfaces from one product line
 
 ## Run
 
@@ -18,13 +19,26 @@ flutter test
 flutter run
 ```
 
-Run on a mobile target only:
+Run on the target that matches the workflow you are testing:
 
 ```bash
 flutter run -d android
 # or
 flutter run -d ios
+# or
+flutter run -d chrome
 ```
+
+For browser release builds:
+
+```bash
+flutter build web --release
+flutter build web --release -t lib/main_rw.dart
+```
+
+BioPay, face enrollment, Wi-Fi auto-connect, and other device-native flows stay
+in the Android/iOS apps. The web/PWA surfaces cover guest, venue, and admin
+browser-safe flows.
 
 ## Supabase Projects
 
@@ -171,7 +185,8 @@ supabase functions deploy --project-ref uskfnszcdqpcfrhjxitl
 ## Notes
 
 - `../dinein-kigali` is now a legacy reference copy, not the primary app.
-- No web, PWA, or Flutter web target is supported or maintained here.
+- Web and PWA app surfaces are now part of the product direction alongside the
+  native mobile apps.
 - The mobile backend depends on the `whatsapp-otp` and `dinein-api` Edge
   Functions under `supabase/functions/`.
 - New venue onboarding draft state is stored locally with `shared_preferences`.

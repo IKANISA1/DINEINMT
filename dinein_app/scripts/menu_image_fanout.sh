@@ -11,11 +11,13 @@ with source_images as (
   select distinct on (
     lower(trim(name)),
     lower(trim(category)),
-    lower(trim(coalesce(description, '')))
+    lower(trim(coalesce(description, ''))),
+    lower(trim(coalesce(class, '')))
   )
     lower(trim(name)) as name_key,
     lower(trim(category)) as category_key,
     lower(trim(coalesce(description, ''))) as description_key,
+    lower(trim(coalesce(class, ''))) as class_key,
     image_url,
     image_storage_path,
     image_model,
@@ -30,6 +32,7 @@ with source_images as (
     lower(trim(name)),
     lower(trim(category)),
     lower(trim(coalesce(description, ''))),
+    lower(trim(coalesce(class, ''))),
     updated_at desc nulls last,
     created_at desc
 ),
@@ -52,6 +55,7 @@ updated as (
     and lower(trim(target.name)) = source.name_key
     and lower(trim(target.category)) = source.category_key
     and lower(trim(coalesce(target.description, ''))) = source.description_key
+    and lower(trim(coalesce(target.class, ''))) = source.class_key
   returning target.id
 )
 select count(*) from updated;

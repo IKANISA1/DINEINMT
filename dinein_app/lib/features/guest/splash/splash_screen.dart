@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_routes.dart';
+import '../../../core/router/web_entry_routing.dart';
 import '../../../core/services/auth_repository.dart';
 import '../../../shared/widgets/brand_mark.dart';
 
@@ -45,6 +47,14 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _exitController, curve: Curves.easeInCubic),
     );
 
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _navigateToHome();
+      });
+      return;
+    }
+
     // Schedule exit animation at 2.5s, navigate at 3s
     _navTimer = Timer(const Duration(milliseconds: 2500), () {
       if (!mounted) return;
@@ -63,6 +73,14 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _navigateToHome() {
+    if (kIsWeb) {
+      final webRoute = resolveCurrentWebRootRoute(Uri.base);
+      if (webRoute != null) {
+        context.go(webRoute);
+        return;
+      }
+    }
+
     final auth = AuthRepository.instance;
     if (auth.hasAdminAccess) {
       context.goNamed(AppRouteNames.adminOverview);

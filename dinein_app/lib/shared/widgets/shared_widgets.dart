@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import 'pressable_scale.dart';
 export 'pressable_scale.dart';
+export 'adaptive_glass_surface.dart';
 export 'dinein_image.dart';
 export 'brand_mark.dart';
 export 'permission_access_dialog.dart';

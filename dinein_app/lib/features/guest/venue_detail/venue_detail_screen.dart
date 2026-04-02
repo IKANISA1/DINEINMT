@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -36,7 +37,11 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
     final config = ref.read(countryConfigProvider);
     final table = widget.tableNumber?.trim();
     if (table != null && table.isNotEmpty) {
-      return buildVenueTableDeepLinkUri(slug: venue.slug, tableNumber: table, config: config);
+      return buildVenueTableDeepLinkUri(
+        slug: venue.slug,
+        tableNumber: table,
+        config: config,
+      );
     }
     return buildVenueDeepLinkUri(slug: venue.slug, config: config);
   }
@@ -184,7 +189,9 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
           onWebsite: venue.websiteUri == null
               ? null
               : () => _openWebsite(venue),
-          onWifiTap: venue.hasWifi ? () => _handleWifiTap(venue) : null,
+          onWifiTap: venue.hasWifi && !kIsWeb
+              ? () => _handleWifiTap(venue)
+              : null,
           onOpenMenu: () => _openMenu(venue),
         );
       },
@@ -577,7 +584,7 @@ class _AboutSection extends StatelessWidget {
                         label: 'Website',
                         onTap: onWebsite,
                       ),
-                    if (venue.hasWifi)
+                    if (venue.hasWifi && !kIsWeb)
                       _DetailChip(
                         icon: LucideIcons.wifi,
                         label: 'Connect to Wifi',

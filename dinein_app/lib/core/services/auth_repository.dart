@@ -4,7 +4,8 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
-import '../services/app_notification_service.dart';
+import '../services/app_notification_service.dart'
+    if (dart.library.html) '../services/app_notification_service_web.dart';
 import '../services/dinein_api_service.dart';
 import '../services/supabase_config.dart';
 

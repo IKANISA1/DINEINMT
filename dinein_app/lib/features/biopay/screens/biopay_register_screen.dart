@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,9 +15,9 @@ import '../models/biopay_models.dart';
 import '../services/enrollment_capture_session.dart';
 import '../widgets/face_enrollment_capture.dart';
 
-/// BioPay enrollment screen — multi-step flow.
+/// BioPay enrollment screen — multi-step flow with premium UI.
 ///
-/// Steps: 1) Consent → 2) USSD string → 3) Display name → 4) Face capture → 5) Submit
+/// Steps: 1) Consent → 2) USSD string → 3) Display name → 4) Face capture → 5) Result
 class BiopayRegisterScreen extends ConsumerStatefulWidget {
   const BiopayRegisterScreen({super.key});
 
@@ -37,6 +38,22 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
 
   static const _totalSteps = 5;
 
+  static const _stepLabels = [
+    'Consent',
+    'Payment',
+    'Name',
+    'Face',
+    'Done',
+  ];
+
+  static const _stepIcons = [
+    LucideIcons.shieldCheck,
+    LucideIcons.phone,
+    LucideIcons.user,
+    LucideIcons.scanFace,
+    LucideIcons.checkCircle2,
+  ];
+
   @override
   void dispose() {
     _ussdController.dispose();
@@ -48,12 +65,13 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final isFaceCaptureStep = _step == 3;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _step < _totalSteps - 1
-              ? 'Register — Step ${_step + 1}'
+              ? 'Register Your Face'
               : 'Registration Complete',
         ),
         leading: _step > 0 && _result == null
@@ -63,7 +81,48 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
               )
             : null,
       ),
-      body: AnimatedSwitcher(duration: 250.ms, child: _buildStep(cs, tt)),
+      body: Column(
+        children: [
+          // ─── Step progress indicator ───
+          if (_step < _totalSteps - 1 || _result == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppTheme.space6,
+                vertical: AppTheme.space3,
+              ),
+              child: _StepProgressBar(
+                currentStep: _step,
+                totalSteps: _totalSteps,
+                labels: _stepLabels,
+                icons: _stepIcons,
+              ),
+            ),
+
+          // ─── Step content ───
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: 250.ms,
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.03, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: isFaceCaptureStep
+                  ? _buildFaceCapture(cs, tt)
+                  : _buildStep(cs, tt),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -72,7 +131,6 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
       0 => _buildConsent(cs, tt),
       1 => _buildUssd(cs, tt),
       2 => _buildName(cs, tt),
-      3 => _buildFaceCapture(cs, tt),
       4 => _buildResult(cs, tt),
       _ => const SizedBox.shrink(),
     };
@@ -108,28 +166,65 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
           ),
         ),
         const SizedBox(height: AppTheme.space6),
-        Row(
-          children: [
-            Checkbox(
-              value: _consentAccepted,
-              onChanged: (v) => setState(() => _consentAccepted = v ?? false),
-              activeColor: cs.primary,
-            ),
-            Expanded(
-              child: GestureDetector(
-                onTap: () =>
-                    setState(() => _consentAccepted = !_consentAccepted),
-                child: Text(
-                  'I agree to the privacy terms above',
-                  style: tt.bodyMedium,
-                ),
+        GestureDetector(
+          onTap: () => setState(() => _consentAccepted = !_consentAccepted),
+          child: Container(
+            padding: const EdgeInsets.all(AppTheme.space4),
+            decoration: BoxDecoration(
+              color: _consentAccepted
+                  ? AppColors.secondary.withValues(alpha: 0.08)
+                  : cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+              border: Border.all(
+                color: _consentAccepted
+                    ? AppColors.secondary.withValues(alpha: 0.3)
+                    : AppColors.white5,
               ),
             ),
-          ],
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _consentAccepted
+                        ? AppColors.secondary
+                        : Colors.transparent,
+                    border: Border.all(
+                      color: _consentAccepted
+                          ? AppColors.secondary
+                          : cs.onSurfaceVariant.withValues(alpha: 0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: _consentAccepted
+                      ? const Icon(
+                          LucideIcons.check,
+                          size: 14,
+                          color: Colors.white,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: AppTheme.space3),
+                Expanded(
+                  child: Text(
+                    'I agree to the privacy terms above',
+                    style: tt.bodyMedium?.copyWith(
+                      fontWeight:
+                          _consentAccepted ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: AppTheme.space6),
         PremiumButton(
           label: 'CONTINUE',
+          icon: LucideIcons.arrowRight,
           onPressed: _consentAccepted ? () => setState(() => _step = 1) : null,
         ),
       ],
@@ -167,6 +262,7 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
         const SizedBox(height: AppTheme.space6),
         PremiumButton(
           label: 'CONTINUE',
+          icon: LucideIcons.arrowRight,
           onPressed: _ussdController.text.trim().isNotEmpty
               ? () => setState(() => _step = 2)
               : null,
@@ -206,6 +302,7 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
         const SizedBox(height: AppTheme.space6),
         PremiumButton(
           label: 'CAPTURE FACE',
+          icon: LucideIcons.scanFace,
           onPressed: _nameController.text.trim().isNotEmpty
               ? () => _startFaceCapture()
               : null,
@@ -214,7 +311,7 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
     );
   }
 
-  // ─── Step 3: Face capture ─────────────────────────────────
+  // ─── Step 3: Face capture (full-bleed) ────────────────────
 
   void _startFaceCapture() {
     setState(() {
@@ -236,35 +333,50 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
   }
 
   Widget _buildFaceCapture(ColorScheme cs, TextTheme tt) {
-    return _StepContainer(
-      key: const ValueKey('face'),
-      icon: LucideIcons.scanFace,
-      iconColor: cs.primary,
-      title: 'Capturing Face...',
+    return Column(
+      key: const ValueKey('face_capture'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Use the front camera and keep your face centered until all 5 samples are captured.',
-          style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-        ),
-        const SizedBox(height: AppTheme.space6),
-        if (_capturedEmbedding == null && !_isSubmitting) ...[
-          FaceEnrollmentCapture(onCaptureReady: _handleCaptureReady),
-          const SizedBox(height: AppTheme.space6),
-        ] else if (_isSubmitting) ...[
-          const SizedBox(height: AppTheme.space8),
-          Center(
-            child: Column(
-              children: [
-                CircularProgressIndicator(color: cs.primary),
-                const SizedBox(height: AppTheme.space4),
-                Text(
-                  'Submitting registration...',
-                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ],
+        if (_capturedEmbedding == null && !_isSubmitting)
+          Expanded(
+            child: FaceEnrollmentCapture(
+              onCaptureReady: _handleCaptureReady,
+              fullBleed: true,
+            ),
+          )
+        else if (_isSubmitting)
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: CircularProgressIndicator(
+                      color: cs.primary,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.space6),
+                  Text(
+                    'Finalizing registration...',
+                    style: tt.titleMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.space2),
+                  Text(
+                    'This usually takes a few seconds',
+                    style: tt.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
       ],
     );
   }
@@ -310,86 +422,307 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
   Widget _buildResult(ColorScheme cs, TextTheme tt) {
     final success = _result?.success ?? false;
 
-    return _StepContainer(
+    return SingleChildScrollView(
       key: const ValueKey('result'),
-      icon: success ? LucideIcons.checkCircle : LucideIcons.xCircle,
-      iconColor: success ? AppColors.secondary : AppColors.error,
-      title: success ? 'Registration Complete!' : 'Registration Failed',
-      children: [
-        if (success && _result != null) ...[
-          _InfoRow(label: 'BioPay ID', value: _result!.biopayId ?? '—'),
-          const SizedBox(height: AppTheme.space3),
-          _InfoRow(label: 'Display Name', value: _result!.displayName ?? '—'),
-          if (_result!.managementCode != null) ...[
-            const SizedBox(height: AppTheme.space6),
-            Container(
-              width: double.infinity,
+      padding: const EdgeInsets.all(AppTheme.space6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(height: AppTheme.space4),
+
+          // Animated result icon
+          Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              color: success
+                  ? AppColors.secondary.withValues(alpha: 0.12)
+                  : AppColors.error.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              success ? LucideIcons.checkCircle2 : LucideIcons.xCircle,
+              size: 40,
+              color: success ? AppColors.secondary : AppColors.error,
+            ),
+          )
+              .animate()
+              .scale(
+                begin: const Offset(0.5, 0.5),
+                end: const Offset(1.0, 1.0),
+                duration: 400.ms,
+                curve: Curves.elasticOut,
+              )
+              .fadeIn(duration: 200.ms),
+
+          const SizedBox(height: AppTheme.space6),
+
+          Text(
+            success ? 'You\'re all set!' : 'Registration Failed',
+            style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+            textAlign: TextAlign.center,
+          ).animate().fadeIn(delay: 150.ms, duration: 300.ms),
+
+          const SizedBox(height: AppTheme.space2),
+
+          Text(
+            success
+                ? 'Your BioPay profile has been created successfully.'
+                : (_result?.error ?? 'An unknown error occurred.'),
+            style: tt.bodyMedium?.copyWith(
+              color: success ? cs.onSurfaceVariant : AppColors.error,
+            ),
+            textAlign: TextAlign.center,
+          ).animate().fadeIn(delay: 250.ms, duration: 300.ms),
+
+          if (success && _result != null) ...[
+            const SizedBox(height: AppTheme.space8),
+
+            // Profile info card
+            ClayCard(
+              borderRadius: AppTheme.radiusXl,
               padding: const EdgeInsets.all(AppTheme.space5),
-              decoration: BoxDecoration(
-                color: AppColors.warning.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                border: Border.all(
-                  color: AppColors.warning.withValues(alpha: 0.3),
-                ),
-              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Icon(LucideIcons.key, size: 16, color: AppColors.warning),
-                      const SizedBox(width: AppTheme.space2),
-                      Text(
-                        BiopayStrings.managementCodeTitle,
-                        style: tt.titleSmall?.copyWith(
-                          color: AppColors.warning,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                  _InfoRow(
+                    label: 'BioPay ID',
+                    value: _result!.biopayId ?? '—',
+                    icon: LucideIcons.fingerprint,
                   ),
-                  const SizedBox(height: AppTheme.space2),
-                  SelectableText(
-                    _result!.managementCode!,
-                    style: tt.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 3,
-                      fontFamily: 'monospace',
-                    ),
+                  Divider(
+                    height: AppTheme.space6,
+                    color: AppColors.white5,
                   ),
-                  const SizedBox(height: AppTheme.space2),
-                  Text(
-                    BiopayStrings.managementCodeBody,
-                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  _InfoRow(
+                    label: 'Display Name',
+                    value: _result!.displayName ?? '—',
+                    icon: LucideIcons.user,
                   ),
                 ],
               ),
+            ).animate().fadeIn(delay: 350.ms, duration: 300.ms).slideY(begin: 0.05),
+
+            // Management code — golden ticket style
+            if (_result!.managementCode != null) ...[
+              const SizedBox(height: AppTheme.space6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppTheme.space6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.warning.withValues(alpha: 0.15),
+                      AppColors.warning.withValues(alpha: 0.06),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                  border: Border.all(
+                    color: AppColors.warning.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          LucideIcons.key,
+                          size: 18,
+                          color: AppColors.warning,
+                        ),
+                        const SizedBox(width: AppTheme.space2),
+                        Text(
+                          BiopayStrings.managementCodeTitle,
+                          style: tt.titleSmall?.copyWith(
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppTheme.space4),
+                    GestureDetector(
+                      onTap: () {
+                        Clipboard.setData(
+                          ClipboardData(text: _result!.managementCode!),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Management code copied!'),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppTheme.space6,
+                          vertical: AppTheme.space4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.surface.withValues(alpha: 0.5),
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.radiusMd),
+                          border: Border.all(
+                            color: AppColors.warning.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _result!.managementCode!,
+                              style: tt.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 4,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                            const SizedBox(width: AppTheme.space3),
+                            Icon(
+                              LucideIcons.copy,
+                              size: 18,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.space3),
+                    Text(
+                      BiopayStrings.managementCodeBody,
+                      style: tt.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ).animate().fadeIn(delay: 450.ms, duration: 300.ms).slideY(begin: 0.05),
+            ],
+          ],
+
+          const SizedBox(height: AppTheme.space10),
+
+          SizedBox(
+            width: double.infinity,
+            child: PremiumButton(
+              label: success ? 'DONE' : 'TRY AGAIN',
+              icon: success ? LucideIcons.checkCircle2 : LucideIcons.refreshCw,
+              onPressed: () {
+                if (success) {
+                  context.goNamed(AppRouteNames.biopayHome);
+                } else {
+                  setState(() {
+                    _step = 0;
+                    _result = null;
+                    _capturedEmbedding = null;
+                    _captureQualityScore = null;
+                    _consentAccepted = false;
+                  });
+                }
+              },
+            ),
+          ).animate().fadeIn(delay: 550.ms, duration: 300.ms),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Step Progress Bar ──────────────────────────────────────
+
+class _StepProgressBar extends StatelessWidget {
+  final int currentStep;
+  final int totalSteps;
+  final List<String> labels;
+  final List<IconData> icons;
+
+  const _StepProgressBar({
+    required this.currentStep,
+    required this.totalSteps,
+    required this.labels,
+    required this.icons,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Row(
+      children: List.generate(totalSteps * 2 - 1, (index) {
+        if (index.isOdd) {
+          // Connector line
+          final stepBefore = index ~/ 2;
+          final isCompleted = stepBefore < currentStep;
+
+          return Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              height: 2,
+              decoration: BoxDecoration(
+                color: isCompleted
+                    ? AppColors.secondary.withValues(alpha: 0.6)
+                    : cs.onSurfaceVariant.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
+          );
+        }
+
+        // Step dot
+        final stepIndex = index ~/ 2;
+        final isCompleted = stepIndex < currentStep;
+        final isCurrent = stepIndex == currentStep;
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: isCurrent ? 32 : 24,
+              height: isCurrent ? 32 : 24,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isCompleted
+                    ? AppColors.secondary
+                    : isCurrent
+                        ? cs.primary
+                        : cs.surfaceContainerHighest,
+                border: isCurrent
+                    ? Border.all(
+                        color: cs.primary.withValues(alpha: 0.3),
+                        width: 3,
+                      )
+                    : null,
+              ),
+              child: Icon(
+                isCompleted ? LucideIcons.check : icons[stepIndex],
+                size: isCurrent ? 14 : 12,
+                color: isCompleted || isCurrent
+                    ? Colors.white
+                    : cs.onSurfaceVariant.withValues(alpha: 0.4),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              labels[stepIndex],
+              style: tt.labelSmall?.copyWith(
+                color: isCurrent
+                    ? cs.primary
+                    : isCompleted
+                        ? AppColors.secondary
+                        : cs.onSurfaceVariant.withValues(alpha: 0.4),
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 9,
+                letterSpacing: 0.5,
+              ),
             ),
           ],
-        ] else ...[
-          Text(
-            _result?.error ?? 'An unknown error occurred.',
-            style: tt.bodyMedium?.copyWith(color: AppColors.error),
-          ),
-        ],
-        const SizedBox(height: AppTheme.space8),
-        PremiumButton(
-          label: success ? 'DONE' : 'TRY AGAIN',
-          onPressed: () {
-            if (success) {
-              context.goNamed(AppRouteNames.biopayHome);
-            } else {
-              setState(() {
-                _step = 0;
-                _result = null;
-                _capturedEmbedding = null;
-                _captureQualityScore = null;
-                _consentAccepted = false;
-              });
-            }
-          },
-        ),
-      ],
+        );
+      }),
     );
   }
 }
@@ -413,6 +746,7 @@ class _StepContainer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(AppTheme.space6),
@@ -423,8 +757,18 @@ class _StepContainer extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  iconColor.withValues(alpha: 0.20),
+                  iconColor.withValues(alpha: 0.08),
+                ],
+              ),
               shape: BoxShape.circle,
+              border: Border.all(
+                color: iconColor.withValues(alpha: 0.15),
+              ),
             ),
             child: Icon(icon, color: iconColor, size: 28),
           ),
@@ -433,7 +777,10 @@ class _StepContainer extends StatelessWidget {
             title,
             style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: AppTheme.space5),
+          Divider(
+            height: AppTheme.space8,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.08),
+          ),
           ...children,
         ],
       ),
@@ -444,8 +791,13 @@ class _StepContainer extends StatelessWidget {
 class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
+  final IconData icon;
 
-  const _InfoRow({required this.label, required this.value});
+  const _InfoRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -454,6 +806,12 @@ class _InfoRow extends StatelessWidget {
 
     return Row(
       children: [
+        Icon(
+          icon,
+          size: 18,
+          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+        ),
+        const SizedBox(width: AppTheme.space3),
         Text(label, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         const Spacer(),
         Text(

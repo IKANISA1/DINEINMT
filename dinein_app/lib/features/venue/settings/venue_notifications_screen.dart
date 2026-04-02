@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../../core/models/models.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -33,6 +34,36 @@ class _VenueNotificationsScreenState
   bool _isLoadingSettings = false;
   bool _isSavingSettings = false;
   String? _loadedVenueId;
+
+  AuthorizationStatus? _osPushStatus;
+  AppLifecycleListener? _lifecycleListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycleListener = AppLifecycleListener(
+      onResume: _checkOsNotificationStatus,
+    );
+    _checkOsNotificationStatus();
+  }
+
+  @override
+  void dispose() {
+    _lifecycleListener?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkOsNotificationStatus() async {
+    try {
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      if (!mounted) return;
+      setState(() {
+        _osPushStatus = settings.authorizationStatus;
+      });
+    } catch (_) {
+      // Handle missing capabilities quietly.
+    }
+  }
 
   Future<void> _loadSettings(String venueId) async {
     if (_isLoadingSettings && _loadedVenueId == venueId) return;
@@ -221,6 +252,37 @@ class _VenueNotificationsScreenState
                   .fadeIn(duration: 300.ms)
                   .slideY(begin: 0.05, end: 0, duration: 300.ms),
               const SizedBox(height: AppTheme.space2),
+
+              if (_orderPush && _osPushStatus == AuthorizationStatus.denied)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  margin: const EdgeInsets.only(bottom: AppTheme.space2),
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: cs.error.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.alertTriangle,
+                          color: cs.error, size: 16),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Push alerts are disabled in your Device Settings. Please enable them to receive incoming orders.',
+                          style: tt.bodySmall?.copyWith(
+                            color: cs.error,
+                            fontSize: 10,
+                            height: 1.3,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ).animate().fadeIn(duration: 300.ms).slideY(
+                    begin: -0.1, end: 0, duration: 300.ms),
 
               // ─── WhatsApp Updates ───
               _ToggleTile(

@@ -3,11 +3,17 @@ import 'package:flutter/material.dart';
 import '../../core/services/support_contact_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import 'otp_widgets.dart';
 
 Future<void> showAccessSupportDialog(
   BuildContext context, {
   required String title,
   required String message,
+  String ctaLabel = 'Contact Support',
+  String closeLabel = 'Close',
+  bool showWhatsAppBadge = false,
+  String? whatsAppNumber,
+  String? email,
 }) {
   final tt = Theme.of(context).textTheme;
   final cs = Theme.of(context).colorScheme;
@@ -40,9 +46,29 @@ Future<void> showAccessSupportDialog(
           AppTheme.space4,
           AppTheme.space4,
         ),
-        title: Text(
-          title,
-          style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+        title: Row(
+          children: [
+            if (showWhatsAppBadge) ...[
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: cs.secondary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                ),
+                child: const Center(
+                  child: WhatsAppIcon(color: AppColors.secondary),
+                ),
+              ),
+              const SizedBox(width: AppTheme.space3),
+            ],
+            Expanded(
+              child: Text(
+                title,
+                style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
         ),
         content: Text(
           message,
@@ -54,14 +80,18 @@ Future<void> showAccessSupportDialog(
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Close'),
+            child: Text(closeLabel),
           ),
           FilledButton(
             onPressed: () async {
               Navigator.of(dialogContext).pop();
-              await SupportContactService.contactSupport(context);
+              await SupportContactService.contactSupport(
+                context,
+                whatsAppNumber: whatsAppNumber,
+                email: email,
+              );
             },
-            child: const Text('Contact Support'),
+            child: Text(ctaLabel),
           ),
         ],
       );

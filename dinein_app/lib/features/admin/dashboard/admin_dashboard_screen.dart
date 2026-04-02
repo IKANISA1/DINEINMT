@@ -3,14 +3,17 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/constants/enums.dart';
+import '../../../core/models/models.dart';
 import '../../../core/config/country_runtime.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
+bool _hasVenueAccessReady(Venue venue) => venue.isAccessReady;
+
 /// Admin overview dashboard — system-wide live KPIs.
-/// Uses [allVenuesProvider], [allOrdersProvider], [pendingClaimsProvider].
+/// Uses [allVenuesProvider] and [allOrdersProvider].
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
 
@@ -21,7 +24,6 @@ class AdminDashboardScreen extends ConsumerWidget {
 
     final venuesAsync = ref.watch(allVenuesProvider);
     final ordersAsync = ref.watch(allOrdersProvider);
-    final claimsAsync = ref.watch(pendingClaimsProvider);
 
     return Scaffold(
       body: CustomScrollView(
@@ -112,14 +114,25 @@ class AdminDashboardScreen extends ConsumerWidget {
                   color: cs.tertiary,
                 ),
                 _AdminKpi(
-                  label: 'PENDING CLAIMS',
-                  value: claimsAsync.when(
+                  label: 'ACCESS READY',
+                  value: venuesAsync.when(
                     loading: () => '—',
                     error: (_, _) => '—',
-                    data: (c) => '${c.length}',
+                    data: (venues) =>
+                        '${venues.where(_hasVenueAccessReady).length}',
                   ),
-                  delta: 'Needs review',
-                  icon: LucideIcons.shieldCheck,
+                  delta: venuesAsync.when(
+                    loading: () => 'Loading...',
+                    error: (_, _) => 'Error',
+                    data: (venues) {
+                      final ready = venues.where(_hasVenueAccessReady).length;
+                      final remaining = venues.length - ready;
+                      return remaining == 0
+                          ? 'All venue access configured'
+                          : '$remaining still need setup';
+                    },
+                  ),
+                  icon: LucideIcons.messageCircle,
                   color: AppColors.warning,
                 ),
                 _AdminKpi(
@@ -148,34 +161,46 @@ class AdminDashboardScreen extends ConsumerWidget {
             ).animate().fadeIn(duration: 500.ms),
           ),
 
-          // ─── Pending Claims Preview ───
+          // ─── Venue Access Setup ───
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(AppTheme.space6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Pending Claims', style: tt.headlineSmall),
+                  Text('Venue Access Setup', style: tt.headlineSmall),
                   const SizedBox(height: AppTheme.space4),
-                  claimsAsync.when(
+                  venuesAsync.when(
                     loading: () => const SkeletonLoader(
                       width: double.infinity,
                       height: 100,
                     ),
-                    error: (_, _) => const Text('Could not load claims'),
-                    data: (claims) {
-                      if (claims.isEmpty) {
+                    error: (_, _) => const Text('Could not load venues'),
+                    data: (venues) {
+                      final pendingAccess = venues
+                          .where((venue) => !_hasVenueAccessReady(venue))
+                          .take(3)
+                          .toList();
+                      if (pendingAccess.isEmpty) {
                         return const EmptyState(
                           icon: LucideIcons.shieldCheck,
-                          title: 'No pending claims',
-                          subtitle: 'All caught up!',
+                          title: 'All venue access is configured',
+                          subtitle:
+                              'Every active venue has a WhatsApp login number.',
                         );
                       }
 
-                      final preview = claims.take(3).toList();
                       return Column(
-                        children: preview.asMap().entries.map((entry) {
-                          final claim = entry.value;
+                        children: pendingAccess.asMap().entries.map((entry) {
+                          final venue = entry.value;
+                          final requiresPhone = !venue.hasAssignedAccessPhone;
+                          final accessLabel = requiresPhone
+                              ? 'Add WhatsApp number'
+                              : !venue.isOpen
+                              ? 'Activate venue'
+                              : !venue.isAccessVerified
+                              ? 'Finish validation'
+                              : 'Review access';
                           return Padding(
                             padding: const EdgeInsets.only(
                               bottom: AppTheme.space3,
@@ -196,7 +221,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                                                   ),
                                             ),
                                             child: Icon(
-                                              LucideIcons.shieldCheck,
+                                              LucideIcons.messageCircle,
                                               size: 20,
                                               color: AppColors.warning,
                                             ),
@@ -210,11 +235,13 @@ class AdminDashboardScreen extends ConsumerWidget {
                                                   CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  claim.venueName,
+                                                  venue.name,
                                                   style: tt.titleSmall,
                                                 ),
                                                 Text(
-                                                  '${claim.contactPhone} • ${claim.venueArea}',
+                                                  requiresPhone
+                                                      ? 'WhatsApp number missing'
+                                                      : 'Venue is not active yet',
                                                   style: tt.bodySmall?.copyWith(
                                                     color: cs.onSurfaceVariant,
                                                   ),
@@ -223,7 +250,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                                             ),
                                           ),
                                           StatusBadge(
-                                            label: 'Pending',
+                                            label: accessLabel,
                                             color: AppColors.warning.withValues(
                                               alpha: 0.12,
                                             ),

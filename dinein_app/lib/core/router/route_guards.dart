@@ -4,18 +4,29 @@ import 'package:go_router/go_router.dart';
 import 'app_routes.dart';
 import '../services/auth_repository.dart';
 
+String _venueLoginRedirectTarget(GoRouterState state) {
+  return Uri(
+    path: AppRoutePaths.venueLogin,
+    queryParameters: {AppRouteParams.returnTo: state.uri.toString()},
+  ).toString();
+}
+
+String? resolveVenueReturnToUri(GoRouterState state) {
+  final raw = state.uri.queryParameters[AppRouteParams.returnTo];
+  if (raw == null || raw.trim().isEmpty) return null;
+
+  final uri = Uri.tryParse(raw);
+  if (uri == null || uri.path.isEmpty) return null;
+  if (!uri.path.startsWith('/venue')) return null;
+  if (uri.path == AppRoutePaths.venueLogin) return null;
+  return uri.toString();
+}
+
 /// Redirect unauthenticated venue users to the venue login screen.
 String? venueAuthGuard(BuildContext context, GoRouterState state) {
   return !AuthRepository.instance.hasVenueAccess
-      ? AppRoutePaths.venueLogin
+      ? _venueLoginRedirectTarget(state)
       : null;
-}
-
-/// Protect OCR review when it is being used against an existing venue.
-String? venueOcrGuard(BuildContext context, GoRouterState state) {
-  final venueId = state.uri.queryParameters[AppRouteParams.venueId];
-  if (venueId == null || venueId.isEmpty) return null;
-  return venueAuthGuard(context, state);
 }
 
 /// Redirect unauthenticated or non-admin users to the admin login page.

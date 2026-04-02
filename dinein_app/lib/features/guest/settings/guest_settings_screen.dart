@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -142,7 +143,7 @@ class GuestSettingsScreen extends ConsumerWidget {
               .animate()
               .fadeIn(delay: 100.ms, duration: 320.ms)
               .slideY(begin: 0.05),
-          if (config.hasBioPay) ...[
+          if (config.hasBioPay && !kIsWeb) ...[
             const SizedBox(height: AppTheme.space3),
             _SettingsTile(
                   icon: LucideIcons.scanFace,
@@ -159,8 +160,8 @@ class GuestSettingsScreen extends ConsumerWidget {
           const SizedBox(height: AppTheme.space4),
           _SettingsTile(
                 icon: LucideIcons.store,
-                title: 'Add Your Venue',
-                onTap: () => context.pushNamed(AppRouteNames.venueClaim),
+                title: 'Venue Portal',
+                onTap: () => context.pushNamed(AppRouteNames.venueLogin),
               )
               .animate()
               .fadeIn(delay: 150.ms, duration: 320.ms)

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -23,17 +24,33 @@ import 'oval_painter.dart';
 typedef EnrollmentCaptureReady =
     void Function(EnrollmentCaptureAggregate aggregate);
 
+/// World-class face enrollment capture widget.
+///
+/// Features:
+/// - Edge-to-edge responsive camera preview
+/// - Segmented progress ring (Apple Face ID-style)
+/// - Animated sample capture dots
+/// - Quality feedback overlay with animated transitions
+/// - Pulsing ring animation during face lock
 class FaceEnrollmentCapture extends ConsumerStatefulWidget {
-  const FaceEnrollmentCapture({super.key, required this.onCaptureReady});
+  const FaceEnrollmentCapture({
+    super.key,
+    required this.onCaptureReady,
+    this.fullBleed = false,
+  });
 
   final EnrollmentCaptureReady onCaptureReady;
+
+  /// When true, camera preview expands edge-to-edge (no border radius).
+  final bool fullBleed;
 
   @override
   ConsumerState<FaceEnrollmentCapture> createState() =>
       _FaceEnrollmentCaptureState();
 }
 
-class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
+class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture>
+    with SingleTickerProviderStateMixin {
   static const Duration _captureDelay = Duration(milliseconds: 500);
 
   final EnrollmentCaptureSession _session = EnrollmentCaptureSession();
@@ -43,14 +60,22 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
   ScannerState _scannerState = ScannerState.searching;
   String _statusText = 'Preparing camera...';
   String? _blockingError;
+  String? _qualityFeedback;
   bool _isInitializing = true;
   bool _isProcessingCapture = false;
   bool _isCaptureScheduled = false;
   bool _hasSubmittedResult = false;
+  bool _showCaptureFlash = false;
+
+  late final AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _initializeCapture();
@@ -59,6 +84,7 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
 
   @override
   void dispose() {
+    _pulseController.dispose();
     final controller = _cameraController;
     _cameraController = null;
     controller?.dispose();
@@ -146,7 +172,7 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
         _isInitializing = false;
         _blockingError = null;
         _scannerState = ScannerState.searching;
-        _statusText = 'Hold still. We need 5 face samples.';
+        _statusText = 'Center your face in the frame';
       });
 
       _scheduleNextCapture();
@@ -199,8 +225,7 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
     setState(() {
       _isProcessingCapture = true;
       _scannerState = ScannerState.searching;
-      _statusText =
-          'Capturing sample ${_session.sampleCount + 1} of ${_session.requiredSamples}...';
+      _qualityFeedback = null;
     });
 
     XFile? capture;
@@ -208,7 +233,6 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
       capture = await controller.takePicture();
       final processed = await _processCapture(capture.path);
       if (!mounted || processed == null) {
-        // Quality failed or no face — gate was already reset inside _processCapture
         return;
       }
 
@@ -233,13 +257,20 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
       await HapticFeedback.lightImpact();
       if (!mounted) return;
 
+      // Brief green flash effect
+      setState(() => _showCaptureFlash = true);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      if (!mounted) return;
+      setState(() => _showCaptureFlash = false);
+
       if (_session.isComplete) {
         _hasSubmittedResult = true;
         final aggregate = _session.buildAggregate();
         setState(() {
           _scannerState = ScannerState.captured;
-          _statusText = 'Face capture complete. Finalizing enrollment...';
+          _statusText = 'Face captured successfully!';
         });
+        await HapticFeedback.mediumImpact();
         widget.onCaptureReady(aggregate);
         return;
       }
@@ -247,7 +278,7 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
       setState(() {
         _scannerState = ScannerState.locked;
         _statusText =
-            'Captured ${_session.sampleCount} of ${_session.requiredSamples} samples';
+            'Sample ${_session.sampleCount} of ${_session.requiredSamples} captured';
       });
     } catch (error, stackTrace) {
       debugPrint('[BioPay Enrollment] Capture error: $error');
@@ -280,7 +311,8 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
       if (!mounted) return null;
       setState(() {
         _scannerState = ScannerState.searching;
-        _statusText = 'No face found. Center your face in the frame.';
+        _statusText = 'Center your face in the frame';
+        _qualityFeedback = 'No face detected';
       });
       return null;
     }
@@ -291,6 +323,7 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
       setState(() {
         _scannerState = ScannerState.error;
         _statusText = BiopayStrings.qualityMultipleFaces;
+        _qualityFeedback = BiopayStrings.qualityMultipleFaces;
       });
       return null;
     }
@@ -312,11 +345,18 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
     if (!quality.isAcceptable) {
       _gate.reset();
       if (!mounted) return null;
+      final feedbackMsg = _messageForQualityIssue(quality.issues.first);
       setState(() {
         _scannerState = ScannerState.error;
-        _statusText = _messageForQualityIssue(quality.issues.first);
+        _statusText = feedbackMsg;
+        _qualityFeedback = feedbackMsg;
       });
       return null;
+    }
+
+    // Quality passed — clear any feedback
+    if (mounted) {
+      setState(() => _qualityFeedback = null);
     }
 
     final landmarks = FaceAlignmentService.extractLandmarks(face);
@@ -326,6 +366,7 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
       setState(() {
         _scannerState = ScannerState.error;
         _statusText = 'Keep your eyes and nose visible inside the frame.';
+        _qualityFeedback = 'Keep your eyes and nose visible';
       });
       return null;
     }
@@ -389,6 +430,25 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
     };
   }
 
+  IconData _iconForQualityIssue(String message) {
+    if (message == BiopayStrings.qualityFaceTooSmall) {
+      return LucideIcons.maximize;
+    }
+    if (message == BiopayStrings.qualityYawTooHigh) {
+      return LucideIcons.moveHorizontal;
+    }
+    if (message == BiopayStrings.qualityEyesClosed) {
+      return LucideIcons.eye;
+    }
+    if (message == BiopayStrings.qualityMultipleFaces) {
+      return LucideIcons.users;
+    }
+    if (message == BiopayStrings.qualityLowLight) {
+      return LucideIcons.sun;
+    }
+    return LucideIcons.alertCircle;
+  }
+
   double _computeQualityScore(FaceQualityResult quality) {
     final sizeScore =
         ((quality.faceWidthRatio - FaceDetectionService.minFaceWidthRatio) /
@@ -419,12 +479,17 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
         : (3 / 4);
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 360;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // ─── Camera preview with overlay ───
         ClipRRect(
-          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          borderRadius: widget.fullBleed
+              ? BorderRadius.zero
+              : BorderRadius.circular(AppTheme.radiusXl),
           child: Container(
             color: Colors.black,
             child: AspectRatio(
@@ -432,86 +497,375 @@ class _FaceEnrollmentCaptureState extends ConsumerState<FaceEnrollmentCapture> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
+                  // Camera feed
                   if (previewReady) CameraPreview(controller),
                   if (!previewReady)
                     Center(
                       child: _isInitializing
-                          ? CircularProgressIndicator(color: cs.primary)
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CircularProgressIndicator(
+                                  color: cs.primary,
+                                  strokeWidth: 2.5,
+                                ),
+                                const SizedBox(height: AppTheme.space4),
+                                Text(
+                                  'Initializing camera...',
+                                  style: tt.bodySmall?.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ],
+                            )
                           : Icon(
                               LucideIcons.cameraOff,
                               size: 48,
                               color: Colors.white.withValues(alpha: 0.5),
                             ),
                     ),
-                  CustomPaint(
-                    painter: OvalPainter(
-                      state: _scannerState,
-                      progress: _isProcessingCapture ? 1.0 : 0.88,
-                    ),
-                    child: const SizedBox.expand(),
+
+                  // Animated segmented progress oval
+                  AnimatedBuilder(
+                    animation: _pulseController,
+                    builder: (context, child) {
+                      return CustomPaint(
+                        painter: OvalPainter(
+                          state: _scannerState,
+                          progress: _pulseController.value,
+                          samplesCaptured: _session.sampleCount,
+                          totalSamples: _session.requiredSamples,
+                        ),
+                        child: const SizedBox.expand(),
+                      );
+                    },
                   ),
+
+                  // Green flash on capture
+                  if (_showCaptureFlash)
+                    Container(
+                      color: AppColors.secondary.withValues(alpha: 0.15),
+                    ),
+
+                  // ─── Status chip (top) ───
                   Positioned(
-                    top: AppTheme.space4,
-                    right: AppTheme.space4,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.space3,
-                        vertical: AppTheme.space2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.48),
-                        borderRadius: BorderRadius.circular(
-                          AppTheme.radiusFull,
-                        ),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.12),
-                        ),
-                      ),
-                      child: Text(
-                        '${_session.sampleCount}/${_session.requiredSamples}',
-                        style: tt.labelSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
+                    top: AppTheme.space3,
+                    left: AppTheme.space3,
+                    right: AppTheme.space3,
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: _StatusChip(
+                          key: ValueKey('status_${_scannerState.name}_${_session.sampleCount}'),
+                          state: _scannerState,
+                          text: _statusText,
+                          isCompact: isCompact,
                         ),
                       ),
                     ),
                   ),
+
+                  // ─── Quality feedback overlay (bottom of camera) ───
+                  if (_qualityFeedback != null)
+                    Positioned(
+                      bottom: AppTheme.space4,
+                      left: AppTheme.space4,
+                      right: AppTheme.space4,
+                      child: _QualityFeedbackBanner(
+                        message: _qualityFeedback!,
+                        icon: _iconForQualityIssue(_qualityFeedback!),
+                      ).animate().fadeIn(duration: 200.ms).slideY(begin: 0.3),
+                    ),
                 ],
               ),
             ),
           ),
         ),
-        const SizedBox(height: AppTheme.space4),
-        LinearProgressIndicator(
-          value: _session.progress,
-          minHeight: 6,
-          borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-          color: AppColors.secondary,
-          backgroundColor: cs.surfaceContainerHighest,
-        ),
-        const SizedBox(height: AppTheme.space3),
-        Text(
-          _blockingError ?? _statusText,
-          style: tt.bodyMedium?.copyWith(
-            color: _blockingError == null
-                ? cs.onSurfaceVariant
-                : AppColors.error,
-            fontWeight: FontWeight.w600,
+
+        const SizedBox(height: AppTheme.space5),
+
+        // ─── Sample capture dots ───
+        Padding(
+          padding: widget.fullBleed
+              ? const EdgeInsets.symmetric(horizontal: AppTheme.space6)
+              : EdgeInsets.zero,
+          child: _SampleDots(
+            captured: _session.sampleCount,
+            total: _session.requiredSamples,
+            isProcessing: _isProcessingCapture,
           ),
         ),
-        const SizedBox(height: AppTheme.space2),
-        Text(
-          'No photos are saved. Samples are processed in memory only.',
-          style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+
+        const SizedBox(height: AppTheme.space3),
+
+        // ─── Privacy badge ───
+        Padding(
+          padding: widget.fullBleed
+              ? const EdgeInsets.symmetric(horizontal: AppTheme.space6)
+              : EdgeInsets.zero,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                LucideIcons.lock,
+                size: 12,
+                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'No photos saved — processed in memory only',
+                style: tt.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
         ),
+
+        // ─── Error retry ───
         if (_blockingError != null) ...[
-          const SizedBox(height: AppTheme.space5),
-          PremiumButton(label: 'TRY AGAIN', onPressed: _initializeCapture),
+          const SizedBox(height: AppTheme.space4),
+          Padding(
+            padding: widget.fullBleed
+                ? const EdgeInsets.symmetric(horizontal: AppTheme.space6)
+                : EdgeInsets.zero,
+            child: Column(
+              children: [
+                Text(
+                  _blockingError!,
+                  style: tt.bodyMedium?.copyWith(
+                    color: AppColors.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppTheme.space4),
+                PremiumButton(
+                  label: 'TRY AGAIN',
+                  icon: LucideIcons.refreshCw,
+                  onPressed: _initializeCapture,
+                ),
+              ],
+            ),
+          ),
         ],
       ],
     );
   }
 }
+
+// ─── Status Chip ───────────────────────────────────────────
+
+class _StatusChip extends StatelessWidget {
+  final ScannerState state;
+  final String text;
+  final bool isCompact;
+
+  const _StatusChip({
+    super.key,
+    required this.state,
+    required this.text,
+    this.isCompact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final (Color bgColor, Color fgColor, IconData icon) = switch (state) {
+      ScannerState.searching => (
+        Colors.white.withValues(alpha: 0.12),
+        Colors.white.withValues(alpha: 0.85),
+        LucideIcons.scanFace,
+      ),
+      ScannerState.locked => (
+        AppColors.secondary.withValues(alpha: 0.20),
+        AppColors.secondary,
+        LucideIcons.lock,
+      ),
+      ScannerState.captured => (
+        AppColors.secondary.withValues(alpha: 0.25),
+        AppColors.secondary,
+        LucideIcons.checkCircle2,
+      ),
+      ScannerState.error => (
+        AppColors.error.withValues(alpha: 0.20),
+        AppColors.error,
+        LucideIcons.alertCircle,
+      ),
+      ScannerState.noMatch => (
+        AppColors.error.withValues(alpha: 0.20),
+        AppColors.error,
+        LucideIcons.xCircle,
+      ),
+    };
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? AppTheme.space3 : AppTheme.space4,
+        vertical: AppTheme.space2,
+      ),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+        border: Border.all(
+          color: fgColor.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fgColor),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: fgColor,
+                fontSize: isCompact ? 11 : 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Quality Feedback Banner ────────────────────────────────
+
+class _QualityFeedbackBanner extends StatelessWidget {
+  final String message;
+  final IconData icon;
+
+  const _QualityFeedbackBanner({
+    required this.message,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppTheme.space4,
+        vertical: AppTheme.space3,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Sample Capture Dots ──────────────────────────────────
+
+class _SampleDots extends StatelessWidget {
+  final int captured;
+  final int total;
+  final bool isProcessing;
+
+  const _SampleDots({
+    required this.captured,
+    required this.total,
+    this.isProcessing = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(total, (index) {
+            final isCaptured = index < captured;
+            final isCurrent = index == captured;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                width: isCaptured ? 28 : (isCurrent ? 24 : 20),
+                height: isCaptured ? 28 : (isCurrent ? 24 : 20),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isCaptured
+                      ? AppColors.secondary.withValues(alpha: 0.20)
+                      : isCurrent
+                          ? AppColors.warning.withValues(alpha: 0.12)
+                          : cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                  border: Border.all(
+                    color: isCaptured
+                        ? AppColors.secondary
+                        : isCurrent
+                            ? AppColors.warning.withValues(alpha: 0.6)
+                            : cs.onSurfaceVariant.withValues(alpha: 0.15),
+                    width: isCaptured ? 2 : 1.5,
+                  ),
+                ),
+                child: isCaptured
+                    ? Icon(
+                        LucideIcons.check,
+                        size: 14,
+                        color: AppColors.secondary,
+                      )
+                    : isCurrent && isProcessing
+                        ? SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: AppColors.warning,
+                            ),
+                          )
+                        : null,
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: AppTheme.space2),
+        Text(
+          captured == total
+              ? 'All samples captured!'
+              : '$captured of $total samples',
+          style: tt.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Private data classes ──────────────────────────────────
 
 class _DecodedImage {
   const _DecodedImage({

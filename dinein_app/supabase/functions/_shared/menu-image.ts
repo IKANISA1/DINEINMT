@@ -1,5 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildGeminiImageGenerationConfig } from "./gemini-image-config.ts";
+import {
+  buildMenuItemResearchPrompt,
+  buildFallbackMenuItemResearchProfile,
+  extractJsonPayloadFromCandidate,
+  extractResearchSourceUrls,
+  menuItemResearchSchema,
+  normalizeMenuItemClass,
+  parseJsonObjectText,
+  parseMenuItemResearchProfile,
+  resolveMenuItemClass,
+  type MenuItemClass,
+  type MenuItemResearchProfile,
+} from "./menu-item-context.ts";
 
 export interface FunctionEnv {
   supabaseUrl: string;
@@ -7,6 +20,7 @@ export interface FunctionEnv {
   supabaseServiceRoleKey: string;
   geminiApiKey: string;
   geminiImageModels: string[];
+  menuItemResearchModels: string[];
   menuImageBucket: string;
   cronSecret: string | null;
 }
@@ -19,6 +33,14 @@ export interface MenuItemRecord {
   name: string;
   description: string | null;
   category: string | null;
+  class: string | null;
+  menu_context: Json | null;
+  menu_context_status: string | null;
+  menu_context_error: string | null;
+  menu_context_model: string | null;
+  menu_context_attempts: number | null;
+  menu_context_locked: boolean | null;
+  menu_context_updated_at: string | null;
   image_url: string | null;
   image_source: string | null;
   image_status: string | null;
@@ -36,11 +58,13 @@ export interface VenueRecord {
   category: string | null;
   description: string | null;
   owner_id: string | null;
+  phone: string | null;
+  owner_contact_phone: string | null;
+  owner_whatsapp_number: string | null;
 }
 
 export interface VenueSessionInput {
-  venue_id?: string;
-  contact_phone?: string;
+  access_token?: string;
 }
 
 export interface InvocationActor {
@@ -73,6 +97,19 @@ interface ReusableMenuImageRecord {
   image_url: string;
   image_storage_path: string;
   image_model: string | null;
+}
+
+const externalRequestTimeoutMs = 60000;
+
+export interface MenuItemContextProcessResult {
+  status: "success" | "skipped";
+  itemId: string;
+  venueId: string;
+  menuContextStatus: "pending" | "researching" | "ready" | "failed";
+  itemClass: MenuItemClass;
+  profile: MenuItemResearchProfile;
+  model: string | null;
+  reason?: string;
 }
 
 export class HttpError extends Error {
@@ -114,6 +151,13 @@ export function getFunctionEnv(): FunctionEnv {
     geminiImageModels: (
       Deno.env.get("GEMINI_IMAGE_MODELS") ??
         "gemini-3.1-flash-image-preview,gemini-2.5-flash-image"
+    )
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    menuItemResearchModels: (
+      Deno.env.get("GEMINI_MENU_ITEM_MODELS") ??
+        "gemini-3-flash-preview,gemini-2.5-flash"
     )
       .split(",")
       .map((value) => value.trim())
@@ -185,7 +229,7 @@ export async function fetchMenuItem(
   const { data, error } = await adminClient
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
     )
     .eq("id", itemId)
     .maybeSingle();
@@ -211,7 +255,9 @@ export async function fetchVenue(
 ): Promise<VenueRecord> {
   const { data, error } = await adminClient
     .from("dinein_venues")
-    .select("id, name, category, description, owner_id")
+    .select(
+      "id, name, category, description, owner_id, phone, owner_contact_phone, owner_whatsapp_number",
+    )
     .eq("id", venueId)
     .maybeSingle();
 
@@ -248,23 +294,221 @@ export async function assertVenueAccess(
   }
 
   const venueSession = getVenueSession(body);
-  if (!venueSession?.venue_id || !venueSession.contact_phone) {
+  const accessToken = venueSession?.access_token?.trim();
+  if (!accessToken) {
     throw new HttpError(401, "Venue session required.");
   }
 
-  if (venueSession.venue_id !== venue.id) {
+  const session = await verifyVenueAccessToken(accessToken);
+  if (session.venueId !== venue.id) {
     throw new HttpError(403, "Venue session does not match requested venue.");
   }
 
-  const approvedClaim = await getApprovedClaimForVenueContact(
-    adminClient,
-    venue.id,
-    normalizeContact(venueSession.contact_phone),
-  );
-
-  if (!approvedClaim) {
+  if (!venueMatchesContact(venue, session.contactPhone)) {
     throw new HttpError(403, "Venue access not granted.");
   }
+}
+
+export async function ensureMenuItemContext(
+  options: {
+    adminClient: ReturnType<typeof createAdminClient>;
+    env: FunctionEnv;
+    item: MenuItemRecord;
+    venue: VenueRecord;
+    forceRefresh?: boolean;
+  },
+): Promise<MenuItemContextProcessResult> {
+  const { adminClient, env, item, venue, forceRefresh = false } = options;
+  const itemClass = resolveMenuItemClass(item);
+  const profile = parseMenuItemResearchProfile(item.menu_context);
+  const resolvedProfileClass = profile?.class ?? itemClass;
+  const menuContextReady =
+    item.menu_context_status === "ready" && profile && !forceRefresh;
+
+  if (item.menu_context_locked == true && !forceRefresh) {
+    if (normalizeMenuItemClass(item.class) !== resolvedProfileClass) {
+      await updateMenuContextState(adminClient, item.id, {
+        class: resolvedProfileClass,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    return {
+      status: "skipped",
+      itemId: item.id,
+      venueId: item.venue_id,
+      menuContextStatus: item.menu_context_status === "failed"
+        ? "failed"
+        : "ready",
+      itemClass: resolvedProfileClass,
+      profile: profile ?? buildFallbackMenuItemResearchProfile({
+        item,
+        itemClass: resolvedProfileClass,
+        visualKind: classifyMenuVisualKind(
+          item,
+          venue,
+          resolvedProfileClass,
+          profile,
+        ),
+      }),
+      model: item.menu_context_model,
+      reason: "menu_context_locked",
+    };
+  }
+
+  if (menuContextReady) {
+    if (normalizeMenuItemClass(item.class) !== resolvedProfileClass) {
+      await updateMenuContextState(adminClient, item.id, {
+        class: resolvedProfileClass,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    return {
+      status: "skipped",
+      itemId: item.id,
+      venueId: item.venue_id,
+      menuContextStatus: "ready",
+      itemClass: resolvedProfileClass,
+      profile: profile as MenuItemResearchProfile,
+      model: item.menu_context_model,
+      reason: "menu_context_ready",
+    };
+  }
+
+  const nextAttempt = (item.menu_context_attempts ?? 0) + 1;
+  const startedAt = new Date().toISOString();
+
+  await updateMenuContextState(adminClient, item.id, {
+    class: resolvedProfileClass,
+    menu_context_status: "researching",
+    menu_context_error: null,
+    menu_context_attempts: nextAttempt,
+    menu_context_updated_at: startedAt,
+    updated_at: startedAt,
+  });
+
+  const prompt = buildMenuItemResearchPrompt({
+    item,
+    venueName: venue.name,
+    venueCategory: venue.category,
+    venueDescription: venue.description,
+  });
+
+  const fallbackProfile = buildFallbackMenuItemResearchProfile({
+    item,
+    itemClass: resolvedProfileClass,
+    visualKind: classifyMenuVisualKind(
+      item,
+      venue,
+      resolvedProfileClass,
+      profile,
+    ),
+  });
+
+  let lastError = "Menu item research did not return a usable profile.";
+
+  for (const model of env.menuItemResearchModels) {
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${
+        encodeURIComponent(model)
+      }:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": env.geminiApiKey,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+          ],
+          tools: [{ google_search: {} }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseJsonSchema: menuItemResearchSchema,
+          },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      lastError = await extractGeminiError(response);
+      continue;
+    }
+
+    const body = await response.json();
+    const candidate = normalizeCandidateObject((body as Json).candidates);
+    if (!candidate) {
+      lastError = `Model "${model}" returned no candidate payload.`;
+      continue;
+    }
+
+    const jsonText = extractJsonPayloadFromCandidate(candidate);
+    const parsedProfile = jsonText
+      ? parseMenuItemResearchProfile(parseJsonObjectText(jsonText))
+      : null;
+    if (!parsedProfile) {
+      lastError = `Model "${model}" returned an invalid menu profile.`;
+      continue;
+    }
+
+    const sourceUrls = [
+      ...extractResearchSourceUrls(candidate),
+      ...parsedProfile.source_urls,
+    ];
+    const profileToStore: MenuItemResearchProfile = {
+      ...parsedProfile,
+      source_urls: [...new Set(sourceUrls)].filter(Boolean).slice(0, 12),
+    };
+
+    await updateMenuContextState(adminClient, item.id, {
+      class: profileToStore.class,
+      menu_context: profileToStore,
+      menu_context_status: "ready",
+      menu_context_error: null,
+      menu_context_model: model,
+      menu_context_attempts: nextAttempt,
+      menu_context_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    return {
+      status: "success",
+      itemId: item.id,
+      venueId: item.venue_id,
+      menuContextStatus: "ready",
+      itemClass: profileToStore.class,
+      profile: profileToStore,
+      model,
+      reason: "google_search_grounded",
+    };
+  }
+
+  await updateMenuContextState(adminClient, item.id, {
+    class: fallbackProfile.class,
+    menu_context: fallbackProfile,
+    menu_context_status: "failed",
+    menu_context_error: lastError,
+    menu_context_model: env.menuItemResearchModels[0] ?? null,
+    menu_context_attempts: nextAttempt,
+    menu_context_updated_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
+  return {
+    status: "success",
+    itemId: item.id,
+    venueId: item.venue_id,
+    menuContextStatus: "failed",
+    itemClass: fallbackProfile.class,
+    profile: fallbackProfile,
+    model: env.menuItemResearchModels[0] ?? null,
+    reason: "heuristic_fallback",
+  };
 }
 
 export async function processMenuItemImageGeneration(
@@ -353,18 +597,30 @@ export async function processMenuItemImageGeneration(
     };
   }
 
+  const context = await ensureMenuItemContext({
+    adminClient,
+    env,
+    item,
+    venue,
+    forceRefresh: forceRegenerate,
+  });
+
   await updateGenerationState(adminClient, item.id, {
     image_status: "generating",
     image_error: null,
     updated_at: new Date().toISOString(),
   });
 
-  const prompt = buildMenuImagePrompt(item, venue);
+  const prompt = buildMenuImagePrompt(item, venue, context.profile, context.itemClass);
   const nextAttempt = (item.image_attempts ?? 0) + 1;
 
   try {
     if (!forceRegenerate) {
-      const reusableImage = await findReusableMenuImage(adminClient, item);
+      const reusableImage = await findReusableMenuImage(
+        adminClient,
+        item,
+        context.itemClass,
+      );
       if (reusableImage) {
         return await cloneReusableMenuImage({
           adminClient,
@@ -453,11 +709,13 @@ export async function processMenuItemImageGeneration(
 async function findReusableMenuImage(
   adminClient: ReturnType<typeof createAdminClient>,
   item: MenuItemRecord,
+  itemClass: MenuItemClass,
 ): Promise<ReusableMenuImageRecord | null> {
   const { data, error } = await adminClient
     .from("dinein_menu_items")
     .select("id, image_url, image_storage_path, image_model")
     .neq("id", item.id)
+    .eq("class", itemClass)
     .eq("name", item.name)
     .eq("category", item.category ?? "Uncategorized")
     .eq("description", item.description ?? "")
@@ -616,6 +874,46 @@ function decodeBase64Url(value: string): string {
   return atob(padded);
 }
 
+function venueSessionSecret(): string {
+  const secret = Deno.env.get("DINEIN_VENUE_SESSION_SECRET")?.trim() ??
+    Deno.env.get("VENUE_OTP_JWT_SECRET")?.trim() ??
+    "";
+  if (!secret) {
+    throw new HttpError(
+      500,
+      "Missing venue session signing secret for menu image access.",
+    );
+  }
+  return secret;
+}
+
+async function hmacSha256Base64Url(
+  value: string,
+  secret: string,
+): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(value),
+  );
+  const bytes = new Uint8Array(signature);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(
+    /=+$/g,
+    "",
+  );
+}
+
 function normalizeContact(value: unknown): string {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
@@ -623,6 +921,10 @@ function normalizeContact(value: unknown): string {
   const digits = trimmed.replaceAll(/[^0-9]/g, "");
   if (!digits) return trimmed;
   return startsWithPlus ? `+${digits}` : digits;
+}
+
+function digitsOnly(value: string): string {
+  return value.replaceAll(/[^0-9]/g, "");
 }
 
 async function fetchUserRole(
@@ -642,34 +944,69 @@ async function fetchUserRole(
   return (data?.role as string | null) ?? null;
 }
 
-async function getApprovedClaimForVenueContact(
-  adminClient: ReturnType<typeof createAdminClient>,
-  venueId: string,
-  contact: string,
-): Promise<unknown | null> {
-  const fields = ["whatsapp_number", "contact_phone", "email"];
+function venueMatchesContact(
+  venue: VenueRecord,
+  contactPhone: string,
+): boolean {
+  const target = digitsOnly(normalizeContact(contactPhone));
+  if (!target) return false;
+  return [
+    venue.phone,
+    venue.owner_contact_phone,
+    venue.owner_whatsapp_number,
+  ].some((value) => digitsOnly(value ?? "") === target);
+}
 
-  for (const field of fields) {
-    const { data, error } = await adminClient
-      .from("dinein_venue_claims")
-      .select("*")
-      .eq("venue_id", venueId)
-      .eq(field, contact)
-      .eq("status", "approved")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      continue;
-    }
-
-    if (data) {
-      return data;
-    }
+async function verifyVenueAccessToken(
+  token: string,
+): Promise<{ venueId: string; contactPhone: string }> {
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    throw new HttpError(403, "Invalid venue access token.");
   }
 
-  return null;
+  const [encodedHeader, encodedPayload, encodedSignature] = parts;
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const expectedSignature = await hmacSha256Base64Url(
+    signingInput,
+    venueSessionSecret(),
+  );
+
+  if (expectedSignature !== encodedSignature) {
+    throw new HttpError(403, "Venue access token signature is invalid.");
+  }
+
+  let payload: Json;
+  try {
+    payload = JSON.parse(decodeBase64Url(encodedPayload)) as Json;
+  } catch {
+    throw new HttpError(403, "Venue access token payload is malformed.");
+  }
+
+  if (payload.aud !== "dinein-venue") {
+    throw new HttpError(403, "Venue access token audience is invalid.");
+  }
+
+  if (
+    typeof payload.exp === "number" &&
+    Math.floor(Date.now() / 1000) >= payload.exp
+  ) {
+    throw new HttpError(
+      401,
+      "Venue access token has expired. Please log in again.",
+    );
+  }
+
+  const venueId = typeof payload.venue_id === "string"
+    ? payload.venue_id
+    : null;
+  const contactPhone = typeof payload.phone === "string" ? payload.phone : null;
+
+  if (!venueId || !contactPhone) {
+    throw new HttpError(403, "Venue access token is missing required claims.");
+  }
+
+  return { venueId, contactPhone };
 }
 
 function getVenueSession(body: Json): VenueSessionInput | null {
@@ -761,9 +1098,57 @@ async function normalizeExistingMenuImageState(
   });
 }
 
+async function updateMenuContextState(
+  adminClient: ReturnType<typeof createAdminClient>,
+  itemId: string,
+  updates: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await adminClient
+    .from("dinein_menu_items")
+    .update(updates)
+    .eq("id", itemId);
+
+  if (error) {
+    throw new HttpError(
+      500,
+      `Unable to update the menu item research state: ${error.message}`,
+      error,
+    );
+  }
+}
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs = externalRequestTimeoutMs,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function normalizeCandidateObject(value: unknown): Json | null {
+  if (Array.isArray(value)) {
+    const first = value.find(isRecord);
+    return first ? (first as Json) : null;
+  }
+
+  return isRecord(value) ? (value as Json) : null;
+}
+
 function buildMenuImagePrompt(
   item: MenuItemRecord,
   venue: VenueRecord,
+  profile: MenuItemResearchProfile | null,
+  itemClass: MenuItemClass,
 ): string {
   const venueCategory = venue.category?.trim() || "Restaurants";
   const itemCategory = item.category?.trim() || "menu item";
@@ -773,11 +1158,34 @@ function buildMenuImagePrompt(
     "Premium hospitality venue with a refined, dark, elevated atmosphere.";
   const tags = (item.tags ?? []).map((tag) => tag.trim()).filter(Boolean);
   const tagsLine = tags.length > 0 ? tags.join(", ") : "none";
-  const visualKind = classifyMenuVisualKind(item, venue);
+  const resolvedClass = normalizeMenuItemClass(item.class) ?? itemClass;
+  const resolvedProfile = profile ?? buildFallbackMenuItemResearchProfile({
+    item,
+    itemClass: resolvedClass,
+    visualKind: classifyMenuVisualKind(item, venue, resolvedClass, null),
+  });
+  const visualKind = classifyMenuVisualKind(
+    item,
+    venue,
+    resolvedClass,
+    resolvedProfile,
+  );
   const artDirection = buildMenuArtDirection(visualKind, venue);
   const isDrink = isBeverageKind(visualKind);
   const typeLabel = isDrink ? "BEVERAGE / DRINK" : "FOOD / PLATED DISH";
   const cuisineHint = detectCuisineHint(item, venue);
+  const keywordSignals = resolvedProfile.keyword_signals.length > 0
+    ? resolvedProfile.keyword_signals.join(", ")
+    : "none";
+  const sourceUrls = resolvedProfile.source_urls.length > 0
+    ? resolvedProfile.source_urls.map((url) => `- ${url}`).join("\n")
+    : "- none";
+  const visualDirections = resolvedProfile.visual_directions.length > 0
+    ? resolvedProfile.visual_directions.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
+  const visualDoNot = resolvedProfile.visual_do_not.length > 0
+    ? resolvedProfile.visual_do_not.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
 
   return `
 Create a photorealistic premium menu image for a luxury dark-mode hospitality mobile app.
@@ -785,6 +1193,8 @@ Create a photorealistic premium menu image for a luxury dark-mode hospitality mo
 ═══ ITEM TYPE CLASSIFICATION (MOST CRITICAL RULE) ═══
 This item is classified as: ${typeLabel}
 Visual kind: ${visualKind}
+Resolved class: ${resolvedProfile.class}
+Research confidence: ${resolvedProfile.confidence}
 ${
     isDrink
       ? `THIS IS A DRINK. You MUST show a beverage — a glass, bottle, cup, or can.
@@ -802,12 +1212,23 @@ Dish/drink name: "${item.name}"
 Category: "${itemCategory}"
 Description: "${itemDescription}"
 Tags: ${tagsLine}
+Canonical name: "${resolvedProfile.canonical_name}"
+Canonical category: "${resolvedProfile.canonical_category}"
+Canonical description: "${resolvedProfile.canonical_description}"
+Visual subject: "${resolvedProfile.visual_subject}"
+Serving style: "${resolvedProfile.serving_style}"
+Keyword signals: ${keywordSignals}
+Research summary: ${resolvedProfile.research_summary}
+Source URLs:
+${sourceUrls}
 
 The image MUST depict EXACTLY what the name and description say.
 - If the name is "Margherita Pizza", show a Margherita pizza, not generic pasta.
 - If the description says "grilled", show grill marks. If "fried", show fried texture.
 - If "vegetarian" or "vegan" tag is present, absolutely NO meat visible.
 - The name is ground truth. Never reinterpret or substitute.
+${visualDirections}
+${visualDoNot}
 
 ═══ VENUE CONTEXT ═══
 Venue: ${venue.name}
@@ -1065,26 +1486,32 @@ interface MenuArtDirection {
 function classifyMenuVisualKind(
   item: MenuItemRecord,
   _venue: VenueRecord,
+  itemClass?: MenuItemClass | null,
+  profile?: MenuItemResearchProfile | null,
 ): MenuVisualKind {
   const tags = (item.tags ?? []).join(" ");
   // IMPORTANT: Only use item-level data for classification.
   // Including venue.category / venue.description causes
   // misclassification (e.g. a burger at a "bar" gets tagged as beer).
   const itemCategory = normalizePromptText(item.category ?? "");
-  const itemName = normalizePromptText(item.name ?? "");
   const context = normalizePromptText(
     [
       item.name,
       item.category,
       item.description,
       tags,
+      profile?.canonical_name,
+      profile?.canonical_category,
+      profile?.canonical_description,
+      profile?.visual_subject,
+      profile?.serving_style,
+      profile?.research_summary,
+      ...(profile?.keyword_signals ?? []),
     ].filter(Boolean).join(" "),
   );
+  const resolvedClass = normalizeMenuItemClass(itemClass) ??
+    resolveMenuItemClass(item);
 
-  // ─── CATEGORY-FIRST OVERRIDE ─────────────────────────────────────
-  // Food categories must NEVER be classified as drinks, even when
-  // the description mentions accompaniments like "served with wine sauce"
-  // or "breakfast … juice and coffee".
   const foodCategoryPrefixes = [
     "mains", "main", "breakfast", "lunch", "dinner",
     "soup", "soups", "salad", "salads", "starter", "starters",
@@ -1098,16 +1525,25 @@ function classifyMenuVisualKind(
     "dessert", "desserts", "pastry", "pastries", "bakery",
   ];
 
-  if (dessertCategoryPrefixes.some((p) => itemCategory.startsWith(p) || itemCategory.includes(p))) {
+  if (
+    dessertCategoryPrefixes.some((p) =>
+      itemCategory.startsWith(p) || itemCategory.includes(p)
+    )
+  ) {
     return "dessert";
   }
 
-  if (foodCategoryPrefixes.some((p) => itemCategory.startsWith(p) || itemCategory.includes(p))) {
+  if (
+    resolvedClass === "food" ||
+    foodCategoryPrefixes.some((p) =>
+      itemCategory.startsWith(p) || itemCategory.includes(p)
+    )
+  ) {
     return "plated_food";
   }
 
-  // ─── DRINK KEYWORD MATCHING (only reached for non-food categories) ─
   if (
+    resolvedClass === "drinks" ||
     matchesAny(context, [
       "beer",
       "lager",
@@ -1251,6 +1687,7 @@ function classifyMenuVisualKind(
   }
 
   if (
+    resolvedClass === "drinks" ||
     matchesAny(context, [
       "beverage",
       "beverages",
@@ -1327,7 +1764,7 @@ function classifyMenuVisualKind(
     return "dessert";
   }
 
-  return "plated_food";
+  return resolvedClass === "drinks" ? "soft_drink" : "plated_food";
 }
 
 function buildMenuArtDirection(
@@ -1595,4 +2032,8 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+function isRecord(value: unknown): value is Json {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

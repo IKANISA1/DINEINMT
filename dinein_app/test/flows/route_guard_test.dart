@@ -19,7 +19,9 @@ void main() {
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
-    await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
+    await tester.pumpWidget(
+      ProviderScope(child: DineInApp(config: CountryConfig.mt)),
+    );
     await tester.pump();
   }
 
@@ -42,6 +44,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(appRouter.state.uri.path, AppRoutePaths.venueLogin);
+      expect(
+        appRouter.state.uri.queryParameters[AppRouteParams.returnTo],
+        AppRoutePaths.venueDashboard,
+      );
       await disposeApp(tester);
     });
 
@@ -101,19 +107,6 @@ void main() {
       await disposeApp(tester);
     });
 
-    testWidgets('admin claims redirects to admin login when no session', (
-      tester,
-    ) async {
-      await pumpApp(tester);
-
-      appRouter.go(AppRoutePaths.adminClaims);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-
-      expect(appRouter.state.uri.path, AppRoutePaths.adminLogin);
-      await disposeApp(tester);
-    });
-
     testWidgets('admin venues redirects to admin login when no session', (
       tester,
     ) async {
@@ -137,47 +130,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
 
       expect(appRouter.state.uri.path, AppRoutePaths.adminLogin);
-      await disposeApp(tester);
-    });
-  });
-
-  // ─── venueOcrGuard ───
-
-  group('venueOcrGuard integration', () {
-    testWidgets('OCR review without venueId does not redirect', (
-      tester,
-    ) async {
-      await pumpApp(tester);
-
-      // No venueId param → guard should not redirect
-      appRouter.goNamed(
-        AppRouteNames.venueOcrReview,
-        queryParameters: {'source': 'onboarding'},
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-
-      // Should reach OCR review (no redirect because no venueId)
-      expect(appRouter.state.uri.path, AppRoutePaths.venueOcrReview);
-      await disposeApp(tester);
-    });
-
-    testWidgets('OCR review with venueId redirects to login when no session', (
-      tester,
-    ) async {
-      await pumpApp(tester);
-
-      appRouter.goNamed(
-        AppRouteNames.venueOcrReview,
-        queryParameters: {
-          'source': 'menu-manager',
-          'venueId': 'venue_123',
-        },
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-
-      expect(appRouter.state.uri.path, AppRoutePaths.venueLogin);
       await disposeApp(tester);
     });
   });

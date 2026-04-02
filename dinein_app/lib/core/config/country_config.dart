@@ -13,6 +13,8 @@ class CountryConfig {
   final String playStoreId;
   final String supportWhatsApp;
   final String supportEmail;
+  final String venueAccessWhatsApp;
+  final String venueAccessEmail;
   final String defaultCountryCode;
   final String countryDialCode;
   final String countryFlag;
@@ -31,6 +33,8 @@ class CountryConfig {
     required this.playStoreId,
     required this.supportWhatsApp,
     required this.supportEmail,
+    String? venueAccessWhatsApp,
+    String? venueAccessEmail,
     required this.defaultCountryCode,
     required this.countryDialCode,
     required this.countryFlag,
@@ -40,7 +44,22 @@ class CountryConfig {
     this.revolutMerchant,
     this.momoUssdCode,
     this.biopayEnabled = false,
-  });
+  }) : venueAccessWhatsApp = venueAccessWhatsApp ?? supportWhatsApp,
+       venueAccessEmail = venueAccessEmail ?? supportEmail;
+
+  /// Host prefix used for the role-specific app domains.
+  ///
+  /// Example: `dineinmt.ikanisa.com` -> `dineinmt`
+  String get webHostPrefix => siteHost.split('.').first;
+
+  /// Guest app hostname for this country.
+  String get guestWebHost => '${webHostPrefix}g.ikanisa.com';
+
+  /// Venue app hostname for this country.
+  String get venueWebHost => '${webHostPrefix}v.ikanisa.com';
+
+  /// Admin app hostname for this country.
+  String get adminWebHost => '${webHostPrefix}a.ikanisa.com';
 
   /// Malta configuration.
   static const mt = CountryConfig(
@@ -51,6 +70,8 @@ class CountryConfig {
     playStoreId: 'com.dineinmalta.app',
     supportWhatsApp: '35699711145',
     supportEmail: 'info@ikanisa.com',
+    venueAccessWhatsApp: '35699711145',
+    venueAccessEmail: 'info@ikanisa.com',
     defaultCountryCode: '356',
     countryDialCode: '+356',
     countryFlag: '🇲🇹',
@@ -70,6 +91,8 @@ class CountryConfig {
     playStoreId: 'com.dineinrw.app',
     supportWhatsApp: '',
     supportEmail: 'info@ikanisa.com',
+    venueAccessWhatsApp: '',
+    venueAccessEmail: 'info@ikanisa.com',
     defaultCountryCode: '250',
     countryDialCode: '+250',
     countryFlag: '🇷🇼',
@@ -99,6 +122,9 @@ class CountryConfig {
 
   /// Whether direct WhatsApp support is configured for this country.
   bool get hasWhatsAppSupport => supportWhatsApp.trim().isNotEmpty;
+
+  /// Whether venue access WhatsApp support is configured for this country.
+  bool get hasVenueAccessWhatsApp => venueAccessWhatsApp.trim().isNotEmpty;
 
   /// Share text for venue discovery.
   String shareText(String content) => '$content\nhttps://$siteHost';

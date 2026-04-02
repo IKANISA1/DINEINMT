@@ -1,14 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import '../config/country_runtime.dart';
-import '../../features/biopay/models/biopay_models.dart';
-import '../../features/biopay/screens/biopay_confirm_screen.dart';
-import '../../features/biopay/screens/biopay_home_screen.dart';
-import '../../features/biopay/screens/biopay_manage_screen.dart';
-import '../../features/biopay/screens/biopay_reenroll_screen.dart';
-import '../../features/biopay/screens/biopay_register_screen.dart';
-import '../../features/biopay/screens/biopay_scanner_screen.dart';
+import '../../features/biopay/biopay_route_surface_native.dart'
+    if (dart.library.html) '../../features/biopay/biopay_route_surface_web.dart';
 import '../../features/guest/cart/cart_screen.dart';
 import '../../features/guest/discover/discover_screen.dart';
 import '../../features/guest/guest_shell.dart';
@@ -26,7 +22,7 @@ import 'app_routes.dart';
 import 'route_helpers.dart';
 
 String? _biopayGuard(BuildContext context, GoRouterState state) {
-  return CountryRuntime.config.biopayEnabled
+  return !kIsWeb && CountryRuntime.config.biopayEnabled
       ? null
       : AppRoutePaths.guestSettings;
 }

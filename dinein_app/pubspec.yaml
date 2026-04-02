@@ -1,5 +1,5 @@
 name: dinein_app
-description: "DineIn Malta mobile application."
+description: "DineIn mobile, web, and PWA application."
 publish_to: 'none'
 version: 1.0.2+10
 

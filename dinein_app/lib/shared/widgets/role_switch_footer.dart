@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/config/country_config_provider.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/app_theme.dart';
@@ -97,6 +99,13 @@ class RoleSwitchFooter extends ConsumerWidget {
     return Center(
       child: Column(
         children: [
+          if (kIsWeb) ...[
+            _MobileAppDownloadCard(
+              appTitle: config.appTitle,
+              onOpen: () => _openPlayStore(context, config.playStoreUrl),
+            ),
+            const SizedBox(height: AppTheme.space4),
+          ],
           Row(
                 mainAxisSize: MainAxisSize.min,
                 children: icons.asMap().entries.map((entry) {
@@ -126,6 +135,24 @@ class RoleSwitchFooter extends ConsumerWidget {
           const SizedBox(height: AppTheme.space4),
         ],
       ),
+    );
+  }
+
+  Future<void> _openPlayStore(BuildContext context, String playStoreUrl) async {
+    final uri = Uri.parse(playStoreUrl);
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (launched || !context.mounted) return;
+    } catch (_) {
+      if (!context.mounted) return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open Google Play.')),
     );
   }
 }
@@ -160,6 +187,7 @@ class _RoleIcon extends StatelessWidget {
       message: data.tooltip,
       child: PressableScale(
         onTap: data.onTap,
+        semanticLabel: data.tooltip,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
@@ -191,6 +219,83 @@ class _RoleIcon extends StatelessWidget {
             size: 20,
             color: data.isActive ? cs.primary : cs.onSurfaceVariant,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileAppDownloadCard extends StatelessWidget {
+  final String appTitle;
+  final VoidCallback onOpen;
+
+  const _MobileAppDownloadCard({required this.appTitle, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 520),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppTheme.space5),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          boxShadow: AppTheme.ambientShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                  ),
+                  child: Icon(LucideIcons.smartphone, color: cs.primary),
+                ),
+                const SizedBox(width: AppTheme.space3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Need the native app?',
+                        style: tt.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$appTitle on Google Play for BioPay, face scan, and device-only features.',
+                        style: tt.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppTheme.space4),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onOpen,
+                icon: const Icon(LucideIcons.externalLink, size: 18),
+                label: const Text('OPEN GOOGLE PLAY'),
+              ),
+            ),
+          ],
         ),
       ),
     );

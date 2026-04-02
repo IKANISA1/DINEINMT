@@ -1,11 +1,11 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -36,11 +36,12 @@ class VenueItemReportScreen extends ConsumerStatefulWidget {
 }
 
 enum _TimePeriod { day, week, month, custom }
+
 enum _ViewMode { orders, revenue }
+
 enum _SortDir { desc, asc }
 
-class _VenueItemReportScreenState
-    extends ConsumerState<VenueItemReportScreen> {
+class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
   _TimePeriod _timePeriod = _TimePeriod.week;
   _ViewMode _viewMode = _ViewMode.orders;
   _SortDir _sortDir = _SortDir.desc;
@@ -63,8 +64,9 @@ class _VenueItemReportScreenState
     final venueAsync = ref.watch(currentVenueProvider);
 
     return venueAsync.when(
-      loading: () =>
-          const Center(child: SkeletonLoader(width: double.infinity, height: 200)),
+      loading: () => const Center(
+        child: SkeletonLoader(width: double.infinity, height: 200),
+      ),
       error: (_, _) => ErrorState(
         message: 'Could not load venue data.',
         onRetry: () => ref.invalidate(currentVenueProvider),
@@ -83,7 +85,8 @@ class _VenueItemReportScreenState
 
         return ordersAsync.when(
           loading: () => const Center(
-              child: SkeletonLoader(width: double.infinity, height: 200)),
+            child: SkeletonLoader(width: double.infinity, height: 200),
+          ),
           error: (_, _) => ErrorState(
             message: 'Could not load orders.',
             onRetry: () => ref.invalidate(venueOrdersProvider(venue.id)),
@@ -100,9 +103,11 @@ class _VenueItemReportScreenState
             if (_searchQuery.isNotEmpty) {
               final q = _searchQuery.toLowerCase();
               filtered = filtered
-                  .where((s) =>
-                      s.name.toLowerCase().contains(q) ||
-                      s.category.toLowerCase().contains(q))
+                  .where(
+                    (s) =>
+                        s.name.toLowerCase().contains(q) ||
+                        s.category.toLowerCase().contains(q),
+                  )
                   .toList();
             }
 
@@ -114,10 +119,14 @@ class _VenueItemReportScreenState
               return _sortDir == _SortDir.desc ? cmp : -cmp;
             });
 
-            final totalOrders =
-                filtered.fold<int>(0, (s, i) => s + i.totalOrders);
-            final totalRevenue =
-                filtered.fold<double>(0, (s, i) => s + i.totalRevenue);
+            final totalOrders = filtered.fold<int>(
+              0,
+              (s, i) => s + i.totalOrders,
+            );
+            final totalRevenue = filtered.fold<double>(
+              0,
+              (s, i) => s + i.totalRevenue,
+            );
 
             return Scaffold(
               backgroundColor: Colors.transparent,
@@ -125,7 +134,11 @@ class _VenueItemReportScreenState
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
-                        AppTheme.space6, AppTheme.space2, AppTheme.space6, 0),
+                      AppTheme.space6,
+                      AppTheme.space2,
+                      AppTheme.space6,
+                      0,
+                    ),
                     sliver: SliverToBoxAdapter(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,30 +155,39 @@ class _VenueItemReportScreenState
                                     color: cs.surfaceContainerLow,
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.05)),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.05,
+                                      ),
+                                    ),
                                   ),
-                                  child: Icon(LucideIcons.chevronLeft,
-                                      size: 18, color: cs.onSurface),
+                                  child: Icon(
+                                    LucideIcons.chevronLeft,
+                                    size: 18,
+                                    color: cs.onSurface,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Item Report',
-                                        style: tt.headlineMedium?.copyWith(
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: -0.5)),
-                                    Text('SALES PERFORMANCE ANALYSIS',
-                                        style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 2,
-                                          color: cs.onSurfaceVariant,
-                                        )),
+                                    Text(
+                                      'Item Report',
+                                      style: tt.headlineMedium?.copyWith(
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.5,
+                                      ),
+                                    ),
+                                    Text(
+                                      'SALES PERFORMANCE ANALYSIS',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 2,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -203,48 +225,50 @@ class _VenueItemReportScreenState
                               color: cs.surfaceContainerLow,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                  color:
-                                      Colors.white.withValues(alpha: 0.05)),
+                                color: Colors.white.withValues(alpha: 0.05),
+                              ),
                             ),
                             child: Row(
                               children: [
                                 _PeriodTab(
-                                    label: 'DAY',
-                                    selected:
-                                        _timePeriod == _TimePeriod.day,
-                                    onTap: () => setState(
-                                        () => _timePeriod = _TimePeriod.day)),
+                                  label: 'DAY',
+                                  selected: _timePeriod == _TimePeriod.day,
+                                  onTap: () => setState(
+                                    () => _timePeriod = _TimePeriod.day,
+                                  ),
+                                ),
                                 _PeriodTab(
-                                    label: 'WEEK',
-                                    selected:
-                                        _timePeriod == _TimePeriod.week,
-                                    onTap: () => setState(
-                                        () => _timePeriod = _TimePeriod.week)),
+                                  label: 'WEEK',
+                                  selected: _timePeriod == _TimePeriod.week,
+                                  onTap: () => setState(
+                                    () => _timePeriod = _TimePeriod.week,
+                                  ),
+                                ),
                                 _PeriodTab(
-                                    label: 'MONTH',
-                                    selected:
-                                        _timePeriod == _TimePeriod.month,
-                                    onTap: () => setState(() =>
-                                        _timePeriod = _TimePeriod.month)),
+                                  label: 'MONTH',
+                                  selected: _timePeriod == _TimePeriod.month,
+                                  onTap: () => setState(
+                                    () => _timePeriod = _TimePeriod.month,
+                                  ),
+                                ),
                                 _PeriodTab(
-                                    label: 'CUSTOM',
-                                    selected:
-                                        _timePeriod == _TimePeriod.custom,
-                                    onTap: () async {
-                                      final range =
-                                          await showDateRangePicker(
-                                        context: context,
-                                        firstDate: DateTime(2024),
-                                        lastDate: DateTime.now(),
-                                        initialDateRange: _customRange,
-                                      );
-                                      if (range != null && mounted) {
-                                        setState(() {
-                                          _customRange = range;
-                                          _timePeriod = _TimePeriod.custom;
-                                        });
-                                      }
-                                    }),
+                                  label: 'CUSTOM',
+                                  selected: _timePeriod == _TimePeriod.custom,
+                                  onTap: () async {
+                                    final range = await showDateRangePicker(
+                                      context: context,
+                                      firstDate: DateTime(2024),
+                                      lastDate: DateTime.now(),
+                                      initialDateRange: _customRange,
+                                    );
+                                    if (range != null && mounted) {
+                                      setState(() {
+                                        _customRange = range;
+                                        _timePeriod = _TimePeriod.custom;
+                                      });
+                                    }
+                                  },
+                                ),
                               ],
                             ),
                           ),
@@ -257,11 +281,12 @@ class _VenueItemReportScreenState
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: cs.surfaceContainerLow,
-                                    borderRadius:
-                                        BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.05)),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.05,
+                                      ),
+                                    ),
                                   ),
                                   child: TextField(
                                     controller: _searchCtrl,
@@ -271,46 +296,56 @@ class _VenueItemReportScreenState
                                     decoration: InputDecoration(
                                       hintText: 'Search items…',
                                       hintStyle: tt.bodyMedium?.copyWith(
-                                          color: cs.onSurfaceVariant
-                                              .withValues(alpha: 0.40)),
+                                        color: cs.onSurfaceVariant.withValues(
+                                          alpha: 0.40,
+                                        ),
+                                      ),
                                       prefixIcon: Padding(
                                         padding: const EdgeInsets.only(
-                                            left: 16, right: 10),
-                                        child: Icon(LucideIcons.search,
-                                            size: 18,
-                                            color: cs.onSurfaceVariant),
+                                          left: 16,
+                                          right: 10,
+                                        ),
+                                        child: Icon(
+                                          LucideIcons.search,
+                                          size: 18,
+                                          color: cs.onSurfaceVariant,
+                                        ),
                                       ),
                                       prefixIconConstraints:
-                                          const BoxConstraints(
-                                              minWidth: 0),
+                                          const BoxConstraints(minWidth: 0),
                                       border: InputBorder.none,
                                       contentPadding:
                                           const EdgeInsets.symmetric(
-                                              vertical: 16),
+                                            vertical: 16,
+                                          ),
                                     ),
                                   ),
                                 ),
                               ),
                               const SizedBox(width: AppTheme.space3),
                               PressableScale(
-                                onTap: () => setState(() =>
-                                    _sortDir = _sortDir == _SortDir.desc
-                                        ? _SortDir.asc
-                                        : _SortDir.desc),
+                                onTap: () => setState(
+                                  () => _sortDir = _sortDir == _SortDir.desc
+                                      ? _SortDir.asc
+                                      : _SortDir.desc,
+                                ),
                                 child: Container(
                                   width: 48,
                                   height: 48,
                                   decoration: BoxDecoration(
                                     color: cs.surfaceContainerLow,
-                                    borderRadius:
-                                        BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.05)),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.05,
+                                      ),
+                                    ),
                                   ),
-                                  child: Icon(LucideIcons.arrowUpDown,
-                                      size: 18,
-                                      color: cs.onSurfaceVariant),
+                                  child: Icon(
+                                    LucideIcons.arrowUpDown,
+                                    size: 18,
+                                    color: cs.onSurfaceVariant,
+                                  ),
                                 ),
                               ),
                             ],
@@ -327,7 +362,11 @@ class _VenueItemReportScreenState
                                   color: cs.error.withValues(alpha: 0.12),
                                   textColor: cs.error,
                                   onTap: () => _exportPdf(
-                                      context, filtered, currency, venue.name),
+                                    context,
+                                    filtered,
+                                    currency,
+                                    venue.name,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: AppTheme.space3),
@@ -335,11 +374,14 @@ class _VenueItemReportScreenState
                                 child: _ExportButton(
                                   icon: LucideIcons.fileSpreadsheet,
                                   label: 'EXPORT EXCEL',
-                                  color:
-                                      cs.primary.withValues(alpha: 0.12),
+                                  color: cs.primary.withValues(alpha: 0.12),
                                   textColor: cs.primary,
                                   onTap: () => _exportCsv(
-                                      context, filtered, currency, venue.name),
+                                    context,
+                                    filtered,
+                                    currency,
+                                    venue.name,
+                                  ),
                                 ),
                               ),
                             ],
@@ -349,28 +391,30 @@ class _VenueItemReportScreenState
                           // ═══ VIEW MODE TABS ═══
                           Row(
                             children: [
-                              Text('ITEM PERFORMANCE',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 2,
-                                    color: cs.onSurfaceVariant,
-                                  )),
+                              Text(
+                                'ITEM PERFORMANCE',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 2,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
                               const Spacer(),
                               _ViewTab(
                                 label: 'ORDERS',
-                                selected:
-                                    _viewMode == _ViewMode.orders,
+                                selected: _viewMode == _ViewMode.orders,
                                 onTap: () => setState(
-                                    () => _viewMode = _ViewMode.orders),
+                                  () => _viewMode = _ViewMode.orders,
+                                ),
                               ),
                               const SizedBox(width: 16),
                               _ViewTab(
                                 label: 'REVENUE',
-                                selected:
-                                    _viewMode == _ViewMode.revenue,
+                                selected: _viewMode == _ViewMode.revenue,
                                 onTap: () => setState(
-                                    () => _viewMode = _ViewMode.revenue),
+                                  () => _viewMode = _ViewMode.revenue,
+                                ),
                               ),
                             ],
                           ),
@@ -393,31 +437,30 @@ class _VenueItemReportScreenState
                   else
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: AppTheme.space6),
+                        horizontal: AppTheme.space6,
+                      ),
                       sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final item = filtered[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(
-                                  bottom: AppTheme.space3),
-                              child: _ItemCard(
-                                stat: item,
-                                currency: currency,
-                                viewMode: _viewMode,
-                                rank: index + 1,
-                              )
-                                  .animate(delay: (50 * index).ms)
-                                  .fadeIn(duration: 200.ms),
-                            );
-                          },
-                          childCount: filtered.length,
-                        ),
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final item = filtered[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              bottom: AppTheme.space3,
+                            ),
+                            child:
+                                _ItemCard(
+                                      stat: item,
+                                      currency: currency,
+                                      viewMode: _viewMode,
+                                      rank: index + 1,
+                                    )
+                                    .animate(delay: (50 * index).ms)
+                                    .fadeIn(duration: 200.ms),
+                          );
+                        }, childCount: filtered.length),
                       ),
                     ),
 
-                  const SliverPadding(
-                      padding: EdgeInsets.only(bottom: 120)),
+                  const SliverPadding(padding: EdgeInsets.only(bottom: 120)),
                 ],
               ),
             );
@@ -431,26 +474,39 @@ class _VenueItemReportScreenState
   List<Order> _filterByTime(List<Order> orders) {
     final now = DateTime.now();
     return switch (_timePeriod) {
-      _TimePeriod.day => orders
-          .where((o) =>
-              o.createdAt.day == now.day &&
-              o.createdAt.month == now.month &&
-              o.createdAt.year == now.year)
-          .toList(),
+      _TimePeriod.day =>
+        orders
+            .where(
+              (o) =>
+                  o.createdAt.day == now.day &&
+                  o.createdAt.month == now.month &&
+                  o.createdAt.year == now.year,
+            )
+            .toList(),
       _TimePeriod.week =>
         orders.where((o) => now.difference(o.createdAt).inDays < 7).toList(),
-      _TimePeriod.month => orders
-          .where((o) => o.createdAt.month == now.month && o.createdAt.year == now.year)
-          .toList(),
-      _TimePeriod.custom => _customRange != null
-          ? orders
-              .where((o) =>
-                  o.createdAt.isAfter(_customRange!.start
-                      .subtract(const Duration(days: 1))) &&
-                  o.createdAt.isBefore(_customRange!.end
-                      .add(const Duration(days: 1))))
-              .toList()
-          : orders,
+      _TimePeriod.month =>
+        orders
+            .where(
+              (o) =>
+                  o.createdAt.month == now.month &&
+                  o.createdAt.year == now.year,
+            )
+            .toList(),
+      _TimePeriod.custom =>
+        _customRange != null
+            ? orders
+                  .where(
+                    (o) =>
+                        o.createdAt.isAfter(
+                          _customRange!.start.subtract(const Duration(days: 1)),
+                        ) &&
+                        o.createdAt.isBefore(
+                          _customRange!.end.add(const Duration(days: 1)),
+                        ),
+                  )
+                  .toList()
+            : orders,
     };
   }
 
@@ -484,16 +540,26 @@ class _VenueItemReportScreenState
 
   String _guessCategoryFromName(String name) {
     final lower = name.toLowerCase();
-    if (lower.contains('beer') || lower.contains('wine') || lower.contains('cocktail') || lower.contains('drink')) {
+    if (lower.contains('beer') ||
+        lower.contains('wine') ||
+        lower.contains('cocktail') ||
+        lower.contains('drink')) {
       return 'DRINKS';
     }
-    if (lower.contains('fries') || lower.contains('side') || lower.contains('salad') || lower.contains('bread')) {
+    if (lower.contains('fries') ||
+        lower.contains('side') ||
+        lower.contains('salad') ||
+        lower.contains('bread')) {
       return 'SIDES';
     }
-    if (lower.contains('dessert') || lower.contains('cake') || lower.contains('ice cream')) {
+    if (lower.contains('dessert') ||
+        lower.contains('cake') ||
+        lower.contains('ice cream')) {
       return 'DESSERTS';
     }
-    if (lower.contains('starter') || lower.contains('bruschetta') || lower.contains('soup')) {
+    if (lower.contains('starter') ||
+        lower.contains('bruschetta') ||
+        lower.contains('soup')) {
       return 'STARTERS';
     }
     return 'MAIN COURSE';
@@ -510,59 +576,82 @@ class _VenueItemReportScreenState
     final totalOrders = items.fold<int>(0, (s, i) => s + i.totalOrders);
     final totalRevenue = items.fold<double>(0, (s, i) => s + i.totalRevenue);
 
-    doc.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      build: (ctx) => [
-        pw.Header(
-          level: 0,
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text(venueName,
-                  style: pw.TextStyle(
-                      fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 4),
-              pw.Text('Item Performance Report — $dateLabel',
-                  style: const pw.TextStyle(fontSize: 12)),
-              pw.SizedBox(height: 8),
-              pw.Row(children: [
-                pw.Text('Total Item Orders: $totalOrders',
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(width: 24),
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (ctx) => [
+          pw.Header(
+            level: 0,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
                 pw.Text(
-                    'Total Revenue: $currency${totalRevenue.toStringAsFixed(2)}',
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              ]),
-            ],
+                  venueName,
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  'Item Performance Report — $dateLabel',
+                  style: const pw.TextStyle(fontSize: 12),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Row(
+                  children: [
+                    pw.Text(
+                      'Total Item Orders: $totalOrders',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.SizedBox(width: 24),
+                    pw.Text(
+                      'Total Revenue: $currency${totalRevenue.toStringAsFixed(2)}',
+                      style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        pw.SizedBox(height: 12),
-        pw.TableHelper.fromTextArray(
-          headers: ['#', 'Item', 'Category', 'Orders', 'Revenue'],
-          data: items
-              .asMap()
-              .entries
-              .map((e) => [
+          pw.SizedBox(height: 12),
+          pw.TableHelper.fromTextArray(
+            headers: ['#', 'Item', 'Category', 'Orders', 'Revenue'],
+            data: items
+                .asMap()
+                .entries
+                .map(
+                  (e) => [
                     '${e.key + 1}',
                     e.value.name,
                     e.value.category,
                     '${e.value.totalOrders}',
                     '$currency${e.value.totalRevenue.toStringAsFixed(2)}',
-                  ])
-              .toList(),
-          headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
-          cellStyle: const pw.TextStyle(fontSize: 8),
-          cellAlignment: pw.Alignment.centerLeft,
-        ),
-      ],
-    ));
+                  ],
+                )
+                .toList(),
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 9,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellAlignment: pw.Alignment.centerLeft,
+          ),
+        ],
+      ),
+    );
 
-    final dir = await getTemporaryDirectory();
-    final file = File(
-        '${dir.path}/item_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf');
-    await file.writeAsBytes(await doc.save());
+    final bytes = Uint8List.fromList(await doc.save());
+    final fileName =
+        'item_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
     if (context.mounted) {
-      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile.fromData(bytes, name: fileName, mimeType: 'application/pdf'),
+          ],
+        ),
+      );
     }
   }
 
@@ -574,21 +663,28 @@ class _VenueItemReportScreenState
   ) async {
     final rows = <List<String>>[
       ['#', 'Item', 'Category', 'Orders', 'Revenue'],
-      ...items.asMap().entries.map((e) => [
-            '${e.key + 1}',
-            e.value.name,
-            e.value.category,
-            '${e.value.totalOrders}',
-            '$currency${e.value.totalRevenue.toStringAsFixed(2)}',
-          ]),
+      ...items.asMap().entries.map(
+        (e) => [
+          '${e.key + 1}',
+          e.value.name,
+          e.value.category,
+          '${e.value.totalOrders}',
+          '$currency${e.value.totalRevenue.toStringAsFixed(2)}',
+        ],
+      ),
     ];
-    final csvData = CsvEncoder().convert(rows.map((r) => r.map((c) => c.toString()).toList()).toList());
-    final dir = await getTemporaryDirectory();
-    final file = File(
-        '${dir.path}/item_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv');
-    await file.writeAsString(csvData);
+    final csvData = CsvEncoder().convert(
+      rows.map((r) => r.map((c) => c.toString()).toList()).toList(),
+    );
+    final bytes = Uint8List.fromList(utf8.encode(csvData));
+    final fileName =
+        'item_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.csv';
     if (context.mounted) {
-      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile.fromData(bytes, name: fileName, mimeType: 'text/csv')],
+        ),
+      );
     }
   }
 }
@@ -625,8 +721,11 @@ class _MiniStatCard extends StatelessWidget {
   final String label;
   final String value;
 
-  const _MiniStatCard(
-      {required this.icon, required this.label, required this.value});
+  const _MiniStatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -643,32 +742,40 @@ class _MiniStatCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: cs.primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 14, color: cs.primary),
               ),
-              child: Icon(icon, size: 14, color: cs.primary),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(label,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.5,
                     color: cs.primary,
                   ),
-                  overflow: TextOverflow.ellipsis),
-            ),
-          ]),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
-          Text(value,
-              style: tt.headlineMedium
-                  ?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+          Text(
+            value,
+            style: tt.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
         ],
       ),
     );
@@ -680,8 +787,11 @@ class _PeriodTab extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _PeriodTab(
-      {required this.label, required this.selected, required this.onTap});
+  const _PeriodTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -698,19 +808,22 @@ class _PeriodTab extends StatelessWidget {
             boxShadow: selected
                 ? [
                     BoxShadow(
-                        color: cs.primary.withValues(alpha: 0.20),
-                        blurRadius: 12)
+                      color: cs.primary.withValues(alpha: 0.20),
+                      blurRadius: 12,
+                    ),
                   ]
                 : [],
           ),
           child: Center(
-            child: Text(label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
-                  color: selected ? cs.onPrimary : cs.onSurfaceVariant,
-                )),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+                color: selected ? cs.onPrimary : cs.onSurfaceVariant,
+              ),
+            ),
           ),
         ),
       ),
@@ -723,8 +836,11 @@ class _ViewTab extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _ViewTab(
-      {required this.label, required this.selected, required this.onTap});
+  const _ViewTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -733,13 +849,15 @@ class _ViewTab extends StatelessWidget {
       onTap: onTap,
       child: Column(
         children: [
-          Text(label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
-                color: selected ? cs.onSurface : cs.onSurfaceVariant,
-              )),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
+              color: selected ? cs.onSurface : cs.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 4),
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
@@ -787,13 +905,15 @@ class _ExportButton extends StatelessWidget {
           children: [
             Icon(icon, size: 16, color: textColor),
             const SizedBox(width: 8),
-            Text(label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
-                  color: textColor,
-                )),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+                color: textColor,
+              ),
+            ),
           ],
         ),
       ),
@@ -842,8 +962,11 @@ class _ItemCard extends StatelessWidget {
               color: cs.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(LucideIcons.barChart3,
-                size: 20, color: AppColors.warning),
+            child: Icon(
+              LucideIcons.barChart3,
+              size: 20,
+              color: AppColors.warning,
+            ),
           ),
           const SizedBox(width: 14),
 
@@ -852,20 +975,22 @@ class _ItemCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(stat.name,
-                    style: tt.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  stat.name,
+                  style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 2),
-                Text(stat.category,
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.5,
-                      color: cs.onSurfaceVariant,
-                    )),
+                Text(
+                  stat.category,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
               ],
             ),
           ),
@@ -888,10 +1013,10 @@ class _ItemCard extends StatelessWidget {
                   ),
                   if (viewMode == _ViewMode.orders) ...[
                     const SizedBox(width: 4),
-                    Text('orders',
-                        style: tt.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        )),
+                    Text(
+                      'orders',
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
                   ],
                 ],
               ),
@@ -901,11 +1026,14 @@ class _ItemCard extends StatelessWidget {
                 children: [
                   // Trend pill
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
-                      color: (trendUp ? cs.primary : cs.error)
-                          .withValues(alpha: 0.12),
+                      color: (trendUp ? cs.primary : cs.error).withValues(
+                        alpha: 0.12,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(

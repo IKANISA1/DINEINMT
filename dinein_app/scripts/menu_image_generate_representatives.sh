@@ -33,7 +33,8 @@ psql "$DATABASE_URL" -At -c "
   with ready_signatures as (
     select distinct
       lower(trim(name)) || '|' || lower(trim(category)) || '|' ||
-      lower(trim(coalesce(description, ''))) as sig
+      lower(trim(coalesce(description, ''))) || '|' ||
+      lower(trim(coalesce(class, ''))) as sig
     from public.dinein_menu_items
     where image_status = 'ready'
       and image_source = 'ai_gemini'
@@ -43,12 +44,14 @@ psql "$DATABASE_URL" -At -c "
     select
       id,
       lower(trim(name)) || '|' || lower(trim(category)) || '|' ||
-      lower(trim(coalesce(description, ''))) as sig,
+      lower(trim(coalesce(description, ''))) || '|' ||
+      lower(trim(coalesce(class, ''))) as sig,
       row_number() over (
         partition by
           lower(trim(name)),
           lower(trim(category)),
-          lower(trim(coalesce(description, '')))
+          lower(trim(coalesce(description, ''))),
+          lower(trim(coalesce(class, '')))
         order by id
       ) as rn
     from public.dinein_menu_items

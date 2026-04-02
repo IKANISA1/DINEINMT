@@ -17,7 +17,9 @@ void main() {
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
-    await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
+    await tester.pumpWidget(
+      ProviderScope(child: DineInApp(config: CountryConfig.mt)),
+    );
     await tester.pump();
   }
 
@@ -80,51 +82,14 @@ void main() {
 
     appRouter.goNamed(AppRouteNames.venueLogin);
     await tester.pump();
-    await pumpUntilVisible(tester, find.text('CLAIM YOUR VENUE'));
+    await pumpUntilVisible(tester, find.text('Portal'));
 
     expect(
       find.text('Access your venue workspace with WhatsApp OTP.'),
       findsOneWidget,
     );
-
-    await tester.pump(const Duration(seconds: 1));
-    await disposeApp(tester);
-  });
-
-  testWidgets('venue login claim CTA opens the claim flow', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    await pumpApp(tester);
-
-    appRouter.goNamed(AppRouteNames.venueLogin);
-    await tester.pump();
-    await pumpUntilVisible(tester, find.text('CLAIM YOUR VENUE'));
-
-    await tester.tap(find.widgetWithText(GestureDetector, 'CLAIM YOUR VENUE'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
-
-    expect(appRouter.state.uri.path, AppRoutePaths.venueClaim);
-
-    await disposeApp(tester);
-  });
-
-  testWidgets('venue claim path resolves to the claim screen', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 1400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    await pumpApp(tester);
-
-    appRouter.go(AppRoutePaths.venueClaim);
-    await tester.pump();
-    await pumpUntilVisible(tester, find.text('STEP 1 OF 4'));
-    await pumpUntilVisible(tester, find.text('ADD YOUR'));
-    await pumpUntilVisible(tester, find.text('VENUE'));
-
-    expect(appRouter.state.uri.path, AppRoutePaths.venueClaim);
-    expect(find.text('ADD YOUR'), findsOneWidget);
-    expect(find.text('VENUE'), findsOneWidget);
+    expect(find.text('WHATSAPP NUMBER'), findsOneWidget);
+    expect(find.text('Get OTP'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 1));
     await disposeApp(tester);

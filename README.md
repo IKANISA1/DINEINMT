@@ -1,9 +1,9 @@
 # DineIn Workspace
 
 This workspace contains the canonical Flutter application for guest, venue, and
-admin flows:
+admin flows across mobile, web, and PWA surfaces:
 
-- `dinein_app`: the primary Flutter application (guest ordering, venue management, admin portal)
+- `dinein_app`: the primary Flutter application family (guest ordering, venue management, admin portal, web/PWA browser app)
 
 > **Note:** `dinein-kigali` (the legacy React/Vite reference) has been deleted after achieving full parity in the Flutter app.
 
@@ -15,6 +15,7 @@ flutter pub get
 flutter analyze
 flutter test
 flutter run
+flutter build web --release
 ```
 
 ## Repository notes

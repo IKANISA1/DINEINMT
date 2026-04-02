@@ -1,6 +1,5 @@
 import 'package:dinein_app/core/constants/enums.dart';
 import 'package:dinein_app/core/models/models.dart';
-import 'package:dinein_app/core/models/onboarding_draft_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -16,10 +15,21 @@ void main() {
         'description': 'Seafront dining.',
         'address': 'Valletta Waterfront',
         'phone': '+356 9999 1111',
+        'owner_contact_phone': '+356 9999 2222',
+        'owner_whatsapp_number': '+356 9999 3333',
         'email': 'hello@harbor.mt',
         'image_url': 'https://example.com/venue.png',
         'status': 'active',
         'ordering_enabled': true,
+        'approved_at': '2026-04-02T08:00:00.000Z',
+        'access_verified_at': '2026-04-02T08:05:00.000Z',
+        'last_access_token_issued_at': '2026-04-02T08:06:00.000Z',
+        'access_number_updated_at': '2026-04-02T08:07:00.000Z',
+        'access_verification_method': 'otp',
+        'access_verified_by': '+35699991111',
+        'access_verification_note': 'Verified via OTP',
+        'access_number_updated_by': 'admin-1',
+        'normalized_access_phone': '+35699991111',
         'rating': 4.8,
         'rating_count': 210,
         'country': 'MT',
@@ -52,7 +62,18 @@ void main() {
       });
       expect(output['owner_id'], 'owner_1');
       expect(output['phone'], '+356 9999 1111');
+      expect(output['owner_contact_phone'], '+356 9999 2222');
+      expect(output['owner_whatsapp_number'], '+356 9999 3333');
       expect(output['email'], 'hello@harbor.mt');
+      expect(output['approved_at'], '2026-04-02T08:00:00.000Z');
+      expect(output['access_verified_at'], '2026-04-02T08:05:00.000Z');
+      expect(output['last_access_token_issued_at'], '2026-04-02T08:06:00.000Z');
+      expect(output['access_number_updated_at'], '2026-04-02T08:07:00.000Z');
+      expect(output['access_verification_method'], 'otp');
+      expect(output['access_verified_by'], '+35699991111');
+      expect(output['access_verification_note'], 'Verified via OTP');
+      expect(output['access_number_updated_by'], 'admin-1');
+      expect(output['normalized_access_phone'], '+35699991111');
       expect(output['wifi_ssid'], 'HarborGuest');
       expect(output['wifi_password'], 'seaside123');
       expect(output['wifi_security'], 'WPA');
@@ -79,6 +100,24 @@ void main() {
       expect(venue.country, Country.mt);
       expect(venue.ownerId, isNull);
       expect(venue.supportedPaymentMethods, [PaymentMethod.cash]);
+    });
+
+    test('effective access helpers prefer configured and verified access', () {
+      final venue = Venue.fromJson({
+        'id': 'venue_4',
+        'name': 'Late Table',
+        'slug': 'late-table',
+        'status': 'active',
+        'phone': '',
+        'owner_contact_phone': '+35699994444',
+        'normalized_access_phone': '+35699994444',
+        'access_verified_at': '2026-04-02T08:05:00.000Z',
+      });
+
+      expect(venue.effectiveAccessPhone, '+35699994444');
+      expect(venue.hasAssignedAccessPhone, isTrue);
+      expect(venue.isAccessVerified, isTrue);
+      expect(venue.isAccessReady, isTrue);
     });
 
     test('normalizeVenueCategoryLabel maps variants correctly', () {
@@ -199,6 +238,7 @@ void main() {
         'description': 'Premium cut.',
         'price': 48.0,
         'category': 'Signature Mains',
+        'class': 'food',
         'image_url': 'https://example.com/ribeye.jpg',
         'image_source': 'manual',
         'image_status': 'ready',
@@ -218,6 +258,7 @@ void main() {
       expect(item.venueId, 'venue_1');
       expect(item.name, 'Dry-Aged Ribeye');
       expect(item.price, 48.0);
+      expect(item.itemClass, MenuItemClass.food);
       expect(item.imageLocked, isTrue);
       expect(item.imageSource, MenuItemImageSource.manual);
       expect(item.imageStatus, MenuItemImageStatus.ready);
@@ -231,6 +272,7 @@ void main() {
       expect(output['venue_id'], 'venue_1');
       expect(output['name'], 'Dry-Aged Ribeye');
       expect(output['price'], 48.0);
+      expect(output['class'], 'food');
       expect(output['image_locked'], isTrue);
       expect(
         output['image_storage_path'],
@@ -253,6 +295,7 @@ void main() {
       expect(item.priceHidden, isFalse);
       expect(item.highlightRank, isNull);
       expect(item.category, 'Uncategorized');
+      expect(item.itemClass, isNull);
       expect(item.imageUrl, isNull);
       expect(item.imageSource, MenuItemImageSource.unknown);
       expect(item.imageStatus, MenuItemImageStatus.pending);
@@ -271,15 +314,22 @@ void main() {
         description: 'D',
         price: 10,
         category: 'C',
+        itemClass: MenuItemClass.food,
         highlightRank: 1,
       );
-      final copy = original.copyWith(price: 20, name: 'Y', highlightRank: null);
+      final copy = original.copyWith(
+        price: 20,
+        name: 'Y',
+        itemClass: MenuItemClass.drinks,
+        highlightRank: null,
+      );
 
       expect(copy.price, 20);
       expect(copy.name, 'Y');
       expect(copy.id, 'item_1');
       expect(copy.description, 'D');
       expect(copy.highlightRank, isNull);
+      expect(copy.itemClass, MenuItemClass.drinks);
     });
 
     test('hasImage returns true only for non-empty imageUrl', () {
@@ -290,6 +340,7 @@ void main() {
         description: '',
         price: 5,
         category: 'C',
+        itemClass: MenuItemClass.food,
         imageUrl: 'https://x.com/img.jpg',
       );
       const withEmpty = MenuItem(
@@ -299,6 +350,7 @@ void main() {
         description: '',
         price: 5,
         category: 'C',
+        itemClass: MenuItemClass.food,
         imageUrl: '  ',
       );
       const withNull = MenuItem(
@@ -308,6 +360,7 @@ void main() {
         description: '',
         price: 5,
         category: 'C',
+        itemClass: MenuItemClass.food,
       );
 
       expect(withImage.hasImage, isTrue);
@@ -323,6 +376,7 @@ void main() {
         description: '',
         price: 10,
         category: 'C',
+        itemClass: MenuItemClass.food,
       );
       const locked = MenuItem(
         id: '2',
@@ -331,6 +385,7 @@ void main() {
         description: '',
         price: 10,
         category: 'C',
+        itemClass: MenuItemClass.food,
         imageLocked: true,
       );
 
@@ -555,80 +610,6 @@ void main() {
         issuedAt: DateTime(2025),
       );
       expect(session.initials, 'A');
-    });
-  });
-
-  // ─── VenueClaim ───
-
-  group('VenueClaim serialization', () {
-    test('fromJson parses whatsapp_number as contactPhone', () {
-      final json = {
-        'id': 'claim_1',
-        'venue_id': 'v1',
-        'venue_name': 'Harbor Table',
-        'venue_area': 'Valletta',
-        'whatsapp_number': '+35679991234',
-        'claimant_name': 'Jean',
-        'status': 'pending',
-        'created_at': '2025-01-01T12:00:00Z',
-      };
-
-      final claim = VenueClaim.fromJson(json);
-      expect(claim.contactPhone, '+35679991234');
-      expect(claim.claimantName, 'Jean');
-      expect(claim.status, ClaimStatus.pending);
-      expect(claim.displayName, 'Jean');
-    });
-
-    test('displayName falls back to phone-derived when no claimantName', () {
-      final json = {
-        'id': 'claim_2',
-        'venue_id': 'v1',
-        'whatsapp_number': '+35679991234',
-        'status': 'approved',
-        'created_at': '2025-01-01T12:00:00Z',
-      };
-
-      final claim = VenueClaim.fromJson(json);
-      expect(claim.displayName, 'Owner 1234');
-    });
-
-    test('displayName derives username from email-like contactPhone', () {
-      final json = {
-        'id': 'claim_3',
-        'venue_id': 'v1',
-        'email': 'jean@dinein.mt',
-        'status': 'rejected',
-        'created_at': '2025-01-01T12:00:00Z',
-      };
-
-      final claim = VenueClaim.fromJson(json);
-      expect(claim.displayName, 'jean');
-    });
-  });
-
-  group('ClaimedVenueDraft serialization', () {
-    test('round-trip preserves onboarding source metadata', () {
-      const draft = ClaimedVenueDraft(
-        name: 'Ocean Pearl',
-        address: '45 Tower Rd, Sliema, Malta',
-        category: 'Restaurants',
-        description: '',
-        imageUrl: 'https://example.com/venue.png',
-        contactPhone: '+35699123456',
-        websiteUrl: 'https://oceanpearl.mt',
-        claimSubmitted: true,
-      );
-
-      final json = draft.toJson();
-      final restored = ClaimedVenueDraft.fromJson(json);
-
-      expect(restored.name, 'Ocean Pearl');
-      expect(restored.address, '45 Tower Rd, Sliema, Malta');
-      expect(restored.imageUrl, 'https://example.com/venue.png');
-      expect(restored.contactPhone, '+35699123456');
-      expect(restored.websiteUrl, 'https://oceanpearl.mt');
-      expect(restored.claimSubmitted, isTrue);
     });
   });
 }

@@ -41,8 +41,6 @@ class DineinApiService {
             !bodyPayload.containsKey('venue_session')) {
           bodyPayload['venue_session'] = {
             'access_token': venueSession.accessToken,
-            'venue_id': venueSession.venueId,
-            'contact_phone': venueSession.whatsAppNumber,
           };
         }
       }

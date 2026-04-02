@@ -39,9 +39,9 @@ void main() {
           builder: (_, _) => const Scaffold(body: Text('Orders Screen')),
         ),
         GoRoute(
-          path: AppRoutePaths.venueClaim,
-          name: AppRouteNames.venueClaim,
-          builder: (_, _) => const Scaffold(body: Text('Venue Claim Screen')),
+          path: AppRoutePaths.venueLogin,
+          name: AppRouteNames.venueLogin,
+          builder: (_, _) => const Scaffold(body: Text('Venue Portal Screen')),
         ),
         GoRoute(
           path: AppRoutePaths.venuesBrowse,
@@ -75,7 +75,7 @@ void main() {
     expect(find.text('WELCOME TO DINEIN MALTA'), findsOneWidget);
     expect(find.text('Order History'), findsOneWidget);
     expect(find.text('VIEW YOUR PAST ORDERS'), findsOneWidget);
-    expect(find.text('Add Your Venue'), findsOneWidget);
+    expect(find.text('Venue Portal'), findsOneWidget);
     expect(find.text('Get in Touch'), findsOneWidget);
     expect(find.text('About DINEIN'), findsOneWidget);
     expect(find.text('Privacy Policy'), findsOneWidget);
@@ -114,7 +114,7 @@ void main() {
     expect(find.text('Orders Screen'), findsOneWidget);
   });
 
-  testWidgets('guest profile add your venue tile routes into venue claim', (
+  testWidgets('guest profile venue portal tile routes into venue login', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(430, 1200));
@@ -124,11 +124,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    await tester.ensureVisible(find.text('Add Your Venue'));
-    await tester.tap(find.text('Add Your Venue'));
+    await tester.ensureVisible(find.text('Venue Portal'));
+    await tester.tap(find.text('Venue Portal'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('Venue Claim Screen'), findsOneWidget);
+    expect(find.text('Venue Portal Screen'), findsOneWidget);
   });
 }

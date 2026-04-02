@@ -32,9 +32,9 @@ void main() {
           builder: (_, _) => const Scaffold(body: Text('Orders')),
         ),
         GoRoute(
-          path: AppRoutePaths.venueClaim,
-          name: AppRouteNames.venueClaim,
-          builder: (_, _) => const Scaffold(body: Text('Venue Claim')),
+          path: AppRoutePaths.venueLogin,
+          name: AppRouteNames.venueLogin,
+          builder: (_, _) => const Scaffold(body: Text('Venue Portal')),
         ),
       ],
     );

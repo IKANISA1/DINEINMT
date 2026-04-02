@@ -356,8 +356,6 @@ class AppNotificationService {
         'action': action,
         'venue_session': {
           'access_token': session.accessToken,
-          'venue_id': session.venueId,
-          'contact_phone': session.whatsAppNumber,
         },
         if (payload != null) ...payload,
       },

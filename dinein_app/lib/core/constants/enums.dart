@@ -143,7 +143,6 @@ enum VenueStatus {
   maintenance,
   suspended,
   deleted,
-  pendingClaim,
   pendingActivation;
 
   String get label {
@@ -153,7 +152,6 @@ enum VenueStatus {
       VenueStatus.maintenance => 'Maintenance',
       VenueStatus.suspended => 'Suspended',
       VenueStatus.deleted => 'Deleted',
-      VenueStatus.pendingClaim => 'Pending Claim',
       VenueStatus.pendingActivation => 'Pending Activation',
     };
   }
@@ -166,7 +164,6 @@ enum VenueStatus {
       VenueStatus.maintenance => 'maintenance',
       VenueStatus.suspended => 'suspended',
       VenueStatus.deleted => 'deleted',
-      VenueStatus.pendingClaim => 'pending_claim',
       VenueStatus.pendingActivation => 'pending_activation',
     };
   }
@@ -179,34 +176,10 @@ enum VenueStatus {
       'maintenance' => VenueStatus.maintenance,
       'suspended' => VenueStatus.suspended,
       'deleted' => VenueStatus.deleted,
-      'pending_claim' => VenueStatus.pendingClaim,
+      'pending_claim' => VenueStatus.pendingActivation,
       'pending_activation' => VenueStatus.pendingActivation,
       _ => VenueStatus.active,
     };
-  }
-}
-
-/// Venue claim status.
-enum ClaimStatus {
-  pending,
-  approved,
-  rejected;
-
-  String get label {
-    return switch (this) {
-      ClaimStatus.pending => 'Pending',
-      ClaimStatus.approved => 'Approved',
-      ClaimStatus.rejected => 'Rejected',
-    };
-  }
-
-  String get dbValue => name;
-
-  static ClaimStatus fromString(String value) {
-    return ClaimStatus.values.firstWhere(
-      (e) => e.name == value,
-      orElse: () => ClaimStatus.pending,
-    );
   }
 }
 
@@ -233,6 +206,29 @@ enum MenuItemImageStatus {
       (status) => status.name == value,
       orElse: () => MenuItemImageStatus.pending,
     );
+  }
+}
+
+/// Menu item classification used to separate food from drinks.
+enum MenuItemClass {
+  food,
+  drinks;
+
+  String get dbValue => name;
+
+  String get label {
+    return switch (this) {
+      MenuItemClass.food => 'Food',
+      MenuItemClass.drinks => 'Drinks',
+    };
+  }
+
+  static MenuItemClass? fromString(String? value) {
+    return switch (value) {
+      'food' => MenuItemClass.food,
+      'drinks' => MenuItemClass.drinks,
+      _ => null,
+    };
   }
 }
 

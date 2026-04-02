@@ -8,8 +8,10 @@ import 'core/config/country_runtime.dart';
 import 'features/guest/permissions/guest_location_permission_host.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
-import 'core/services/app_notification_service.dart';
-import 'core/services/app_telemetry_service.dart';
+import 'core/services/app_notification_service.dart'
+    if (dart.library.html) 'core/services/app_notification_service_web.dart';
+import 'core/services/app_telemetry_service.dart'
+    if (dart.library.html) 'core/services/app_telemetry_service_web.dart';
 import 'core/services/auth_repository.dart';
 import 'core/services/supabase_config.dart';
 

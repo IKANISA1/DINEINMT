@@ -45,6 +45,7 @@ class _BiopayScannerScreenState extends ConsumerState<BiopayScannerScreen>
   bool _isInitializing = true;
   bool _isProcessing = false;
   bool _hasNavigated = false;
+  bool _isSoftFlashActive = false; // Screen illumination for low-light
   late AnimationController _pulseController;
 
   @override
@@ -235,6 +236,14 @@ class _BiopayScannerScreenState extends ConsumerState<BiopayScannerScreen>
       );
 
       if (!quality.isAcceptable) {
+        final hasLowLight = quality.issues.contains(FaceQualityIssue.lowLighting);
+        if (hasLowLight && !_isSoftFlashActive) {
+          // Trigger screen illumination to act as a soft-flash
+          setState(() {
+            _isSoftFlashActive = true;
+          });
+        }
+
         setState(() {
           _scannerState = ScannerState.searching;
           _statusMessage = _messageForQualityIssue(quality.issues.first);
@@ -388,6 +397,7 @@ class _BiopayScannerScreenState extends ConsumerState<BiopayScannerScreen>
       _scannerState = ScannerState.searching;
       _statusMessage = BiopayStrings.scanSearching;
       _blockingError = null;
+      _isSoftFlashActive = false;
     });
     if (_cameraController?.value.isInitialized == true) {
       _scheduleScanFrame();
@@ -408,7 +418,7 @@ class _BiopayScannerScreenState extends ConsumerState<BiopayScannerScreen>
         !_isInitializing;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: _isSoftFlashActive ? Colors.white : Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -436,6 +446,7 @@ class _BiopayScannerScreenState extends ConsumerState<BiopayScannerScreen>
               painter: OvalPainter(
                 state: _scannerState,
                 progress: _pulseController.value,
+                totalSamples: 0, // scan mode — simple border, no segments
               ),
             ),
           ),

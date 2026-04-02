@@ -77,17 +77,9 @@ class MenuImageGenerationService {
     final session = AuthRepository.instance.currentVenueSession;
     if (session == null) return const {};
     final token = session.accessToken;
-    if (token.isNotEmpty) {
-      return {
-        'venue_session': {'access_token': token},
-      };
-    }
+    if (token.isEmpty) return const {};
     return {
-      'venue_session': {
-        'access_token': session.accessToken,
-        'venue_id': session.venueId,
-        'contact_phone': session.whatsAppNumber,
-      },
+      'venue_session': {'access_token': token},
     };
   }
 

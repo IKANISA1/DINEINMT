@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/permission_providers.dart';
@@ -138,6 +139,10 @@ class _GuestLocationPermissionHostState
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return widget.child;
+    }
+
     return Stack(
       fit: StackFit.expand,
       children: [

@@ -82,10 +82,6 @@ class _PressableScaleState extends State<PressableScale>
 
   @override
   Widget build(BuildContext context) {
-    if (widget.onTap == null) {
-      return widget.child;
-    }
-
     final constrainedChild = widget.minTouchTargetSize == null
         ? widget.child
         : ConstrainedBox(
@@ -93,12 +89,20 @@ class _PressableScaleState extends State<PressableScale>
               minWidth: widget.minTouchTargetSize!.width,
               minHeight: widget.minTouchTargetSize!.height,
             ),
-            child: Center(
-              widthFactor: 1,
-              heightFactor: 1,
-              child: widget.child,
-            ),
+            child: Center(widthFactor: 1, heightFactor: 1, child: widget.child),
           );
+    final semanticChild = widget.semanticLabel == null
+        ? constrainedChild
+        : ExcludeSemantics(child: constrainedChild);
+
+    if (widget.onTap == null) {
+      return Semantics(
+        button: true,
+        enabled: false,
+        label: widget.semanticLabel,
+        child: semanticChild,
+      );
+    }
 
     return Semantics(
       button: true,
@@ -133,7 +137,7 @@ class _PressableScaleState extends State<PressableScale>
                 : null,
             child: ScaleTransition(
               scale: _scaleAnimation,
-              child: constrainedChild,
+              child: semanticChild,
             ),
           ),
         ),

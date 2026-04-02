@@ -14,13 +14,9 @@ abstract final class AppRouteNames {
   static const menu = 'menu';
 
   static const venueLogin = 'venueLogin';
-  static const venueClaim = 'venueClaim';
-  static const venueVerify = 'venueVerify';
-  static const venueOnboarding = 'venueOnboarding';
   static const venueOrderDetail = 'venueOrderDetail';
   static const venueNewItem = 'venueNewItem';
   static const venueEditItem = 'venueEditItem';
-  static const venueOcrReview = 'venueOcrReview';
   static const venueDashboard = 'venueDashboard';
   static const venueOrders = 'venueOrders';
   static const venueMenu = 'venueMenu';
@@ -38,8 +34,6 @@ abstract final class AppRouteNames {
   static const adminLogin = 'adminLogin';
   static const adminActivation = 'adminActivation';
   static const adminOverview = 'adminOverview';
-  static const adminClaims = 'adminClaims';
-  static const adminClaimDetail = 'adminClaimDetail';
   static const adminVenues = 'adminVenues';
   static const adminVenueDetail = 'adminVenueDetail';
   static const adminSettings = 'adminSettings';
@@ -82,13 +76,9 @@ abstract final class AppRoutePaths {
   static const venueMenuChild = 'menu';
 
   static const venueLogin = '/venue-login';
-  static const venueClaim = '/venue/claim';
-  static const venueVerify = '/venue/verify';
-  static const venueOnboarding = '/venue/onboarding';
   static const venueOrderDetail = '/venue/order/:${AppRouteParams.id}';
   static const venueNewItem = '/venue/item/new';
   static const venueEditItem = '/venue/item/:${AppRouteParams.id}';
-  static const venueOcrReview = '/venue/ocr-review';
   static const venueDashboard = '/venue/dashboard';
   static const venueOrders = '/venue/orders';
   static const venueMenu = '/venue/menu';
@@ -107,8 +97,6 @@ abstract final class AppRoutePaths {
   static const adminActivation =
       '/admin/venues/:${AppRouteParams.id}/activation';
   static const adminOverview = '/admin/overview';
-  static const adminClaims = '/admin/claims';
-  static const adminClaimDetail = '/admin/claims/:${AppRouteParams.id}';
   static const adminVenues = '/admin/venues';
   static const adminVenueDetail = '/admin/venues/:${AppRouteParams.id}';
   static const adminSettings = '/admin/settings';
