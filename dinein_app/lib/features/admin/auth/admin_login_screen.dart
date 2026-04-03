@@ -82,14 +82,35 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
 
   String get _dialCode => CountryRuntime.config.countryDialCode;
 
-  int get _expectedPhoneLength =>
-      CountryRuntime.config.country.code == 'RW' ? 10 : 8;
+  int get _configuredPhoneLength =>
+      CountryRuntime.config.adminWhatsAppLocalDigits;
 
-  String get _localPhone => normalizePhoneLocalInput(
-    _phoneController.text,
-    countryCode: _countryCode,
-    maxDigits: _expectedPhoneLength,
-  );
+  int get _inputPhoneLength =>
+      CountryRuntime.config.country.code == 'RW' && _configuredPhoneLength == 9
+      ? 10
+      : _configuredPhoneLength;
+
+  String _normalizeAdminPhoneInput(String value) {
+    final normalized = normalizePhoneLocalInput(
+      value,
+      countryCode: _countryCode,
+      maxDigits: _inputPhoneLength,
+    );
+    if (CountryRuntime.config.country.code == 'RW' &&
+        normalized.length == _configuredPhoneLength + 1 &&
+        normalized.startsWith('0')) {
+      return normalized.substring(1);
+    }
+    return normalized;
+  }
+
+  bool _isValidAdminPhoneInput(String value) {
+    final normalized = _normalizeAdminPhoneInput(value);
+    return normalized.length == _configuredPhoneLength &&
+        !normalized.startsWith(_countryCode);
+  }
+
+  String get _localPhone => _normalizeAdminPhoneInput(_phoneController.text);
 
   String get _fullPhone => _localPhone.isEmpty ? '' : '$_dialCode$_localPhone';
 
@@ -98,11 +119,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
   bool get _canSendOtp =>
       !_isLoading &&
       !_isCoolingDown &&
-      isValidPhoneLocalInput(
-        _phoneController.text,
-        countryCode: _countryCode,
-        expectedLength: _expectedPhoneLength,
-      );
+      _isValidAdminPhoneInput(_phoneController.text);
 
   String _entryReturnPath(BuildContext context) {
     final candidate = GoRouterState.of(
@@ -136,14 +153,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
 
   Future<void> _sendOtp() async {
     if (_isCoolingDown) return;
-    if (!isValidPhoneLocalInput(
-      _phoneController.text,
-      countryCode: _countryCode,
-      expectedLength: _expectedPhoneLength,
-    )) {
+    if (!_isValidAdminPhoneInput(_phoneController.text)) {
       setState(() {
-        _error =
-            'Enter your $_expectedPhoneLength-digit ${CountryRuntime.config.country.label} phone number.';
+        _error = 'Enter the WhatsApp number assigned to your admin profile.';
       });
       return;
     }
@@ -390,11 +402,17 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
         ),
         const SizedBox(height: 16),
 
-        CountryPhoneInput.fromConfig(
-          config: CountryRuntime.config,
+        CountryPhoneInput(
           controller: _phoneController,
           onSubmitted: _canSendOtp ? _sendOtp : null,
           onChanged: (_) => setState(() {}),
+          countryFlag: CountryRuntime.config.countryFlag,
+          dialCode: _dialCode,
+          hintText: CountryRuntime.config.country.code == 'RW'
+              ? '078 123 4567'
+              : '9912 3456',
+          countryCode: _countryCode,
+          maxDigits: _inputPhoneLength,
         ),
 
         // Error / Info

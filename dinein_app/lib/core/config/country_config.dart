@@ -68,7 +68,7 @@ class CountryConfig {
     appTitle: 'DINEIN MALTA',
     siteHost: 'dineinmt.ikanisa.com',
     playStoreId: 'com.dineinmalta.app',
-    supportWhatsApp: '35699711145',
+    supportWhatsApp: '356771861993',
     supportEmail: 'info@ikanisa.com',
     venueAccessWhatsApp: '35699711145',
     venueAccessEmail: 'info@ikanisa.com',
@@ -89,7 +89,7 @@ class CountryConfig {
     appTitle: 'DINEIN RW',
     siteHost: 'dineinrw.ikanisa.com',
     playStoreId: 'com.dineinrw.app',
-    supportWhatsApp: '',
+    supportWhatsApp: '250788767816',
     supportEmail: 'info@ikanisa.com',
     venueAccessWhatsApp: '',
     venueAccessEmail: 'info@ikanisa.com',
@@ -125,6 +125,18 @@ class CountryConfig {
 
   /// Whether venue access WhatsApp support is configured for this country.
   bool get hasVenueAccessWhatsApp => venueAccessWhatsApp.trim().isNotEmpty;
+
+  /// Local-digit length accepted for admin WhatsApp login in this country.
+  int get adminWhatsAppLocalDigits {
+    final digits = supportWhatsApp.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith(defaultCountryCode)) {
+      final localDigits = digits.substring(defaultCountryCode.length);
+      if (localDigits.length >= 8 && localDigits.length <= 10) {
+        return localDigits.length;
+      }
+    }
+    return country == Country.rw ? 10 : 8;
+  }
 
   /// Share text for venue discovery.
   String shareText(String content) => '$content\nhttps://$siteHost';

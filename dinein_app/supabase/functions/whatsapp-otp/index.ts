@@ -20,6 +20,10 @@ const graphApiVersion = Deno.env.get("WHATSAPP_GRAPH_API_VERSION") ?? "v22.0";
 const defaultCountryCode =
   (Deno.env.get("DEFAULT_WHATSAPP_COUNTRY_CODE") ?? "356")
     .replace(/\D/g, "");
+const fallbackAdminWhatsAppByCountry = new Map<string, string>([
+  ["250", "+250788767816"],
+  ["356", "+356771861993"],
+]);
 const allowMock = boolEnv("WHATSAPP_OTP_ALLOW_MOCK", false);
 const allowTextFallback = boolEnv("WHATSAPP_OTP_ALLOW_TEXT_FALLBACK", false);
 const allowTestOverride = boolEnv("WHATSAPP_OTP_ALLOW_TEST_OVERRIDE", false);
@@ -132,6 +136,25 @@ function optionalNormalizedPhone(raw?: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+export function configuredAdminWhatsAppNumberForCountry(
+  countryCode: string,
+): string | null {
+  const normalizedCountryCode = countryCode.replace(/\D/g, "");
+  const envKey = normalizedCountryCode === "250"
+    ? "DINEIN_ADMIN_WHATSAPP_NUMBER_RW"
+    : normalizedCountryCode === "356"
+    ? "DINEIN_ADMIN_WHATSAPP_NUMBER_MT"
+    : "DINEIN_ADMIN_WHATSAPP_NUMBER";
+  const configured = optionalNormalizedPhone(Deno.env.get(envKey)) ??
+    optionalNormalizedPhone(Deno.env.get("DINEIN_ADMIN_WHATSAPP_NUMBER"));
+  if (configured != null) return configured;
+  return fallbackAdminWhatsAppByCountry.get(normalizedCountryCode) ?? null;
+}
+
+function configuredAdminWhatsAppNumber(): string | null {
+  return configuredAdminWhatsAppNumberForCountry(defaultCountryCode);
 }
 
 function numericOtp(length = 6): string {
@@ -349,14 +372,35 @@ async function getAdminProfileByPhone(
     throw new Error("Could not verify admin access configuration.");
   }
 
+  return selectAdminProfileForPhone(
+    (data ?? []) as AdminProfile[],
+    normalizedPhone,
+  );
+}
+
+export function selectAdminProfileForPhone(
+  profiles: AdminProfile[],
+  normalizedPhone: string,
+  countryCode = defaultCountryCode,
+): AdminProfile | null {
   const normalizedDigits = digitsOnly(normalizedPhone);
-  for (const row of (data ?? []) as AdminProfile[]) {
+  for (const row of profiles) {
     const rowPhone = typeof row.whatsapp_number === "string"
       ? row.whatsapp_number
       : "";
     if (digitsOnly(rowPhone) === normalizedDigits) {
       return row;
     }
+  }
+
+  const configuredAdminPhone = configuredAdminWhatsAppNumberForCountry(
+    countryCode,
+  );
+  if (
+    configuredAdminPhone != null &&
+    digitsOnly(configuredAdminPhone) === normalizedDigits
+  ) {
+    return profiles[0] ?? null;
   }
 
   return null;
@@ -495,6 +539,26 @@ async function buildAdminSession(
     issued_at: issuedAt.toISOString(),
     expires_at: expiresAt.toISOString(),
   };
+}
+
+async function persistAdminProfilePhone(
+  supabase: ReturnType<typeof adminClient>,
+  profile: AdminProfile,
+  normalizedPhone: string,
+): Promise<void> {
+  const currentDigits = digitsOnly(profile.whatsapp_number ?? "");
+  const nextDigits = digitsOnly(normalizedPhone);
+  if (currentDigits === nextDigits) return;
+
+  const { error } = await supabase
+    .from("dinein_profiles")
+    .update({ whatsapp_number: normalizedPhone })
+    .eq("id", profile.id);
+
+  if (error) {
+    console.error("[whatsapp-otp] admin profile whatsapp sync failed", error);
+    throw new Error("Could not persist the admin WhatsApp number.");
+  }
 }
 
 async function buildVenueSession(
@@ -926,6 +990,12 @@ async function handleVerify(
       return errorResponse("Admin OTP session is not configured.", 500, {
         reason: "session_not_configured",
       });
+    }
+
+    try {
+      await persistAdminProfilePhone(supabase, adminProfile, normalizedPhone);
+    } catch (error) {
+      console.error("[whatsapp-otp] admin profile sync failed", error);
     }
   } else if (data.app_scope === "venue") {
     validatedVenue = await getValidatedVenueByPhone(

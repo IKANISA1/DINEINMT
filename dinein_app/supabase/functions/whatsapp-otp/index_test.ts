@@ -1,5 +1,36 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { buildVenueAccessAuditUpdate } from "./index.ts";
+import {
+  buildVenueAccessAuditUpdate,
+  configuredAdminWhatsAppNumberForCountry,
+  selectAdminProfileForPhone,
+} from "./index.ts";
+
+Deno.test("configuredAdminWhatsAppNumberForCountry returns the current country number", () => {
+  assertEquals(
+    configuredAdminWhatsAppNumberForCountry("356"),
+    "+356771861993",
+  );
+  assertEquals(
+    configuredAdminWhatsAppNumberForCountry("250"),
+    "+250788767816",
+  );
+});
+
+Deno.test("selectAdminProfileForPhone falls back to the configured country admin number", () => {
+  const profile = selectAdminProfileForPhone(
+    [{
+      id: "admin-1",
+      display_name: "Main Admin",
+      email: "admin@example.com",
+      role: "admin",
+      whatsapp_number: "+35699742524",
+    }],
+    "+356771861993",
+    "356",
+  );
+
+  assertEquals(profile?.id, "admin-1");
+});
 
 Deno.test("buildVenueAccessAuditUpdate preserves venue access data and verification audit", () => {
   const issuedAt = "2026-03-21T11:00:00.000Z";
