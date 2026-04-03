@@ -1,7 +1,6 @@
 import 'package:dinein_app/core/config/country_config.dart';
 import 'package:dinein_app/core/config/country_runtime.dart';
 import 'package:dinein_app/core/models/models.dart';
-import 'package:dinein_app/core/providers/venue_providers.dart';
 import 'package:dinein_app/features/admin/venues/admin_venue_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,16 +13,28 @@ void main() {
     CountryRuntime.configure(CountryConfig.mt);
   });
 
-  Venue buildVenue({String? phone, String? accessVerifiedAt}) {
+  Venue buildVenue() {
     return Venue.fromJson({
       'id': 'venue-1',
       'name': 'Harbor Table',
       'slug': 'harbor-table',
       'category': 'restaurant',
+      'description': 'Harbor-facing dining.',
+      'address': '45 Tower Rd, Sliema, Malta',
+      'phone': '+35699123456',
+      'email': 'harbor@example.com',
+      'website_url': 'https://harbortable.example.com',
+      'reservation_url': 'https://reserve.example.com/harbor-table',
+      'revolut_url': 'https://revolut.me/harbortable',
+      'social_links': {
+        'instagram': 'https://instagram.com/harbortable',
+        'tiktok': 'https://tiktok.com/@harbortable',
+      },
+      'opening_hours': {
+        'Monday': {'open': '10:00', 'close': '22:00', 'is_open': true},
+      },
       'status': 'active',
-      'phone': phone,
-      'normalized_access_phone': phone,
-      'access_verified_at': accessVerifiedAt,
+      'ordering_enabled': true,
     });
   }
 
@@ -33,23 +44,58 @@ void main() {
     required Future<void> Function(String venueId, Map<String, dynamic> updates)
     onUpdateVenue,
   }) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 2600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          venueByIdProvider(venue.id).overrideWith((ref) async => venue),
-        ],
-        child: MaterialApp(
-          home: AdminVenueDetailScreen(
-            venueId: venue.id,
-            onUpdateVenueOverride: onUpdateVenue,
+        child: TickerMode(
+          enabled: false,
+          child: MaterialApp(
+            home: AdminVenueDetailScreen(
+              venueId: venue.id,
+              initialVenueOverride: venue,
+              onUpdateVenueOverride: onUpdateVenue,
+            ),
           ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
   }
 
-  testWidgets('admin can assign a venue WhatsApp access number', (
+  testWidgets('admin venue detail renders guest and venue app urls', (
+    tester,
+  ) async {
+    await pumpScreen(
+      tester,
+      venue: buildVenue(),
+      onUpdateVenue: (_, __) async {},
+    );
+
+    await tester.scrollUntilVisible(
+      find.textContaining('https://dineinmt.ikanisa.com/v/harbor-table'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pump();
+
+    expect(
+      find.textContaining('https://dineinmt.ikanisa.com/v/harbor-table'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'https://dineinmt.ikanisa.com/download/?slug=harbor-table',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('admin venue detail saves the full venue profile payload', (
     tester,
   ) async {
     Map<String, dynamic>? savedUpdates;
@@ -57,51 +103,38 @@ void main() {
     await pumpScreen(
       tester,
       venue: buildVenue(),
-      onUpdateVenue: (venueId, updates) async {
+      onUpdateVenue: (_, updates) async {
         savedUpdates = updates;
       },
     );
 
-    await tester.ensureVisible(find.text('Add WhatsApp Number'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Add WhatsApp Number'));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(find.byType(TextField).last, '99123456');
+    await tester.tap(find.text('SAVE CHANGES'));
     await tester.pump();
-    await tester.tap(find.text('SAVE WHATSAPP NUMBER'));
-    await tester.pumpAndSettle();
-
-    expect(savedUpdates?['phone'], '+35699123456');
-    expect(find.text('Venue WhatsApp access updated'), findsOneWidget);
-  });
-
-  testWidgets('duplicate venue access numbers surface a clear admin error', (
-    tester,
-  ) async {
-    await pumpScreen(
-      tester,
-      venue: buildVenue(phone: '+35699123456'),
-      onUpdateVenue: (venueId, updates) async {
-        throw Exception(
-          'This WhatsApp number is already assigned to another venue.',
-        );
-      },
-    );
-
-    await tester.ensureVisible(find.text('Edit WhatsApp Number'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Edit WhatsApp Number'));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(find.byType(TextField).last, '99222333');
     await tester.pump();
-    await tester.tap(find.text('SAVE WHATSAPP NUMBER'));
-    await tester.pumpAndSettle();
 
+    expect(savedUpdates, isNotNull);
+    expect(savedUpdates?['name'], 'Harbor Table');
+    expect(savedUpdates?['slug'], 'harbor-table');
+    expect(savedUpdates?['category'], 'Restaurants');
+    expect(savedUpdates?['address'], '45 Tower Rd, Sliema, Malta');
+    expect(savedUpdates?['website_url'], 'https://harbortable.example.com');
     expect(
-      find.text('This WhatsApp number is already assigned to another venue.'),
-      findsOneWidget,
+      savedUpdates?['reservation_url'],
+      'https://reserve.example.com/harbor-table',
     );
+    expect(savedUpdates?['ordering_enabled'], true);
+    expect(savedUpdates?['status'], 'active');
+    expect(savedUpdates?['country'], 'MT');
+    expect(savedUpdates?['social_links'], {
+      'instagram': 'https://instagram.com/harbortable',
+      'tiktok': 'https://tiktok.com/@harbortable',
+    });
+
+    final openingHours = savedUpdates?['opening_hours'] as Map<String, dynamic>;
+    expect(openingHours['Monday'], {
+      'open': '10:00',
+      'close': '22:00',
+      'is_open': true,
+    });
   });
 }

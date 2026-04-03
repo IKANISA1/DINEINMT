@@ -225,6 +225,22 @@ function normalizeCountryCode(
   return fallback;
 }
 
+function normalizeStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => stringValue(entry))
+    .filter((entry): entry is string => Boolean(entry));
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-");
+}
+
 function requestCountryCode(
   body: JsonRecord,
   fallback: CountryCode = "MT",
@@ -1327,6 +1343,10 @@ async function authorizeVenueMutation(
   return "venue";
 }
 
+function isServiceRoleRequest(req: Request): boolean {
+  return decodeJwtRole(req.headers.get("Authorization")) == "service_role";
+}
+
 async function venueNotificationSettingsSnapshot(
   supabase: ReturnType<typeof adminClient>,
   venueId: string,
@@ -1648,6 +1668,308 @@ async function menuItemVenueId(
   }
 
   return venueId;
+}
+
+async function menuItemAdminSnapshot(
+  supabase: ReturnType<typeof adminClient>,
+  itemId: string,
+): Promise<JsonRecord> {
+  const { data, error } = await supabase
+    .from("dinein_menu_items")
+    .select(
+      "id, venue_id, admin_group_id, admin_managed, name, description, category, class, image_url, image_source, image_status, image_model, image_error, image_generated_at, image_locked, image_storage_path, image_attempts, tags",
+    )
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[dinein-api] menu item admin snapshot failed", error);
+    throw new HttpError(500, "Could not load the menu item.");
+  }
+
+  if (!data) {
+    throw new HttpError(404, "Menu item not found.");
+  }
+
+  return asRecord(data);
+}
+
+async function adminManagedMenuGroupSeed(
+  supabase: ReturnType<typeof adminClient>,
+  groupId: string,
+): Promise<JsonRecord> {
+  const { data, error } = await supabase
+    .from("dinein_menu_items")
+    .select(
+      "id, venue_id, admin_group_id, admin_managed, name, description, category, class, image_url, image_source, image_status, image_model, image_error, image_generated_at, image_locked, image_storage_path, image_attempts, tags",
+    )
+    .eq("admin_group_id", groupId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[dinein-api] admin menu group seed lookup failed", error);
+    throw new HttpError(500, "Could not load the menu group.");
+  }
+
+  if (!data) {
+    throw new HttpError(404, "Admin menu group not found.");
+  }
+
+  return asRecord(data);
+}
+
+async function syncAdminManagedGroupSharedFields(
+  supabase: ReturnType<typeof adminClient>,
+  groupId: string,
+  updates: JsonRecord,
+): Promise<void> {
+  if (Object.keys(updates).length == 0) return;
+
+  const { error } = await supabase
+    .from("dinein_menu_items")
+    .update(updates)
+    .eq("admin_group_id", groupId);
+
+  if (error) {
+    console.error("[dinein-api] sync admin menu group fields failed", error);
+    throw new HttpError(500, "Could not update the admin menu group.");
+  }
+}
+
+async function syncAdminManagedGroupImageFields(
+  supabase: ReturnType<typeof adminClient>,
+  groupId: string,
+  sourceItemId: string,
+): Promise<void> {
+  const source = await menuItemAdminSnapshot(supabase, sourceItemId);
+  const updates: JsonRecord = {
+    image_url: stringValue(source.image_url) ?? null,
+    image_source: stringValue(source.image_source) ?? null,
+    image_status: stringValue(source.image_status) ?? null,
+    image_model: stringValue(source.image_model) ?? null,
+    image_error: stringValue(source.image_error) ?? null,
+    image_generated_at: stringValue(source.image_generated_at) ?? null,
+    image_locked: booleanValue(source.image_locked) ?? false,
+    image_storage_path: stringValue(source.image_storage_path) ?? null,
+    image_attempts: numberValue(source.image_attempts) ?? 0,
+  };
+
+  await syncAdminManagedGroupSharedFields(supabase, groupId, updates);
+}
+
+async function ensureUniqueVenueSlug(
+  supabase: ReturnType<typeof adminClient>,
+  input: string,
+  excludeVenueId?: string,
+): Promise<string> {
+  const base = slugify(input) || "venue";
+  let attempt = 0;
+
+  while (attempt < 100) {
+    const candidate = attempt == 0 ? base : `${base}-${attempt + 1}`;
+    let query = supabase.from("dinein_venues").select("id").eq(
+      "slug",
+      candidate,
+    );
+    if (excludeVenueId) {
+      query = query.neq("id", excludeVenueId);
+    }
+    const { data, error } = await query.maybeSingle();
+    if (error) {
+      console.error("[dinein-api] venue slug lookup failed", error);
+      throw new HttpError(500, "Could not validate the venue slug.");
+    }
+    if (!data) return candidate;
+    attempt += 1;
+  }
+
+  throw new HttpError(500, "Could not generate a unique venue slug.");
+}
+
+async function resolveAdminAssignmentVenueIds(
+  supabase: ReturnType<typeof adminClient>,
+  body: JsonRecord,
+): Promise<string[]> {
+  const assignAll = booleanValue(body.assignAll ?? body.assign_all) ?? false;
+  const requestedVenueIds = Array.from(
+    new Set(
+      normalizeStringList(body.venueIds ?? body.venue_ids).map((value) =>
+        value.trim()
+      ).filter(Boolean),
+    ),
+  );
+
+  let query = supabase
+    .from("dinein_venues")
+    .select("id")
+    .neq("status", "deleted");
+
+  if (assignAll) {
+    query = query.eq("country", requestCountryCode(body));
+  } else {
+    if (requestedVenueIds.length == 0) {
+      throw new HttpError(
+        400,
+        "Select at least one venue or choose to assign to all venues.",
+      );
+    }
+    query = query.in("id", requestedVenueIds);
+  }
+
+  const { data, error } = await query.order("name", { ascending: true });
+  if (error) {
+    console.error("[dinein-api] resolve admin venue assignment failed", error);
+    throw new HttpError(500, "Could not load the target venues.");
+  }
+
+  const resolvedVenueIds = (data ?? [])
+    .map((row) => stringValue(asRecord(row).id))
+    .filter((value): value is string => Boolean(value));
+
+  if (!assignAll && resolvedVenueIds.length != requestedVenueIds.length) {
+    throw new HttpError(400, "One or more selected venues could not be found.");
+  }
+
+  if (resolvedVenueIds.length == 0) {
+    throw new HttpError(400, "No venues are available for this assignment.");
+  }
+
+  return resolvedVenueIds;
+}
+
+function sanitizeAdminManagedMenuDraft(rawItem: unknown): JsonRecord {
+  const item = asRecord(rawItem);
+  const name = requireString(item, "name");
+  const description = stringValue(item.description) ?? "";
+  const category = stringValue(item.category) ?? "Uncategorized";
+  const tags = normalizeStringList(item.tags);
+  const sanitized: JsonRecord = {
+    name,
+    description,
+    category,
+    tags,
+  };
+
+  if ("class" in item) {
+    const normalizedClass = normalizeMenuItemClass(item.class);
+    if (item.class != undefined && item.class != null && !normalizedClass) {
+      throw new HttpError(400, "Menu item class must be food or drinks.");
+    }
+    if (normalizedClass) sanitized.class = normalizedClass;
+  }
+
+  if ("image_url" in item || "imageUrl" in item) {
+    const imageUrl = stringValue(item.image_url) ??
+      stringValue(item.imageUrl) ??
+      null;
+    sanitized.image_url = imageUrl;
+    if (imageUrl) {
+      sanitized.image_source = "manual";
+      sanitized.image_status = "ready";
+      sanitized.image_model = null;
+      sanitized.image_error = null;
+      sanitized.image_generated_at = null;
+      sanitized.image_storage_path = null;
+      sanitized.image_locked = true;
+    } else {
+      sanitized.image_source = null;
+      sanitized.image_status = "pending";
+      sanitized.image_model = null;
+      sanitized.image_error = null;
+      sanitized.image_generated_at = null;
+      sanitized.image_storage_path = null;
+      sanitized.image_locked = false;
+    }
+  }
+
+  return sanitized;
+}
+
+function sanitizeAdminMenuUpdates(rawUpdates: unknown): JsonRecord {
+  const updates = asRecord(rawUpdates);
+  const forbiddenKeys = [
+    "price",
+    "is_available",
+    "isAvailable",
+    "highlight_rank",
+    "highlightRank",
+    "sort_order",
+    "sortOrder",
+    "venue_id",
+    "venueId",
+    "admin_group_id",
+    "adminGroupId",
+    "admin_managed",
+    "adminManaged",
+  ];
+  for (const key of forbiddenKeys) {
+    if (key in updates) {
+      throw new HttpError(
+        403,
+        "Admin can update shared menu content only. Price and availability remain venue-specific.",
+      );
+    }
+  }
+
+  const sanitized: JsonRecord = {};
+
+  if ("name" in updates) sanitized.name = requireString(updates, "name");
+  if ("description" in updates) {
+    sanitized.description = stringValue(updates.description) ?? "";
+  }
+  if ("category" in updates) {
+    sanitized.category = stringValue(updates.category) ?? "Uncategorized";
+  }
+  if ("tags" in updates) {
+    sanitized.tags = normalizeStringList(updates.tags);
+  }
+  if ("class" in updates) {
+    const normalizedClass = normalizeMenuItemClass(updates.class);
+    if (
+      updates.class != undefined &&
+      updates.class != null &&
+      !normalizedClass
+    ) {
+      throw new HttpError(400, "Menu item class must be food or drinks.");
+    }
+    sanitized.class = normalizedClass ?? null;
+  }
+  if ("image_url" in updates || "imageUrl" in updates) {
+    const imageUrl = stringValue(updates.image_url) ??
+      stringValue(updates.imageUrl) ??
+      null;
+    sanitized.image_url = imageUrl;
+    if (imageUrl) {
+      sanitized.image_source = "manual";
+      sanitized.image_status = "ready";
+      sanitized.image_model = null;
+      sanitized.image_error = null;
+      sanitized.image_generated_at = null;
+      sanitized.image_storage_path = null;
+      sanitized.image_locked = true;
+    } else {
+      sanitized.image_source = null;
+      sanitized.image_status = "pending";
+      sanitized.image_model = null;
+      sanitized.image_error = null;
+      sanitized.image_generated_at = null;
+      sanitized.image_storage_path = null;
+      sanitized.image_locked = false;
+    }
+  }
+  if ("image_locked" in updates || "imageLocked" in updates) {
+    const imageLocked = booleanValue(
+      updates.image_locked ?? updates.imageLocked,
+    );
+    if (imageLocked == undefined) {
+      throw new HttpError(400, "A valid image_locked flag is required.");
+    }
+    sanitized.image_locked = imageLocked;
+  }
+
+  return sanitized;
 }
 
 async function orderVenueId(
@@ -2567,6 +2889,71 @@ async function handleGetAllVenues(
   return ok(data ?? []);
 }
 
+async function handleCreateVenue(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  await requireAdmin(supabase, req);
+
+  const venuePayload = asRecord(body.venue);
+  const payload = Object.keys(venuePayload).length == 0 ? body : venuePayload;
+  const updates = sanitizeVenueUpdates(payload, true);
+  const name = stringValue(updates.name);
+  if (!name) {
+    throw new HttpError(400, "Venue name is required.");
+  }
+
+  const slug = await ensureUniqueVenueSlug(
+    supabase,
+    stringValue(updates.slug) ?? name,
+  );
+
+  const insert: JsonRecord = {
+    name,
+    slug,
+    category: stringValue(updates.category) ?? "restaurant",
+    description: stringValue(updates.description) ?? "",
+    address: stringValue(updates.address) ?? "",
+    email: stringValue(updates.email) ?? null,
+    image_url: stringValue(updates.image_url) ?? null,
+    revolut_url: stringValue(updates.revolut_url) ?? null,
+    website_url: stringValue(updates.website_url) ?? null,
+    reservation_url: stringValue(updates.reservation_url) ?? null,
+    opening_hours: updates.opening_hours ?? null,
+    social_links: updates.social_links ?? {},
+    phone: stringValue(updates.phone) ?? null,
+    owner_contact_phone: stringValue(updates.phone) ?? null,
+    owner_whatsapp_number: stringValue(updates.phone) ?? null,
+    normalized_access_phone: stringValue(updates.phone) ?? null,
+    status: stringValue(updates.status) ?? "inactive",
+    ordering_enabled: booleanValue(updates.ordering_enabled) ?? false,
+    country: normalizeCountryCode(
+      updates.country ?? payload.country ?? payload.country_code,
+    ),
+    owner_id: stringValue(updates.owner_id) ?? null,
+    wifi_ssid: stringValue(updates.wifi_ssid) ?? null,
+    wifi_password: stringValue(updates.wifi_password) ?? null,
+    wifi_security: stringValue(updates.wifi_security) ?? null,
+    supported_payment_methods: Array.isArray(updates.supported_payment_methods)
+      ? updates.supported_payment_methods
+      : ["cash"],
+  };
+
+  const { data, error } = await supabase
+    .from("dinein_venues")
+    .insert(insert)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[dinein-api] create venue failed", error);
+    throw new HttpError(500, "Could not create the venue.");
+  }
+
+  return ok(data, 201);
+}
+
 async function handleGetVenueBySlug(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
@@ -2691,6 +3078,13 @@ async function handleUpdateVenue(
   const updates = sanitizeVenueUpdates(body.updates, mode == "admin");
   if (mode == "venue") {
     delete updates.phone;
+  }
+  if ("slug" in updates) {
+    updates.slug = await ensureUniqueVenueSlug(
+      supabase,
+      requireString(updates, "slug"),
+      venueId,
+    );
   }
   if (Object.keys(updates).length == 0) {
     return ok(true);
@@ -2862,6 +3256,448 @@ async function handleGetMenuItems(
   );
 }
 
+async function handleGetAdminMenuQueue(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+): Promise<Response> {
+  await requireAdmin(supabase, req);
+
+  const { data, error } = await supabase
+    .from("dinein_menu_items")
+    .select(
+      "venue_id, category, is_available, image_status, menu_context_status, updated_at, venue:dinein_venues!inner(id, name, image_url, address, category, status)",
+    )
+    .or("admin_managed.is.false,admin_managed.is.null")
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("[dinein-api] get admin menu queue failed", error);
+    throw new HttpError(500, "Could not load the admin menu queue.");
+  }
+
+  type QueueAccumulator = {
+    venueId: string;
+    venueName: string;
+    venueImageUrl: string | null;
+    venueAddress: string;
+    venueCategory: string;
+    venueStatus: string;
+    totalItems: number;
+    availableItems: number;
+    pendingReviewCount: number;
+    failedReviewCount: number;
+    readyCount: number;
+    categories: Set<string>;
+    lastUpdatedAt: string | null;
+  };
+
+  const queue = new Map<string, QueueAccumulator>();
+
+  for (const rawRow of data ?? []) {
+    const row = asRecord(rawRow);
+    const venue = asRecord(row.venue);
+    const venueId = stringValue(row.venue_id) ?? stringValue(venue.id);
+    if (!venueId) continue;
+
+    const existing = queue.get(venueId) ?? {
+      venueId,
+      venueName: stringValue(venue.name) ?? "Venue",
+      venueImageUrl: stringValue(venue.image_url) ?? null,
+      venueAddress: stringValue(venue.address) ?? "",
+      venueCategory: stringValue(venue.category) ?? "",
+      venueStatus: stringValue(venue.status) ?? "active",
+      totalItems: 0,
+      availableItems: 0,
+      pendingReviewCount: 0,
+      failedReviewCount: 0,
+      readyCount: 0,
+      categories: new Set<string>(),
+      lastUpdatedAt: null,
+    };
+
+    existing.totalItems += 1;
+    if (booleanValue(row.is_available) ?? true) {
+      existing.availableItems += 1;
+    }
+
+    const reviewStatus = stringValue(row.menu_context_status) ??
+      (stringValue(row.image_status) == "ready" ? "ready" : "pending");
+    switch (reviewStatus) {
+      case "ready":
+        existing.readyCount += 1;
+        break;
+      case "failed":
+        existing.failedReviewCount += 1;
+        break;
+      default:
+        existing.pendingReviewCount += 1;
+        break;
+    }
+
+    const category = stringValue(row.category);
+    if (category) {
+      existing.categories.add(category);
+    }
+
+    const updatedAt = stringValue(row.updated_at);
+    if (
+      updatedAt &&
+      (!existing.lastUpdatedAt || updatedAt > existing.lastUpdatedAt)
+    ) {
+      existing.lastUpdatedAt = updatedAt;
+    }
+
+    queue.set(venueId, existing);
+  }
+
+  const items = Array.from(queue.values())
+    .map((entry) => ({
+      venue_id: entry.venueId,
+      venue_name: entry.venueName,
+      venue_image_url: entry.venueImageUrl,
+      venue_address: entry.venueAddress,
+      venue_category: entry.venueCategory,
+      venue_status: entry.venueStatus,
+      total_items: entry.totalItems,
+      available_items: entry.availableItems,
+      pending_review_count: entry.pendingReviewCount,
+      failed_review_count: entry.failedReviewCount,
+      ready_count: entry.readyCount,
+      category_count: entry.categories.size,
+      last_updated_at: entry.lastUpdatedAt,
+    }))
+    .sort((a, b) => {
+      const aNeedsReview = a.pending_review_count > 0 ||
+        a.failed_review_count > 0;
+      const bNeedsReview = b.pending_review_count > 0 ||
+        b.failed_review_count > 0;
+      if (aNeedsReview != bNeedsReview) {
+        return aNeedsReview ? -1 : 1;
+      }
+      return (b.last_updated_at ?? "").localeCompare(a.last_updated_at ?? "");
+    });
+
+  return ok(items);
+}
+
+async function handleGetAdminMenuCatalog(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+): Promise<Response> {
+  await requireAdmin(supabase, req);
+
+  const { data, error } = await supabase
+    .from("dinein_menu_items")
+    .select(
+      "id, venue_id, admin_group_id, name, description, category, class, image_url, image_source, image_status, image_locked, tags, updated_at, venue:dinein_venues!inner(status)",
+    )
+    .eq("admin_managed", true)
+    .not("admin_group_id", "is", null)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("[dinein-api] get admin menu catalog failed", error);
+    throw new HttpError(500, "Could not load the admin menu catalog.");
+  }
+
+  type CatalogAccumulator = {
+    groupId: string;
+    representativeItemId: string;
+    representativeVenueId: string;
+    name: string;
+    description: string;
+    category: string;
+    itemClass: string | null;
+    imageUrl: string | null;
+    imageSource: string | null;
+    imageStatus: string | null;
+    imageLocked: boolean;
+    tags: string[];
+    assignedVenueCount: number;
+    assignedActiveVenueCount: number;
+    lastUpdatedAt: string | null;
+  };
+
+  const catalog = new Map<string, CatalogAccumulator>();
+  for (const rawRow of data ?? []) {
+    const row = asRecord(rawRow);
+    const groupId = stringValue(row.admin_group_id);
+    if (!groupId) continue;
+    const venue = asRecord(row.venue);
+    const updatedAt = stringValue(row.updated_at) ?? null;
+    const existing = catalog.get(groupId);
+    if (!existing) {
+      catalog.set(groupId, {
+        groupId,
+        representativeItemId: stringValue(row.id) ?? "",
+        representativeVenueId: stringValue(row.venue_id) ?? "",
+        name: stringValue(row.name) ?? "",
+        description: stringValue(row.description) ?? "",
+        category: stringValue(row.category) ?? "Uncategorized",
+        itemClass: stringValue(row.class) ?? null,
+        imageUrl: stringValue(row.image_url) ?? null,
+        imageSource: stringValue(row.image_source) ?? null,
+        imageStatus: stringValue(row.image_status) ?? "pending",
+        imageLocked: booleanValue(row.image_locked) ?? false,
+        tags: normalizeStringList(row.tags),
+        assignedVenueCount: 1,
+        assignedActiveVenueCount: stringValue(venue.status) == "active" ? 1 : 0,
+        lastUpdatedAt: updatedAt,
+      });
+      continue;
+    }
+
+    existing.assignedVenueCount += 1;
+    if (stringValue(venue.status) == "active") {
+      existing.assignedActiveVenueCount += 1;
+    }
+    if (
+      updatedAt &&
+      (!existing.lastUpdatedAt ||
+        updatedAt.localeCompare(existing.lastUpdatedAt) > 0)
+    ) {
+      existing.representativeItemId = stringValue(row.id) ??
+        existing.representativeItemId;
+      existing.representativeVenueId = stringValue(row.venue_id) ??
+        existing.representativeVenueId;
+      existing.name = stringValue(row.name) ?? existing.name;
+      existing.description = stringValue(row.description) ??
+        existing.description;
+      existing.category = stringValue(row.category) ?? existing.category;
+      existing.itemClass = stringValue(row.class) ?? existing.itemClass;
+      existing.imageUrl = stringValue(row.image_url) ?? existing.imageUrl;
+      existing.imageSource = stringValue(row.image_source) ??
+        existing.imageSource;
+      existing.imageStatus = stringValue(row.image_status) ??
+        existing.imageStatus;
+      existing.imageLocked = booleanValue(row.image_locked) ??
+        existing.imageLocked;
+      existing.tags = normalizeStringList(row.tags);
+      existing.lastUpdatedAt = updatedAt;
+    }
+  }
+
+  return ok(
+    Array.from(catalog.values()).sort((left, right) =>
+      (right.lastUpdatedAt ?? "").localeCompare(left.lastUpdatedAt ?? "")
+    ).map((entry) => ({
+      group_id: entry.groupId,
+      representative_item_id: entry.representativeItemId,
+      representative_venue_id: entry.representativeVenueId,
+      name: entry.name,
+      description: entry.description,
+      category: entry.category,
+      class: entry.itemClass,
+      image_url: entry.imageUrl,
+      image_source: entry.imageSource,
+      image_status: entry.imageStatus,
+      image_locked: entry.imageLocked,
+      tags: entry.tags,
+      assigned_venue_count: entry.assignedVenueCount,
+      assigned_active_venue_count: entry.assignedActiveVenueCount,
+      last_updated_at: entry.lastUpdatedAt,
+    })),
+  );
+}
+
+async function handleGetAdminMenuGroupAssignments(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  await requireAdmin(supabase, req);
+  const groupId = requireString(body, "groupId", "group_id");
+
+  const { data, error } = await supabase
+    .from("dinein_menu_items")
+    .select(
+      "id, admin_group_id, price, is_available, updated_at, venue:dinein_venues!inner(id, name, slug, status, ordering_enabled)",
+    )
+    .eq("admin_group_id", groupId)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("[dinein-api] get admin menu assignments failed", error);
+    throw new HttpError(500, "Could not load menu assignments.");
+  }
+
+  return ok(
+    (data ?? []).map((row) => {
+      const record = asRecord(row);
+      const venue = asRecord(record.venue);
+      return {
+        item_id: stringValue(record.id) ?? "",
+        group_id: stringValue(record.admin_group_id) ?? groupId,
+        venue_id: stringValue(venue.id) ?? "",
+        venue_name: stringValue(venue.name) ?? "Venue",
+        venue_slug: stringValue(venue.slug) ?? "",
+        venue_status: stringValue(venue.status) ?? "active",
+        ordering_enabled: booleanValue(venue.ordering_enabled) ?? false,
+        price: numberValue(record.price) ?? 0,
+        is_available: booleanValue(record.is_available) ?? false,
+        updated_at: stringValue(record.updated_at) ?? null,
+      };
+    }),
+  );
+}
+
+async function handleCreateAdminMenuGroups(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  await requireAdmin(supabase, req);
+
+  const rawItems = Array.isArray(body.items)
+    ? body.items
+    : (body.item ? [body.item] : []);
+  if (rawItems.length == 0) {
+    throw new HttpError(400, "At least one menu item is required.");
+  }
+
+  const venueIds = await resolveAdminAssignmentVenueIds(supabase, body);
+  const inserts: JsonRecord[] = [];
+  const groupIds: string[] = [];
+
+  for (const rawItem of rawItems) {
+    const draft = sanitizeAdminManagedMenuDraft(rawItem);
+    const groupId = crypto.randomUUID();
+    groupIds.push(groupId);
+    for (const venueId of venueIds) {
+      inserts.push({
+        venue_id: venueId,
+        admin_group_id: groupId,
+        admin_managed: true,
+        name: stringValue(draft.name) ?? "",
+        description: stringValue(draft.description) ?? "",
+        category: stringValue(draft.category) ?? "Uncategorized",
+        class: stringValue(draft.class) ?? null,
+        image_url: stringValue(draft.image_url) ?? null,
+        image_source: stringValue(draft.image_source) ?? null,
+        image_status: stringValue(draft.image_status) ?? "pending",
+        image_model: null,
+        image_error: null,
+        image_generated_at: null,
+        image_locked: booleanValue(draft.image_locked) ?? false,
+        image_storage_path: null,
+        image_attempts: 0,
+        price: 0,
+        is_available: false,
+        tags: Array.isArray(draft.tags) ? draft.tags : [],
+      });
+    }
+  }
+
+  const { error } = await supabase.from("dinein_menu_items").insert(inserts);
+  if (error) {
+    console.error("[dinein-api] create admin menu groups failed", error);
+    throw new HttpError(500, "Could not create the admin menu items.");
+  }
+
+  return ok({
+    created_groups: groupIds.length,
+    assigned_venues: venueIds.length,
+    group_ids: groupIds,
+  }, 201);
+}
+
+async function handleAssignAdminMenuGroup(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  await requireAdmin(supabase, req);
+  const groupId = requireString(body, "groupId", "group_id");
+  const venueIds = await resolveAdminAssignmentVenueIds(supabase, body);
+  const seed = await adminManagedMenuGroupSeed(supabase, groupId);
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from("dinein_menu_items")
+    .select("venue_id")
+    .eq("admin_group_id", groupId)
+    .in("venue_id", venueIds);
+
+  if (existingError) {
+    console.error(
+      "[dinein-api] assign admin menu group lookup failed",
+      existingError,
+    );
+    throw new HttpError(500, "Could not validate existing menu assignments.");
+  }
+
+  const existingVenueIds = new Set(
+    (existingRows ?? [])
+      .map((row) => stringValue(asRecord(row).venue_id))
+      .filter((value): value is string => Boolean(value)),
+  );
+  const missingVenueIds = venueIds.filter((venueId) =>
+    !existingVenueIds.has(venueId)
+  );
+
+  if (missingVenueIds.length == 0) {
+    return ok({
+      group_id: groupId,
+      assigned_count: 0,
+      total_count: venueIds.length,
+    });
+  }
+
+  const inserts = missingVenueIds.map((venueId) => ({
+    venue_id: venueId,
+    admin_group_id: groupId,
+    admin_managed: true,
+    name: stringValue(seed.name) ?? "",
+    description: stringValue(seed.description) ?? "",
+    category: stringValue(seed.category) ?? "Uncategorized",
+    class: stringValue(seed.class) ?? null,
+    image_url: stringValue(seed.image_url) ?? null,
+    image_source: stringValue(seed.image_source) ?? null,
+    image_status: stringValue(seed.image_status) ?? "pending",
+    image_model: stringValue(seed.image_model) ?? null,
+    image_error: stringValue(seed.image_error) ?? null,
+    image_generated_at: stringValue(seed.image_generated_at) ?? null,
+    image_locked: booleanValue(seed.image_locked) ?? false,
+    image_storage_path: stringValue(seed.image_storage_path) ?? null,
+    image_attempts: numberValue(seed.image_attempts) ?? 0,
+    price: 0,
+    is_available: false,
+    tags: normalizeStringList(seed.tags),
+  }));
+
+  const { error } = await supabase.from("dinein_menu_items").insert(inserts);
+  if (error) {
+    console.error("[dinein-api] assign admin menu group failed", error);
+    throw new HttpError(500, "Could not assign the menu item to venues.");
+  }
+
+  return ok({
+    group_id: groupId,
+    assigned_count: missingVenueIds.length,
+    total_count: venueIds.length,
+  });
+}
+
+async function handleDeleteAdminMenuGroup(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  await requireAdmin(supabase, req);
+  const groupId = requireString(body, "groupId", "group_id");
+
+  const { error } = await supabase
+    .from("dinein_menu_items")
+    .delete()
+    .eq("admin_group_id", groupId);
+
+  if (error) {
+    console.error("[dinein-api] delete admin menu group failed", error);
+    throw new HttpError(500, "Could not delete the admin menu item.");
+  }
+
+  return ok(true);
+}
+
 async function handleToggleMenuItemAvailability(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
@@ -2869,7 +3705,18 @@ async function handleToggleMenuItemAvailability(
 ): Promise<Response> {
   const itemId = requireString(body, "itemId", "item_id");
   const venueId = await menuItemVenueId(supabase, itemId);
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+  const mode = await authorizeVenueMutation(
+    supabase,
+    req,
+    venueId,
+    body.venue_session,
+  );
+  if (mode == "admin" && !isServiceRoleRequest(req)) {
+    throw new HttpError(
+      403,
+      "Admin cannot change venue-specific availability. Venue teams control this field.",
+    );
+  }
 
   const isAvailable = booleanValue(body.isAvailable);
   if (isAvailable == undefined) {
@@ -2896,7 +3743,18 @@ async function handleCreateMenuItem(
 ): Promise<Response> {
   const item = sanitizeMenuItemInsert(body.item);
   const venueId = requireString(item, "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+  const mode = await authorizeVenueMutation(
+    supabase,
+    req,
+    venueId,
+    body.venue_session,
+  );
+  if (mode == "admin" && !isServiceRoleRequest(req)) {
+    throw new HttpError(
+      403,
+      "Admin menu creation must use the centralized assignment flow.",
+    );
+  }
 
   const { data, error } = await supabase
     .from("dinein_menu_items")
@@ -2919,11 +3777,30 @@ async function handleUpdateMenuItem(
 ): Promise<Response> {
   const itemId = requireString(body, "itemId", "item_id");
   const venueId = await menuItemVenueId(supabase, itemId);
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+  const mode = await authorizeVenueMutation(
+    supabase,
+    req,
+    venueId,
+    body.venue_session,
+  );
+  const snapshot = mode == "admin"
+    ? await menuItemAdminSnapshot(supabase, itemId)
+    : null;
 
-  const updates = sanitizeMenuItemUpdates(body.updates);
+  const updates = mode == "admin"
+    ? sanitizeAdminMenuUpdates(body.updates)
+    : sanitizeMenuItemUpdates(body.updates);
   if (Object.keys(updates).length == 0) {
     return ok(true);
+  }
+
+  if (mode == "admin") {
+    const groupId = stringValue(snapshot?.admin_group_id);
+    if (groupId) {
+      await syncAdminManagedGroupSharedFields(supabase, groupId, updates);
+      const refreshed = await adminManagedMenuGroupSeed(supabase, groupId);
+      return ok(refreshed);
+    }
   }
 
   const { data, error } = await supabase
@@ -2948,7 +3825,18 @@ async function handleDeleteMenuItem(
 ): Promise<Response> {
   const itemId = requireString(body, "itemId", "item_id");
   const venueId = await menuItemVenueId(supabase, itemId);
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+  const mode = await authorizeVenueMutation(
+    supabase,
+    req,
+    venueId,
+    body.venue_session,
+  );
+  if (mode == "admin" && !isServiceRoleRequest(req)) {
+    throw new HttpError(
+      403,
+      "Admin deletion must use the centralized menu group flow.",
+    );
+  }
 
   const { error } = await supabase
     .from("dinein_menu_items")
@@ -2969,7 +3857,18 @@ async function handleSetMenuItemHighlights(
   body: JsonRecord,
 ): Promise<Response> {
   const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+  const mode = await authorizeVenueMutation(
+    supabase,
+    req,
+    venueId,
+    body.venue_session,
+  );
+  if (mode == "admin" && !isServiceRoleRequest(req)) {
+    throw new HttpError(
+      403,
+      "Admin cannot change venue-specific highlight ordering.",
+    );
+  }
 
   const rawItemIds = Array.isArray(body.itemIds)
     ? body.itemIds
@@ -3060,7 +3959,12 @@ async function handleGenerateMenuItemImage(
   const venueSession = asRecord(body.venue_session);
   const venueId = stringValue(venueSession.venue_id) ??
     requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
+  const mode = await authorizeVenueMutation(
+    supabase,
+    req,
+    venueId,
+    body.venue_session,
+  );
   const imageClient = supabase as unknown as ReturnType<
     typeof createMenuImageAdminClient
   >;
@@ -3074,6 +3978,14 @@ async function handleGenerateMenuItemImage(
     venue,
     forceRegenerate,
   });
+
+  if (mode == "admin") {
+    const snapshot = await menuItemAdminSnapshot(supabase, itemId);
+    const groupId = stringValue(snapshot.admin_group_id);
+    if (groupId) {
+      await syncAdminManagedGroupImageFields(supabase, groupId, itemId);
+    }
+  }
 
   return ok(result);
 }
@@ -4421,6 +5333,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleGetVenues(supabase, body);
       case "get_all_venues":
         return await handleGetAllVenues(supabase, req, body);
+      case "create_venue":
+        return await handleCreateVenue(supabase, req, body);
       case "get_venue_by_slug":
         return await handleGetVenueBySlug(supabase, req, body);
       case "get_venue_by_id":
@@ -4431,6 +5345,18 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleUpdateVenue(supabase, req, body);
       case "get_menu_items":
         return await handleGetMenuItems(supabase, req, body);
+      case "get_admin_menu_queue":
+        return await handleGetAdminMenuQueue(supabase, req);
+      case "get_admin_menu_catalog":
+        return await handleGetAdminMenuCatalog(supabase, req);
+      case "get_admin_menu_group_assignments":
+        return await handleGetAdminMenuGroupAssignments(supabase, req, body);
+      case "create_admin_menu_groups":
+        return await handleCreateAdminMenuGroups(supabase, req, body);
+      case "assign_admin_menu_group":
+        return await handleAssignAdminMenuGroup(supabase, req, body);
+      case "delete_admin_menu_group":
+        return await handleDeleteAdminMenuGroup(supabase, req, body);
       case "toggle_menu_item_availability":
         return await handleToggleMenuItemAvailability(supabase, req, body);
       case "create_menu_item":

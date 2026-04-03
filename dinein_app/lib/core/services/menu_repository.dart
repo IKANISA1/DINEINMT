@@ -28,10 +28,14 @@ class MenuRepository {
   }
 
   /// Fetch all menu items for a venue.
-  Future<List<MenuItem>> getMenuItems(String venueId) async {
+  Future<List<MenuItem>> getMenuItems(
+    String venueId, {
+    bool useAdminSession = false,
+  }) async {
     final data =
         await DineinApiService.invoke(
               'get_menu_items',
+              useAdminSession: useAdminSession,
               payload: {'venueId': venueId},
             )
             as List<dynamic>;
@@ -44,6 +48,94 @@ class MenuRepository {
       await _persistLocalMenuItems(venueId, items);
     }
     return items;
+  }
+
+  /// Fetch the admin menu review queue across all venues.
+  Future<List<AdminMenuQueueEntry>> getAdminMenuQueue() async {
+    final data =
+        await DineinApiService.invoke(
+              'get_admin_menu_queue',
+              useAdminSession: true,
+            )
+            as List<dynamic>;
+    return data
+        .map(
+          (entry) => AdminMenuQueueEntry.fromJson(
+            Map<String, dynamic>.from(entry as Map),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<AdminMenuCatalogEntry>> getAdminMenuCatalog() async {
+    final data =
+        await DineinApiService.invoke(
+              'get_admin_menu_catalog',
+              useAdminSession: true,
+            )
+            as List<dynamic>;
+    return data
+        .map(
+          (entry) => AdminMenuCatalogEntry.fromJson(
+            Map<String, dynamic>.from(entry as Map),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<AdminMenuGroupAssignment>> getAdminMenuGroupAssignments(
+    String groupId,
+  ) async {
+    final data =
+        await DineinApiService.invoke(
+              'get_admin_menu_group_assignments',
+              useAdminSession: true,
+              payload: {'groupId': groupId},
+            )
+            as List<dynamic>;
+    return data
+        .map(
+          (entry) => AdminMenuGroupAssignment.fromJson(
+            Map<String, dynamic>.from(entry as Map),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<void> createAdminMenuGroups({
+    required List<Map<String, dynamic>> items,
+    List<String> venueIds = const [],
+    bool assignAll = false,
+  }) async {
+    await DineinApiService.invoke(
+      'create_admin_menu_groups',
+      useAdminSession: true,
+      payload: {'items': items, 'venueIds': venueIds, 'assignAll': assignAll},
+    );
+  }
+
+  Future<void> assignAdminMenuGroup(
+    String groupId, {
+    List<String> venueIds = const [],
+    bool assignAll = false,
+  }) async {
+    await DineinApiService.invoke(
+      'assign_admin_menu_group',
+      useAdminSession: true,
+      payload: {
+        'groupId': groupId,
+        'venueIds': venueIds,
+        'assignAll': assignAll,
+      },
+    );
+  }
+
+  Future<void> deleteAdminMenuGroup(String groupId) async {
+    await DineinApiService.invoke(
+      'delete_admin_menu_group',
+      useAdminSession: true,
+      payload: {'groupId': groupId},
+    );
   }
 
   /// Fetch locally persisted menu items for a venue.
@@ -85,17 +177,19 @@ class MenuRepository {
   /// Update an existing menu item.
   Future<void> updateMenuItem(
     String itemId,
-    Map<String, dynamic> updates,
-  ) async {
+    Map<String, dynamic> updates, {
+    bool useAdminSession = false,
+  }) async {
     final data = await DineinApiService.invoke(
       'update_menu_item',
+      useAdminSession: useAdminSession,
       payload: {
         'itemId': itemId,
         'updates': updates,
         ..._venueSessionPayload(),
       },
     );
-    if (data is Map<String, dynamic>) {
+    if (!useAdminSession && data is Map<String, dynamic>) {
       final updated = MenuItem.fromJson(data);
       await _mergeAndPersistLocalMenuItems(updated.venueId, [updated]);
     }
@@ -140,11 +234,15 @@ class MenuRepository {
 
   Future<MenuImageGenerationResult> generateMenuItemImage(
     String itemId, {
+    String? venueId,
     bool forceRegenerate = false,
+    bool useAdminSession = false,
   }) {
     return MenuImageGenerationService.instance.generateForItem(
       itemId: itemId,
+      venueId: venueId,
       forceRegenerate: forceRegenerate,
+      useAdminSession: useAdminSession,
     );
   }
 
@@ -152,23 +250,31 @@ class MenuRepository {
     required String venueId,
     int limit = 12,
     bool forceRegenerate = false,
+    bool useAdminSession = false,
   }) {
     return MenuImageGenerationService.instance.backfillMissingImages(
       venueId: venueId,
       limit: limit,
       forceRegenerate: forceRegenerate,
+      useAdminSession: useAdminSession,
     );
   }
 
-  Future<void> setMenuItemImageLock(String itemId, bool imageLocked) async {
+  Future<void> setMenuItemImageLock(
+    String itemId,
+    bool imageLocked, {
+    bool useAdminSession = false,
+  }) async {
     await DineinApiService.invoke(
       'update_menu_item',
+      useAdminSession: useAdminSession,
       payload: {
         'itemId': itemId,
         'updates': {'image_locked': imageLocked},
         ..._venueSessionPayload(),
       },
     );
+    if (useAdminSession) return;
     await _updateLocalMenuItemById(
       itemId,
       (item) => item.copyWith(imageLocked: imageLocked),

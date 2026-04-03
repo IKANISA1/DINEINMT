@@ -42,6 +42,21 @@ Map<String, OpeningHours>? _parseOpeningHours(Object? raw) {
   return parsed.isEmpty ? null : parsed;
 }
 
+Map<String, String>? _parseStringMap(Object? raw) {
+  if (raw is! Map) return null;
+
+  final parsed = <String, String>{};
+  for (final entry in raw.entries) {
+    final key = entry.key;
+    if (key is! String) continue;
+    final value = entry.value?.toString().trim();
+    if (value == null || value.isEmpty) continue;
+    parsed[key] = value;
+  }
+
+  return parsed.isEmpty ? null : parsed;
+}
+
 List<PaymentMethod> _parseSupportedPaymentMethods(
   Object? raw, {
   String? revolutUrl,
@@ -99,12 +114,14 @@ class Venue extends Equatable {
   final Country country;
   final Map<String, OpeningHours>? openingHours;
   final String? websiteUrl;
+  final String? reservationUrl;
   final String? ownerId;
   final List<Review>? reviews;
   final List<PaymentMethod> supportedPaymentMethods;
   final String? wifiSsid;
   final String? wifiPassword;
   final String? wifiSecurity;
+  final Map<String, String>? socialLinks;
 
   const Venue({
     required this.id,
@@ -135,12 +152,14 @@ class Venue extends Equatable {
     this.country = Country.mt,
     this.openingHours,
     this.websiteUrl,
+    this.reservationUrl,
     this.ownerId,
     this.reviews,
     this.supportedPaymentMethods = const [PaymentMethod.cash],
     this.wifiSsid,
     this.wifiPassword,
     this.wifiSecurity,
+    this.socialLinks,
   });
 
   /// Deserialize from Supabase JSON row.
@@ -196,6 +215,9 @@ class Venue extends Equatable {
       ),
       websiteUrl:
           json['website_url'] as String? ?? json['websiteUrl'] as String?,
+      reservationUrl:
+          json['reservation_url'] as String? ??
+          json['reservationUrl'] as String?,
       ownerId: json['owner_id'] as String?,
       reviews: (json['reviews'] as List<dynamic>?)
           ?.map((r) => Review.fromJson(r as Map<String, dynamic>))
@@ -208,6 +230,7 @@ class Venue extends Equatable {
       wifiSsid: json['wifi_ssid'] as String?,
       wifiPassword: json['wifi_password'] as String?,
       wifiSecurity: json['wifi_security'] as String?,
+      socialLinks: _parseStringMap(json['social_links'] ?? json['socialLinks']),
     );
   }
 
@@ -243,6 +266,7 @@ class Venue extends Equatable {
       (key, value) => MapEntry(key, value.toJson()),
     ),
     'website_url': websiteUrl,
+    'reservation_url': reservationUrl,
     'owner_id': ownerId,
     'supported_payment_methods': supportedPaymentMethods
         .map((method) => method.dbValue)
@@ -250,6 +274,7 @@ class Venue extends Equatable {
     'wifi_ssid': wifiSsid,
     'wifi_password': wifiPassword,
     'wifi_security': wifiSecurity,
+    'social_links': socialLinks,
   };
 
   /// Whether this venue is currently accepting orders.
@@ -329,6 +354,7 @@ class Venue extends Equatable {
     ownerContactPhone,
     ownerWhatsAppNumber,
     websiteUrl,
+    reservationUrl,
     revolutUrl,
     status,
     orderingEnabled,
@@ -349,6 +375,7 @@ class Venue extends Equatable {
     wifiSsid,
     wifiPassword,
     wifiSecurity,
+    socialLinks,
   ];
 }
 
@@ -444,10 +471,298 @@ class OpeningHours extends Equatable {
   List<Object?> get props => [open, close, isOpen];
 }
 
+/// Admin queue summary for a venue's menu review state.
+class AdminMenuQueueEntry extends Equatable {
+  final String venueId;
+  final String venueName;
+  final String? venueImageUrl;
+  final String venueCategory;
+  final String venueAddress;
+  final VenueStatus venueStatus;
+  final int totalItems;
+  final int availableItems;
+  final int pendingReviewCount;
+  final int failedReviewCount;
+  final int readyCount;
+  final int categoryCount;
+  final DateTime? lastUpdatedAt;
+
+  const AdminMenuQueueEntry({
+    required this.venueId,
+    required this.venueName,
+    this.venueImageUrl,
+    required this.venueCategory,
+    required this.venueAddress,
+    this.venueStatus = VenueStatus.active,
+    required this.totalItems,
+    required this.availableItems,
+    required this.pendingReviewCount,
+    required this.failedReviewCount,
+    required this.readyCount,
+    required this.categoryCount,
+    this.lastUpdatedAt,
+  });
+
+  factory AdminMenuQueueEntry.fromJson(Map<String, dynamic> json) {
+    return AdminMenuQueueEntry(
+      venueId: json['venue_id'] as String? ?? json['venueId'] as String? ?? '',
+      venueName:
+          json['venue_name'] as String? ??
+          json['venueName'] as String? ??
+          'Venue',
+      venueImageUrl:
+          json['venue_image_url'] as String? ??
+          json['venueImageUrl'] as String?,
+      venueCategory: normalizeVenueCategoryLabel(
+        json['venue_category'] as String? ?? json['venueCategory'] as String?,
+      ),
+      venueAddress:
+          json['venue_address'] as String? ??
+          json['venueAddress'] as String? ??
+          '',
+      venueStatus: VenueStatus.fromString(
+        json['venue_status'] as String? ??
+            json['venueStatus'] as String? ??
+            'active',
+      ),
+      totalItems:
+          (json['total_items'] as num?)?.toInt() ??
+          (json['totalItems'] as num?)?.toInt() ??
+          0,
+      availableItems:
+          (json['available_items'] as num?)?.toInt() ??
+          (json['availableItems'] as num?)?.toInt() ??
+          0,
+      pendingReviewCount:
+          (json['pending_review_count'] as num?)?.toInt() ??
+          (json['pendingReviewCount'] as num?)?.toInt() ??
+          0,
+      failedReviewCount:
+          (json['failed_review_count'] as num?)?.toInt() ??
+          (json['failedReviewCount'] as num?)?.toInt() ??
+          0,
+      readyCount:
+          (json['ready_count'] as num?)?.toInt() ??
+          (json['readyCount'] as num?)?.toInt() ??
+          0,
+      categoryCount:
+          (json['category_count'] as num?)?.toInt() ??
+          (json['categoryCount'] as num?)?.toInt() ??
+          0,
+      lastUpdatedAt: DateTime.tryParse(
+        json['last_updated_at'] as String? ??
+            json['lastUpdatedAt'] as String? ??
+            '',
+      ),
+    );
+  }
+
+  bool get requiresReview => pendingReviewCount > 0 || failedReviewCount > 0;
+
+  @override
+  List<Object?> get props => [
+    venueId,
+    venueName,
+    venueImageUrl,
+    venueCategory,
+    venueAddress,
+    venueStatus,
+    totalItems,
+    availableItems,
+    pendingReviewCount,
+    failedReviewCount,
+    readyCount,
+    categoryCount,
+    lastUpdatedAt,
+  ];
+}
+
+/// Admin catalog summary for centrally managed menu items.
+class AdminMenuCatalogEntry extends Equatable {
+  final String groupId;
+  final String representativeItemId;
+  final String representativeVenueId;
+  final String name;
+  final String description;
+  final String category;
+  final MenuItemClass? itemClass;
+  final String? imageUrl;
+  final MenuItemImageSource imageSource;
+  final MenuItemImageStatus imageStatus;
+  final bool imageLocked;
+  final List<String> tags;
+  final int assignedVenueCount;
+  final int assignedActiveVenueCount;
+  final DateTime? lastUpdatedAt;
+
+  const AdminMenuCatalogEntry({
+    required this.groupId,
+    required this.representativeItemId,
+    required this.representativeVenueId,
+    required this.name,
+    required this.description,
+    required this.category,
+    this.itemClass,
+    this.imageUrl,
+    this.imageSource = MenuItemImageSource.unknown,
+    this.imageStatus = MenuItemImageStatus.pending,
+    this.imageLocked = false,
+    this.tags = const [],
+    required this.assignedVenueCount,
+    required this.assignedActiveVenueCount,
+    this.lastUpdatedAt,
+  });
+
+  factory AdminMenuCatalogEntry.fromJson(Map<String, dynamic> json) {
+    return AdminMenuCatalogEntry(
+      groupId: json['group_id'] as String? ?? json['groupId'] as String? ?? '',
+      representativeItemId:
+          json['representative_item_id'] as String? ??
+          json['representativeItemId'] as String? ??
+          '',
+      representativeVenueId:
+          json['representative_venue_id'] as String? ??
+          json['representativeVenueId'] as String? ??
+          '',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      category: json['category'] as String? ?? 'Uncategorized',
+      itemClass: MenuItemClass.fromString(
+        json['class'] as String? ?? json['itemClass'] as String?,
+      ),
+      imageUrl: json['image_url'] as String? ?? json['imageUrl'] as String?,
+      imageSource: MenuItemImageSource.fromString(
+        json['image_source'] as String? ?? json['imageSource'] as String?,
+      ),
+      imageStatus: MenuItemImageStatus.fromString(
+        json['image_status'] as String? ??
+            json['imageStatus'] as String? ??
+            'pending',
+      ),
+      imageLocked:
+          json['image_locked'] as bool? ??
+          json['imageLocked'] as bool? ??
+          false,
+      tags: (json['tags'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList(growable: false),
+      assignedVenueCount:
+          (json['assigned_venue_count'] as num?)?.toInt() ??
+          (json['assignedVenueCount'] as num?)?.toInt() ??
+          0,
+      assignedActiveVenueCount:
+          (json['assigned_active_venue_count'] as num?)?.toInt() ??
+          (json['assignedActiveVenueCount'] as num?)?.toInt() ??
+          0,
+      lastUpdatedAt: DateTime.tryParse(
+        json['last_updated_at'] as String? ??
+            json['lastUpdatedAt'] as String? ??
+            '',
+      ),
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    groupId,
+    representativeItemId,
+    representativeVenueId,
+    name,
+    description,
+    category,
+    itemClass,
+    imageUrl,
+    imageSource,
+    imageStatus,
+    imageLocked,
+    tags,
+    assignedVenueCount,
+    assignedActiveVenueCount,
+    lastUpdatedAt,
+  ];
+}
+
+/// Venue assignment state for a centrally managed menu item.
+class AdminMenuGroupAssignment extends Equatable {
+  final String itemId;
+  final String groupId;
+  final String venueId;
+  final String venueName;
+  final String venueSlug;
+  final VenueStatus venueStatus;
+  final bool orderingEnabled;
+  final double price;
+  final bool isAvailable;
+  final DateTime? updatedAt;
+
+  const AdminMenuGroupAssignment({
+    required this.itemId,
+    required this.groupId,
+    required this.venueId,
+    required this.venueName,
+    required this.venueSlug,
+    this.venueStatus = VenueStatus.active,
+    this.orderingEnabled = false,
+    this.price = 0,
+    this.isAvailable = false,
+    this.updatedAt,
+  });
+
+  factory AdminMenuGroupAssignment.fromJson(Map<String, dynamic> json) {
+    return AdminMenuGroupAssignment(
+      itemId: json['item_id'] as String? ?? json['itemId'] as String? ?? '',
+      groupId: json['group_id'] as String? ?? json['groupId'] as String? ?? '',
+      venueId: json['venue_id'] as String? ?? json['venueId'] as String? ?? '',
+      venueName:
+          json['venue_name'] as String? ??
+          json['venueName'] as String? ??
+          'Venue',
+      venueSlug:
+          json['venue_slug'] as String? ?? json['venueSlug'] as String? ?? '',
+      venueStatus: VenueStatus.fromString(
+        json['venue_status'] as String? ??
+            json['venueStatus'] as String? ??
+            'active',
+      ),
+      orderingEnabled:
+          json['ordering_enabled'] as bool? ??
+          json['orderingEnabled'] as bool? ??
+          false,
+      price:
+          (json['price'] as num?)?.toDouble() ??
+          (json['menu_price'] as num?)?.toDouble() ??
+          0,
+      isAvailable:
+          json['is_available'] as bool? ??
+          json['isAvailable'] as bool? ??
+          false,
+      updatedAt: DateTime.tryParse(
+        json['updated_at'] as String? ?? json['updatedAt'] as String? ?? '',
+      ),
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    itemId,
+    groupId,
+    venueId,
+    venueName,
+    venueSlug,
+    venueStatus,
+    orderingEnabled,
+    price,
+    isAvailable,
+    updatedAt,
+  ];
+}
+
 /// A menu item belonging to a venue.
 class MenuItem extends Equatable {
   final String id;
   final String venueId;
+  final String? adminGroupId;
+  final bool adminManaged;
   final String name;
   final String description;
   final double price;
@@ -470,6 +785,8 @@ class MenuItem extends Equatable {
   const MenuItem({
     required this.id,
     required this.venueId,
+    this.adminGroupId,
+    this.adminManaged = false,
     required this.name,
     required this.description,
     required this.price,
@@ -494,6 +811,12 @@ class MenuItem extends Equatable {
     return MenuItem(
       id: json['id'] as String,
       venueId: json['venue_id'] as String,
+      adminGroupId:
+          json['admin_group_id'] as String? ?? json['adminGroupId'] as String?,
+      adminManaged:
+          json['admin_managed'] as bool? ??
+          json['adminManaged'] as bool? ??
+          false,
       name: json['name'] as String,
       description: json['description'] as String? ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
@@ -524,7 +847,10 @@ class MenuItem extends Equatable {
   }
 
   Map<String, dynamic> toJson() => {
+    'id': id,
     'venue_id': venueId,
+    'admin_group_id': adminGroupId,
+    'admin_managed': adminManaged,
     'name': name,
     'description': description,
     'price': price,
@@ -548,6 +874,8 @@ class MenuItem extends Equatable {
   MenuItem copyWith({
     String? id,
     String? venueId,
+    String? adminGroupId,
+    bool? adminManaged,
     String? name,
     String? description,
     double? price,
@@ -570,6 +898,8 @@ class MenuItem extends Equatable {
     return MenuItem(
       id: id ?? this.id,
       venueId: venueId ?? this.venueId,
+      adminGroupId: adminGroupId ?? this.adminGroupId,
+      adminManaged: adminManaged ?? this.adminManaged,
       name: name ?? this.name,
       description: description ?? this.description,
       price: price ?? this.price,
@@ -618,6 +948,8 @@ class MenuItem extends Equatable {
   List<Object?> get props => [
     id,
     venueId,
+    adminGroupId,
+    adminManaged,
     name,
     description,
     price,

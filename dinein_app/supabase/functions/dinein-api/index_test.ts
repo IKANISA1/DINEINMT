@@ -630,6 +630,120 @@ Deno.test({
 });
 
 Deno.test({
+  name: "get_admin_menu_queue aggregates menu review state by venue",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    mockFetch(async (req) => {
+      if (req.url.includes("/auth/v1/user")) {
+        return new Response(
+          JSON.stringify({
+            id: "admin-1",
+            email: "admin@example.com",
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (req.url.includes("/rest/v1/dinein_profiles")) {
+        return new Response(
+          JSON.stringify({
+            id: "admin-1",
+            role: "admin",
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (req.url.includes("/rest/v1/dinein_menu_items")) {
+        return new Response(
+          JSON.stringify([
+            {
+              venue_id: "venue-1",
+              category: "Mains",
+              is_available: true,
+              menu_context_status: "pending",
+              updated_at: "2026-04-03T09:00:00.000Z",
+              venue: {
+                id: "venue-1",
+                name: "Harbor Table",
+                image_url: "https://cdn.example.com/harbor.png",
+                address: "Valletta Waterfront",
+                category: "restaurant",
+                status: "active",
+              },
+            },
+            {
+              venue_id: "venue-1",
+              category: "Desserts",
+              is_available: false,
+              menu_context_status: "ready",
+              updated_at: "2026-04-03T08:00:00.000Z",
+              venue: {
+                id: "venue-1",
+                name: "Harbor Table",
+                image_url: "https://cdn.example.com/harbor.png",
+                address: "Valletta Waterfront",
+                category: "restaurant",
+                status: "active",
+              },
+            },
+            {
+              venue_id: "venue-2",
+              category: "Drinks",
+              is_available: true,
+              menu_context_status: "ready",
+              updated_at: "2026-04-02T12:00:00.000Z",
+              venue: {
+                id: "venue-2",
+                name: "Skyline Lounge",
+                image_url: null,
+                address: "Sliema",
+                category: "bar",
+                status: "inactive",
+              },
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceRoleJwt}`,
+        },
+        body: JSON.stringify({
+          action: "get_admin_menu_queue",
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+
+      const body = await res.json();
+      assertEquals(body.data?.length, 2);
+      assertEquals(body.data?.[0]?.venue_id, "venue-1");
+      assertEquals(body.data?.[0]?.total_items, 2);
+      assertEquals(body.data?.[0]?.available_items, 1);
+      assertEquals(body.data?.[0]?.pending_review_count, 1);
+      assertEquals(body.data?.[0]?.failed_review_count, 0);
+      assertEquals(body.data?.[0]?.ready_count, 1);
+      assertEquals(body.data?.[0]?.category_count, 2);
+      assertEquals(body.data?.[1]?.venue_id, "venue-2");
+      assertEquals(body.data?.[1]?.ready_count, 1);
+    } finally {
+      restoreFetch();
+    }
+  },
+});
+
+Deno.test({
   name: "set_menu_item_highlights stores ordered guest highlights for a venue",
   sanitizeOps: false,
   sanitizeResources: false,

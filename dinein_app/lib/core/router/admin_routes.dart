@@ -4,6 +4,7 @@ import '../../features/admin/activation/admin_activation_screen.dart';
 import '../../features/admin/admin_shell.dart';
 import '../../features/admin/auth/admin_login_screen.dart';
 import '../../features/admin/dashboard/admin_dashboard_screen.dart';
+import '../../features/admin/menus/admin_menu_item_screen.dart';
 import '../../features/admin/menus/admin_menu_review_screen.dart';
 import '../../features/admin/menus/admin_menus_screen.dart';
 import '../../features/admin/orders/admin_orders_screen.dart';
@@ -56,6 +57,13 @@ final List<RouteBase> adminRoutes = [
             buildFadeSlidePage(state, const AdminVenuesScreen()),
       ),
       GoRoute(
+        path: AppRoutePaths.adminVenueCreate,
+        name: AppRouteNames.adminVenueCreate,
+        redirect: adminRoleGuard,
+        pageBuilder: (context, state) =>
+            buildFadeSlidePage(state, const AdminVenueDetailScreen()),
+      ),
+      GoRoute(
         path: AppRoutePaths.adminVenueDetail,
         name: AppRouteNames.adminVenueDetail,
         redirect: adminRoleGuard,
@@ -77,6 +85,22 @@ final List<RouteBase> adminRoutes = [
         redirect: adminRoleGuard,
         pageBuilder: (context, state) =>
             buildFadeSlidePage(state, const AdminMenusScreen()),
+      ),
+      GoRoute(
+        path: AppRoutePaths.adminMenuNew,
+        name: AppRouteNames.adminMenuNew,
+        redirect: adminRoleGuard,
+        pageBuilder: (context, state) =>
+            buildFadeSlidePage(state, const AdminMenuItemScreen()),
+      ),
+      GoRoute(
+        path: AppRoutePaths.adminMenuItem,
+        name: AppRouteNames.adminMenuItem,
+        redirect: adminRoleGuard,
+        pageBuilder: (context, state) {
+          final id = state.pathParameters[AppRouteParams.id]!;
+          return buildFadeSlidePage(state, AdminMenuItemScreen(groupId: id));
+        },
       ),
       GoRoute(
         path: AppRoutePaths.adminMenuReview,

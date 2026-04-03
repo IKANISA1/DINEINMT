@@ -59,6 +59,15 @@ class VenueRepository {
     return data != null ? Venue.fromJson(data) : null;
   }
 
+  Future<Venue> createVenue(Map<String, dynamic> venue) async {
+    final data = await DineinApiService.invoke(
+      'create_venue',
+      useAdminSession: true,
+      payload: {'venue': venue},
+    );
+    return Venue.fromJson(data as Map<String, dynamic>);
+  }
+
   /// Fetch the venue owned by a given user ID.
   Future<Venue?> getVenueForOwner(String ownerId) async {
     final data = await DineinApiService.invoke(

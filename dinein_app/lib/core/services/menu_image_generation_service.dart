@@ -85,13 +85,17 @@ class MenuImageGenerationService {
 
   Future<MenuImageGenerationResult> generateForItem({
     required String itemId,
+    String? venueId,
     bool forceRegenerate = false,
+    bool useAdminSession = false,
   }) async {
     final payload =
         await DineinApiService.invoke(
               'generate_menu_item_image',
+              useAdminSession: useAdminSession,
               payload: {
                 'itemId': itemId,
+                if (venueId != null) 'venueId': venueId,
                 'forceRegenerate': forceRegenerate,
                 ..._venueSessionPayload(),
               },
@@ -104,10 +108,12 @@ class MenuImageGenerationService {
     required String venueId,
     int limit = 12,
     bool forceRegenerate = false,
+    bool useAdminSession = false,
   }) async {
     final payload =
         await DineinApiService.invoke(
               'backfill_menu_images',
+              useAdminSession: useAdminSession,
               payload: {
                 'venueId': venueId,
                 'limit': limit,
