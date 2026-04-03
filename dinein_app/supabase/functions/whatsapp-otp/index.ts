@@ -37,6 +37,7 @@ type AdminProfile = {
 type VenueAccessRow = {
   id: string;
   name?: string | null;
+  slug?: string | null;
   image_url?: string | null;
   status?: string | null;
   approved_at?: string | null;
@@ -422,7 +423,7 @@ async function getValidatedVenueByPhone(
   normalizedPhone: string,
 ): Promise<VenueAccessRow | null> {
   const selectClause =
-    "id, name, image_url, status, approved_at, access_verified_at, normalized_access_phone, phone, owner_contact_phone, owner_whatsapp_number";
+    "id, name, slug, image_url, status, approved_at, access_verified_at, normalized_access_phone, phone, owner_contact_phone, owner_whatsapp_number";
   const { data, error } = await supabase
     .from("dinein_venues")
     .select(selectClause)
@@ -447,7 +448,7 @@ async function getValidatedVenueByPhone(
   const { data: legacyData, error: legacyError } = await supabase
     .from("dinein_venues")
     .select(
-      "id, name, image_url, status, approved_at, access_verified_at, phone, owner_contact_phone, owner_whatsapp_number",
+      "id, name, slug, image_url, status, approved_at, access_verified_at, phone, owner_contact_phone, owner_whatsapp_number",
     )
     .eq("status", "active");
 
@@ -525,6 +526,9 @@ async function buildVenueSession(
     venue_name: (typeof venue.name === "string" && venue.name.trim().length > 0)
       ? venue.name
       : "Venue",
+    venue_slug: typeof venue.slug === "string" && venue.slug.trim().length > 0
+      ? venue.slug
+      : null,
     whatsapp_number: normalizedPhone,
     venue_image_url: typeof venue.image_url === "string"
       ? venue.image_url

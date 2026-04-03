@@ -1,11 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/country_runtime.dart';
 import '../models/models.dart';
 import '../services/auth_repository.dart';
 import '../services/venue_repository.dart';
 import 'auth_providers.dart';
 
 const _venueBootstrapTimeout = Duration(seconds: 3);
+
+String _fallbackVenueSlug(VenueAccessSession session) {
+  final raw = (session.venueSlug ?? session.venueName).trim().toLowerCase();
+  final normalized = raw
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  if (normalized.isNotEmpty) return normalized;
+  return session.venueId;
+}
 
 /// The venue owned by the currently authenticated user.
 /// Used by VenueShell to display the venue name in the top bar.
@@ -25,11 +35,12 @@ final currentVenueProvider = FutureProvider<Venue?>((ref) async {
     return Venue(
       id: venueSession.venueId,
       name: venueSession.venueName,
-      slug: venueSession.venueName.toLowerCase().replaceAll(' ', '-'),
+      slug: _fallbackVenueSlug(venueSession),
       category: 'Restaurants',
       description: '',
       address: '',
       imageUrl: venueSession.venueImageUrl,
+      country: CountryRuntime.config.country,
     );
   }
 

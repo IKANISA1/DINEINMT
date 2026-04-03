@@ -1153,6 +1153,7 @@ class VenueAccessSession extends Equatable {
   final String accessToken;
   final String venueId;
   final String venueName;
+  final String? venueSlug;
   final String whatsAppNumber;
   final String? venueImageUrl;
   final DateTime issuedAt;
@@ -1162,6 +1163,7 @@ class VenueAccessSession extends Equatable {
     required this.accessToken,
     required this.venueId,
     required this.venueName,
+    this.venueSlug,
     required this.whatsAppNumber,
     this.venueImageUrl,
     required this.issuedAt,
@@ -1178,6 +1180,7 @@ class VenueAccessSession extends Equatable {
           '',
       venueId: json['venue_id'] as String,
       venueName: json['venue_name'] as String? ?? '',
+      venueSlug: json['venue_slug'] as String? ?? json['venueSlug'] as String?,
       whatsAppNumber: json['whatsapp_number'] as String? ?? '',
       venueImageUrl: json['venue_image_url'] as String?,
       issuedAt: DateTime.parse(
@@ -1193,6 +1196,7 @@ class VenueAccessSession extends Equatable {
     'access_token': accessToken,
     'venue_id': venueId,
     'venue_name': venueName,
+    'venue_slug': venueSlug,
     'whatsapp_number': whatsAppNumber,
     'venue_image_url': venueImageUrl,
     'issued_at': issuedAt.toIso8601String(),
@@ -1204,6 +1208,7 @@ class VenueAccessSession extends Equatable {
     accessToken,
     venueId,
     venueName,
+    venueSlug,
     whatsAppNumber,
     venueImageUrl,
     issuedAt,

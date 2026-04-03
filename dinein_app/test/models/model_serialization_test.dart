@@ -522,6 +522,7 @@ void main() {
         'access_token': 'tok-123',
         'venue_id': 'v1',
         'venue_name': 'Harbor',
+        'venue_slug': 'harbor-table',
         'whatsapp_number': '+35612345678',
         'venue_image_url': 'https://example.com/img.jpg',
         'issued_at': '2025-01-01T10:00:00Z',
@@ -531,6 +532,7 @@ void main() {
       final session = VenueAccessSession.fromJson(json);
       expect(session.accessToken, 'tok-123');
       expect(session.venueId, 'v1');
+      expect(session.venueSlug, 'harbor-table');
       expect(session.whatsAppNumber, '+35612345678');
       expect(session.isExpired, isTrue); // past date
     });
@@ -541,6 +543,7 @@ void main() {
         accessToken: 'tok',
         venueId: 'v1',
         venueName: 'V',
+        venueSlug: 'v',
         whatsAppNumber: '+356',
         issuedAt: now,
         expiresAt: now.add(const Duration(days: 1)),
@@ -551,6 +554,7 @@ void main() {
 
       expect(restored.accessToken, session.accessToken);
       expect(restored.venueId, session.venueId);
+      expect(restored.venueSlug, session.venueSlug);
       expect(restored.isExpired, isFalse);
     });
   });
