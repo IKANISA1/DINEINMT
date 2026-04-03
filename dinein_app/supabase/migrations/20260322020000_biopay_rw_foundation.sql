@@ -46,6 +46,30 @@ create table if not exists public.biopay_profiles (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'biopay_profiles'
+      and column_name = 'manage_code_hash'
+  ) and not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'biopay_profiles'
+      and column_name = 'management_code_hash'
+  ) then
+    execute 'alter table public.biopay_profiles rename column manage_code_hash to management_code_hash';
+  end if;
+end $$;
+
+alter table public.biopay_profiles
+  add column if not exists recipient_phone_e164 text,
+  add column if not exists management_code_hash text,
+  add column if not exists management_code_hint text;
+
 comment on table public.biopay_profiles is
   'RW-only BioPay payee registry. Do not apply this schema to the Malta project.';
 
@@ -54,6 +78,41 @@ comment on column public.biopay_profiles.ussd_normalized is
 
 comment on column public.biopay_profiles.owner_token_version is
   'Rotated whenever BioPay ownership credentials are re-issued or invalidated.';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'biopay_profiles_recipient_phone_e164_check'
+      and conrelid = 'public.biopay_profiles'::regclass
+  ) then
+    execute $sql$
+      alter table public.biopay_profiles
+        add constraint biopay_profiles_recipient_phone_e164_check
+        check (
+          recipient_phone_e164 is null
+          or recipient_phone_e164 ~ '^\+2507[0-9]{8}$'
+        )
+    $sql$;
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'biopay_profiles_management_code_hint_check'
+      and conrelid = 'public.biopay_profiles'::regclass
+  ) then
+    execute $sql$
+      alter table public.biopay_profiles
+        add constraint biopay_profiles_management_code_hint_check
+        check (
+          management_code_hint is null
+          or management_code_hint ~ '^[0-9]{2}$'
+        )
+    $sql$;
+  end if;
+end $$;
 
 drop trigger if exists set_biopay_profiles_updated_at
   on public.biopay_profiles;
@@ -91,6 +150,25 @@ create table if not exists public.biopay_face_embeddings (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+alter table public.biopay_face_embeddings
+  add column if not exists source text not null default 'enrollment';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'biopay_face_embeddings_source_check'
+      and conrelid = 'public.biopay_face_embeddings'::regclass
+  ) then
+    execute $sql$
+      alter table public.biopay_face_embeddings
+        add constraint biopay_face_embeddings_source_check
+        check (source in ('enrollment', 're_enrollment'))
+    $sql$;
+  end if;
+end $$;
+
 comment on table public.biopay_face_embeddings is
   'RW-only BioPay face embeddings. Raw face images must never be persisted.';
 
@@ -122,6 +200,9 @@ create table if not exists public.biopay_match_audit (
   details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.biopay_match_audit
+  add column if not exists details jsonb not null default '{}'::jsonb;
 
 create index if not exists idx_biopay_match_audit_created_at
   on public.biopay_match_audit (created_at desc);
@@ -160,6 +241,27 @@ create table if not exists public.biopay_abuse_reports (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.biopay_abuse_reports
+  add column if not exists status text not null default 'open',
+  add column if not exists resolution_notes text,
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'biopay_abuse_reports_status_check'
+      and conrelid = 'public.biopay_abuse_reports'::regclass
+  ) then
+    execute $sql$
+      alter table public.biopay_abuse_reports
+        add constraint biopay_abuse_reports_status_check
+        check (status in ('open', 'resolved', 'dismissed'))
+    $sql$;
+  end if;
+end $$;
 
 drop trigger if exists set_biopay_abuse_reports_updated_at
   on public.biopay_abuse_reports;
