@@ -12,6 +12,7 @@ import '../../../core/models/models.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/providers/cart_provider.dart';
 import '../../../core/services/app_telemetry.dart';
+import '../../../core/theme/motion_preferences.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 import 'menu_item_badges.dart';
 
@@ -44,6 +45,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
   Map<String, int> _categoryHeaderIndexes = const {};
   String _query = '';
   String? _trackedMenuVenueId;
+  GuestMenuBundle? _lastBundle;
 
   @override
   void initState() {
@@ -213,120 +215,100 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final venueAsync = widget.venueId != null
-        ? ref.watch(venueByIdProvider(widget.venueId!))
-        : ref.watch(venueBySlugProvider(widget.venueSlug!));
+    final bundleRequest = GuestMenuRequest(
+      venueId: widget.venueId,
+      venueSlug: widget.venueSlug,
+    );
+    final bundleAsync = ref.watch(guestMenuBundleProvider(bundleRequest));
+    final currentBundle = bundleAsync.asData?.value;
+    _lastBundle = currentBundle ?? _lastBundle;
+    final bundle = currentBundle ?? _lastBundle;
     final cart = ref.watch(cartProvider);
     final cartNotifier = ref.read(cartProvider.notifier);
-    return venueAsync.when(
-      loading: () => _buildScaffoldFrame(
+    if (bundle == null) {
+      return _buildScaffoldFrame(
         context,
         title: 'Menu',
         venueId: widget.venueId,
-        body: const Center(
-          child: SkeletonLoader(width: double.infinity, height: 200),
-        ),
-      ),
-      error: (err, _) => _buildScaffoldFrame(
+        body: bundleAsync.hasError
+            ? ErrorState(
+                message: 'Could not load the menu.',
+                onRetry: () =>
+                    ref.invalidate(guestMenuBundleProvider(bundleRequest)),
+              )
+            : const Center(
+                child: SkeletonLoader(width: double.infinity, height: 200),
+              ),
+      );
+    }
+
+    final venue = bundle.venue;
+    if (venue == null) {
+      return _buildScaffoldFrame(
         context,
         title: 'Menu',
         venueId: widget.venueId,
-        body: ErrorState(
-          message: 'Could not load the venue.',
-          onRetry: () => widget.venueId != null
-              ? ref.invalidate(venueByIdProvider(widget.venueId!))
-              : ref.invalidate(venueBySlugProvider(widget.venueSlug!)),
+        body: const EmptyState(
+          icon: LucideIcons.store,
+          title: 'Venue not found',
+          subtitle: 'This venue is unavailable right now.',
         ),
-      ),
-      data: (venue) {
-        if (venue == null) {
-          return _buildScaffoldFrame(
-            context,
-            title: 'Menu',
-            venueId: widget.venueId,
-            body: const EmptyState(
-              icon: LucideIcons.store,
-              title: 'Venue not found',
-              subtitle: 'This venue is unavailable right now.',
-            ),
-          );
-        }
+      );
+    }
 
-        if (cart.venueId != venue.id ||
-            cart.venueName != venue.name ||
-            cart.venueCountry != venue.country ||
-            cart.venueRevolutUrl != venue.revolutUrl) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            ref
-                .read(cartProvider.notifier)
-                .setVenue(
-                  venueId: venue.id,
-                  venueSlug: venue.slug,
-                  venueName: venue.name,
-                  venueRevolutUrl: venue.revolutUrl,
-                  venueCountry: venue.country,
-                  tableNumber: cart.tableNumber,
-                );
-          });
-        }
-
-        final menuAsync = ref.watch(menuItemsProvider(venue.id));
-        return menuAsync.when(
-          loading: () => _buildScaffoldFrame(
-            context,
-            title: venue.name,
-            venueId: venue.id,
-            body: const Center(
-              child: SkeletonLoader(width: double.infinity, height: 200),
-            ),
-          ),
-          error: (err, _) => _buildScaffoldFrame(
-            context,
-            title: venue.name,
-            venueId: venue.id,
-            body: ErrorState(
-              message: 'Could not load menu items.',
-              onRetry: () => ref.invalidate(menuItemsProvider(venue.id)),
-            ),
-          ),
-          data: (items) {
-            if (items.isEmpty) {
-              return _buildScaffoldFrame(
-                context,
-                title: venue.name,
-                venueId: venue.id,
-                body: const EmptyState(
-                  icon: LucideIcons.chefHat,
-                  title: 'Menu not published yet',
-                  subtitle:
-                      'This venue has not added menu items yet. Check back later or ask the team in person.',
-                ),
-              );
-            }
-
-            _trackMenuViewed(venue, items.length);
-            final filteredItems = _filterItems(items);
-            final categories = filteredItems
-                .map((item) => item.category)
-                .toSet()
-                .toList();
-
-            _rebuildTabs(categories);
-            _rebuildEntries(categories, filteredItems);
-
-            return _buildMenu(
-              context,
-              cs,
-              tt,
-              venue,
-              categories,
-              cart,
-              cartNotifier,
+    if (cart.venueId != venue.id ||
+        cart.venueName != venue.name ||
+        cart.venueCountry != venue.country ||
+        cart.venueRevolutUrl != venue.revolutUrl) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref
+            .read(cartProvider.notifier)
+            .setVenue(
+              venueId: venue.id,
+              venueSlug: venue.slug,
+              venueName: venue.name,
+              venueRevolutUrl: venue.revolutUrl,
+              venueCountry: venue.country,
+              tableNumber: cart.tableNumber,
             );
-          },
-        );
-      },
+      });
+    }
+
+    final items = bundle.items;
+    if (items.isEmpty && !bundleAsync.isLoading) {
+      return _buildScaffoldFrame(
+        context,
+        title: venue.name,
+        venueId: venue.id,
+        body: const EmptyState(
+          icon: LucideIcons.chefHat,
+          title: 'Menu not published yet',
+          subtitle:
+              'This venue has not added menu items yet. Check back later or ask the team in person.',
+        ),
+      );
+    }
+
+    _trackMenuViewed(venue, items.length);
+    final filteredItems = _filterItems(items);
+    final categories = filteredItems
+        .map((item) => item.category)
+        .toSet()
+        .toList();
+
+    _rebuildTabs(categories);
+    _rebuildEntries(categories, filteredItems);
+
+    return _buildMenu(
+      context,
+      cs,
+      tt,
+      venue,
+      categories,
+      cart,
+      cartNotifier,
+      isRefreshing: bundleAsync.isLoading,
     );
   }
 
@@ -364,8 +346,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
     Venue? venue,
     List<String> categories,
     CartState cart,
-    CartNotifier cartNotifier,
-  ) {
+    CartNotifier cartNotifier, {
+    required bool isRefreshing,
+  }) {
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -510,10 +493,28 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
               ),
             ),
           ),
+          if (isRefreshing)
+            const SliverToBoxAdapter(
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
         ],
         body: categories.isEmpty
             ? CustomScrollView(
                 slivers: [
+                  ...(isRefreshing
+                      ? const [
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.all(AppTheme.space6),
+                              child: SkeletonLoader(
+                                width: double.infinity,
+                                height: 140,
+                                borderRadius: 24,
+                              ),
+                            ),
+                          ),
+                        ]
+                      : const []),
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: Padding(
@@ -683,7 +684,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                     ),
                   ),
                 )
-                .animate()
+                .animate(target: reduceMotionOf(context) ? 0 : 1)
                 .fadeIn(duration: 300.ms)
                 .slideY(begin: 1, end: 0, duration: 300.ms)
           : null,

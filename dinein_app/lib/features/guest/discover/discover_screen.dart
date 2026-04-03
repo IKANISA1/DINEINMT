@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../core/models/guest_venue_feed.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/router/app_routes.dart';
@@ -13,6 +14,7 @@ import '../../../core/services/app_telemetry.dart';
 import '../../../core/services/discovery_location_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/motion_preferences.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
 const _discoverHeroImageUrl =
@@ -27,12 +29,15 @@ class DiscoverScreen extends ConsumerStatefulWidget {
 
 class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   static const _searchDebounce = Duration(milliseconds: 180);
+  static const _pageSize = 12;
 
   final _searchController = TextEditingController();
   Timer? _queryDebounce;
   String _query = '';
+  int _resultLimit = _pageSize;
   bool _requestingLocation = false;
   bool _trackedDiscoverView = false;
+  GuestVenueFeed? _lastFeed;
 
   @override
   void dispose() {
@@ -47,14 +52,20 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
     if (normalized.isEmpty) {
       if (_query.isNotEmpty) {
-        setState(() => _query = '');
+        setState(() {
+          _query = '';
+          _resultLimit = _pageSize;
+        });
       }
       return;
     }
 
     _queryDebounce = Timer(_searchDebounce, () {
       if (!mounted || _query == normalized) return;
-      setState(() => _query = normalized);
+      setState(() {
+        _query = normalized;
+        _resultLimit = _pageSize;
+      });
       _trackGuestEvent(
         'discover_search',
         details: {
@@ -138,56 +149,66 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         .asData
         ?.value;
     final venuesQuery = GuestVenueQuery(
+      limit: _resultLimit,
       query: _query.isEmpty ? null : _query,
       latitude: discoveryLocation?.latitude,
       longitude: discoveryLocation?.longitude,
     );
-    final venuesAsync = ref.watch(guestVenueQueryProvider(venuesQuery));
+    final feedAsync = ref.watch(guestVenueFeedProvider(venuesQuery));
+    final currentFeed = feedAsync.asData?.value;
+    _lastFeed = currentFeed ?? _lastFeed;
+    final feed = currentFeed ?? _lastFeed;
 
-    return venuesAsync.when(
-      loading: () => const Center(
-        child: SkeletonLoader(width: double.infinity, height: 320),
-      ),
-      error: (error, stackTrace) => ErrorState(
-        message: 'Check your connection and try again.',
-        onRetry: () => ref.invalidate(guestVenueQueryProvider(venuesQuery)),
-      ),
-      data: (venues) {
-        if (!_trackedDiscoverView && venues.isNotEmpty) {
-          _trackedDiscoverView = true;
-          _trackGuestEvent(
-            'discover_viewed',
-            details: {
-              'venue_count': venues.length,
-              'has_location': discoveryLocation != null,
-            },
-          );
-        }
+    if (!_trackedDiscoverView &&
+        currentFeed != null &&
+        currentFeed.items.isNotEmpty) {
+      _trackedDiscoverView = true;
+      _trackGuestEvent(
+        'discover_viewed',
+        details: {
+          'venue_count': currentFeed.totalCount,
+          'has_location': discoveryLocation != null,
+        },
+      );
+    }
 
-        return _DiscoverBody(
-          query: _query,
-          controller: _searchController,
-          venues: venues,
-          discoveryLocation: discoveryLocation,
-          requestingLocation: _requestingLocation,
-          onQueryChanged: _onSearchChanged,
-          onUseMyLocation: _requestLocation,
-          onOpenFeaturedVenue: (venue) =>
-              _openVenue(venue, source: 'discover_featured'),
-          onOpenResultVenue: (venue) =>
-              _openVenue(venue, source: 'discover_results'),
-          onOpenBrowse: () {
-            _trackGuestEvent('discover_view_all_tapped');
-            context.pushNamed(AppRouteNames.venuesBrowse);
-          },
-          onClearQuery: () {
-            _queryDebounce?.cancel();
-            _searchController.clear();
-            if (_query.isNotEmpty) {
-              setState(() => _query = '');
+    return _DiscoverBody(
+      query: _query,
+      controller: _searchController,
+      feed: feed,
+      isLoading: feedAsync.isLoading,
+      loadError: feedAsync.asError?.error,
+      discoveryLocation: discoveryLocation,
+      requestingLocation: _requestingLocation,
+      onRetry: () => ref.invalidate(guestVenueFeedProvider(venuesQuery)),
+      onLoadMore: feed?.hasMore == true
+          ? () {
+              _trackGuestEvent(
+                'discover_load_more',
+                details: {'current_limit': _resultLimit, 'query': _query},
+              );
+              setState(() => _resultLimit += _pageSize);
             }
-          },
-        );
+          : null,
+      onQueryChanged: _onSearchChanged,
+      onUseMyLocation: _requestLocation,
+      onOpenFeaturedVenue: (venue) =>
+          _openVenue(venue, source: 'discover_featured'),
+      onOpenResultVenue: (venue) =>
+          _openVenue(venue, source: 'discover_results'),
+      onOpenBrowse: () {
+        _trackGuestEvent('discover_view_all_tapped');
+        context.pushNamed(AppRouteNames.venuesBrowse);
+      },
+      onClearQuery: () {
+        _queryDebounce?.cancel();
+        _searchController.clear();
+        if (_query.isNotEmpty) {
+          setState(() {
+            _query = '';
+            _resultLimit = _pageSize;
+          });
+        }
       },
     );
   }
@@ -196,9 +217,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 class _DiscoverBody extends StatelessWidget {
   final String query;
   final TextEditingController controller;
-  final List<Venue> venues;
+  final GuestVenueFeed? feed;
+  final bool isLoading;
+  final Object? loadError;
   final DiscoveryCoordinates? discoveryLocation;
   final bool requestingLocation;
+  final VoidCallback onRetry;
+  final VoidCallback? onLoadMore;
   final ValueChanged<String> onQueryChanged;
   final VoidCallback onUseMyLocation;
   final ValueChanged<Venue> onOpenFeaturedVenue;
@@ -209,9 +234,13 @@ class _DiscoverBody extends StatelessWidget {
   const _DiscoverBody({
     required this.query,
     required this.controller,
-    required this.venues,
+    required this.feed,
+    required this.isLoading,
+    required this.loadError,
     required this.discoveryLocation,
     required this.requestingLocation,
+    required this.onRetry,
+    required this.onLoadMore,
     required this.onQueryChanged,
     required this.onUseMyLocation,
     required this.onOpenFeaturedVenue,
@@ -222,17 +251,10 @@ class _DiscoverBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final venues = feed?.items ?? const <Venue>[];
     final featuredVenues = venues.take(6).toList(growable: false);
     final results = venues;
-    final shouldAnimateResults = query.isEmpty;
-
-    if (venues.isEmpty) {
-      return const EmptyState(
-        icon: LucideIcons.store,
-        title: 'No venues yet',
-        subtitle: 'Check back soon for newly onboarded venues.',
-      );
-    }
+    final shouldAnimateResults = query.isEmpty && !reduceMotionOf(context);
 
     return CustomScrollView(
       slivers: [
@@ -255,6 +277,37 @@ class _DiscoverBody extends StatelessWidget {
             ),
           ),
         ),
+        if (isLoading)
+          const SliverToBoxAdapter(
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+        if (loadError != null && venues.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.space6,
+                AppTheme.space10,
+                AppTheme.space6,
+                0,
+              ),
+              child: ErrorState(
+                message: 'Check your connection and try again.',
+                onRetry: onRetry,
+              ),
+            ),
+          ),
+        if (isLoading && venues.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppTheme.space6,
+                AppTheme.space10,
+                AppTheme.space6,
+                0,
+              ),
+              child: _DiscoverLoadingState(),
+            ),
+          ),
         if (query.isEmpty && featuredVenues.isNotEmpty)
           SliverToBoxAdapter(
             child: Padding(
@@ -302,7 +355,7 @@ class _DiscoverBody extends StatelessWidget {
             ),
           ),
         ),
-        if (results.isEmpty)
+        if (!isLoading && results.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
@@ -345,6 +398,26 @@ class _DiscoverBody extends StatelessWidget {
               },
             ),
           ),
+        if (onLoadMore != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.space6,
+                AppTheme.space8,
+                AppTheme.space6,
+                0,
+              ),
+              child: Center(
+                child: PremiumButton(
+                  label:
+                      'LOAD MORE${feed == null ? '' : ' (${results.length}/${feed!.totalCount})'}',
+                  onPressed: onLoadMore,
+                  isOutlined: true,
+                  isSmall: true,
+                ),
+              ),
+            ),
+          ),
         if (query.isEmpty)
           SliverToBoxAdapter(
             child: Padding(
@@ -357,6 +430,23 @@ class _DiscoverBody extends StatelessWidget {
               child: _DiscoverCta(onTap: onOpenBrowse),
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _DiscoverLoadingState extends StatelessWidget {
+  const _DiscoverLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: const [
+        SkeletonLoader(width: double.infinity, height: 220, borderRadius: 24),
+        SizedBox(height: AppTheme.space6),
+        SkeletonLoader(width: double.infinity, height: 128, borderRadius: 24),
+        SizedBox(height: AppTheme.space4),
+        SkeletonLoader(width: double.infinity, height: 128, borderRadius: 24),
       ],
     );
   }

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../core/models/guest_venue_feed.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/router/app_routes.dart';
@@ -13,6 +14,7 @@ import '../../../core/services/app_telemetry.dart';
 import '../../../core/services/discovery_location_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/motion_preferences.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
 const _baseVenueFilters = ['All', 'Open Now', 'Ordering'];
@@ -49,13 +51,16 @@ class VenuesBrowseScreen extends ConsumerStatefulWidget {
 
 class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
   static const _searchDebounce = Duration(milliseconds: 180);
+  static const _pageSize = 18;
 
   final _searchController = TextEditingController();
   Timer? _queryDebounce;
   List<String> _selectedCategories = const ['All'];
   String _query = '';
+  int _resultLimit = _pageSize;
   bool _requestingLocation = false;
   bool _trackedBrowseView = false;
+  GuestVenueFeed? _lastFeed;
 
   @override
   void dispose() {
@@ -70,14 +75,20 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
 
     if (normalized.isEmpty) {
       if (_query.isNotEmpty) {
-        setState(() => _query = '');
+        setState(() {
+          _query = '';
+          _resultLimit = _pageSize;
+        });
       }
       return;
     }
 
     _queryDebounce = Timer(_searchDebounce, () {
       if (!mounted || _query == normalized) return;
-      setState(() => _query = normalized);
+      setState(() {
+        _query = normalized;
+        _resultLimit = _pageSize;
+      });
       _trackGuestEvent(
         'venues_search',
         details: {
@@ -138,6 +149,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
         }
         _selectedCategories = next.isEmpty ? const ['All'] : next;
       }
+      _resultLimit = _pageSize;
     });
 
     _trackGuestEvent(
@@ -146,25 +158,10 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
     );
   }
 
-  List<String> _buildCategoryOptions(List<Venue> venues) {
-    final categoryCounts = <String, int>{};
-    for (final venue in venues) {
-      final category = venue.category.trim();
-      if (category.isEmpty) continue;
-      categoryCounts.update(category, (count) => count + 1, ifAbsent: () => 1);
-    }
-
-    final rankedCategories = categoryCounts.entries.toList()
-      ..sort((left, right) {
-        final countCompare = right.value.compareTo(left.value);
-        if (countCompare != 0) return countCompare;
-        return left.key.compareTo(right.key);
-      });
-
+  List<String> _buildCategoryOptions(GuestVenueFeed? feed) {
     return [
       ..._baseVenueFilters,
-      ...rankedCategories
-          .map((entry) => entry.key)
+      ...(feed?.categories ?? const <String>[])
           .where((category) => !_baseVenueFilters.contains(category))
           .take(6),
     ];
@@ -216,6 +213,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
         : null;
 
     return GuestVenueQuery(
+      limit: _resultLimit,
       query: _query.isEmpty ? null : _query,
       category: backendCategory,
       orderingOnly: selected.contains('Ordering'),
@@ -251,69 +249,65 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
         .watch(discoveryLocationProvider)
         .asData
         ?.value;
-    final allVenuesAsync = ref.watch(venuesProvider);
     final venuesQuery = _buildGuestVenueQuery(discoveryLocation);
-    final filteredVenuesAsync = ref.watch(guestVenueQueryProvider(venuesQuery));
+    final feedAsync = ref.watch(guestVenueFeedProvider(venuesQuery));
+    final currentFeed = feedAsync.asData?.value;
+    _lastFeed = currentFeed ?? _lastFeed;
+    final feed = currentFeed ?? _lastFeed;
+    final venues = _applyClientFilters(feed?.items ?? const []);
 
-    return allVenuesAsync.when(
-      loading: () => const Center(
-        child: SkeletonLoader(width: double.infinity, height: 320),
-      ),
-      error: (error, stackTrace) => ErrorState(
-        message: 'Failed to load venues.',
-        onRetry: () {
-          ref.invalidate(venuesProvider);
-          ref.invalidate(guestVenueQueryProvider(venuesQuery));
+    if (!_trackedBrowseView &&
+        currentFeed != null &&
+        currentFeed.items.isNotEmpty) {
+      _trackedBrowseView = true;
+      _trackGuestEvent(
+        'venues_browse_viewed',
+        details: {
+          'venue_count': currentFeed.totalCount,
+          'has_location': discoveryLocation != null,
         },
-      ),
-      data: (allVenues) => filteredVenuesAsync.when(
-        loading: () => const Center(
-          child: SkeletonLoader(width: double.infinity, height: 320),
-        ),
-        error: (error, stackTrace) => ErrorState(
-          message: 'Failed to load venues.',
-          onRetry: () {
-            ref.invalidate(venuesProvider);
-            ref.invalidate(guestVenueQueryProvider(venuesQuery));
-          },
-        ),
-        data: (fetchedVenues) {
-          final venues = _applyClientFilters(fetchedVenues);
-          if (!_trackedBrowseView && allVenues.isNotEmpty) {
-            _trackedBrowseView = true;
-            _trackGuestEvent(
-              'venues_browse_viewed',
-              details: {
-                'venue_count': venues.length,
-                'has_location': discoveryLocation != null,
-              },
-            );
-          }
+      );
+    }
 
-          return _VenuesBody(
-            venues: venues,
-            categoryOptions: _buildCategoryOptions(allVenues),
-            query: _query,
-            searchController: _searchController,
-            discoveryLocation: discoveryLocation,
-            requestingLocation: _requestingLocation,
-            selectedCategories: _selectedCategories,
-            onSearchChanged: _onSearchChanged,
-            onUseMyLocation: _requestLocation,
-            onCategorySelected: _toggleCategory,
-            onOpenVenue: _openVenue,
-            onResetFilters: () {
-              _queryDebounce?.cancel();
-              _searchController.clear();
-              setState(() {
-                _query = '';
-                _selectedCategories = const ['All'];
-              });
-              _trackGuestEvent('venues_filters_reset');
-            },
-          );
-        },
-      ),
+    return _VenuesBody(
+      venues: venues,
+      categoryOptions: _buildCategoryOptions(feed),
+      totalCount: feed?.totalCount ?? venues.length,
+      query: _query,
+      isLoading: feedAsync.isLoading,
+      loadError: feedAsync.asError?.error,
+      onRetry: () => ref.invalidate(guestVenueFeedProvider(venuesQuery)),
+      onLoadMore: feed?.hasMore == true
+          ? () {
+              _trackGuestEvent(
+                'venues_load_more',
+                details: {
+                  'current_limit': _resultLimit,
+                  'filters': _selectedCategories,
+                  'query': _query,
+                },
+              );
+              setState(() => _resultLimit += _pageSize);
+            }
+          : null,
+      searchController: _searchController,
+      discoveryLocation: discoveryLocation,
+      requestingLocation: _requestingLocation,
+      selectedCategories: _selectedCategories,
+      onSearchChanged: _onSearchChanged,
+      onUseMyLocation: _requestLocation,
+      onCategorySelected: _toggleCategory,
+      onOpenVenue: _openVenue,
+      onResetFilters: () {
+        _queryDebounce?.cancel();
+        _searchController.clear();
+        setState(() {
+          _query = '';
+          _selectedCategories = const ['All'];
+          _resultLimit = _pageSize;
+        });
+        _trackGuestEvent('venues_filters_reset');
+      },
     );
   }
 }
@@ -321,7 +315,12 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
 class _VenuesBody extends StatelessWidget {
   final List<Venue> venues;
   final List<String> categoryOptions;
+  final int totalCount;
   final String query;
+  final bool isLoading;
+  final Object? loadError;
+  final VoidCallback onRetry;
+  final VoidCallback? onLoadMore;
   final TextEditingController searchController;
   final DiscoveryCoordinates? discoveryLocation;
   final bool requestingLocation;
@@ -335,7 +334,12 @@ class _VenuesBody extends StatelessWidget {
   const _VenuesBody({
     required this.venues,
     required this.categoryOptions,
+    required this.totalCount,
     required this.query,
+    required this.isLoading,
+    required this.loadError,
+    required this.onRetry,
+    required this.onLoadMore,
     required this.searchController,
     required this.discoveryLocation,
     required this.requestingLocation,
@@ -354,7 +358,8 @@ class _VenuesBody extends StatelessWidget {
     final shouldAnimateVenues =
         query.isEmpty &&
         selectedCategories.length == 1 &&
-        selectedCategories.first == 'All';
+        selectedCategories.first == 'All' &&
+        !reduceMotionOf(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final useGrid = screenWidth >= 1100;
     final crossAxisCount = screenWidth >= 1480 ? 3 : 2;
@@ -500,6 +505,25 @@ class _VenuesBody extends StatelessWidget {
             ),
           ),
         ),
+        if (isLoading)
+          const SliverToBoxAdapter(
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+        if (loadError != null && venues.isEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.space6,
+                AppTheme.space8,
+                AppTheme.space6,
+                0,
+              ),
+              child: ErrorState(
+                message: 'Failed to load venues.',
+                onRetry: onRetry,
+              ),
+            ),
+          ),
         SliverToBoxAdapter(
           child: SizedBox(
             height: 64,
@@ -557,7 +581,31 @@ class _VenuesBody extends StatelessWidget {
           ),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: AppTheme.space8)),
-        if (venues.isEmpty)
+        if (isLoading && venues.isEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppTheme.space6),
+              child: _VenueBrowseLoadingState(),
+            ),
+          )
+        else
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.space6,
+                0,
+                AppTheme.space6,
+                AppTheme.space4,
+              ),
+              child: Text(
+                '${venues.length} of $totalCount venues',
+                style: tt.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.66),
+                ),
+              ),
+            ),
+          ),
+        if (!isLoading && venues.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
             child: _EmptyVenuesState(onResetFilters: onResetFilters),
@@ -616,7 +664,41 @@ class _VenuesBody extends StatelessWidget {
               },
             ),
           ),
+        if (onLoadMore != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.space6,
+                AppTheme.space8,
+                AppTheme.space6,
+                0,
+              ),
+              child: Center(
+                child: PremiumButton(
+                  label: 'LOAD MORE ($totalCount)',
+                  onPressed: onLoadMore,
+                  isOutlined: true,
+                  isSmall: true,
+                ),
+              ),
+            ),
+          ),
         const SliverToBoxAdapter(child: SizedBox(height: AppTheme.space24)),
+      ],
+    );
+  }
+}
+
+class _VenueBrowseLoadingState extends StatelessWidget {
+  const _VenueBrowseLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: const [
+        SkeletonLoader(width: double.infinity, height: 240, borderRadius: 24),
+        SizedBox(height: AppTheme.space6),
+        SkeletonLoader(width: double.infinity, height: 240, borderRadius: 24),
       ],
     );
   }
