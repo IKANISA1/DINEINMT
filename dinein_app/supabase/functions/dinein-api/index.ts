@@ -1677,7 +1677,7 @@ async function menuItemAdminSnapshot(
   const { data, error } = await supabase
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, admin_group_id, admin_managed, name, description, category, class, image_url, image_source, image_status, image_model, image_error, image_generated_at, image_locked, image_storage_path, image_attempts, tags",
+      "id, venue_id, admin_group_id, admin_managed, name, description, category, class, image_url, image_source, image_status, image_model, image_prompt, image_error, image_generated_at, image_locked, image_storage_path, image_attempts, tags",
     )
     .eq("id", itemId)
     .maybeSingle();
@@ -1701,7 +1701,7 @@ async function adminManagedMenuGroupSeed(
   const { data, error } = await supabase
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, admin_group_id, admin_managed, name, description, category, class, image_url, image_source, image_status, image_model, image_error, image_generated_at, image_locked, image_storage_path, image_attempts, tags",
+      "id, venue_id, admin_group_id, admin_managed, name, description, category, class, image_url, image_source, image_status, image_model, image_prompt, image_error, image_generated_at, image_locked, image_storage_path, image_attempts, tags",
     )
     .eq("admin_group_id", groupId)
     .order("updated_at", { ascending: false })
@@ -1749,6 +1749,7 @@ async function syncAdminManagedGroupImageFields(
     image_source: stringValue(source.image_source) ?? null,
     image_status: stringValue(source.image_status) ?? null,
     image_model: stringValue(source.image_model) ?? null,
+    image_prompt: stringValue(source.image_prompt) ?? null,
     image_error: stringValue(source.image_error) ?? null,
     image_generated_at: stringValue(source.image_generated_at) ?? null,
     image_locked: booleanValue(source.image_locked) ?? false,
@@ -2597,6 +2598,13 @@ function menuImageEnv(): MenuImageEnv {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
+    menuImageVerifierModels: (
+      Deno.env.get("GEMINI_MENU_IMAGE_VERIFIER_MODELS") ??
+        "gemini-2.5-flash,gemini-2.5-flash-lite"
+    )
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
     menuImageBucket: Deno.env.get("MENU_IMAGE_BUCKET")?.trim() ||
       "menu-images",
     cronSecret: Deno.env.get("MENU_IMAGE_CRON_SECRET")?.trim() || null,
@@ -2617,7 +2625,7 @@ async function loadMenuItemForImageGeneration(
   const { data, error } = await supabase
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
     )
     .eq("venue_id", venueId)
     .order("sort_order", { ascending: true })
@@ -3576,6 +3584,7 @@ async function handleCreateAdminMenuGroups(
         image_source: stringValue(draft.image_source) ?? null,
         image_status: stringValue(draft.image_status) ?? "pending",
         image_model: null,
+        image_prompt: null,
         image_error: null,
         image_generated_at: null,
         image_locked: booleanValue(draft.image_locked) ?? false,
@@ -3654,6 +3663,7 @@ async function handleAssignAdminMenuGroup(
     image_source: stringValue(seed.image_source) ?? null,
     image_status: stringValue(seed.image_status) ?? "pending",
     image_model: stringValue(seed.image_model) ?? null,
+    image_prompt: stringValue(seed.image_prompt) ?? null,
     image_error: stringValue(seed.image_error) ?? null,
     image_generated_at: stringValue(seed.image_generated_at) ?? null,
     image_locked: booleanValue(seed.image_locked) ?? false,
@@ -4009,7 +4019,7 @@ async function handleBackfillMenuImages(
   let query = imageClient
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
     )
     .eq("venue_id", venueId)
     .eq("image_locked", false)

@@ -1,17 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildGeminiImageGenerationConfig } from "./gemini-image-config.ts";
 import {
-  buildMenuItemResearchPrompt,
   buildFallbackMenuItemResearchProfile,
+  buildMenuItemResearchPrompt,
   extractJsonPayloadFromCandidate,
   extractResearchSourceUrls,
+  inferMenuItemClass,
+  type MenuItemClass,
+  type MenuItemResearchProfile,
   menuItemResearchSchema,
   normalizeMenuItemClass,
   parseJsonObjectText,
   parseMenuItemResearchProfile,
   resolveMenuItemClass,
-  type MenuItemClass,
-  type MenuItemResearchProfile,
 } from "./menu-item-context.ts";
 
 export interface FunctionEnv {
@@ -21,6 +22,7 @@ export interface FunctionEnv {
   geminiApiKey: string;
   geminiImageModels: string[];
   menuItemResearchModels: string[];
+  menuImageVerifierModels: string[];
   menuImageBucket: string;
   cronSecret: string | null;
 }
@@ -45,6 +47,7 @@ export interface MenuItemRecord {
   image_source: string | null;
   image_status: string | null;
   image_model: string | null;
+  image_prompt: string | null;
   image_error: string | null;
   image_attempts: number | null;
   image_locked: boolean | null;
@@ -97,9 +100,15 @@ interface ReusableMenuImageRecord {
   image_url: string;
   image_storage_path: string;
   image_model: string | null;
+  image_prompt: string | null;
 }
 
 const externalRequestTimeoutMs = 60000;
+
+type MenuItemSignalSnapshot = Pick<
+  MenuItemRecord,
+  "name" | "category" | "description" | "tags" | "class"
+>;
 
 export interface MenuItemContextProcessResult {
   status: "success" | "skipped";
@@ -110,6 +119,99 @@ export interface MenuItemContextProcessResult {
   profile: MenuItemResearchProfile;
   model: string | null;
   reason?: string;
+}
+
+export function menuItemSignalClass(
+  item: MenuItemSignalSnapshot,
+): MenuItemClass {
+  const explicitClass = normalizeMenuItemClass(item.class);
+  if (explicitClass) return explicitClass;
+
+  return inferMenuItemClass({
+    name: item.name,
+    category: item.category,
+    description: item.description,
+    tags: item.tags,
+    class: null,
+    menu_context: null,
+  });
+}
+
+export function shouldRefreshMenuItemContext(
+  item: MenuItemSignalSnapshot,
+  profile: MenuItemResearchProfile | null,
+): boolean {
+  if (!profile) return false;
+
+  const explicitClass = normalizeMenuItemClass(item.class);
+  if (explicitClass) {
+    return profile.class !== explicitClass;
+  }
+
+  // `inferMenuItemClass` defaults to food, so only treat a drinks result as a
+  // strong enough signal to invalidate a stale stored profile automatically.
+  return menuItemSignalClass(item) === "drinks" && profile.class !== "drinks";
+}
+
+function escapePromptRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractPromptLineValue(
+  prompt: string | null | undefined,
+  label: string,
+): string | null {
+  const source = prompt?.trim();
+  if (!source) return null;
+
+  const regex = new RegExp(`^${escapePromptRegex(label)}:\\s*(.+)$`, "im");
+  const match = source.match(regex);
+  return match?.[1]?.trim() ?? null;
+}
+
+export function extractMenuImagePromptClass(
+  prompt: string | null | undefined,
+): MenuItemClass | null {
+  return normalizeMenuItemClass(
+    extractPromptLineValue(prompt, "This item is classified as"),
+  );
+}
+
+export function extractMenuImagePromptVisualKind(
+  prompt: string | null | undefined,
+): MenuVisualKind | null {
+  const value = normalizePromptText(
+    extractPromptLineValue(prompt, "Visual kind") ?? "",
+  );
+  if (!value) return null;
+
+  const validKinds: MenuVisualKind[] = [
+    "plated_food",
+    "dessert",
+    "packaged_beer",
+    "draft_beer",
+    "cocktail",
+    "wine",
+    "spirits",
+    "coffee",
+    "tea",
+    "soft_drink",
+  ];
+
+  return validKinds.includes(value as MenuVisualKind)
+    ? (value as MenuVisualKind)
+    : null;
+}
+
+export function isMenuImagePromptCompatible(
+  prompt: string | null | undefined,
+  args: {
+    itemClass: MenuItemClass;
+    visualKind: MenuVisualKind;
+  },
+): boolean {
+  return extractMenuImagePromptClass(prompt) === args.itemClass &&
+    extractMenuImagePromptVisualKind(prompt) === args.visualKind;
 }
 
 export class HttpError extends Error {
@@ -158,6 +260,13 @@ export function getFunctionEnv(): FunctionEnv {
     menuItemResearchModels: (
       Deno.env.get("GEMINI_MENU_ITEM_MODELS") ??
         "gemini-3-flash-preview,gemini-2.5-flash"
+    )
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    menuImageVerifierModels: (
+      Deno.env.get("GEMINI_MENU_IMAGE_VERIFIER_MODELS") ??
+        "gemini-2.5-flash,gemini-2.5-flash-lite"
     )
       .split(",")
       .map((value) => value.trim())
@@ -229,7 +338,7 @@ export async function fetchMenuItem(
   const { data, error } = await adminClient
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
     )
     .eq("id", itemId)
     .maybeSingle();
@@ -319,11 +428,13 @@ export async function ensureMenuItemContext(
   },
 ): Promise<MenuItemContextProcessResult> {
   const { adminClient, env, item, venue, forceRefresh = false } = options;
-  const itemClass = resolveMenuItemClass(item);
   const profile = parseMenuItemResearchProfile(item.menu_context);
-  const resolvedProfileClass = profile?.class ?? itemClass;
-  const menuContextReady =
-    item.menu_context_status === "ready" && profile && !forceRefresh;
+  const itemClass = menuItemSignalClass(item);
+  const staleStoredProfile = shouldRefreshMenuItemContext(item, profile);
+  const effectiveProfile = staleStoredProfile ? null : profile;
+  const resolvedProfileClass = effectiveProfile?.class ?? itemClass;
+  const menuContextReady = item.menu_context_status === "ready" &&
+    effectiveProfile && !forceRefresh;
 
   if (item.menu_context_locked == true && !forceRefresh) {
     if (normalizeMenuItemClass(item.class) !== resolvedProfileClass) {
@@ -341,18 +452,20 @@ export async function ensureMenuItemContext(
         ? "failed"
         : "ready",
       itemClass: resolvedProfileClass,
-      profile: profile ?? buildFallbackMenuItemResearchProfile({
+      profile: effectiveProfile ?? buildFallbackMenuItemResearchProfile({
         item,
         itemClass: resolvedProfileClass,
         visualKind: classifyMenuVisualKind(
           item,
           venue,
           resolvedProfileClass,
-          profile,
+          effectiveProfile,
         ),
       }),
       model: item.menu_context_model,
-      reason: "menu_context_locked",
+      reason: staleStoredProfile
+        ? "menu_context_locked_stale"
+        : "menu_context_locked",
     };
   }
 
@@ -370,7 +483,7 @@ export async function ensureMenuItemContext(
       venueId: item.venue_id,
       menuContextStatus: "ready",
       itemClass: resolvedProfileClass,
-      profile: profile as MenuItemResearchProfile,
+      profile: effectiveProfile as MenuItemResearchProfile,
       model: item.menu_context_model,
       reason: "menu_context_ready",
     };
@@ -402,7 +515,7 @@ export async function ensureMenuItemContext(
       item,
       venue,
       resolvedProfileClass,
-      profile,
+      effectiveProfile,
     ),
   });
 
@@ -563,10 +676,35 @@ export async function processMenuItemImageGeneration(
     };
   }
 
+  const context = await ensureMenuItemContext({
+    adminClient,
+    env,
+    item,
+    venue,
+    forceRefresh: forceRegenerate,
+  });
+
+  const visualKind = classifyMenuVisualKind(
+    item,
+    venue,
+    context.itemClass,
+    context.profile,
+  );
+  const prompt = buildMenuImagePrompt(
+    item,
+    venue,
+    context.profile,
+    context.itemClass,
+  );
+
   if (
     hasExistingImage &&
     imageSource === "ai_gemini" &&
-    !forceRegenerate
+    !forceRegenerate &&
+    isMenuImagePromptCompatible(item.image_prompt, {
+      itemClass: context.itemClass,
+      visualKind,
+    })
   ) {
     await normalizeExistingMenuImageState(adminClient, item);
     return {
@@ -582,7 +720,7 @@ export async function processMenuItemImageGeneration(
     };
   }
 
-  if (hasExistingImage && !forceRegenerate) {
+  if (hasExistingImage && imageSource !== "ai_gemini" && !forceRegenerate) {
     await normalizeExistingMenuImageState(adminClient, item);
     return {
       status: "skipped",
@@ -597,21 +735,12 @@ export async function processMenuItemImageGeneration(
     };
   }
 
-  const context = await ensureMenuItemContext({
-    adminClient,
-    env,
-    item,
-    venue,
-    forceRefresh: forceRegenerate,
-  });
-
   await updateGenerationState(adminClient, item.id, {
     image_status: "generating",
     image_error: null,
     updated_at: new Date().toISOString(),
   });
 
-  const prompt = buildMenuImagePrompt(item, venue, context.profile, context.itemClass);
   const nextAttempt = (item.image_attempts ?? 0) + 1;
 
   try {
@@ -620,6 +749,7 @@ export async function processMenuItemImageGeneration(
         adminClient,
         item,
         context.itemClass,
+        visualKind,
       );
       if (reusableImage) {
         return await cloneReusableMenuImage({
@@ -637,6 +767,12 @@ export async function processMenuItemImageGeneration(
       apiKey: env.geminiApiKey,
       models: env.geminiImageModels,
       prompt,
+      verification: {
+        models: env.menuImageVerifierModels,
+        item,
+        itemClass: context.itemClass,
+        visualKind,
+      },
     });
 
     const extension = extensionForMimeType(generated.mimeType);
@@ -710,10 +846,11 @@ async function findReusableMenuImage(
   adminClient: ReturnType<typeof createAdminClient>,
   item: MenuItemRecord,
   itemClass: MenuItemClass,
+  visualKind: MenuVisualKind,
 ): Promise<ReusableMenuImageRecord | null> {
   const { data, error } = await adminClient
     .from("dinein_menu_items")
-    .select("id, image_url, image_storage_path, image_model")
+    .select("id, image_url, image_storage_path, image_model, image_prompt")
     .neq("id", item.id)
     .eq("class", itemClass)
     .eq("name", item.name)
@@ -736,6 +873,15 @@ async function findReusableMenuImage(
 
   const candidate = (data?.[0] as ReusableMenuImageRecord | undefined) ?? null;
   if (!candidate?.image_url?.trim() || !candidate.image_storage_path?.trim()) {
+    return null;
+  }
+
+  if (
+    !isMenuImagePromptCompatible(candidate.image_prompt, {
+      itemClass,
+      visualKind,
+    })
+  ) {
     return null;
   }
 
@@ -1513,16 +1659,45 @@ function classifyMenuVisualKind(
     resolveMenuItemClass(item);
 
   const foodCategoryPrefixes = [
-    "mains", "main", "breakfast", "lunch", "dinner",
-    "soup", "soups", "salad", "salads", "starter", "starters",
-    "appetizer", "appetizers", "sandwich", "sandwiches", "wrap", "wraps",
-    "burger", "burgers", "pizza", "pasta", "grill", "bbq",
-    "sides", "side", "accompaniment", "accompaniments",
-    "rwandan traditional", "hotel buffet", "indian cuisine",
-    "seafood", "fish",
+    "mains",
+    "main",
+    "breakfast",
+    "lunch",
+    "dinner",
+    "soup",
+    "soups",
+    "salad",
+    "salads",
+    "starter",
+    "starters",
+    "appetizer",
+    "appetizers",
+    "sandwich",
+    "sandwiches",
+    "wrap",
+    "wraps",
+    "burger",
+    "burgers",
+    "pizza",
+    "pasta",
+    "grill",
+    "bbq",
+    "sides",
+    "side",
+    "accompaniment",
+    "accompaniments",
+    "rwandan traditional",
+    "hotel buffet",
+    "indian cuisine",
+    "seafood",
+    "fish",
   ];
   const dessertCategoryPrefixes = [
-    "dessert", "desserts", "pastry", "pastries", "bakery",
+    "dessert",
+    "desserts",
+    "pastry",
+    "pastries",
+    "bakery",
   ];
 
   if (
@@ -1917,7 +2092,9 @@ function matchesAny(value: string, phrases: string[]): boolean {
     // Use word-boundary matching to avoid false positives like
     // "wine sauce" matching "wine" or "chapati" matching "chai"
     const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const wordBoundaryRegex = new RegExp(`(?:^|\\s|[^a-z0-9])${escaped}(?:\\s|[^a-z0-9]|$)`);
+    const wordBoundaryRegex = new RegExp(
+      `(?:^|\\s|[^a-z0-9])${escaped}(?:\\s|[^a-z0-9]|$)`,
+    );
     return wordBoundaryRegex.test(value);
   });
 }
@@ -1928,14 +2105,162 @@ interface GeminiImagePayload {
   model: string;
 }
 
+interface MenuImageVerificationPayload {
+  matches: boolean;
+  observed_class: "food" | "drinks" | "unclear";
+  reason: string;
+}
+
+const menuImageVerificationSchema = {
+  type: "object",
+  properties: {
+    matches: { type: "boolean" },
+    observed_class: {
+      type: "string",
+      enum: ["food", "drinks", "unclear"],
+    },
+    reason: { type: "string" },
+  },
+  required: ["matches", "observed_class", "reason"],
+} as const;
+
+function buildMenuImageVerificationPrompt(args: {
+  item: MenuItemRecord;
+  itemClass: MenuItemClass;
+  visualKind: MenuVisualKind;
+}): string {
+  const expectedSubject = args.itemClass === "drinks"
+    ? "a beverage only"
+    : "a plated dish or dessert only";
+
+  return `
+You are reviewing a generated hospitality menu image for production.
+Return JSON only.
+
+Expected class: ${args.itemClass}
+Expected visual kind: ${args.visualKind}
+Menu item: ${args.item.name}
+Category: ${args.item.category ?? ""}
+Description: ${args.item.description ?? ""}
+
+Check only the hero subject in the image.
+- The hero subject must be ${expectedSubject}.
+- Mark matches=false if the image shows the opposite class, or if the hero subject is unclear.
+- Ignore style or quality. Grade only subject correctness.
+`.trim();
+}
+
+function encodeBytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+async function verifyGeneratedMenuImage(args: {
+  apiKey: string;
+  models: string[];
+  imageBytes: Uint8Array;
+  mimeType: string;
+  item: MenuItemRecord;
+  itemClass: MenuItemClass;
+  visualKind: MenuVisualKind;
+}): Promise<MenuImageVerificationPayload | null> {
+  const prompt = buildMenuImageVerificationPrompt({
+    item: args.item,
+    itemClass: args.itemClass,
+    visualKind: args.visualKind,
+  });
+  const encodedImage = encodeBytesToBase64(args.imageBytes);
+
+  for (const model of args.models) {
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${
+        encodeURIComponent(model)
+      }:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": args.apiKey,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    mimeType: args.mimeType,
+                    data: encodedImage,
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseJsonSchema: menuImageVerificationSchema,
+          },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      continue;
+    }
+
+    const body = await response.json();
+    const candidate = normalizeCandidateObject((body as Json).candidates);
+    if (!candidate) continue;
+
+    const jsonText = extractJsonPayloadFromCandidate(candidate);
+    const parsed = jsonText ? parseJsonObjectText(jsonText) : null;
+    if (!parsed || !isRecord(parsed)) continue;
+
+    const observedClass = typeof parsed.observed_class === "string"
+      ? parsed.observed_class.trim()
+      : null;
+    if (
+      typeof parsed.matches !== "boolean" ||
+      !observedClass ||
+      !["food", "drinks", "unclear"].includes(observedClass)
+    ) {
+      continue;
+    }
+
+    return {
+      matches: parsed.matches,
+      observed_class: observedClass as "food" | "drinks" | "unclear",
+      reason:
+        typeof parsed.reason === "string" && parsed.reason.trim().length > 0
+          ? parsed.reason.trim()
+          : "No verification reason supplied.",
+    };
+  }
+
+  return null;
+}
+
 async function generateGeminiImage({
   apiKey,
   models,
   prompt,
+  verification,
 }: {
   apiKey: string;
   models: string[];
   prompt: string;
+  verification?: {
+    models: string[];
+    item: MenuItemRecord;
+    itemClass: MenuItemClass;
+    visualKind: MenuVisualKind;
+  };
 }): Promise<GeminiImagePayload> {
   let lastError = "Gemini did not return an image.";
 
@@ -1973,14 +2298,33 @@ async function generateGeminiImage({
 
     const json = await response.json();
     const payload = extractInlineImage(json);
-    if (payload) {
-      return {
-        ...payload,
-        model,
-      };
+    if (!payload) {
+      lastError = `Model "${model}" returned no inline image payload.`;
+      continue;
     }
 
-    lastError = `Model "${model}" returned no inline image payload.`;
+    if (verification) {
+      const verdict = await verifyGeneratedMenuImage({
+        apiKey,
+        models: verification.models,
+        imageBytes: payload.bytes,
+        mimeType: payload.mimeType,
+        item: verification.item,
+        itemClass: verification.itemClass,
+        visualKind: verification.visualKind,
+      });
+
+      if (verdict && !verdict.matches) {
+        lastError =
+          `Model "${model}" generated a ${verdict.observed_class} image for ${verification.itemClass}: ${verdict.reason}`;
+        continue;
+      }
+    }
+
+    return {
+      ...payload,
+      model,
+    };
   }
 
   throw new HttpError(502, lastError);

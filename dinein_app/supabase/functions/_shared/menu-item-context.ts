@@ -172,21 +172,73 @@ const drinkCategoryPrefixes = [
   "drinks",
   "beverage",
   "beverages",
+  "hot drink",
+  "hot drinks",
+  "cold drink",
+  "cold drinks",
   "wine",
   "wines",
   "beer",
   "beers",
+  "lager",
+  "lagers",
+  "ale",
+  "ales",
+  "stout",
+  "stouts",
+  "porter",
+  "porters",
+  "cider",
+  "ciders",
   "cocktail",
   "cocktails",
+  "mocktail",
+  "mocktails",
   "spirits",
+  "spirit",
   "liquor",
   "liquors",
+  "liqueur",
+  "liqueurs",
+  "whisky",
+  "whiskey",
+  "scotch",
+  "bourbon",
+  "single malt",
+  "vodka",
+  "gin",
+  "rum",
+  "tequila",
+  "mezcal",
+  "brandy",
+  "cognac",
+  "aperitif",
+  "aperitifs",
+  "digestif",
+  "digestifs",
+  "shot",
+  "shots",
+  "shooter",
+  "shooters",
   "soft drink",
   "soft drinks",
+  "soda",
+  "sodas",
   "coffee",
   "tea",
   "juice",
+  "juices",
+  "smoothie",
+  "smoothies",
+  "milkshake",
+  "milkshakes",
   "water",
+  "sparkling water",
+  "still water",
+  "energy drink",
+  "energy drinks",
+  "tonic",
+  "tonics",
   "bar",
   "pub",
   "lounge",
@@ -247,6 +299,44 @@ const drinkKeywordPhrases = [
   "vermouth",
   "limoncello",
   "grappa",
+  "johnnie walker",
+  "red label",
+  "black label",
+  "blue label",
+  "double black",
+  "chivas",
+  "ballantines",
+  "jameson",
+  "jack daniels",
+  "jim beam",
+  "glenfiddich",
+  "glenlivet",
+  "macallan",
+  "talisker",
+  "bombay sapphire",
+  "gordons",
+  "gordon s",
+  "tanqueray",
+  "hendricks",
+  "hendrick s",
+  "smirnoff",
+  "absolut",
+  "grey goose",
+  "bacardi",
+  "captain morgan",
+  "malibu",
+  "hennessy",
+  "martell",
+  "courvoisier",
+  "remy martin",
+  "baileys",
+  "jagermeister",
+  "jägermeister",
+  "disaronno",
+  "kahlua",
+  "tia maria",
+  "cointreau",
+  "amaretto",
   "espresso",
   "coffee",
   "latte",
@@ -268,9 +358,18 @@ const drinkKeywordPhrases = [
   "soda",
   "cola",
   "coke",
+  "coke zero",
+  "diet coke",
+  "coca cola",
+  "coca-cola",
   "pepsi",
+  "pepsi max",
   "sprite",
+  "sprite zero",
   "fanta",
+  "schweppes",
+  "schweppes tonic",
+  "fever tree",
   "tonic",
   "sparkling water",
   "still water",
@@ -282,6 +381,15 @@ const drinkKeywordPhrases = [
   "san pellegrino",
   "perrier",
   "acqua panna",
+  "red bull",
+  "monster",
+  "guinness",
+  "heineken",
+  "carlsberg",
+  "corona",
+  "budweiser",
+  "stella artois",
+  "cisk",
 ];
 
 const foodKeywordPhrases = [
@@ -362,9 +470,7 @@ export function normalizeMenuItemClass(value: unknown): MenuItemClass | null {
     return "drinks";
   }
 
-  return normalized === "food" || normalized === "drinks"
-    ? normalized
-    : null;
+  return normalized === "food" || normalized === "drinks" ? normalized : null;
 }
 
 export function resolveMenuItemClass(
@@ -515,6 +621,8 @@ Guidance:
 - Override the current class only when the item text clearly contradicts it.
 - Keep drinks classes for beverages, bottles, cans, glasses, cocktails, wines, coffees, teas, and soft drinks.
 - Keep food classes for dishes, desserts, snacks, starters, mains, and sides.
+- If the category or item text indicates whisky, whiskey, vodka, gin, rum, tequila, cognac, brandy, liqueur, beer, cider, wine, cocktail, mocktail, soda, juice, smoothie, milkshake, coffee, or tea, class must be "drinks".
+- Brand-only alcohol names such as "Red Label", "Black Label", "Blue Label", or "Bombay Sapphire" are still drinks.
 `.trim();
 }
 
@@ -587,7 +695,9 @@ export function parseJsonObjectText(value: string): Json | null {
   return null;
 }
 
-export function extractJsonPayloadFromCandidate(candidate: Json): string | null {
+export function extractJsonPayloadFromCandidate(
+  candidate: Json,
+): string | null {
   const content = candidate.content;
   if (!isRecord(content)) return null;
   const parts = content.parts;
