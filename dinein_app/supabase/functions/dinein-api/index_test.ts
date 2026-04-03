@@ -22,6 +22,7 @@ import {
 Deno.env.set("SUPABASE_URL", "https://mock.supabase.co");
 Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "mock-key");
 Deno.env.set("SUPABASE_ANON_KEY", "mock-anon-key");
+Deno.env.set("GEMINI_API_KEY", "mock-gemini-key");
 Deno.env.set("DINEIN_ADMIN_SESSION_SECRET", "mock-secret");
 Deno.env.set("DINEIN_VENUE_SESSION_SECRET", "mock-secret");
 
@@ -739,6 +740,156 @@ Deno.test({
       assertEquals(body.data?.[1]?.ready_count, 1);
     } finally {
       restoreFetch();
+    }
+  },
+});
+
+Deno.test({
+  name: "audit_menu_item_images reports verifier mismatches for live images",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    Deno.env.set("GEMINI_API_KEY", "test-gemini-key");
+    mockFetch(async (req) => {
+      if (
+        req.method === "GET" &&
+        req.url.includes("/rest/v1/dinein_menu_items")
+      ) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: "item-whisky",
+              venue_id: "venue-1",
+              name: "Blue Label",
+              description: "Aged whisky served neat.",
+              category: "Whisky",
+              class: "drinks",
+              menu_context: {
+                class: "drinks",
+                confidence: 0.96,
+                canonical_name: "Blue Label",
+                canonical_category: "Whisky",
+                canonical_description: "Aged whisky served neat.",
+                visual_subject: "A premium whisky serve",
+                serving_style: "Neat pour in a short tumbler",
+                visual_directions: [],
+                visual_do_not: [],
+                keyword_signals: ["whisky"],
+                source_queries: [],
+                source_urls: [],
+                research_summary: "Premium whisky.",
+              },
+              menu_context_status: "ready",
+              menu_context_error: null,
+              menu_context_model: "gemini",
+              menu_context_attempts: 1,
+              menu_context_locked: false,
+              menu_context_updated_at: "2026-04-03T09:00:00.000Z",
+              image_url: "https://cdn.example.com/item-whisky.png",
+              image_source: "ai_gemini",
+              image_status: "ready",
+              image_model: "gemini-image",
+              image_prompt:
+                "This item is classified as: drinks\nVisual kind: spirits",
+              image_error: null,
+              image_attempts: 1,
+              image_locked: false,
+              image_storage_path: null,
+              tags: [],
+            },
+          ]),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Content-Range": "0-0/1",
+            },
+          },
+        );
+      }
+
+      if (req.method === "GET" && req.url.includes("/rest/v1/dinein_venues")) {
+        return new Response(
+          JSON.stringify({
+            id: "venue-1",
+            name: "Harbor Lounge",
+            category: "bar",
+            description: "Cocktails and spirits",
+            owner_id: "owner-1",
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (
+        req.method === "GET" &&
+        req.url === "https://cdn.example.com/item-whisky.png"
+      ) {
+        return new Response(new Uint8Array([137, 80, 78, 71]), {
+          status: 200,
+          headers: {
+            "Content-Type": "image/png",
+          },
+        });
+      }
+
+      if (
+        req.method === "POST" &&
+        req.url.includes("generativelanguage.googleapis.com")
+      ) {
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text:
+                        '{"matches":false,"observed_class":"food","reason":"The image shows a plated dish instead of a spirit serve."}',
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceRoleJwt}`,
+        },
+        body: JSON.stringify({
+          action: "audit_menu_item_images",
+          limit: 5,
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+
+      const body = await res.json();
+      assertEquals(body.data?.total_count, 1);
+      assertEquals(body.data?.summary?.mismatch_count, 1);
+      assertEquals(body.data?.summary?.needs_regeneration_count, 1);
+      assertEquals(body.data?.items?.[0]?.itemId, "item-whisky");
+      assertEquals(body.data?.items?.[0]?.auditStatus, "mismatch");
+      assertEquals(
+        body.data?.items?.[0]?.issues?.some((
+          issue: { code: string },
+        ) => issue.code === "image_verification_mismatch"),
+        true,
+      );
+    } finally {
+      restoreFetch();
+      Deno.env.delete("GEMINI_API_KEY");
     }
   },
 });

@@ -7,6 +7,7 @@ import {
   postWhatsAppMessage,
 } from "../_shared/whatsapp.ts";
 import {
+  auditMenuItemImage,
   createAdminClient as createMenuImageAdminClient,
   type FunctionEnv as MenuImageEnv,
   HttpError as MenuImageHttpError,
@@ -2269,6 +2270,14 @@ function publicVenueListPayload(rawVenue: unknown): JsonRecord {
     supported_payment_methods: readiness.supportedPaymentMethods,
     rating: numberValue(venue.rating) ?? 0,
     rating_count: numberValue(venue.rating_count) ?? 0,
+    google_maps_uri: stringValue(venue.google_maps_uri) ?? null,
+    google_location: venue.google_location ?? null,
+    google_price_level: stringValue(venue.google_price_level) ?? null,
+    google_review_summary: stringValue(venue.google_review_summary) ?? null,
+    google_place_summary: stringValue(venue.google_place_summary) ?? null,
+    enrichment_status: stringValue(venue.enrichment_status) ?? null,
+    last_enriched_at: stringValue(venue.last_enriched_at) ?? null,
+    enrichment_confidence: numberValue(venue.enrichment_confidence) ?? null,
     country: stringValue(venue.country) ?? "MT",
   };
 }
@@ -2282,6 +2291,7 @@ function publicVenueDetailPayload(rawVenue: unknown): JsonRecord {
     reservation_url: stringValue(venue.reservation_url) ?? null,
     revolut_url: stringValue(venue.revolut_url) ?? null,
     social_links: venue.social_links ?? null,
+    reviews: venue.reviews ?? null,
     wifi_ssid: stringValue(venue.wifi_ssid) ?? null,
     wifi_password: stringValue(venue.wifi_password) ?? null,
     wifi_security: stringValue(venue.wifi_security) ?? null,
@@ -2615,6 +2625,57 @@ function normalizeMenuImageBackfillLimit(value: unknown): number {
   const parsed = numberValue(value);
   if (parsed == undefined || !Number.isFinite(parsed)) return 12;
   return Math.max(1, Math.min(25, Math.floor(parsed)));
+}
+
+function normalizeMenuImageAuditLimit(value: unknown): number {
+  const parsed = numberValue(value);
+  if (parsed == undefined || !Number.isFinite(parsed)) return 5;
+  return Math.max(1, Math.min(10, Math.floor(parsed)));
+}
+
+function normalizeOffset(value: unknown): number {
+  const parsed = numberValue(value);
+  if (parsed == undefined || !Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.floor(parsed));
+}
+
+async function loadMenuItemsForImageAudit(
+  supabase: ReturnType<typeof adminClient>,
+  args: {
+    venueId?: string;
+    itemIds?: string[];
+    limit: number;
+    offset: number;
+  },
+): Promise<{ items: MenuItemRecord[]; totalCount: number }> {
+  let query = supabase
+    .from("dinein_menu_items")
+    .select(
+      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
+      { count: "exact" },
+    )
+    .order("updated_at", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: true })
+    .range(args.offset, args.offset + args.limit - 1);
+
+  if (args.venueId) {
+    query = query.eq("venue_id", args.venueId);
+  }
+
+  if ((args.itemIds?.length ?? 0) > 0) {
+    query = query.in("id", args.itemIds ?? []);
+  }
+
+  const { data, error, count } = await query;
+  if (error) {
+    console.error("[dinein-api] menu image audit lookup failed", error);
+    throw new HttpError(500, "Could not load menu items for image audit.");
+  }
+
+  return {
+    items: (data ?? []) as MenuItemRecord[],
+    totalCount: count ?? 0,
+  };
 }
 
 async function loadMenuItemForImageGeneration(
@@ -3262,6 +3323,67 @@ async function handleGetMenuItems(
   return ok(
     visibleItems.map((item) => publicMenuItemPayload(item, { hidePrice })),
   );
+}
+
+async function handleGetMenuItemById(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const itemId = requireString(body, "itemId", "item_id", "id");
+  const { data, error } = await supabase
+    .from("dinein_menu_items")
+    .select("*")
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[dinein-api] get menu item by id failed", error);
+    throw new HttpError(500, "Could not load menu item.");
+  }
+
+  const item = asRecord(data);
+  const venueId = stringValue(item.venue_id);
+  if (!venueId) {
+    throw new HttpError(404, "Menu item not found.");
+  }
+
+  const { data: venueData, error: venueError } = await supabase
+    .from("dinein_venues")
+    .select("*")
+    .eq("id", venueId)
+    .maybeSingle();
+
+  if (venueError) {
+    console.error(
+      "[dinein-api] get menu item by id venue lookup failed",
+      venueError,
+    );
+    throw new HttpError(500, "Could not load the venue.");
+  }
+
+  const venue = asRecord(venueData);
+  if (!stringValue(venue.id)) {
+    throw new HttpError(404, "Menu item not found.");
+  }
+
+  const canReadPrivate = await hasPrivateVenueAccess(
+    supabase,
+    req,
+    venueId,
+    body.venue_session,
+  );
+  if (!canReadPrivate && !isGuestVisibleVenue(venue)) {
+    throw new HttpError(404, "Menu item not found.");
+  }
+
+  const isAvailable = booleanValue(item.is_available) ?? true;
+  if (!canReadPrivate && !isAvailable) {
+    throw new HttpError(404, "Menu item not found.");
+  }
+
+  const hidePrice = !canReadPrivate && !canVenueAcceptGuestOrders(venue);
+  return ok(publicMenuItemPayload(item, { hidePrice }));
 }
 
 async function handleGetAdminMenuQueue(
@@ -4078,6 +4200,130 @@ async function handleBackfillMenuImages(
     skipped,
     failed,
     results,
+  });
+}
+
+async function handleAuditMenuItemImages(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const venueId = stringValue(body.venueId) ?? stringValue(body.venue_id);
+  const itemIds = Array.from(
+    new Set(
+      normalizeStringList(body.itemIds ?? body.item_ids).map((value) =>
+        value.trim()
+      ).filter(Boolean),
+    ),
+  );
+  const limit = normalizeMenuImageAuditLimit(body.limit);
+  const offset = normalizeOffset(body.offset);
+  const regenerateMismatches = booleanValue(body.regenerateMismatches) ??
+    booleanValue(body.regenerate_mismatches) ?? false;
+  const regenerateManual = booleanValue(body.regenerateManual) ??
+    booleanValue(body.regenerate_manual) ?? false;
+  const forceRefreshContext = booleanValue(body.forceRefreshContext) ??
+    booleanValue(body.force_refresh_context) ?? false;
+
+  let mode: "admin" | "venue" = "admin";
+  if (venueId) {
+    mode = await authorizeVenueMutation(
+      supabase,
+      req,
+      venueId,
+      body.venue_session,
+    );
+  } else if (!isServiceRoleRequest(req)) {
+    await requireAdmin(supabase, req);
+  }
+
+  const imageClient = supabase as unknown as ReturnType<
+    typeof createMenuImageAdminClient
+  >;
+  const env = menuImageEnv();
+  const { items, totalCount } = await loadMenuItemsForImageAudit(supabase, {
+    venueId: venueId ?? undefined,
+    itemIds,
+    limit,
+    offset,
+  });
+  const venueCache = new Map<string, VenueRecord>();
+  const results: JsonRecord[] = [];
+
+  let cleanCount = 0;
+  let warningCount = 0;
+  let mismatchCount = 0;
+  let needsRegenerationCount = 0;
+  let regeneratedCount = 0;
+  let blockedCount = 0;
+
+  for (const item of items) {
+    let venue = venueCache.get(item.venue_id);
+    if (!venue) {
+      venue = await loadVenueForImageGeneration(supabase, item.venue_id);
+      venueCache.set(item.venue_id, venue);
+    }
+
+    const audit = await auditMenuItemImage({
+      adminClient: imageClient,
+      env,
+      item,
+      venue,
+      forceRefreshContext,
+      regenerateMismatch: regenerateMismatches,
+      regenerateManual,
+    });
+
+    switch (audit.auditStatus) {
+      case "clean":
+        cleanCount += 1;
+        break;
+      case "warning":
+        warningCount += 1;
+        break;
+      case "mismatch":
+        mismatchCount += 1;
+        break;
+    }
+
+    if (audit.needsRegeneration) {
+      needsRegenerationCount += 1;
+    }
+
+    if (audit.regenerationResult?.status === "success") {
+      regeneratedCount += 1;
+      if (mode === "admin") {
+        const snapshot = await menuItemAdminSnapshot(supabase, audit.itemId);
+        const groupId = stringValue(snapshot.admin_group_id);
+        if (groupId) {
+          await syncAdminManagedGroupImageFields(
+            supabase,
+            groupId,
+            audit.itemId,
+          );
+        }
+      }
+    } else if (audit.regenerationBlockedReason) {
+      blockedCount += 1;
+    }
+
+    results.push(audit as unknown as JsonRecord);
+  }
+
+  return ok({
+    total_count: totalCount,
+    offset,
+    limit,
+    has_more: offset + items.length < totalCount,
+    summary: {
+      clean_count: cleanCount,
+      warning_count: warningCount,
+      mismatch_count: mismatchCount,
+      needs_regeneration_count: needsRegenerationCount,
+      regenerated_count: regeneratedCount,
+      blocked_count: blockedCount,
+    },
+    items: results,
   });
 }
 
@@ -5355,6 +5601,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleUpdateVenue(supabase, req, body);
       case "get_menu_items":
         return await handleGetMenuItems(supabase, req, body);
+      case "get_menu_item_by_id":
+        return await handleGetMenuItemById(supabase, req, body);
       case "get_admin_menu_queue":
         return await handleGetAdminMenuQueue(supabase, req);
       case "get_admin_menu_catalog":
@@ -5381,6 +5629,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleGenerateMenuItemImage(supabase, req, body);
       case "backfill_menu_images":
         return await handleBackfillMenuImages(supabase, req, body);
+      case "audit_menu_item_images":
+        return await handleAuditMenuItemImages(supabase, req, body);
       case "enrich_venue_profile":
         return await handleEnrichVenueProfile(supabase, req, body);
       case "backfill_venue_profiles":

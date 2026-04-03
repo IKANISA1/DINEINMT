@@ -95,6 +95,78 @@ export interface MenuImageProcessResult {
   reason?: string;
 }
 
+export interface MenuImageAuditIssue {
+  code:
+    | "missing_image"
+    | "image_failed"
+    | "image_fetch_failed"
+    | "image_verification_mismatch"
+    | "image_prompt_metadata_stale"
+    | "image_verification_unavailable";
+  severity: "error" | "warning";
+  message: string;
+}
+
+export interface AuditMenuImageOptions {
+  adminClient: ReturnType<typeof createAdminClient>;
+  env: FunctionEnv;
+  item: MenuItemRecord;
+  venue: VenueRecord;
+  forceRefreshContext?: boolean;
+  regenerateMismatch?: boolean;
+  regenerateManual?: boolean;
+}
+
+export interface MenuImageAuditResult {
+  itemId: string;
+  venueId: string;
+  itemName: string;
+  category: string | null;
+  imageUrl: string | null;
+  imageSource: "manual" | "ai_gemini" | null;
+  imageStatus: "pending" | "generating" | "ready" | "failed";
+  imageLocked: boolean;
+  itemClass: MenuItemClass;
+  visualKind: MenuVisualKind;
+  promptClass: MenuItemClass | null;
+  promptVisualKind: MenuVisualKind | null;
+  verification: MenuImageVerificationPayload | null;
+  issues: MenuImageAuditIssue[];
+  auditStatus: "clean" | "warning" | "mismatch";
+  needsRegeneration: boolean;
+  regenerationBlockedReason: string | null;
+  regenerationAttempted: boolean;
+  regenerationResult: MenuImageProcessResult | null;
+}
+
+export function shouldRegenerateAuditedMenuImage(
+  issues: MenuImageAuditIssue[],
+): boolean {
+  return issues.some((issue) =>
+    issue.severity === "error" &&
+    [
+      "missing_image",
+      "image_failed",
+      "image_fetch_failed",
+      "image_verification_mismatch",
+    ].includes(issue.code)
+  );
+}
+
+export function auditRegenerationBlockedReason(args: {
+  needsRegeneration: boolean;
+  imageLocked: boolean;
+  imageSource: "manual" | "ai_gemini" | null;
+  regenerateManual: boolean;
+}): string | null {
+  if (!args.needsRegeneration) return null;
+  if (args.imageLocked) return "image_locked";
+  if (args.imageSource === "manual" && !args.regenerateManual) {
+    return "manual_image_requires_override";
+  }
+  return null;
+}
+
 interface ReusableMenuImageRecord {
   id: string;
   image_url: string;
@@ -104,6 +176,7 @@ interface ReusableMenuImageRecord {
 }
 
 const externalRequestTimeoutMs = 60000;
+const auditImageFetchTimeoutMs = 15000;
 
 type MenuItemSignalSnapshot = Pick<
   MenuItemRecord,
@@ -172,9 +245,16 @@ function extractPromptLineValue(
 export function extractMenuImagePromptClass(
   prompt: string | null | undefined,
 ): MenuItemClass | null {
-  return normalizeMenuItemClass(
-    extractPromptLineValue(prompt, "This item is classified as"),
-  );
+  const rawValue = extractPromptLineValue(prompt, "This item is classified as");
+  const normalized = normalizePromptText(rawValue ?? "");
+  if (!normalized) return null;
+  if (normalized.includes("drink") || normalized.includes("beverage")) {
+    return "drinks";
+  }
+  if (normalized.includes("food") || normalized.includes("dish")) {
+    return "food";
+  }
+  return normalizeMenuItemClass(rawValue);
 }
 
 export function extractMenuImagePromptVisualKind(
@@ -647,7 +727,7 @@ export async function processMenuItemImageGeneration(
     };
   }
 
-  if (hasExistingImage && imageSource === "manual") {
+  if (hasExistingImage && imageSource === "manual" && !forceRegenerate) {
     await normalizeExistingMenuImageState(adminClient, item);
     return {
       status: "skipped",
@@ -840,6 +920,170 @@ export async function processMenuItemImageGeneration(
 
     throw error;
   }
+}
+
+export async function auditMenuItemImage(
+  options: AuditMenuImageOptions,
+): Promise<MenuImageAuditResult> {
+  const {
+    adminClient,
+    env,
+    item,
+    venue,
+    forceRefreshContext = false,
+    regenerateMismatch = false,
+    regenerateManual = false,
+  } = options;
+
+  const issues: MenuImageAuditIssue[] = [];
+  const imageSource = normalizeImageSource(item.image_source);
+  const imageStatus = normalizeImageStatus(item.image_status);
+  const imageLocked = item.image_locked === true;
+  const hasImage = Boolean(item.image_url?.trim());
+
+  const context = await ensureMenuItemContext({
+    adminClient,
+    env,
+    item,
+    venue,
+    forceRefresh: forceRefreshContext,
+  });
+  const visualKind = classifyMenuVisualKind(
+    item,
+    venue,
+    context.itemClass,
+    context.profile,
+  );
+  const promptClass = extractMenuImagePromptClass(item.image_prompt);
+  const promptVisualKind = extractMenuImagePromptVisualKind(item.image_prompt);
+
+  let verification: MenuImageVerificationPayload | null = null;
+
+  if (!hasImage) {
+    issues.push({
+      code: "missing_image",
+      severity: "error",
+      message: "No image is currently stored for this menu item.",
+    });
+  } else {
+    if (imageStatus === "failed") {
+      issues.push({
+        code: "image_failed",
+        severity: "error",
+        message: item.image_error?.trim() ||
+          "The stored image is marked as failed.",
+      });
+    }
+
+    if (
+      imageSource === "ai_gemini" &&
+      !isMenuImagePromptCompatible(item.image_prompt, {
+        itemClass: context.itemClass,
+        visualKind,
+      })
+    ) {
+      issues.push({
+        code: "image_prompt_metadata_stale",
+        severity: "warning",
+        message:
+          "The stored AI prompt metadata does not match the current item class or visual kind.",
+      });
+    }
+
+    try {
+      const payload = await downloadMenuItemImageForAudit({
+        adminClient,
+        env,
+        item,
+      });
+
+      verification = await verifyGeneratedMenuImage({
+        apiKey: env.geminiApiKey,
+        models: env.menuImageVerifierModels,
+        imageBytes: payload.bytes,
+        mimeType: payload.mimeType,
+        item,
+        itemClass: context.itemClass,
+        visualKind,
+      });
+
+      if (!verification) {
+        issues.push({
+          code: "image_verification_unavailable",
+          severity: "warning",
+          message:
+            "The image verifier could not return a decision for this image.",
+        });
+      } else if (!verification.matches) {
+        issues.push({
+          code: "image_verification_mismatch",
+          severity: "error",
+          message:
+            `Verifier observed ${verification.observed_class}: ${verification.reason}`,
+        });
+      }
+    } catch (error) {
+      issues.push({
+        code: "image_fetch_failed",
+        severity: "error",
+        message: getErrorMessage(error),
+      });
+    }
+  }
+
+  const hasMismatch = issues.some((issue) => issue.severity === "error");
+  const needsRegeneration = shouldRegenerateAuditedMenuImage(issues);
+  const regenerationBlockedReason = auditRegenerationBlockedReason({
+    needsRegeneration,
+    imageLocked,
+    imageSource,
+    regenerateManual,
+  });
+
+  let regenerationAttempted = false;
+  let regenerationResult: MenuImageProcessResult | null = null;
+  if (
+    regenerateMismatch &&
+    needsRegeneration &&
+    regenerationBlockedReason == null
+  ) {
+    regenerationAttempted = true;
+    regenerationResult = await processMenuItemImageGeneration({
+      adminClient,
+      env,
+      item,
+      venue,
+      forceRegenerate: true,
+    });
+  }
+
+  const auditStatus = hasMismatch
+    ? "mismatch"
+    : issues.length > 0
+    ? "warning"
+    : "clean";
+
+  return {
+    itemId: item.id,
+    venueId: item.venue_id,
+    itemName: item.name,
+    category: item.category,
+    imageUrl: item.image_url,
+    imageSource,
+    imageStatus,
+    imageLocked,
+    itemClass: context.itemClass,
+    visualKind,
+    promptClass,
+    promptVisualKind,
+    verification,
+    issues,
+    auditStatus,
+    needsRegeneration,
+    regenerationBlockedReason,
+    regenerationAttempted,
+    regenerationResult,
+  };
 }
 
 async function findReusableMenuImage(
@@ -1609,7 +1853,7 @@ function detectCuisineHint(
   return null;
 }
 
-type MenuVisualKind =
+export type MenuVisualKind =
   | "plated_food"
   | "dessert"
   | "packaged_beer"
@@ -1629,7 +1873,7 @@ interface MenuArtDirection {
   background: string;
 }
 
-function classifyMenuVisualKind(
+export function classifyMenuVisualKind(
   item: MenuItemRecord,
   _venue: VenueRecord,
   itemClass?: MenuItemClass | null,
@@ -1718,7 +1962,15 @@ function classifyMenuVisualKind(
   }
 
   if (
-    resolvedClass === "drinks" ||
+    matchesAny(context, [
+      "shandy",
+      "lager and lemonade",
+    ])
+  ) {
+    return "cocktail";
+  }
+
+  if (
     matchesAny(context, [
       "beer",
       "lager",
@@ -1738,10 +1990,48 @@ function classifyMenuVisualKind(
       "craft beer",
     ])
   ) {
-    if (matchesAny(context, ["draft", "draught", "tap", "pint", "on tap"])) {
+    const explicitPackagedBeerSignals = matchesAny(context, [
+      "bottled beer",
+      "beer bottle",
+      "beer can",
+      "bottle of",
+      "can of",
+      "330ml bottle",
+      "500ml bottle",
+      "iconic green bottle",
+      "accompanied by a bottle",
+      "accompanied by the bottle",
+    ]) ||
+      matchesAny(itemCategory, [
+        "bottled beer",
+        "bottled beers",
+        "bottled beer & ciders",
+        "bottled beers & ciders",
+        "ciders",
+      ]);
+    const genericPackagedBeerSignals = matchesAny(context, [
+      "bottle",
+      "bottled",
+      "can",
+      "canned",
+      "cider",
+    ]);
+    const draftBeerSignals = matchesAny(context, [
+      "draft",
+      "draught",
+      "on tap",
+      "tap handle",
+      "beer tap",
+      "taproom",
+      "keg",
+    ]) ||
+      matchesAny(itemCategory, ["draft beer", "draught beer", "on tap"]);
+    if (draftBeerSignals && !explicitPackagedBeerSignals) {
       return "draft_beer";
     }
-    return "packaged_beer";
+    return explicitPackagedBeerSignals || genericPackagedBeerSignals
+      ? "packaged_beer"
+      : "draft_beer";
   }
 
   if (
@@ -1790,36 +2080,19 @@ function classifyMenuVisualKind(
 
   if (
     matchesAny(context, [
-      "whisky",
-      "whiskey",
-      "vodka",
-      "rum",
-      "gin",
-      "tequila",
-      "mezcal",
-      "cognac",
-      "brandy",
-      "liqueur",
-      "digestif",
-      "spirit",
-      "shot",
-      "limoncello",
-      "grappa",
-      "aperitif",
-      "aperol",
-      "campari",
-      "amaro",
-      "sambuca",
-      "absinthe",
-      "vermouth",
-      "port",
-      "sherry",
-      "bourbon",
-      "scotch",
-      "single malt",
+      "tea",
+      "matcha",
+      "chai",
+      "earl grey",
+      "herbal",
+      "green tea",
+      "oolong",
+      "chamomile",
+      "peppermint",
+      "infusion",
     ])
   ) {
-    return "spirits";
+    return "tea";
   }
 
   if (
@@ -1846,19 +2119,35 @@ function classifyMenuVisualKind(
 
   if (
     matchesAny(context, [
-      "tea",
-      "matcha",
-      "chai",
-      "earl grey",
-      "herbal",
-      "green tea",
-      "oolong",
-      "chamomile",
-      "peppermint",
-      "infusion",
+      "whisky",
+      "whiskey",
+      "vodka",
+      "rum",
+      "gin",
+      "tequila",
+      "mezcal",
+      "cognac",
+      "brandy",
+      "liqueur",
+      "digestif",
+      "spirit",
+      "limoncello",
+      "grappa",
+      "aperitif",
+      "aperol",
+      "campari",
+      "amaro",
+      "sambuca",
+      "absinthe",
+      "vermouth",
+      "port",
+      "sherry",
+      "bourbon",
+      "scotch",
+      "single malt",
     ])
   ) {
-    return "tea";
+    return "spirits";
   }
 
   if (
@@ -2105,7 +2394,7 @@ interface GeminiImagePayload {
   model: string;
 }
 
-interface MenuImageVerificationPayload {
+export interface MenuImageVerificationPayload {
   matches: boolean;
   observed_class: "food" | "drinks" | "unclear";
   reason: string;
@@ -2244,6 +2533,58 @@ async function verifyGeneratedMenuImage(args: {
   }
 
   return null;
+}
+
+async function downloadMenuItemImageForAudit(args: {
+  adminClient: ReturnType<typeof createAdminClient>;
+  env: FunctionEnv;
+  item: MenuItemRecord;
+}): Promise<{ bytes: Uint8Array; mimeType: string }> {
+  const storagePath = args.item.image_storage_path?.trim();
+  if (storagePath) {
+    const { data, error } = await args.adminClient.storage
+      .from(args.env.menuImageBucket)
+      .download(storagePath);
+
+    if (!error && data) {
+      const buffer = await data.arrayBuffer();
+      return {
+        bytes: new Uint8Array(buffer),
+        mimeType: data.type || mimeTypeFromPath(storagePath),
+      };
+    }
+  }
+
+  const imageUrl = args.item.image_url?.trim();
+  if (!imageUrl) {
+    throw new HttpError(404, "Menu item has no image URL to audit.");
+  }
+
+  const response = await fetchWithTimeout(
+    imageUrl,
+    { method: "GET" },
+    auditImageFetchTimeoutMs,
+  );
+  if (!response.ok) {
+    throw new HttpError(
+      502,
+      `Could not download the current image: HTTP ${response.status}.`,
+    );
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  return {
+    bytes,
+    mimeType: response.headers.get("content-type")?.split(";")[0]?.trim() ||
+      mimeTypeFromPath(imageUrl),
+  };
+}
+
+function mimeTypeFromPath(value: string): string {
+  const normalized = value.toLowerCase();
+  if (normalized.endsWith(".png")) return "image/png";
+  if (normalized.endsWith(".webp")) return "image/webp";
+  return "image/jpeg";
 }
 
 async function generateGeminiImage({
