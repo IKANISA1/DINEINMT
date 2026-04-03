@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,16 +11,20 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/providers/cart_provider.dart';
+import '../../../core/services/app_telemetry.dart';
 import '../../../shared/widgets/shared_widgets.dart';
+import 'menu_item_badges.dart';
 
 /// Menu screen with sticky category tabs and add-to-cart interactions.
 /// Loads items from Supabase via [menuItemsProvider].
 /// Cart state managed by [cartProvider].
 /// Tap budget: Add item = 1 tap (tap the + on card OR tap card → bottom sheet → add).
 class MenuScreen extends ConsumerStatefulWidget {
-  final String venueId;
+  final String? venueId;
+  final String? venueSlug;
 
-  const MenuScreen({super.key, required this.venueId});
+  const MenuScreen({super.key, this.venueId, this.venueSlug})
+    : assert(venueId != null || venueSlug != null);
 
   @override
   ConsumerState<MenuScreen> createState() => _MenuScreenState();
@@ -37,6 +43,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
   List<_MenuListEntry> _entries = const [];
   Map<String, int> _categoryHeaderIndexes = const {};
   String _query = '';
+  String? _trackedMenuVenueId;
 
   @override
   void initState() {
@@ -128,6 +135,12 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
     final normalized = value.trim();
     if (_query == normalized) return;
     setState(() => _query = normalized);
+    if (normalized.isNotEmpty) {
+      _trackGuestEvent(
+        'menu_search',
+        details: {'query': normalized, 'query_length': normalized.length},
+      );
+    }
     _syncMenuToTop();
   }
 
@@ -136,6 +149,37 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
     _searchController.clear();
     setState(() => _query = '');
     _syncMenuToTop();
+  }
+
+  void _trackGuestEvent(
+    String eventName, {
+    String? venueId,
+    String? menuItemId,
+    Map<String, Object?> details = const {},
+  }) {
+    unawaited(
+      AppTelemetryService.trackGuestEvent(
+        eventName,
+        route: '/menu',
+        venueId: venueId,
+        menuItemId: menuItemId,
+        details: details,
+      ),
+    );
+  }
+
+  void _trackMenuViewed(Venue venue, int itemCount) {
+    if (_trackedMenuVenueId == venue.id) return;
+    _trackedMenuVenueId = venue.id;
+    _trackGuestEvent(
+      'menu_viewed',
+      venueId: venue.id,
+      details: {
+        'slug': venue.slug,
+        'item_count': itemCount,
+        'can_order': venue.canAcceptGuestOrders,
+      },
+    );
   }
 
   void _syncActiveTabWithScroll() {
@@ -169,115 +213,147 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final menuAsync = ref.watch(menuItemsProvider(widget.venueId));
-    final venueAsync = ref.watch(venueByIdProvider(widget.venueId));
+    final venueAsync = widget.venueId != null
+        ? ref.watch(venueByIdProvider(widget.venueId!))
+        : ref.watch(venueBySlugProvider(widget.venueSlug!));
     final cart = ref.watch(cartProvider);
     final cartNotifier = ref.read(cartProvider.notifier);
-    final venue = venueAsync.asData?.value;
-
-    if (venue != null &&
-        (cart.venueId != venue.id ||
-            cart.venueName != venue.name ||
-            cart.venueCountry != venue.country ||
-            cart.venueRevolutUrl != venue.revolutUrl)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ref
-            .read(cartProvider.notifier)
-            .setVenue(
-              venueId: venue.id,
-              venueSlug: venue.slug,
-              venueName: venue.name,
-              venueRevolutUrl: venue.revolutUrl,
-              venueCountry: venue.country,
-              tableNumber: cart.tableNumber,
-            );
-      });
-    }
-
-    return menuAsync.when(
-      loading: () => Scaffold(
-        appBar: AppBar(
-          title: Text('Menu', style: tt.headlineMedium),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: IconButton(
-                icon: Icon(LucideIcons.hand, color: cs.primary),
-                onPressed: () => WaveBottomSheet.show(context, widget.venueId),
-              ),
-            ),
-          ],
-        ),
+    return venueAsync.when(
+      loading: () => _buildScaffoldFrame(
+        context,
+        title: 'Menu',
+        venueId: widget.venueId,
         body: const Center(
           child: SkeletonLoader(width: double.infinity, height: 200),
         ),
       ),
-      error: (err, _) => Scaffold(
-        appBar: AppBar(
-          title: Text('Menu', style: tt.headlineMedium),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: IconButton(
-                icon: Icon(LucideIcons.hand, color: cs.primary),
-                onPressed: () => WaveBottomSheet.show(context, widget.venueId),
-              ),
-            ),
-          ],
-        ),
+      error: (err, _) => _buildScaffoldFrame(
+        context,
+        title: 'Menu',
+        venueId: widget.venueId,
         body: ErrorState(
-          message: 'Could not load menu items.',
-          onRetry: () => ref.invalidate(menuItemsProvider(widget.venueId)),
+          message: 'Could not load the venue.',
+          onRetry: () => widget.venueId != null
+              ? ref.invalidate(venueByIdProvider(widget.venueId!))
+              : ref.invalidate(venueBySlugProvider(widget.venueSlug!)),
         ),
       ),
-      data: (items) {
-        if (items.isEmpty) {
-          return Scaffold(
-            appBar: AppBar(
-              title: Text('Menu', style: tt.headlineMedium),
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: IconButton(
-                    icon: Icon(LucideIcons.hand, color: cs.primary),
-                    onPressed: () =>
-                        WaveBottomSheet.show(context, widget.venueId),
-                  ),
-                ),
-              ],
-            ),
+      data: (venue) {
+        if (venue == null) {
+          return _buildScaffoldFrame(
+            context,
+            title: 'Menu',
+            venueId: widget.venueId,
             body: const EmptyState(
-              icon: LucideIcons.chefHat,
-              title: 'Menu not published yet',
-              subtitle:
-                  'This venue has not added menu items yet. Check back later or ask the team in person.',
+              icon: LucideIcons.store,
+              title: 'Venue not found',
+              subtitle: 'This venue is unavailable right now.',
             ),
           );
         }
 
-        final filteredItems = _filterItems(items);
+        if (cart.venueId != venue.id ||
+            cart.venueName != venue.name ||
+            cart.venueCountry != venue.country ||
+            cart.venueRevolutUrl != venue.revolutUrl) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            ref
+                .read(cartProvider.notifier)
+                .setVenue(
+                  venueId: venue.id,
+                  venueSlug: venue.slug,
+                  venueName: venue.name,
+                  venueRevolutUrl: venue.revolutUrl,
+                  venueCountry: venue.country,
+                  tableNumber: cart.tableNumber,
+                );
+          });
+        }
 
-        // Derive visible categories from filtered available items while
-        // preserving insertion order.
-        final categories = filteredItems
-            .map((item) => item.category)
-            .toSet()
-            .toList();
+        final menuAsync = ref.watch(menuItemsProvider(venue.id));
+        return menuAsync.when(
+          loading: () => _buildScaffoldFrame(
+            context,
+            title: venue.name,
+            venueId: venue.id,
+            body: const Center(
+              child: SkeletonLoader(width: double.infinity, height: 200),
+            ),
+          ),
+          error: (err, _) => _buildScaffoldFrame(
+            context,
+            title: venue.name,
+            venueId: venue.id,
+            body: ErrorState(
+              message: 'Could not load menu items.',
+              onRetry: () => ref.invalidate(menuItemsProvider(venue.id)),
+            ),
+          ),
+          data: (items) {
+            if (items.isEmpty) {
+              return _buildScaffoldFrame(
+                context,
+                title: venue.name,
+                venueId: venue.id,
+                body: const EmptyState(
+                  icon: LucideIcons.chefHat,
+                  title: 'Menu not published yet',
+                  subtitle:
+                      'This venue has not added menu items yet. Check back later or ask the team in person.',
+                ),
+              );
+            }
 
-        _rebuildTabs(categories);
-        _rebuildEntries(categories, filteredItems);
+            _trackMenuViewed(venue, items.length);
+            final filteredItems = _filterItems(items);
+            final categories = filteredItems
+                .map((item) => item.category)
+                .toSet()
+                .toList();
 
-        return _buildMenu(
-          context,
-          cs,
-          tt,
-          venue,
-          categories,
-          cart,
-          cartNotifier,
+            _rebuildTabs(categories);
+            _rebuildEntries(categories, filteredItems);
+
+            return _buildMenu(
+              context,
+              cs,
+              tt,
+              venue,
+              categories,
+              cart,
+              cartNotifier,
+            );
+          },
         );
       },
+    );
+  }
+
+  Scaffold _buildScaffoldFrame(
+    BuildContext context, {
+    required String title,
+    required Widget body,
+    required String? venueId,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title, style: tt.headlineMedium),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: IconButton(
+              icon: Icon(LucideIcons.hand, color: cs.primary),
+              onPressed: venueId == null
+                  ? null
+                  : () => WaveBottomSheet.show(context, venueId),
+            ),
+          ),
+        ],
+      ),
+      body: body,
     );
   }
 
@@ -320,8 +396,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                 padding: const EdgeInsets.all(8),
                 child: IconButton(
                   icon: Icon(LucideIcons.hand, color: cs.primary),
-                  onPressed: () =>
-                      WaveBottomSheet.show(context, widget.venueId),
+                  onPressed: venue?.id == null
+                      ? null
+                      : () => WaveBottomSheet.show(context, venue!.id),
                 ),
               ),
             ],
@@ -487,13 +564,29 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                         item: entry.item!,
                         quantity: cartNotifier.quantityOf(entry.item!.id),
                         currencySymbol: cart.currencySymbol,
-                        onAdd: () => cartNotifier.addItem(entry.item!),
+                        onAdd: () {
+                          _trackGuestEvent(
+                            'menu_item_added',
+                            venueId: venue?.id ?? entry.item!.venueId,
+                            menuItemId: entry.item!.id,
+                            details: {'source': 'menu_card', 'quantity': 1},
+                          );
+                          cartNotifier.addItem(entry.item!);
+                        },
                         onRemove: () => cartNotifier.removeItem(entry.item!.id),
-                        onTap: () => context.pushNamed(
-                          AppRouteNames.itemDetail,
-                          pathParameters: {AppRouteParams.id: entry.item!.id},
-                          extra: entry.item,
-                        ),
+                        onTap: () {
+                          _trackGuestEvent(
+                            'menu_item_opened',
+                            venueId: venue?.id ?? entry.item!.venueId,
+                            menuItemId: entry.item!.id,
+                            details: {'source': 'menu_list'},
+                          );
+                          context.pushNamed(
+                            AppRouteNames.itemDetail,
+                            pathParameters: {AppRouteParams.id: entry.item!.id},
+                            extra: entry.item,
+                          );
+                        },
                       ),
                     ),
                     _MenuListEntryType.spacer => const SizedBox.shrink(),
@@ -521,7 +614,17 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                   ),
                   child: SafeArea(
                     child: ElevatedButton(
-                      onPressed: () => context.pushNamed(AppRouteNames.cart),
+                      onPressed: () {
+                        _trackGuestEvent(
+                          'cart_opened',
+                          venueId: venue?.id ?? cart.venueId,
+                          details: {
+                            'item_count': cart.itemCount,
+                            'cart_total': cart.total,
+                          },
+                        );
+                        context.pushNamed(AppRouteNames.cart);
+                      },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
@@ -691,40 +794,10 @@ class _MenuItemCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Tags
-                  if (item.tags.isNotEmpty)
+                  if (item.guestDisplayTags.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
-                      child: Wrap(
-                        spacing: 6,
-                        children: item.tags.map((tag) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: tag == 'Signature'
-                                  ? cs.primary.withValues(alpha: 0.12)
-                                  : cs.surfaceContainerHigh,
-                              borderRadius: BorderRadius.circular(
-                                AppTheme.radiusFull,
-                              ),
-                            ),
-                            child: Text(
-                              tag.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.5,
-                                color: tag == 'Signature'
-                                    ? cs.primary
-                                    : cs.onSurfaceVariant,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
+                      child: MenuItemBadges(item: item),
                     ),
 
                   Text(

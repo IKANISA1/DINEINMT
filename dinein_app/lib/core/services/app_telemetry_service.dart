@@ -1,6 +1,7 @@
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 
+import 'app_telemetry_shared.dart';
 import 'firebase_runtime_service.dart';
 
 /// Initializes production telemetry without blocking app startup when provider
@@ -12,11 +13,13 @@ class AppTelemetryService {
   static bool _enabled = false;
 
   static bool get isEnabled => _enabled;
+  static String? get sessionId => currentGuestTelemetrySessionId();
 
   static Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
 
+    await initializeGuestTelemetrySession();
     final firebaseReady = await FirebaseRuntimeService.ensureInitialized();
     if (!firebaseReady) {
       return;
@@ -42,5 +45,23 @@ class AppTelemetryService {
       debugPrint('[telemetry] Firebase initialization skipped: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
+  }
+
+  static Future<void> trackGuestEvent(
+    String eventName, {
+    String? route,
+    String? venueId,
+    String? menuItemId,
+    String? orderId,
+    Map<String, Object?> details = const {},
+  }) {
+    return recordGuestTelemetryEvent(
+      eventName,
+      route: route,
+      venueId: venueId,
+      menuItemId: menuItemId,
+      orderId: orderId,
+      details: details,
+    );
   }
 }

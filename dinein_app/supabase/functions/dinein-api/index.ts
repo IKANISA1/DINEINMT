@@ -2251,7 +2251,10 @@ function sanitizeVenueUpdates(
   return sanitized;
 }
 
-function publicVenueListPayload(rawVenue: unknown): JsonRecord {
+function publicVenueListPayload(
+  rawVenue: unknown,
+  options?: { distanceKm?: number | null },
+): JsonRecord {
   const venue = asRecord(rawVenue);
   const readiness = venueOrderingReadiness(venue);
   return {
@@ -2278,6 +2281,7 @@ function publicVenueListPayload(rawVenue: unknown): JsonRecord {
     enrichment_status: stringValue(venue.enrichment_status) ?? null,
     last_enriched_at: stringValue(venue.last_enriched_at) ?? null,
     enrichment_confidence: numberValue(venue.enrichment_confidence) ?? null,
+    distance_km: options?.distanceKm ?? null,
     country: stringValue(venue.country) ?? "MT",
   };
 }
@@ -2313,6 +2317,63 @@ function venueSupportedPaymentMethods(rawVenue: unknown): string[] {
 
 function isGuestVisibleVenue(rawVenue: unknown): boolean {
   return publicVenueStatuses.has(venueStatus(rawVenue));
+}
+
+function venueCoordinates(rawVenue: unknown): {
+  latitude: number | null;
+  longitude: number | null;
+} {
+  const venue = asRecord(rawVenue);
+  const location = asRecord(venue.google_location);
+  return {
+    latitude: numberValue(location.latitude) ?? numberValue(location.lat) ??
+      null,
+    longitude: numberValue(location.longitude) ?? numberValue(location.lng) ??
+      null,
+  };
+}
+
+function venueDistanceKm(
+  rawVenue: unknown,
+  latitude: number,
+  longitude: number,
+): number | null {
+  const coordinates = venueCoordinates(rawVenue);
+  if (coordinates.latitude == null || coordinates.longitude == null) {
+    return null;
+  }
+
+  const toRadians = (value: number) => value * (Math.PI / 180);
+  const earthRadiusKm = 6371;
+  const deltaLatitude = toRadians(coordinates.latitude - latitude);
+  const deltaLongitude = toRadians(coordinates.longitude - longitude);
+  const startLatitude = toRadians(latitude);
+  const endLatitude = toRadians(coordinates.latitude);
+
+  const a = Math.sin(deltaLatitude / 2) ** 2 +
+    Math.cos(startLatitude) *
+      Math.cos(endLatitude) *
+      Math.sin(deltaLongitude / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+}
+
+function venueMatchesQuery(rawVenue: unknown, query: string): boolean {
+  const venue = asRecord(rawVenue);
+  if (!query) return true;
+  const haystack = [
+    stringValue(venue.name),
+    stringValue(venue.category),
+    stringValue(venue.description),
+    stringValue(venue.address),
+    stringValue(venue.google_place_summary),
+    stringValue(venue.google_review_summary),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(query);
 }
 
 function canVenueAcceptGuestOrders(rawVenue: unknown): boolean {
@@ -2886,6 +2947,41 @@ async function handleGetUserRole(
   return ok(data?.role ?? null);
 }
 
+async function handleTrackGuestEvent(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const eventName = requireString(body, "eventName", "event_name");
+  const sessionId = requireString(body, "sessionId", "session_id");
+  const user = await currentUser(req);
+
+  const insert: JsonRecord = {
+    country: requestCountryCode(body),
+    event_name: eventName,
+    session_id: sessionId,
+    route: stringValue(body.route) ?? null,
+    venue_id: stringValue(body.venueId ?? body.venue_id) ?? null,
+    menu_item_id: stringValue(body.menuItemId ?? body.menu_item_id) ?? null,
+    order_id: stringValue(body.orderId ?? body.order_id) ?? null,
+    user_id: user?.id ?? null,
+    user_agent: req.headers.get("user-agent") ?? null,
+    referrer: req.headers.get("referer") ?? null,
+    details: asRecord(body.details ?? body.metadata ?? body.properties),
+  };
+
+  const { error } = await supabase
+    .from("dinein_guest_analytics_events")
+    .insert(insert);
+
+  if (error) {
+    console.error("[dinein-api] track guest event failed", error);
+    throw new HttpError(500, "Could not record the analytics event.");
+  }
+
+  return ok(true, 201);
+}
+
 async function handleGetVenues(
   supabase: ReturnType<typeof adminClient>,
   body: JsonRecord,
@@ -2893,6 +2989,12 @@ async function handleGetVenues(
   const countryCode = requestCountryCode(body);
   const limit = normalizeListLimit(body.limit);
   const offset = normalizeListOffset(body.offset);
+  const query = (stringValue(body.query) ?? "").toLowerCase();
+  const category = stringValue(body.category)?.toLowerCase();
+  const orderingOnly = booleanValue(body.ordering_only ?? body.orderingOnly) ??
+    false;
+  const latitude = numberValue(body.latitude ?? body.lat);
+  const longitude = numberValue(body.longitude ?? body.lng);
   const { data, error } = await supabase
     .from("dinein_venues")
     .select("*")
@@ -2908,7 +3010,25 @@ async function handleGetVenues(
   // enum-backed status values.
   const venues = (data ?? [])
     .filter((venue) => isGuestVisibleVenue(venue))
+    .filter((venue) => venueMatchesQuery(venue, query))
+    .filter((venue) => {
+      if (!category || category == "all") return true;
+      return (stringValue(asRecord(venue).category) ?? "").toLowerCase() ==
+        category;
+    })
+    .filter((venue) => !orderingOnly || canVenueAcceptGuestOrders(venue))
     .sort((left, right) => {
+      if (latitude != null && longitude != null) {
+        const leftDistance = venueDistanceKm(left, latitude, longitude);
+        const rightDistance = venueDistanceKm(right, latitude, longitude);
+        if (leftDistance == null && rightDistance != null) return 1;
+        if (leftDistance != null && rightDistance == null) return -1;
+        if (leftDistance != null && rightDistance != null) {
+          const distanceCompare = leftDistance - rightDistance;
+          if (distanceCompare != 0) return distanceCompare;
+        }
+      }
+
       const orderableCompare = Number(canVenueAcceptGuestOrders(right)) -
         Number(canVenueAcceptGuestOrders(left));
       if (orderableCompare != 0) return orderableCompare;
@@ -2927,7 +3047,15 @@ async function handleGetVenues(
     });
   const visible = limit == null ? venues : venues.slice(offset, offset + limit);
 
-  return ok(visible.map(publicVenueListPayload));
+  return ok(
+    visible.map((venue) =>
+      publicVenueListPayload(venue, {
+        distanceKm: latitude != null && longitude != null
+          ? venueDistanceKm(venue, latitude, longitude)
+          : null,
+      })
+    ),
+  );
 }
 
 async function handleGetAllVenues(
@@ -5585,6 +5713,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
         return await handleCreateProfile(supabase, req, body);
       case "get_user_role":
         return await handleGetUserRole(supabase, req, body);
+      case "track_guest_event":
+        return await handleTrackGuestEvent(supabase, req, body);
       case "get_venues":
         return await handleGetVenues(supabase, body);
       case "get_all_venues":

@@ -8,6 +8,7 @@ import 'core/services/app_notification_service.dart'
 import 'core/services/app_telemetry_service.dart'
     if (dart.library.html) 'core/services/app_telemetry_service_web.dart';
 import 'core/services/auth_repository.dart';
+import 'core/router/url_strategy.dart';
 import 'core/services/supabase_config.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
@@ -16,6 +17,7 @@ import 'dart:async';
 Future<void> main() async {
   const config = CountryConfig.rw;
   WidgetsFlutterBinding.ensureInitialized();
+  configureWebUrlStrategy();
   CountryRuntime.configure(config);
 
   await Future.wait<void>([

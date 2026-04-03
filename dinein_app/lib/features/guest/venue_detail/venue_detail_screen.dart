@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +17,7 @@ import '../../../core/models/models.dart';
 import '../../../core/providers/cart_provider.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../core/services/app_telemetry.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/shared_widgets.dart';
@@ -32,6 +35,40 @@ class VenueDetailScreen extends ConsumerStatefulWidget {
 class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
   bool _aboutExpanded = false;
   bool _isSaved = false;
+  String? _trackedVenueViewId;
+
+  void _trackGuestEvent(
+    String eventName, {
+    String? venueId,
+    Map<String, Object?> details = const {},
+  }) {
+    unawaited(
+      AppTelemetryService.trackGuestEvent(
+        eventName,
+        route: AppRoutePaths.venueDetail.replaceFirst(
+          ':${AppRouteParams.slug}',
+          widget.slug,
+        ),
+        venueId: venueId,
+        details: details,
+      ),
+    );
+  }
+
+  void _trackVenueViewed(Venue venue) {
+    if (_trackedVenueViewId == venue.id) return;
+    _trackedVenueViewId = venue.id;
+    _trackGuestEvent(
+      'venue_detail_viewed',
+      venueId: venue.id,
+      details: {
+        'slug': venue.slug,
+        'table_context': widget.tableNumber?.trim().isNotEmpty == true,
+        'can_order': venue.canAcceptGuestOrders,
+        'is_open_now': venue.isOpenNow,
+      },
+    );
+  }
 
   Uri _venueLink(Venue venue) {
     final config = ref.read(countryConfigProvider);
@@ -47,6 +84,14 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
   }
 
   void _openMenu(Venue venue) {
+    _trackGuestEvent(
+      'menu_opened',
+      venueId: venue.id,
+      details: {
+        'slug': venue.slug,
+        'table_context': widget.tableNumber?.trim().isNotEmpty == true,
+      },
+    );
     ref
         .read(cartProvider.notifier)
         .setVenue(
@@ -127,6 +172,26 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
     );
   }
 
+  Future<void> _openMaps(Venue venue) async {
+    final raw = venue.googleMapsUri?.trim();
+    final uri = raw == null || raw.isEmpty ? null : Uri.tryParse(raw);
+    if (uri == null) return;
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (launched || !mounted) return;
+    } catch (_) {
+      if (!mounted) return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Unable to open the venue map link.')),
+    );
+  }
+
   Future<void> _handleWifiTap(Venue venue) async {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
@@ -176,6 +241,7 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
             ),
           );
         }
+        _trackVenueViewed(venue);
         return _VenueDetailBody(
           venue: venue,
           tableNumber: widget.tableNumber,
@@ -189,6 +255,7 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
           onWebsite: venue.websiteUri == null
               ? null
               : () => _openWebsite(venue),
+          onMaps: venue.googleMapsUri == null ? null : () => _openMaps(venue),
           onWifiTap: venue.hasWifi && !kIsWeb
               ? () => _handleWifiTap(venue)
               : null,
@@ -210,6 +277,7 @@ class _VenueDetailBody extends StatelessWidget {
   final VoidCallback onToggleAbout;
   final VoidCallback? onCall;
   final VoidCallback? onWebsite;
+  final VoidCallback? onMaps;
   final VoidCallback? onWifiTap;
   final VoidCallback onOpenMenu;
 
@@ -224,6 +292,7 @@ class _VenueDetailBody extends StatelessWidget {
     required this.onToggleAbout,
     required this.onCall,
     required this.onWebsite,
+    required this.onMaps,
     required this.onWifiTap,
     required this.onOpenMenu,
   });
@@ -347,6 +416,18 @@ class _VenueDetailBody extends StatelessWidget {
                                 letterSpacing: 2.2,
                               ),
                             ),
+                            if (venue.ratingCount > 0) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                '(${venue.ratingCount})',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.62),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.4,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ],
@@ -380,6 +461,7 @@ class _VenueDetailBody extends StatelessWidget {
                   onToggle: onToggleAbout,
                   onCall: onCall,
                   onWebsite: onWebsite,
+                  onMaps: onMaps,
                   onWifiTap: onWifiTap,
                 ).animate(delay: 120.ms).fadeIn().slideY(begin: 0.05),
                 const SizedBox(height: AppTheme.space6),
@@ -473,6 +555,7 @@ class _AboutSection extends StatelessWidget {
   final VoidCallback onToggle;
   final VoidCallback? onCall;
   final VoidCallback? onWebsite;
+  final VoidCallback? onMaps;
   final VoidCallback? onWifiTap;
 
   const _AboutSection({
@@ -481,6 +564,7 @@ class _AboutSection extends StatelessWidget {
     required this.onToggle,
     required this.onCall,
     required this.onWebsite,
+    required this.onMaps,
     required this.onWifiTap,
   });
 
@@ -584,6 +668,17 @@ class _AboutSection extends StatelessWidget {
                         label: 'Website',
                         onTap: onWebsite,
                       ),
+                    if (venue.googleMapsUri != null)
+                      _DetailChip(
+                        icon: LucideIcons.mapPin,
+                        label: 'Map',
+                        onTap: onMaps,
+                      ),
+                    if (venue.priceLevelLabel != null)
+                      _DetailChip(
+                        icon: LucideIcons.badgeDollarSign,
+                        label: venue.priceLevelLabel!,
+                      ),
                     if (venue.hasWifi && !kIsWeb)
                       _DetailChip(
                         icon: LucideIcons.wifi,
@@ -593,6 +688,26 @@ class _AboutSection extends StatelessWidget {
                       ),
                   ],
                 ),
+                if (venue.primaryReviewSnippet != null) ...[
+                  const SizedBox(height: AppTheme.space5),
+                  Text(
+                    'WHAT GUESTS NOTICE',
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.2,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    venue.primaryReviewSnippet!,
+                    style: tt.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.82),
+                      height: 1.55,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

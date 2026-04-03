@@ -9,6 +9,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../core/services/app_telemetry.dart';
+import '../../../core/services/discovery_location_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/shared_widgets.dart';
@@ -29,6 +31,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   final _searchController = TextEditingController();
   Timer? _queryDebounce;
   String _query = '';
+  bool _requestingLocation = false;
+  bool _trackedDiscoverView = false;
 
   @override
   void dispose() {
@@ -51,25 +55,94 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     _queryDebounce = Timer(_searchDebounce, () {
       if (!mounted || _query == normalized) return;
       setState(() => _query = normalized);
+      _trackGuestEvent(
+        'discover_search',
+        details: {
+          'query': normalized,
+          'query_length': normalized.length,
+          'has_location':
+              ref.read(discoveryLocationProvider).asData?.value != null,
+        },
+      );
     });
   }
 
-  List<Venue> _filterVenues(List<Venue> venues) {
-    if (_query.isEmpty) return venues;
-    final needle = _query.toLowerCase();
-    return venues
-        .where((venue) {
-          final haystack =
-              '${venue.name} ${venue.category} ${venue.description} ${venue.address}'
-                  .toLowerCase();
-          return haystack.contains(needle);
-        })
-        .toList(growable: false);
+  void _trackGuestEvent(
+    String eventName, {
+    String? venueId,
+    Map<String, Object?> details = const {},
+  }) {
+    unawaited(
+      AppTelemetryService.trackGuestEvent(
+        eventName,
+        route: AppRoutePaths.discover,
+        venueId: venueId,
+        details: details,
+      ),
+    );
+  }
+
+  void _openVenue(Venue venue, {required String source}) {
+    _trackGuestEvent(
+      'venue_opened',
+      venueId: venue.id,
+      details: {
+        'source': source,
+        'slug': venue.slug,
+        'can_order': venue.canAcceptGuestOrders,
+        'is_open_now': venue.isOpenNow,
+      },
+    );
+    context.pushNamed(
+      AppRouteNames.venueDetail,
+      pathParameters: {AppRouteParams.slug: venue.slug},
+    );
+  }
+
+  Future<void> _requestLocation() async {
+    if (_requestingLocation) return;
+    _trackGuestEvent(
+      'discover_location_requested',
+      details: {'has_query': _query.isNotEmpty},
+    );
+    setState(() => _requestingLocation = true);
+    try {
+      final result = await ref
+          .read(discoveryLocationServiceProvider)
+          .getCurrentLocation(requestIfNeeded: true);
+      ref.invalidate(discoveryLocationProvider);
+      _trackGuestEvent(
+        'discover_location_result',
+        details: {'granted': result != null, 'has_query': _query.isNotEmpty},
+      );
+      if (result == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location is still unavailable. Enable it in the browser to rank venues near you.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _requestingLocation = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final venuesAsync = ref.watch(venuesProvider);
+    final discoveryLocation = ref
+        .watch(discoveryLocationProvider)
+        .asData
+        ?.value;
+    final venuesQuery = GuestVenueQuery(
+      query: _query.isEmpty ? null : _query,
+      latitude: discoveryLocation?.latitude,
+      longitude: discoveryLocation?.longitude,
+    );
+    final venuesAsync = ref.watch(guestVenueQueryProvider(venuesQuery));
 
     return venuesAsync.when(
       loading: () => const Center(
@@ -77,22 +150,45 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       ),
       error: (error, stackTrace) => ErrorState(
         message: 'Check your connection and try again.',
-        onRetry: () => ref.invalidate(venuesProvider),
+        onRetry: () => ref.invalidate(guestVenueQueryProvider(venuesQuery)),
       ),
-      data: (venues) => _DiscoverBody(
-        query: _query,
-        controller: _searchController,
-        venues: venues,
-        filteredVenues: _filterVenues(venues),
-        onQueryChanged: _onSearchChanged,
-        onClearQuery: () {
-          _queryDebounce?.cancel();
-          _searchController.clear();
-          if (_query.isNotEmpty) {
-            setState(() => _query = '');
-          }
-        },
-      ),
+      data: (venues) {
+        if (!_trackedDiscoverView && venues.isNotEmpty) {
+          _trackedDiscoverView = true;
+          _trackGuestEvent(
+            'discover_viewed',
+            details: {
+              'venue_count': venues.length,
+              'has_location': discoveryLocation != null,
+            },
+          );
+        }
+
+        return _DiscoverBody(
+          query: _query,
+          controller: _searchController,
+          venues: venues,
+          discoveryLocation: discoveryLocation,
+          requestingLocation: _requestingLocation,
+          onQueryChanged: _onSearchChanged,
+          onUseMyLocation: _requestLocation,
+          onOpenFeaturedVenue: (venue) =>
+              _openVenue(venue, source: 'discover_featured'),
+          onOpenResultVenue: (venue) =>
+              _openVenue(venue, source: 'discover_results'),
+          onOpenBrowse: () {
+            _trackGuestEvent('discover_view_all_tapped');
+            context.pushNamed(AppRouteNames.venuesBrowse);
+          },
+          onClearQuery: () {
+            _queryDebounce?.cancel();
+            _searchController.clear();
+            if (_query.isNotEmpty) {
+              setState(() => _query = '');
+            }
+          },
+        );
+      },
     );
   }
 }
@@ -101,23 +197,33 @@ class _DiscoverBody extends StatelessWidget {
   final String query;
   final TextEditingController controller;
   final List<Venue> venues;
-  final List<Venue> filteredVenues;
+  final DiscoveryCoordinates? discoveryLocation;
+  final bool requestingLocation;
   final ValueChanged<String> onQueryChanged;
+  final VoidCallback onUseMyLocation;
+  final ValueChanged<Venue> onOpenFeaturedVenue;
+  final ValueChanged<Venue> onOpenResultVenue;
+  final VoidCallback onOpenBrowse;
   final VoidCallback onClearQuery;
 
   const _DiscoverBody({
     required this.query,
     required this.controller,
     required this.venues,
-    required this.filteredVenues,
+    required this.discoveryLocation,
+    required this.requestingLocation,
     required this.onQueryChanged,
+    required this.onUseMyLocation,
+    required this.onOpenFeaturedVenue,
+    required this.onOpenResultVenue,
+    required this.onOpenBrowse,
     required this.onClearQuery,
   });
 
   @override
   Widget build(BuildContext context) {
     final featuredVenues = venues.take(6).toList(growable: false);
-    final results = filteredVenues;
+    final results = venues;
     final shouldAnimateResults = query.isEmpty;
 
     if (venues.isEmpty) {
@@ -141,7 +247,10 @@ class _DiscoverBody extends StatelessWidget {
             child: _DiscoverHero(
               controller: controller,
               query: query,
+              discoveryLocation: discoveryLocation,
+              requestingLocation: requestingLocation,
               onChanged: onQueryChanged,
+              onUseMyLocation: onUseMyLocation,
               onClear: onClearQuery,
             ),
           ),
@@ -169,8 +278,14 @@ class _DiscoverBody extends StatelessWidget {
                   AppTheme.space6,
                   0,
                 ),
-                itemBuilder: (context, index) =>
-                    _FeaturedVenueCard(venue: featuredVenues[index]),
+                itemBuilder: (context, index) => _FeaturedVenueCard(
+                  venue: featuredVenues[index],
+                  distanceLabel: _distanceLabelForVenue(
+                    featuredVenues[index],
+                    discoveryLocation,
+                  ),
+                  onTap: () => onOpenFeaturedVenue(featuredVenues[index]),
+                ),
                 separatorBuilder: (_, _) =>
                     const SizedBox(width: AppTheme.space6),
                 itemCount: featuredVenues.length,
@@ -213,7 +328,14 @@ class _DiscoverBody extends StatelessWidget {
                   const SizedBox(height: AppTheme.space4),
               itemBuilder: (context, index) {
                 final venue = results[index];
-                final card = _NearbyVenueCard(venue: venue);
+                final card = _NearbyVenueCard(
+                  venue: venue,
+                  distanceLabel: _distanceLabelForVenue(
+                    venue,
+                    discoveryLocation,
+                  ),
+                  onTap: () => onOpenResultVenue(venue),
+                );
                 if (!shouldAnimateResults) return card;
 
                 return card
@@ -232,9 +354,7 @@ class _DiscoverBody extends StatelessWidget {
                 AppTheme.space6,
                 AppTheme.space24,
               ),
-              child: _DiscoverCta(
-                onTap: () => context.pushNamed(AppRouteNames.venuesBrowse),
-              ),
+              child: _DiscoverCta(onTap: onOpenBrowse),
             ),
           ),
       ],
@@ -245,13 +365,19 @@ class _DiscoverBody extends StatelessWidget {
 class _DiscoverHero extends StatelessWidget {
   final TextEditingController controller;
   final String query;
+  final DiscoveryCoordinates? discoveryLocation;
+  final bool requestingLocation;
   final ValueChanged<String> onChanged;
+  final VoidCallback onUseMyLocation;
   final VoidCallback onClear;
 
   const _DiscoverHero({
     required this.controller,
     required this.query,
+    required this.discoveryLocation,
+    required this.requestingLocation,
     required this.onChanged,
+    required this.onUseMyLocation,
     required this.onClear,
   });
 
@@ -313,54 +439,120 @@ class _DiscoverHero extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  decoration: BoxDecoration(
-                    color: cs.surface.withValues(alpha: 0.96),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                    border: Border.all(color: AppColors.white10),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        LucideIcons.search,
-                        size: 20,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.68),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      decoration: BoxDecoration(
+                        color: cs.surface.withValues(alpha: 0.96),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                        border: Border.all(color: AppColors.white10),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: controller,
-                          onChanged: onChanged,
-                          textInputAction: TextInputAction.search,
-                          style: tt.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
+                      child: Row(
+                        children: [
+                          Icon(
+                            LucideIcons.search,
+                            size: 20,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.68),
                           ),
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            filled: false,
-                            hintText: 'Search venues...',
-                            hintStyle: tt.bodyLarge?.copyWith(
-                              color: cs.onSurfaceVariant.withValues(
-                                alpha: 0.30,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: controller,
+                              onChanged: onChanged,
+                              textInputAction: TextInputAction.search,
+                              style: tt.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
                               ),
-                              fontWeight: FontWeight.w800,
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                filled: false,
+                                hintText: 'Search venues...',
+                                hintStyle: tt.bodyLarge?.copyWith(
+                                  color: cs.onSurfaceVariant.withValues(
+                                    alpha: 0.30,
+                                  ),
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                          if (query.isNotEmpty)
+                            PressableScale(
+                              onTap: onClear,
+                              minTouchTargetSize: const Size(44, 44),
+                              child: Icon(
+                                LucideIcons.x,
+                                size: 18,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
                       ),
-                      if (query.isNotEmpty)
-                        PressableScale(
-                          onTap: onClear,
-                          minTouchTargetSize: const Size(44, 44),
-                          child: Icon(
-                            LucideIcons.x,
-                            size: 18,
-                            color: cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: AppTheme.space4),
+                    PressableScale(
+                      onTap: requestingLocation ? null : onUseMyLocation,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: discoveryLocation != null
+                              ? cs.primary.withValues(alpha: 0.14)
+                              : Colors.black.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusFull,
+                          ),
+                          border: Border.all(
+                            color: discoveryLocation != null
+                                ? cs.primary.withValues(alpha: 0.28)
+                                : AppColors.white10,
                           ),
                         ),
-                    ],
-                  ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (requestingLocation)
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: cs.primary,
+                                ),
+                              )
+                            else
+                              Icon(
+                                discoveryLocation != null
+                                    ? LucideIcons.navigation
+                                    : LucideIcons.mapPin,
+                                size: 16,
+                                color: discoveryLocation != null
+                                    ? cs.primary
+                                    : Colors.white,
+                              ),
+                            const SizedBox(width: 10),
+                            Text(
+                              discoveryLocation != null
+                                  ? 'NEAR YOU ACTIVE'
+                                  : 'USE MY LOCATION',
+                              style: TextStyle(
+                                color: discoveryLocation != null
+                                    ? cs.primary
+                                    : Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -416,8 +608,14 @@ class _SectionHeader extends StatelessWidget {
 
 class _FeaturedVenueCard extends StatelessWidget {
   final Venue venue;
+  final String? distanceLabel;
+  final VoidCallback onTap;
 
-  const _FeaturedVenueCard({required this.venue});
+  const _FeaturedVenueCard({
+    required this.venue,
+    required this.onTap,
+    this.distanceLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -425,10 +623,7 @@ class _FeaturedVenueCard extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return PressableScale(
-      onTap: () => context.pushNamed(
-        AppRouteNames.venueDetail,
-        pathParameters: {AppRouteParams.slug: venue.slug},
-      ),
+      onTap: onTap,
       child: SizedBox(
         width: 288,
         child: Container(
@@ -481,17 +676,24 @@ class _FeaturedVenueCard extends StatelessWidget {
                         Icon(LucideIcons.star, size: 15, color: cs.primary),
                         const SizedBox(width: 6),
                         Text(
-                          venue.rating.toStringAsFixed(
-                            venue.rating.truncateToDouble() == venue.rating
-                                ? 0
-                                : 1,
-                          ),
+                          _ratingLabel(venue),
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 13,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
+                        if (distanceLabel != null) ...[
+                          const SizedBox(width: 10),
+                          Text(
+                            distanceLabel!,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.74),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ],
@@ -507,8 +709,14 @@ class _FeaturedVenueCard extends StatelessWidget {
 
 class _NearbyVenueCard extends StatelessWidget {
   final Venue venue;
+  final String? distanceLabel;
+  final VoidCallback onTap;
 
-  const _NearbyVenueCard({required this.venue});
+  const _NearbyVenueCard({
+    required this.venue,
+    required this.onTap,
+    this.distanceLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -516,10 +724,7 @@ class _NearbyVenueCard extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return PressableScale(
-      onTap: () => context.pushNamed(
-        AppRouteNames.venueDetail,
-        pathParameters: {AppRouteParams.slug: venue.slug},
-      ),
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(AppTheme.space6),
         decoration: BoxDecoration(
@@ -556,14 +761,10 @@ class _NearbyVenueCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(
-                        LucideIcons.clock3,
-                        size: 15,
-                        color: cs.onSurfaceVariant,
-                      ),
+                      Icon(LucideIcons.star, size: 15, color: cs.primary),
                       const SizedBox(width: 6),
                       Text(
-                        venue.isOpen ? 'OPEN NOW' : 'CLOSED',
+                        _ratingLabel(venue),
                         style: TextStyle(
                           color: cs.onSurfaceVariant.withValues(alpha: 0.72),
                           fontSize: 10,
@@ -571,6 +772,23 @@ class _NearbyVenueCard extends StatelessWidget {
                           letterSpacing: 2.2,
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _MetaPill(
+                        label: venue.isOpenNow ? 'OPEN NOW' : 'CLOSED',
+                        isPrimary: venue.isOpenNow,
+                      ),
+                      if (venue.canAcceptGuestOrders)
+                        const _MetaPill(label: 'ORDERING'),
+                      if (venue.priceLevelLabel != null)
+                        _MetaPill(label: venue.priceLevelLabel!),
+                      if (distanceLabel != null)
+                        _MetaPill(label: distanceLabel!),
                     ],
                   ),
                 ],
@@ -590,6 +808,41 @@ class _NearbyVenueCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  final String label;
+  final bool isPrimary;
+
+  const _MetaPill({required this.label, this.isPrimary = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isPrimary
+            ? cs.primary.withValues(alpha: 0.14)
+            : AppColors.white5,
+        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+        border: Border.all(
+          color: isPrimary
+              ? cs.primary.withValues(alpha: 0.24)
+              : AppColors.white5,
+        ),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          color: isPrimary ? cs.primary : cs.onSurfaceVariant,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 2.0,
         ),
       ),
     );
@@ -672,4 +925,17 @@ class _DiscoverCta extends StatelessWidget {
       ),
     );
   }
+}
+
+String _ratingLabel(Venue venue) {
+  final rating = venue.rating.toStringAsFixed(
+    venue.rating.truncateToDouble() == venue.rating ? 0 : 1,
+  );
+  if (venue.ratingCount <= 0) return rating;
+  return '$rating · ${venue.ratingCount}';
+}
+
+String? _distanceLabelForVenue(Venue venue, DiscoveryCoordinates? location) {
+  if (location == null) return null;
+  return venue.distanceLabelFrom(location.latitude, location.longitude);
 }

@@ -50,6 +50,19 @@ class MenuRepository {
     return items;
   }
 
+  Future<MenuItem?> getMenuItemById(
+    String itemId, {
+    bool useAdminSession = false,
+  }) async {
+    final data = await DineinApiService.invoke(
+      'get_menu_item_by_id',
+      useAdminSession: useAdminSession,
+      payload: {'itemId': itemId},
+    );
+    if (data == null) return null;
+    return MenuItem.fromJson(data as Map<String, dynamic>);
+  }
+
   /// Fetch the admin menu review queue across all venues.
   Future<List<AdminMenuQueueEntry>> getAdminMenuQueue() async {
     final data =

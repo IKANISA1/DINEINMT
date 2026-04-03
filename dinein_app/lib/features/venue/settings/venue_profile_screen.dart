@@ -28,6 +28,7 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
   final _coverCtrl = TextEditingController();
 
   bool _saving = false;
+  bool _syncingProfile = false;
   String? _seededId;
 
   @override
@@ -86,6 +87,29 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
       ).showSnackBar(const SnackBar(content: Text('Could not save profile.')));
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _syncProfileData(Venue venue) async {
+    if (_syncingProfile) return;
+    setState(() => _syncingProfile = true);
+    try {
+      await VenueRepository.instance.enrichVenueProfile(venue.id);
+      ref.invalidate(currentVenueProvider);
+      ref.invalidate(venueByIdProvider(venue.id));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Venue discovery data refreshed.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not refresh venue discovery data.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _syncingProfile = false);
     }
   }
 
@@ -306,6 +330,147 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
                   ),
                 ).animate().fadeIn(duration: 300.ms),
                 const SizedBox(height: AppTheme.space6),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                    boxShadow: AppTheme.clayShadow,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Discovery Data',
+                                  style: tt.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Keep Maps data, review summaries, and geo metadata current for the guest web experience.',
+                                  style: tt.bodyMedium?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                    height: 1.45,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (venue.enrichmentStatus != null)
+                            StatusBadge(
+                              label: venue.enrichmentStatus!,
+                              color: AppColors.primary.withValues(alpha: 0.12),
+                              textColor: AppColors.primary,
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: AppTheme.space4),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          StatusBadge(
+                            label: '${venue.ratingCount} ratings',
+                            color: cs.surfaceContainerHigh,
+                            textColor: cs.onSurfaceVariant,
+                          ),
+                          if (venue.priceLevelLabel != null)
+                            StatusBadge(
+                              label: venue.priceLevelLabel!,
+                              color: cs.surfaceContainerHigh,
+                              textColor: cs.onSurfaceVariant,
+                            ),
+                          StatusBadge(
+                            label:
+                                venue.latitude != null &&
+                                    venue.longitude != null
+                                ? 'Geo Ready'
+                                : 'Geo Missing',
+                            color:
+                                venue.latitude != null &&
+                                    venue.longitude != null
+                                ? AppColors.primary.withValues(alpha: 0.12)
+                                : cs.error.withValues(alpha: 0.12),
+                            textColor:
+                                venue.latitude != null &&
+                                    venue.longitude != null
+                                ? AppColors.primary
+                                : cs.error,
+                          ),
+                        ],
+                      ),
+                      if (venue.primaryReviewSnippet != null) ...[
+                        const SizedBox(height: AppTheme.space4),
+                        Text(
+                          venue.primaryReviewSnippet!,
+                          style: tt.bodyMedium?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            height: 1.55,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: AppTheme.space5),
+                      SizedBox(
+                        width: double.infinity,
+                        child: PressableScale(
+                          onTap: _syncingProfile
+                              ? null
+                              : () => _syncProfileData(venue),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (_syncingProfile)
+                                  const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.onPrimary,
+                                    ),
+                                  )
+                                else
+                                  const Icon(
+                                    LucideIcons.sparkles,
+                                    size: 16,
+                                    color: AppColors.onPrimary,
+                                  ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _syncingProfile
+                                      ? 'SYNCING...'
+                                      : 'SYNC PROFILE DATA',
+                                  style: TextStyle(
+                                    color: AppColors.onPrimary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 2.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppTheme.space4),
                 _ProfileField(
                   icon: LucideIcons.user,
                   label: 'VENUE NAME',

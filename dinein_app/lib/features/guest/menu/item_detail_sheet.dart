@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/models/models.dart';
 import '../../../shared/widgets/shared_widgets.dart';
+import 'menu_item_badges.dart';
 
 /// Item detail bottom sheet — shown when tapping a menu item.
 /// Allows selecting quantity and viewing full description.
@@ -104,25 +105,10 @@ class _ItemDetailSheetState extends State<ItemDetailSheet> {
 
               const SizedBox(height: AppTheme.space6),
 
-              // ─── Tags ───
-              if (item.tags.isNotEmpty)
+              if (item.guestDisplayTags.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppTheme.space3),
-                  child: Wrap(
-                    spacing: 8,
-                    children: item.tags.map((tag) {
-                      final isSignature = tag == 'Signature';
-                      return StatusBadge(
-                        label: tag,
-                        color: isSignature
-                            ? cs.primary.withValues(alpha: 0.12)
-                            : cs.surfaceContainerHigh,
-                        textColor: isSignature
-                            ? cs.primary
-                            : cs.onSurfaceVariant,
-                      );
-                    }).toList(),
-                  ),
+                  child: MenuItemBadges(item: item),
                 ),
 
               // ─── Name + Price ───
@@ -151,8 +137,6 @@ class _ItemDetailSheetState extends State<ItemDetailSheet> {
                   height: 1.5,
                 ),
               ),
-
-
 
               const SizedBox(height: AppTheme.space6),
 

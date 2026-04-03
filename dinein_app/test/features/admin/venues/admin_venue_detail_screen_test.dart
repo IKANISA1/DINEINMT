@@ -73,7 +73,7 @@ void main() {
     await pumpScreen(
       tester,
       venue: buildVenue(),
-      onUpdateVenue: (_, __) async {},
+      onUpdateVenue: (venueId, updates) async {},
     );
 
     await tester.scrollUntilVisible(

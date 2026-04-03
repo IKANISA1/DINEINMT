@@ -138,10 +138,12 @@ final List<RouteBase> guestRoutes = [
         path: AppRoutePaths.venueMenuChild,
         name: AppRouteNames.menu,
         builder: (context, state) {
-          final venueId =
-              state.extra as String? ??
-              state.pathParameters[AppRouteParams.slug]!;
-          return MenuScreen(venueId: venueId);
+          final extra = state.extra;
+          final venueId = extra is String ? extra : null;
+          return MenuScreen(
+            venueId: venueId,
+            venueSlug: state.pathParameters[AppRouteParams.slug],
+          );
         },
       ),
     ],

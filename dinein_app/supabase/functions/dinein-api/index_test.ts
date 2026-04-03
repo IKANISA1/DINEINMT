@@ -194,6 +194,71 @@ Deno.test("sanitizeOrderInsert rejects anonymous user spoofing", () => {
   );
 });
 
+Deno.test({
+  name: "track_guest_event stores the guest funnel event payload",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    let insertedBody: Record<string, unknown> | null = null;
+
+    mockFetch(async (req) => {
+      if (
+        req.url.includes("/rest/v1/dinein_guest_analytics_events") &&
+        req.method === "POST"
+      ) {
+        insertedBody = await req.json();
+        return new Response(JSON.stringify({ id: "event-1" }), {
+          status: 201,
+        });
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "DineIn Test Agent",
+          "Referer": "https://dineinmt.ikanisa.com/discover",
+        },
+        body: JSON.stringify({
+          action: "track_guest_event",
+          country: "MT",
+          event_name: "guest_venue_opened",
+          session_id: "guest-session-1",
+          route: "/v/harbor-table",
+          venue_id: "venue-123",
+          details: {
+            source: "discover",
+            query: "seafood",
+          },
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 201);
+      if (insertedBody == null) {
+        throw new Error("Expected analytics insert payload to be captured.");
+      }
+      const inserted = insertedBody;
+      assertEquals(inserted["event_name"], "guest_venue_opened");
+      assertEquals(inserted["session_id"], "guest-session-1");
+      assertEquals(inserted["country"], "MT");
+      assertEquals(inserted["route"], "/v/harbor-table");
+      assertEquals(inserted["venue_id"], "venue-123");
+      assertEquals(inserted["user_agent"], "DineIn Test Agent");
+      assertEquals(
+        (inserted["details"] as Record<string, unknown>)["source"],
+        "discover",
+      );
+    } finally {
+      restoreFetch();
+    }
+  },
+});
+
 Deno.test("normalizeWaveTableNumber canonicalizes numeric values", () => {
   assertEquals(normalizeWaveTableNumber(" 04 "), "4");
   assertEquals(normalizeWaveTableNumber(12), "12");
@@ -624,6 +689,168 @@ Deno.test({
       assertEquals(body.data?.[0]?.id, "item-1");
       assertEquals(body.data?.[0]?.price, 0);
       assertEquals(body.data?.[0]?.price_hidden, true);
+    } finally {
+      restoreFetch();
+    }
+  },
+});
+
+Deno.test({
+  name:
+    "get_venues filters by query and ordering readiness, then ranks by distance when coordinates are provided",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    mockFetch(async (req) => {
+      if (req.url.includes("/rest/v1/dinein_venues")) {
+        return new Response(
+          JSON.stringify([
+            {
+              id: "venue-near",
+              name: "Atlas Grill",
+              slug: "atlas-grill",
+              category: "Seafood",
+              description: "Lakefront seafood grill",
+              address: "Kigali Heights",
+              phone: "+250700000001",
+              status: "active",
+              ordering_enabled: true,
+              supported_payment_methods: ["cash"],
+              access_verified_at: "2026-04-02T10:00:00.000Z",
+              image_url: "https://cdn.example.com/atlas-grill.png",
+              rating: 4.6,
+              rating_count: 120,
+              country: "RW",
+              google_location: { latitude: -1.9442, longitude: 30.0621 },
+            },
+            {
+              id: "venue-far",
+              name: "Harbor Table",
+              slug: "harbor-table",
+              category: "Seafood",
+              description: "Ocean-style seafood dining",
+              address: "Kimihurura",
+              phone: "+250700000002",
+              status: "active",
+              ordering_enabled: true,
+              supported_payment_methods: ["cash"],
+              access_verified_at: "2026-04-02T10:00:00.000Z",
+              image_url: "https://cdn.example.com/harbor-table.png",
+              rating: 4.9,
+              rating_count: 300,
+              country: "RW",
+              google_location: { latitude: -1.9505, longitude: 30.0899 },
+            },
+            {
+              id: "venue-preview",
+              name: "Quiet Bar",
+              slug: "quiet-bar",
+              category: "Seafood",
+              description: "Seafood lounge preview only",
+              address: "Kacyiru",
+              status: "active",
+              ordering_enabled: false,
+              rating: 4.7,
+              rating_count: 90,
+              country: "RW",
+              google_location: { latitude: -1.9435, longitude: 30.0608 },
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_venues",
+          country: "RW",
+          query: "seafood",
+          category: "Seafood",
+          ordering_only: true,
+          latitude: -1.9445,
+          longitude: 30.0620,
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+
+      const body = await res.json();
+      assertEquals(body.data?.length, 2);
+      assertEquals(body.data?.[0]?.id, "venue-near");
+      assertEquals(body.data?.[1]?.id, "venue-far");
+      assertEquals(typeof body.data?.[0]?.distance_km, "number");
+    } finally {
+      restoreFetch();
+    }
+  },
+});
+
+Deno.test({
+  name:
+    "get_menu_item_by_id returns a guest-visible item and hides price for browse-only venues",
+  sanitizeOps: false,
+  sanitizeResources: false,
+  async fn() {
+    mockFetch(async (req) => {
+      if (
+        req.url.includes("/rest/v1/dinein_menu_items") &&
+        req.url.includes("id=eq.item-1")
+      ) {
+        return new Response(
+          JSON.stringify({
+            id: "item-1",
+            venue_id: "venue-123",
+            name: "Visible Item",
+            description: "Shown to guests",
+            category: "Mains",
+            price: 14,
+            is_available: true,
+            tags: ["vegan"],
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (req.url.includes("/rest/v1/dinein_venues")) {
+        return new Response(
+          JSON.stringify({
+            id: "venue-123",
+            name: "Preview Venue",
+            status: "active",
+            ordering_enabled: false,
+          }),
+          { status: 200 },
+        );
+      }
+
+      throw new Error(`Unexpected fetch in test: ${req.method} ${req.url}`);
+    });
+
+    try {
+      const req = new Request("http://localhost:8000/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "get_menu_item_by_id",
+          itemId: "item-1",
+        }),
+      });
+
+      const res = await handleAppRequest(req);
+      assertEquals(res.status, 200);
+
+      const body = await res.json();
+      assertEquals(body.data?.id, "item-1");
+      assertEquals(body.data?.price, 0);
+      assertEquals(body.data?.price_hidden, true);
+      assertEquals(body.data?.tags, ["vegan"]);
     } finally {
       restoreFetch();
     }

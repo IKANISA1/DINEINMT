@@ -71,6 +71,7 @@ class _AdminVenueDetailScreenState
   bool _orderingEnabled = false;
   String _wifiSecurity = 'WPA';
   bool _saving = false;
+  bool _syncingProfile = false;
   String? _seededKey;
   bool _slugDirty = false;
 
@@ -418,6 +419,26 @@ class _AdminVenueDetailScreenState
       if (!mounted) return;
     }
     _showSnack('Unable to open $label.');
+  }
+
+  Future<void> _syncProfileData(Venue venue) async {
+    if (_syncingProfile) return;
+    setState(() => _syncingProfile = true);
+    try {
+      await VenueRepository.instance.enrichVenueProfile(
+        venue.id,
+        useAdminSession: true,
+      );
+      _invalidateVenueCaches(venue.id);
+      if (!mounted) return;
+      _showSnack('Venue discovery data refreshed.');
+    } catch (error) {
+      _showSnack('Could not refresh venue discovery data: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _syncingProfile = false);
+      }
+    }
   }
 
   void _showQrSheet({
@@ -783,6 +804,134 @@ class _AdminVenueDetailScreenState
                     ],
                   ),
                 ),
+                if (venue != null) ...[
+                  const SizedBox(height: AppTheme.space4),
+                  ClayCard(
+                    padding: const EdgeInsets.all(AppTheme.space5),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Discovery Data',
+                                    style: tt.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Refresh Maps-backed profile data used across guest discovery, venue detail, and admin review surfaces.',
+                                    style: tt.bodyMedium?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (venue.enrichmentStatus != null)
+                              StatusBadge(
+                                label: venue.enrichmentStatus!,
+                                color: cs.primary.withValues(alpha: 0.12),
+                                textColor: cs.primary,
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppTheme.space4),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            StatusBadge(
+                              label: '${venue.ratingCount} ratings',
+                              color: cs.surfaceContainerHigh,
+                              textColor: cs.onSurfaceVariant,
+                            ),
+                            if (venue.priceLevelLabel != null)
+                              StatusBadge(
+                                label: venue.priceLevelLabel!,
+                                color: cs.surfaceContainerHigh,
+                                textColor: cs.onSurfaceVariant,
+                              ),
+                            StatusBadge(
+                              label:
+                                  venue.latitude != null &&
+                                      venue.longitude != null
+                                  ? 'Geo Ready'
+                                  : 'Geo Missing',
+                              color:
+                                  venue.latitude != null &&
+                                      venue.longitude != null
+                                  ? cs.primary.withValues(alpha: 0.12)
+                                  : cs.error.withValues(alpha: 0.12),
+                              textColor:
+                                  venue.latitude != null &&
+                                      venue.longitude != null
+                                  ? cs.primary
+                                  : cs.error,
+                            ),
+                          ],
+                        ),
+                        if (venue.primaryReviewSnippet != null) ...[
+                          const SizedBox(height: AppTheme.space4),
+                          Text(
+                            venue.primaryReviewSnippet!,
+                            style: tt.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.55,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: AppTheme.space5),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: PremiumButton(
+                                label: _syncingProfile
+                                    ? 'SYNCING...'
+                                    : 'SYNC PROFILE DATA',
+                                icon: LucideIcons.sparkles,
+                                onPressed: _syncingProfile
+                                    ? null
+                                    : () => _syncProfileData(venue),
+                              ),
+                            ),
+                            if (venue.googleMapsUri != null) ...[
+                              const SizedBox(width: AppTheme.space3),
+                              PressableScale(
+                                onTap: () => _openLink(
+                                  'Map',
+                                  Uri.parse(venue.googleMapsUri!),
+                                ),
+                                child: Container(
+                                  width: 52,
+                                  height: 52,
+                                  decoration: BoxDecoration(
+                                    color: cs.surfaceContainerHigh,
+                                    borderRadius: BorderRadius.circular(
+                                      AppTheme.radiusLg,
+                                    ),
+                                    border: Border.all(color: AppColors.white5),
+                                  ),
+                                  child: Icon(
+                                    LucideIcons.mapPin,
+                                    size: 20,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppTheme.space4),
                 _SectionCard(
                   title: 'Core Details',

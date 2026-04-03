@@ -9,18 +9,13 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../../core/models/models.dart';
 import '../../../core/providers/providers.dart';
 import '../../../core/router/app_routes.dart';
+import '../../../core/services/app_telemetry.dart';
+import '../../../core/services/discovery_location_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/shared_widgets.dart';
 
-const _venueCategories = [
-  'All',
-  'Bars',
-  'Restaurants',
-  'Immersive Sound',
-  'Seafood',
-  'Italian',
-];
+const _baseVenueFilters = ['All', 'Open Now', 'Ordering'];
 
 const _grayscaleMatrix = <double>[
   0.2126,
@@ -59,6 +54,8 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
   Timer? _queryDebounce;
   List<String> _selectedCategories = const ['All'];
   String _query = '';
+  bool _requestingLocation = false;
+  bool _trackedBrowseView = false;
 
   @override
   void dispose() {
@@ -81,106 +78,240 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
     _queryDebounce = Timer(_searchDebounce, () {
       if (!mounted || _query == normalized) return;
       setState(() => _query = normalized);
+      _trackGuestEvent(
+        'venues_search',
+        details: {
+          'query': normalized,
+          'query_length': normalized.length,
+          'filters': _selectedCategories,
+          'has_location':
+              ref.read(discoveryLocationProvider).asData?.value != null,
+        },
+      );
     });
+  }
+
+  void _trackGuestEvent(
+    String eventName, {
+    String? venueId,
+    Map<String, Object?> details = const {},
+  }) {
+    unawaited(
+      AppTelemetryService.trackGuestEvent(
+        eventName,
+        route: AppRoutePaths.venuesBrowse,
+        venueId: venueId,
+        details: details,
+      ),
+    );
+  }
+
+  void _openVenue(Venue venue) {
+    _trackGuestEvent(
+      'venue_opened',
+      venueId: venue.id,
+      details: {
+        'source': 'venues_browse',
+        'slug': venue.slug,
+        'can_order': venue.canAcceptGuestOrders,
+        'is_open_now': venue.isOpenNow,
+      },
+    );
+    context.pushNamed(
+      AppRouteNames.venueDetail,
+      pathParameters: {AppRouteParams.slug: venue.slug},
+    );
   }
 
   void _toggleCategory(String category) {
     setState(() {
       if (category == 'All') {
         _selectedCategories = const ['All'];
-        return;
-      }
-
-      final next = _selectedCategories.where((item) => item != 'All').toList();
-      if (next.contains(category)) {
-        next.remove(category);
       } else {
-        next.add(category);
+        final next = _selectedCategories
+            .where((item) => item != 'All')
+            .toList();
+        if (next.contains(category)) {
+          next.remove(category);
+        } else {
+          next.add(category);
+        }
+        _selectedCategories = next.isEmpty ? const ['All'] : next;
       }
-      _selectedCategories = next.isEmpty ? const ['All'] : next;
     });
+
+    _trackGuestEvent(
+      'venues_filters_changed',
+      details: {'filters': _selectedCategories, 'query': _query},
+    );
   }
 
-  bool _matchesCategory(Venue venue, String category) {
-    if (category == 'All') return true;
-
-    final haystack = '${venue.category} ${venue.description} ${venue.name}'
-        .toLowerCase();
-
-    switch (category) {
-      case 'Bars':
-        return haystack.contains('bar') ||
-            haystack.contains('lounge') ||
-            haystack.contains('cocktail') ||
-            haystack.contains('pub') ||
-            haystack.contains('rooftop');
-      case 'Restaurants':
-        return haystack.contains('restaurant') ||
-            haystack.contains('grill') ||
-            haystack.contains('bistro') ||
-            haystack.contains('dining') ||
-            haystack.contains('gastro');
-      case 'Immersive Sound':
-        return haystack.contains('immersive') ||
-            haystack.contains('sound') ||
-            haystack.contains('music');
-      case 'Seafood':
-        return haystack.contains('seafood') || haystack.contains('fish');
-      case 'Italian':
-        return haystack.contains('italian') ||
-            haystack.contains('pizza') ||
-            haystack.contains('pasta') ||
-            haystack.contains('trattoria');
+  List<String> _buildCategoryOptions(List<Venue> venues) {
+    final categoryCounts = <String, int>{};
+    for (final venue in venues) {
+      final category = venue.category.trim();
+      if (category.isEmpty) continue;
+      categoryCounts.update(category, (count) => count + 1, ifAbsent: () => 1);
     }
 
-    return false;
+    final rankedCategories = categoryCounts.entries.toList()
+      ..sort((left, right) {
+        final countCompare = right.value.compareTo(left.value);
+        if (countCompare != 0) return countCompare;
+        return left.key.compareTo(right.key);
+      });
+
+    return [
+      ..._baseVenueFilters,
+      ...rankedCategories
+          .map((entry) => entry.key)
+          .where((category) => !_baseVenueFilters.contains(category))
+          .take(6),
+    ];
   }
 
-  List<Venue> _filterVenues(List<Venue> venues) {
+  Future<void> _requestLocation() async {
+    if (_requestingLocation) return;
+    _trackGuestEvent(
+      'venues_location_requested',
+      details: {'filters': _selectedCategories, 'query': _query},
+    );
+    setState(() => _requestingLocation = true);
+    try {
+      final result = await ref
+          .read(discoveryLocationServiceProvider)
+          .getCurrentLocation(requestIfNeeded: true);
+      ref.invalidate(discoveryLocationProvider);
+      _trackGuestEvent(
+        'venues_location_result',
+        details: {
+          'granted': result != null,
+          'filters': _selectedCategories,
+          'query': _query,
+        },
+      );
+      if (result == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Location is still unavailable. Enable it in the browser to browse venues near you.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _requestingLocation = false);
+      }
+    }
+  }
+
+  GuestVenueQuery _buildGuestVenueQuery(DiscoveryCoordinates? location) {
     final selected = _selectedCategories;
+    final categoryFilters = selected
+        .where((category) => !_baseVenueFilters.contains(category))
+        .toList(growable: false);
+    final backendCategory = categoryFilters.length == 1
+        ? categoryFilters.first
+        : null;
+
+    return GuestVenueQuery(
+      query: _query.isEmpty ? null : _query,
+      category: backendCategory,
+      orderingOnly: selected.contains('Ordering'),
+      latitude: location?.latitude,
+      longitude: location?.longitude,
+    );
+  }
+
+  List<Venue> _applyClientFilters(List<Venue> venues) {
+    final selected = _selectedCategories;
+    final categoryFilters = selected.where(
+      (category) => !_baseVenueFilters.contains(category),
+    );
+
     return venues
         .where((venue) {
-          final matchesSearch =
-              _query.isEmpty ||
-              venue.name.toLowerCase().contains(_query.toLowerCase()) ||
-              venue.category.toLowerCase().contains(_query.toLowerCase()) ||
-              venue.description.toLowerCase().contains(_query.toLowerCase());
+          if (selected.contains('Open Now') && !venue.isOpenNow) {
+            return false;
+          }
+          if (categoryFilters.isNotEmpty &&
+              !categoryFilters.contains(venue.category)) {
+            return false;
+          }
 
-          final matchesCategory =
-              selected.contains('All') ||
-              selected.any((category) => _matchesCategory(venue, category));
-
-          return matchesSearch && matchesCategory;
+          return true;
         })
         .toList(growable: false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final venuesAsync = ref.watch(venuesProvider);
+    final discoveryLocation = ref
+        .watch(discoveryLocationProvider)
+        .asData
+        ?.value;
+    final allVenuesAsync = ref.watch(venuesProvider);
+    final venuesQuery = _buildGuestVenueQuery(discoveryLocation);
+    final filteredVenuesAsync = ref.watch(guestVenueQueryProvider(venuesQuery));
 
-    return venuesAsync.when(
+    return allVenuesAsync.when(
       loading: () => const Center(
         child: SkeletonLoader(width: double.infinity, height: 320),
       ),
       error: (error, stackTrace) => ErrorState(
         message: 'Failed to load venues.',
-        onRetry: () => ref.invalidate(venuesProvider),
+        onRetry: () {
+          ref.invalidate(venuesProvider);
+          ref.invalidate(guestVenueQueryProvider(venuesQuery));
+        },
       ),
-      data: (venues) => _VenuesBody(
-        venues: _filterVenues(venues),
-        query: _query,
-        searchController: _searchController,
-        selectedCategories: _selectedCategories,
-        onSearchChanged: _onSearchChanged,
-        onCategorySelected: _toggleCategory,
-        onResetFilters: () {
-          _queryDebounce?.cancel();
-          _searchController.clear();
-          setState(() {
-            _query = '';
-            _selectedCategories = const ['All'];
-          });
+      data: (allVenues) => filteredVenuesAsync.when(
+        loading: () => const Center(
+          child: SkeletonLoader(width: double.infinity, height: 320),
+        ),
+        error: (error, stackTrace) => ErrorState(
+          message: 'Failed to load venues.',
+          onRetry: () {
+            ref.invalidate(venuesProvider);
+            ref.invalidate(guestVenueQueryProvider(venuesQuery));
+          },
+        ),
+        data: (fetchedVenues) {
+          final venues = _applyClientFilters(fetchedVenues);
+          if (!_trackedBrowseView && allVenues.isNotEmpty) {
+            _trackedBrowseView = true;
+            _trackGuestEvent(
+              'venues_browse_viewed',
+              details: {
+                'venue_count': venues.length,
+                'has_location': discoveryLocation != null,
+              },
+            );
+          }
+
+          return _VenuesBody(
+            venues: venues,
+            categoryOptions: _buildCategoryOptions(allVenues),
+            query: _query,
+            searchController: _searchController,
+            discoveryLocation: discoveryLocation,
+            requestingLocation: _requestingLocation,
+            selectedCategories: _selectedCategories,
+            onSearchChanged: _onSearchChanged,
+            onUseMyLocation: _requestLocation,
+            onCategorySelected: _toggleCategory,
+            onOpenVenue: _openVenue,
+            onResetFilters: () {
+              _queryDebounce?.cancel();
+              _searchController.clear();
+              setState(() {
+                _query = '';
+                _selectedCategories = const ['All'];
+              });
+              _trackGuestEvent('venues_filters_reset');
+            },
+          );
         },
       ),
     );
@@ -189,20 +320,30 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
 
 class _VenuesBody extends StatelessWidget {
   final List<Venue> venues;
+  final List<String> categoryOptions;
   final String query;
   final TextEditingController searchController;
+  final DiscoveryCoordinates? discoveryLocation;
+  final bool requestingLocation;
   final List<String> selectedCategories;
   final ValueChanged<String> onSearchChanged;
+  final VoidCallback onUseMyLocation;
   final ValueChanged<String> onCategorySelected;
+  final ValueChanged<Venue> onOpenVenue;
   final VoidCallback onResetFilters;
 
   const _VenuesBody({
     required this.venues,
+    required this.categoryOptions,
     required this.query,
     required this.searchController,
+    required this.discoveryLocation,
+    required this.requestingLocation,
     required this.selectedCategories,
     required this.onSearchChanged,
+    required this.onUseMyLocation,
     required this.onCategorySelected,
+    required this.onOpenVenue,
     required this.onResetFilters,
   });
 
@@ -214,6 +355,9 @@ class _VenuesBody extends StatelessWidget {
         query.isEmpty &&
         selectedCategories.length == 1 &&
         selectedCategories.first == 'All';
+    final screenWidth = MediaQuery.of(context).size.width;
+    final useGrid = screenWidth >= 1100;
+    final crossAxisCount = screenWidth >= 1480 ? 3 : 2;
 
     return CustomScrollView(
       slivers: [
@@ -279,6 +423,9 @@ class _VenuesBody extends StatelessWidget {
                               child: TextField(
                                 controller: searchController,
                                 onChanged: onSearchChanged,
+                                style: tt.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
                                   filled: false,
@@ -295,21 +442,59 @@ class _VenuesBody extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: AppTheme.space4),
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainer,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                        border: Border.all(color: AppColors.white5),
-                      ),
-                      child: Icon(
-                        LucideIcons.slidersHorizontal,
-                        size: 24,
-                        color: AppColors.white40,
+                    PressableScale(
+                      onTap: requestingLocation ? null : onUseMyLocation,
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: discoveryLocation != null
+                              ? cs.primary.withValues(alpha: 0.14)
+                              : cs.surfaceContainer,
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusXl,
+                          ),
+                          border: Border.all(
+                            color: discoveryLocation != null
+                                ? cs.primary.withValues(alpha: 0.28)
+                                : AppColors.white5,
+                          ),
+                        ),
+                        child: Center(
+                          child: requestingLocation
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: cs.primary,
+                                  ),
+                                )
+                              : Icon(
+                                  discoveryLocation != null
+                                      ? LucideIcons.navigation
+                                      : LucideIcons.mapPin,
+                                  size: 22,
+                                  color: discoveryLocation != null
+                                      ? cs.primary
+                                      : AppColors.white40,
+                                ),
+                        ),
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: AppTheme.space4),
+                Text(
+                  discoveryLocation != null
+                      ? 'VENUES ARE RANKED USING YOUR CURRENT LOCATION'
+                      : 'ALLOW LOCATION TO RANK VENUES NEAR YOU',
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.58),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.1,
+                  ),
                 ),
               ],
             ),
@@ -327,7 +512,7 @@ class _VenuesBody extends StatelessWidget {
               ),
               scrollDirection: Axis.horizontal,
               itemBuilder: (context, index) {
-                final category = _venueCategories[index];
+                final category = categoryOptions[index];
                 final isSelected = selectedCategories.contains(category);
                 return PressableScale(
                   onTap: () => onCategorySelected(category),
@@ -367,7 +552,7 @@ class _VenuesBody extends StatelessWidget {
               },
               separatorBuilder: (_, _) =>
                   const SizedBox(width: AppTheme.space3),
-              itemCount: _venueCategories.length,
+              itemCount: categoryOptions.length,
             ),
           ),
         ),
@@ -376,6 +561,34 @@ class _VenuesBody extends StatelessWidget {
           SliverFillRemaining(
             hasScrollBody: false,
             child: _EmptyVenuesState(onResetFilters: onResetFilters),
+          )
+        else if (useGrid)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                mainAxisSpacing: AppTheme.space8,
+                crossAxisSpacing: AppTheme.space6,
+                childAspectRatio: 0.66,
+              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final venue = venues[index];
+                final card = _VenueCard(
+                  venue: venue,
+                  distanceLabel: _distanceLabelForVenue(
+                    venue,
+                    discoveryLocation,
+                  ),
+                  onTap: () => onOpenVenue(venue),
+                );
+                if (!shouldAnimateVenues) return card;
+                return card
+                    .animate(delay: (50 * index).ms)
+                    .fadeIn(duration: 350.ms)
+                    .slideY(begin: 0.08, end: 0);
+              }, childCount: venues.length),
+            ),
           )
         else
           SliverPadding(
@@ -386,7 +599,14 @@ class _VenuesBody extends StatelessWidget {
                   const SizedBox(height: AppTheme.space8),
               itemBuilder: (context, index) {
                 final venue = venues[index];
-                final card = _VenueCard(venue: venue);
+                final card = _VenueCard(
+                  venue: venue,
+                  distanceLabel: _distanceLabelForVenue(
+                    venue,
+                    discoveryLocation,
+                  ),
+                  onTap: () => onOpenVenue(venue),
+                );
                 if (!shouldAnimateVenues) return card;
 
                 return card
@@ -404,8 +624,14 @@ class _VenuesBody extends StatelessWidget {
 
 class _VenueCard extends StatelessWidget {
   final Venue venue;
+  final String? distanceLabel;
+  final VoidCallback onTap;
 
-  const _VenueCard({required this.venue});
+  const _VenueCard({
+    required this.venue,
+    required this.onTap,
+    this.distanceLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -413,10 +639,7 @@ class _VenueCard extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return PressableScale(
-      onTap: () => context.pushNamed(
-        AppRouteNames.venueDetail,
-        pathParameters: {AppRouteParams.slug: venue.slug},
-      ),
+      onTap: onTap,
       child: Column(
         children: [
           AspectRatio(
@@ -476,11 +699,7 @@ class _VenueCard extends StatelessWidget {
                           Icon(LucideIcons.star, size: 12, color: cs.primary),
                           const SizedBox(width: 6),
                           Text(
-                            venue.rating.toStringAsFixed(
-                              venue.rating.truncateToDouble() == venue.rating
-                                  ? 0
-                                  : 1,
-                            ),
+                            _ratingLabel(venue),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 11,
@@ -518,6 +737,23 @@ class _VenueCard extends StatelessWidget {
                             height: 0.96,
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _VenueMetaPill(
+                              label: venue.isOpenNow ? 'OPEN NOW' : 'CLOSED',
+                              isPrimary: venue.isOpenNow,
+                            ),
+                            if (venue.canAcceptGuestOrders)
+                              const _VenueMetaPill(label: 'ORDERING'),
+                            if (venue.priceLevelLabel != null)
+                              _VenueMetaPill(label: venue.priceLevelLabel!),
+                            if (distanceLabel != null)
+                              _VenueMetaPill(label: distanceLabel!),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -536,7 +772,10 @@ class _VenueCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    venue.isOpen ? 'OPEN' : 'CLOSED',
+                    venue.primaryReviewSnippet ??
+                        (venue.isOpenNow ? 'OPEN NOW' : 'CLOSED'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: AppColors.white40,
                       fontSize: 10,
@@ -562,6 +801,41 @@ class _VenueCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _VenueMetaPill extends StatelessWidget {
+  final String label;
+  final bool isPrimary;
+
+  const _VenueMetaPill({required this.label, this.isPrimary = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isPrimary
+            ? cs.primary.withValues(alpha: 0.14)
+            : Colors.black.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+        border: Border.all(
+          color: isPrimary
+              ? cs.primary.withValues(alpha: 0.28)
+              : AppColors.white10,
+        ),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          color: isPrimary ? cs.primary : Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 2.0,
+        ),
       ),
     );
   }
@@ -641,4 +915,17 @@ class _EmptyVenuesState extends StatelessWidget {
       ),
     );
   }
+}
+
+String _ratingLabel(Venue venue) {
+  final rating = venue.rating.toStringAsFixed(
+    venue.rating.truncateToDouble() == venue.rating ? 0 : 1,
+  );
+  if (venue.ratingCount <= 0) return rating;
+  return '$rating · ${venue.ratingCount}';
+}
+
+String? _distanceLabelForVenue(Venue venue, DiscoveryCoordinates? location) {
+  if (location == null) return null;
+  return venue.distanceLabelFrom(location.latitude, location.longitude);
 }

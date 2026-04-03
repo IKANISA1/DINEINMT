@@ -18,8 +18,24 @@ class VenueRepository {
   /// Fetch all guest-visible venues for discovery.
   ///
   /// Use [limit] and [offset] for pagination. Omit both to fetch all.
-  Future<List<Venue>> getVenues({int? limit, int? offset}) async {
-    final payload = <String, dynamic>{'limit': ?limit, 'offset': ?offset};
+  Future<List<Venue>> getVenues({
+    int? limit,
+    int? offset,
+    String? query,
+    String? category,
+    bool orderingOnly = false,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final payload = <String, dynamic>{
+      'limit': ?limit,
+      'offset': ?offset,
+      'query': ?query,
+      'category': ?category,
+      if (orderingOnly) 'ordering_only': true,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
+    };
     final data =
         await DineinApiService.invoke('get_venues', payload: payload)
             as List<dynamic>;

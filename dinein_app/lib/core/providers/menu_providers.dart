@@ -17,6 +17,13 @@ final menuItemsProvider = FutureProvider.family<List<MenuItem>, String>((
   }
 });
 
+final menuItemByIdProvider = FutureProvider.family<MenuItem?, String>((
+  ref,
+  itemId,
+) async {
+  return await MenuRepository.instance.getMenuItemById(itemId);
+});
+
 /// Menu items for a given venue in the admin console.
 final adminMenuItemsProvider = FutureProvider.family<List<MenuItem>, String>((
   ref,

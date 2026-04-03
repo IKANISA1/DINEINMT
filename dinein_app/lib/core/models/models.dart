@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:equatable/equatable.dart';
 import '../constants/enums.dart';
 
@@ -55,6 +57,22 @@ Map<String, String>? _parseStringMap(Object? raw) {
   }
 
   return parsed.isEmpty ? null : parsed;
+}
+
+Map<String, dynamic>? _parseJsonMap(Object? raw) {
+  if (raw is Map<String, dynamic>) return raw;
+  if (raw is Map) {
+    return raw.map((key, value) => MapEntry('$key', value));
+  }
+  return null;
+}
+
+double? _doubleFromDynamic(Object? raw) {
+  return switch (raw) {
+    num value => value.toDouble(),
+    String value => double.tryParse(value),
+    _ => null,
+  };
 }
 
 List<PaymentMethod> _parseSupportedPaymentMethods(
@@ -117,6 +135,14 @@ class Venue extends Equatable {
   final String? reservationUrl;
   final String? ownerId;
   final List<Review>? reviews;
+  final String? googleMapsUri;
+  final Map<String, dynamic>? googleLocation;
+  final String? googlePriceLevel;
+  final String? googleReviewSummary;
+  final String? googlePlaceSummary;
+  final String? enrichmentStatus;
+  final DateTime? lastEnrichedAt;
+  final double? enrichmentConfidence;
   final List<PaymentMethod> supportedPaymentMethods;
   final String? wifiSsid;
   final String? wifiPassword;
@@ -155,6 +181,14 @@ class Venue extends Equatable {
     this.reservationUrl,
     this.ownerId,
     this.reviews,
+    this.googleMapsUri,
+    this.googleLocation,
+    this.googlePriceLevel,
+    this.googleReviewSummary,
+    this.googlePlaceSummary,
+    this.enrichmentStatus,
+    this.lastEnrichedAt,
+    this.enrichmentConfidence,
     this.supportedPaymentMethods = const [PaymentMethod.cash],
     this.wifiSsid,
     this.wifiPassword,
@@ -222,6 +256,32 @@ class Venue extends Equatable {
       reviews: (json['reviews'] as List<dynamic>?)
           ?.map((r) => Review.fromJson(r as Map<String, dynamic>))
           .toList(),
+      googleMapsUri:
+          json['google_maps_uri'] as String? ??
+          json['googleMapsUri'] as String?,
+      googleLocation: _parseJsonMap(
+        json['google_location'] ?? json['googleLocation'],
+      ),
+      googlePriceLevel:
+          json['google_price_level'] as String? ??
+          json['googlePriceLevel'] as String?,
+      googleReviewSummary:
+          json['google_review_summary'] as String? ??
+          json['googleReviewSummary'] as String?,
+      googlePlaceSummary:
+          json['google_place_summary'] as String? ??
+          json['googlePlaceSummary'] as String?,
+      enrichmentStatus:
+          json['enrichment_status'] as String? ??
+          json['enrichmentStatus'] as String?,
+      lastEnrichedAt: DateTime.tryParse(
+        json['last_enriched_at'] as String? ??
+            json['lastEnrichedAt'] as String? ??
+            '',
+      ),
+      enrichmentConfidence:
+          (json['enrichment_confidence'] as num?)?.toDouble() ??
+          (json['enrichmentConfidence'] as num?)?.toDouble(),
       supportedPaymentMethods: _parseSupportedPaymentMethods(
         json['supported_payment_methods'] ?? json['supportedPaymentMethods'],
         revolutUrl:
@@ -268,6 +328,14 @@ class Venue extends Equatable {
     'website_url': websiteUrl,
     'reservation_url': reservationUrl,
     'owner_id': ownerId,
+    'google_maps_uri': googleMapsUri,
+    'google_location': googleLocation,
+    'google_price_level': googlePriceLevel,
+    'google_review_summary': googleReviewSummary,
+    'google_place_summary': googlePlaceSummary,
+    'enrichment_status': enrichmentStatus,
+    'last_enriched_at': lastEnrichedAt?.toIso8601String(),
+    'enrichment_confidence': enrichmentConfidence,
     'supported_payment_methods': supportedPaymentMethods
         .map((method) => method.dbValue)
         .toList(growable: false),
@@ -331,6 +399,102 @@ class Venue extends Equatable {
   /// Whether this venue has WiFi credentials configured for guests.
   bool get hasWifi => wifiSsid != null && wifiSsid!.trim().isNotEmpty;
 
+  double? get latitude =>
+      _doubleFromDynamic(googleLocation?['latitude'] ?? googleLocation?['lat']);
+
+  double? get longitude => _doubleFromDynamic(
+    googleLocation?['longitude'] ?? googleLocation?['lng'],
+  );
+
+  String? get priceLevelLabel {
+    final level = googlePriceLevel?.trim();
+    if (level == null || level.isEmpty) return null;
+    return switch (level) {
+      'FREE' => 'Free',
+      'PRICE_LEVEL_INEXPENSIVE' => r'$',
+      'PRICE_LEVEL_MODERATE' => r'$$',
+      'PRICE_LEVEL_EXPENSIVE' => r'$$$',
+      'PRICE_LEVEL_VERY_EXPENSIVE' => r'$$$$',
+      _ => level.replaceAll('PRICE_LEVEL_', '').replaceAll('_', ' '),
+    };
+  }
+
+  String? get primaryReviewSnippet {
+    final reviewText = reviews
+        ?.map((review) => review.text.trim())
+        .where((text) => text.isNotEmpty)
+        .firstOrNull;
+    if (reviewText != null) return reviewText;
+    final googleSummary = googleReviewSummary?.trim();
+    if (googleSummary != null && googleSummary.isNotEmpty) {
+      return googleSummary;
+    }
+    return null;
+  }
+
+  bool get hasDiscoveryMetadata =>
+      latitude != null ||
+      longitude != null ||
+      priceLevelLabel != null ||
+      primaryReviewSnippet != null;
+
+  bool get isOpenNow {
+    final hours = openingHours;
+    if (hours == null || hours.isEmpty) return isOpen;
+
+    final now = DateTime.now();
+    final dayName = switch (now.weekday) {
+      DateTime.monday => 'Monday',
+      DateTime.tuesday => 'Tuesday',
+      DateTime.wednesday => 'Wednesday',
+      DateTime.thursday => 'Thursday',
+      DateTime.friday => 'Friday',
+      DateTime.saturday => 'Saturday',
+      DateTime.sunday => 'Sunday',
+      _ => 'Monday',
+    };
+
+    final today = hours[dayName];
+    if (today == null || !today.isOpen) return false;
+
+    final openMinutes = _minutesSinceMidnight(today.open);
+    final closeMinutes = _minutesSinceMidnight(today.close);
+    if (openMinutes == null || closeMinutes == null) return isOpen;
+
+    final nowMinutes = now.hour * 60 + now.minute;
+    if (closeMinutes < openMinutes) {
+      return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+    }
+    return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
+  }
+
+  double? distanceInKmFrom(double latitude, double longitude) {
+    final venueLatitude = this.latitude;
+    final venueLongitude = this.longitude;
+    if (venueLatitude == null || venueLongitude == null) return null;
+
+    const earthRadiusKm = 6371.0;
+    final dLat = _degreesToRadians(venueLatitude - latitude);
+    final dLon = _degreesToRadians(venueLongitude - longitude);
+    final lat1 = _degreesToRadians(latitude);
+    final lat2 = _degreesToRadians(venueLatitude);
+
+    final a =
+        (sin(dLat / 2) * sin(dLat / 2)) +
+        cos(lat1) * cos(lat2) * (sin(dLon / 2) * sin(dLon / 2));
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
+  String? distanceLabelFrom(double latitude, double longitude) {
+    final distance = distanceInKmFrom(latitude, longitude);
+    if (distance == null) return null;
+    if (distance < 1) {
+      return '${(distance * 1000).round()} m away';
+    }
+    return '${distance.toStringAsFixed(distance < 10 ? 1 : 0)} km away';
+  }
+
   bool supportsPaymentMethod(PaymentMethod method) =>
       supportedPaymentMethods.contains(method);
 
@@ -371,6 +535,14 @@ class Venue extends Equatable {
     openingHours,
     ownerId,
     reviews,
+    googleMapsUri,
+    googleLocation,
+    googlePriceLevel,
+    googleReviewSummary,
+    googlePlaceSummary,
+    enrichmentStatus,
+    lastEnrichedAt,
+    enrichmentConfidence,
     supportedPaymentMethods,
     wifiSsid,
     wifiPassword,
@@ -931,6 +1103,52 @@ class MenuItem extends Equatable {
 
   bool get isGuestHighlight => highlightRank != null;
 
+  bool get isPopular =>
+      isGuestHighlight || tags.any((tag) => _isPopularMenuTag(tag));
+
+  bool get isSignature => tags.any((tag) => _isSignatureMenuTag(tag));
+
+  String? get guestHighlightLabel {
+    if (isPopular) return 'Popular';
+    if (isSignature) return 'Signature';
+    return null;
+  }
+
+  List<String> get dietaryBadges {
+    final badges = <String>[];
+    for (final tag in tags) {
+      final normalized = _normalizeDietaryMenuTag(tag);
+      if (normalized == null || badges.contains(normalized)) continue;
+      badges.add(normalized);
+    }
+    return badges;
+  }
+
+  List<String> get guestDisplayTags {
+    final badges = <String>[];
+    final highlight = guestHighlightLabel;
+    if (highlight != null) badges.add(highlight);
+    badges.addAll(dietaryBadges);
+
+    for (final tag in tags) {
+      final trimmed = tag.trim();
+      if (trimmed.isEmpty) continue;
+      if (_isPopularMenuTag(trimmed) ||
+          _isSignatureMenuTag(trimmed) ||
+          _normalizeDietaryMenuTag(trimmed) != null) {
+        continue;
+      }
+      if (badges.any(
+        (existing) => existing.toLowerCase() == trimmed.toLowerCase(),
+      )) {
+        continue;
+      }
+      badges.add(trimmed);
+    }
+
+    return badges;
+  }
+
   MenuItemImageSource? get effectiveImageSource {
     if (imageSource != MenuItemImageSource.unknown) return imageSource;
     if (hasImage) return MenuItemImageSource.manual;
@@ -969,6 +1187,44 @@ class MenuItem extends Equatable {
 }
 
 const Object _menuItemNoChange = Object();
+
+bool _isPopularMenuTag(String raw) {
+  final normalized = raw.trim().toLowerCase();
+  return normalized == 'popular' ||
+      normalized == 'bestseller' ||
+      normalized == 'best seller' ||
+      normalized == 'house favorite' ||
+      normalized == 'house favourite';
+}
+
+bool _isSignatureMenuTag(String raw) {
+  final normalized = raw.trim().toLowerCase();
+  return normalized == 'signature' || normalized == 'chef special';
+}
+
+String? _normalizeDietaryMenuTag(String raw) {
+  final normalized = raw.trim().toLowerCase();
+  return switch (normalized) {
+    'vegetarian' || 'veg' => 'Vegetarian',
+    'vegan' => 'Vegan',
+    'halal' => 'Halal',
+    'gluten free' || 'gluten-free' || 'gf' => 'Gluten-Free',
+    _ => null,
+  };
+}
+
+int? _minutesSinceMidnight(String raw) {
+  final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(raw.trim());
+  if (match == null) return null;
+  final hours = int.tryParse(match.group(1) ?? '');
+  final minutes = int.tryParse(match.group(2) ?? '');
+  if (hours == null || minutes == null) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+double _degreesToRadians(double degrees) =>
+    degrees * (3.1415926535897932 / 180);
 
 /// A single item in a cart or order.
 class OrderItem extends Equatable {

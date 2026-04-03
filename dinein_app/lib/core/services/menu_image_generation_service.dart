@@ -95,7 +95,7 @@ class MenuImageGenerationService {
               useAdminSession: useAdminSession,
               payload: {
                 'itemId': itemId,
-                if (venueId != null) 'venueId': venueId,
+                'venueId': ?venueId,
                 'forceRegenerate': forceRegenerate,
                 ..._venueSessionPayload(),
               },

@@ -201,6 +201,31 @@ void main() {
         expect(venue.supportsPaymentMethod(PaymentMethod.revolutLink), isTrue);
       },
     );
+
+    test(
+      'discovery metadata helpers expose maps, price, and review context',
+      () {
+        final venue = Venue.fromJson({
+          'id': 'venue_discovery',
+          'name': 'Atlas Grill',
+          'slug': 'atlas-grill',
+          'google_maps_uri': 'https://maps.google.com/?cid=123',
+          'google_location': {'latitude': -1.9441, 'longitude': 30.0619},
+          'google_price_level': 'PRICE_LEVEL_MODERATE',
+          'google_review_summary':
+              'Guests praise the lake views and grilled fish.',
+        });
+
+        expect(venue.latitude, closeTo(-1.9441, 0.0001));
+        expect(venue.longitude, closeTo(30.0619, 0.0001));
+        expect(venue.priceLevelLabel, r'$$');
+        expect(
+          venue.primaryReviewSnippet,
+          'Guests praise the lake views and grilled fish.',
+        );
+        expect(venue.hasDiscoveryMetadata, isTrue);
+      },
+    );
   });
 
   // ─── Review ───
@@ -391,6 +416,22 @@ void main() {
 
       expect(item.needsGeneratedImage, isTrue);
       expect(locked.needsGeneratedImage, isFalse);
+    });
+
+    test('guest display tags prioritize popular and dietary badges', () {
+      final item = MenuItem.fromJson({
+        'id': 'item_4',
+        'venue_id': 'venue_1',
+        'name': 'Garden Bowl',
+        'price': 16,
+        'highlight_rank': 1,
+        'tags': ['vegan', 'halal', 'Chef Pick'],
+      });
+
+      expect(item.isPopular, isTrue);
+      expect(item.guestHighlightLabel, 'Popular');
+      expect(item.dietaryBadges, ['Vegan', 'Halal']);
+      expect(item.guestDisplayTags, ['Popular', 'Vegan', 'Halal', 'Chef Pick']);
     });
   });
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -13,6 +15,7 @@ import '../../../core/config/country_config_provider.dart';
 import '../../../core/constants/enums.dart';
 import '../../../core/providers/cart_provider.dart';
 import '../../../core/providers/providers.dart';
+import '../../../core/services/app_telemetry.dart';
 import '../../../core/services/order_repository.dart';
 import '../../../core/services/venue_repository.dart';
 import '../../../shared/widgets/pressable_scale.dart';
@@ -42,6 +45,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   bool _queuedCartAnimationSettle = false;
   String _persistedTableNumber = '';
   String _persistedSpecialRequests = '';
+  bool _trackedCartView = false;
 
   @override
   void initState() {
@@ -113,6 +117,23 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     });
   }
 
+  void _trackGuestEvent(
+    String eventName, {
+    String? venueId,
+    String? orderId,
+    Map<String, Object?> details = const {},
+  }) {
+    unawaited(
+      AppTelemetryService.trackGuestEvent(
+        eventName,
+        route: AppRoutePaths.cart,
+        venueId: venueId,
+        orderId: orderId,
+        details: details,
+      ),
+    );
+  }
+
   Future<void> _placeOrder(PaymentMethod method) async {
     // Validate table number
     if (_tableController.text.trim().isEmpty) {
@@ -148,8 +169,29 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         paymentMethod: method,
         userId: user?.id,
       );
+      _trackGuestEvent(
+        'checkout_started',
+        venueId: venueId,
+        details: {
+          'payment_method': method.dbValue,
+          'item_count': cart.itemCount,
+          'cart_total': cart.total,
+          'table_number': cart.tableNumber,
+        },
+      );
 
       final placed = await OrderRepository.instance.placeOrder(order);
+      _trackGuestEvent(
+        'order_placed',
+        venueId: venueId,
+        orderId: placed.id,
+        details: {
+          'payment_method': method.dbValue,
+          'item_count': cart.itemCount,
+          'cart_total': cart.total,
+          'order_number': placed.displayNumber,
+        },
+      );
 
       if (method == PaymentMethod.revolutLink) {
         final config = ref.read(countryConfigProvider);
@@ -208,6 +250,19 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final supportsRevolut =
         hasRevolutLink &&
         (supportedPaymentMethods?.contains(PaymentMethod.revolutLink) ?? true);
+
+    if (cart.itemCount > 0 && !_trackedCartView) {
+      _trackedCartView = true;
+      _trackGuestEvent(
+        'cart_viewed',
+        venueId: cart.venueId,
+        details: {
+          'item_count': cart.itemCount,
+          'cart_total': cart.total,
+          'table_number_present': (cart.tableNumber ?? '').trim().isNotEmpty,
+        },
+      );
+    }
 
     // Empty cart
     if (cart.isEmpty) {

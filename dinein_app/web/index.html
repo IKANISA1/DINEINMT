@@ -34,8 +34,176 @@
 
   <title>DineIn</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      color-scheme: dark;
+      --dinein-bg: #111111;
+      --dinein-panel: rgba(255, 255, 255, 0.06);
+      --dinein-border: rgba(255, 255, 255, 0.08);
+      --dinein-text: rgba(255, 255, 255, 0.94);
+      --dinein-muted: rgba(255, 255, 255, 0.62);
+      --dinein-gold: #c8a96b;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--dinein-bg);
+    }
+
+    body {
+      color: var(--dinein-text);
+      font-family: "SF Pro Display", "Segoe UI", sans-serif;
+    }
+
+    #app-loader {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+      background:
+        radial-gradient(circle at top, rgba(200, 169, 107, 0.18), transparent 34%),
+        linear-gradient(180deg, #191919 0%, #111111 100%);
+      z-index: 9999;
+      transition: opacity 260ms ease, visibility 260ms ease;
+    }
+
+    #app-loader.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loader-shell {
+      width: min(100%, 420px);
+      padding: 28px;
+      border-radius: 28px;
+      border: 1px solid var(--dinein-border);
+      background: var(--dinein-panel);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+      backdrop-filter: blur(18px);
+      text-align: center;
+    }
+
+    .loader-mark {
+      width: 92px;
+      height: 92px;
+      margin: 0 auto 18px;
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+      animation: loaderPulse 1.8s ease-in-out infinite;
+    }
+
+    .loader-mark img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .loader-brand {
+      margin: 0;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .loader-brand span:first-child {
+      color: var(--dinein-gold);
+    }
+
+    .loader-kicker {
+      margin: 10px 0 0;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.34em;
+      color: var(--dinein-muted);
+    }
+
+    .loader-copy {
+      margin: 18px 0 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--dinein-muted);
+    }
+
+    .loader-bar {
+      height: 4px;
+      margin-top: 24px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .loader-bar::after {
+      content: "";
+      display: block;
+      width: 34%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(200, 169, 107, 0.12), var(--dinein-gold));
+      animation: loaderProgress 1.5s ease-in-out infinite;
+    }
+
+    @keyframes loaderPulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+      }
+      50% {
+        transform: scale(0.98);
+        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.36);
+      }
+    }
+
+    @keyframes loaderProgress {
+      0% {
+        transform: translateX(-130%);
+      }
+      100% {
+        transform: translateX(380%);
+      }
+    }
+  </style>
 </head>
 <body>
+  <div id="app-loader" aria-live="polite">
+    <div class="loader-shell">
+      <div class="loader-mark" aria-hidden="true">
+        <img src="assets/branding/dinein-brand-icon-512.png" alt="" />
+      </div>
+      <p class="loader-brand"><span>DINE</span><span>IN</span></p>
+      <p class="loader-kicker">GUEST EXPERIENCE</p>
+      <p class="loader-copy">
+        Preparing venues, menus, and your saved session.
+      </p>
+      <div class="loader-bar" aria-hidden="true"></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const loader = document.getElementById('app-loader');
+      if (!loader) return;
+
+      let hidden = false;
+      const hideLoader = function () {
+        if (hidden) return;
+        hidden = true;
+        loader.classList.add('is-hidden');
+        window.setTimeout(function () {
+          loader.remove();
+        }, 320);
+      };
+
+      window.addEventListener('flutter-first-frame', hideLoader, { once: true });
+      window.addEventListener('load', function () {
+        window.setTimeout(hideLoader, 12000);
+      }, { once: true });
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
