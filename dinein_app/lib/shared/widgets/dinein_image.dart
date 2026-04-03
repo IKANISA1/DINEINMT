@@ -5,6 +5,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../core/theme/motion_preferences.dart';
+
 /// Premium network image widget with shimmer loading and graceful fallback.
 ///
 /// Matches the React reference's image-heavy design:
@@ -172,6 +174,18 @@ class _ShimmerState extends State<_Shimmer>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final reduceMotion = reduceMotionOf(context);
+
+    if (reduceMotion) {
+      return Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(widget.borderRadius),
+          color: cs.surfaceContainerHigh,
+        ),
+      );
+    }
 
     return AnimatedBuilder(
       animation: _controller,

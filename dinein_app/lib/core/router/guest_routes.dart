@@ -39,18 +39,18 @@ final List<RouteBase> guestRoutes = [
     name: AppRouteNames.splash,
     builder: (context, state) => const SplashScreen(),
   ),
-  GoRoute(
-    path: AppRoutePaths.venueDeepLink,
-    name: AppRouteNames.venueDeepLink,
-    builder: (context, state) {
-      final slug = state.pathParameters[AppRouteParams.slug]!;
-      final table = state.uri.queryParameters[AppRouteParams.table];
-      return VenueDetailScreen(slug: slug, tableNumber: table);
-    },
-  ),
   ShellRoute(
     builder: (context, state, child) => GuestShell(child: child),
     routes: [
+      GoRoute(
+        path: AppRoutePaths.venueDeepLink,
+        name: AppRouteNames.venueDeepLink,
+        builder: (context, state) {
+          final slug = state.pathParameters[AppRouteParams.slug]!;
+          final table = state.uri.queryParameters[AppRouteParams.table];
+          return VenueDetailScreen(slug: slug, tableNumber: table);
+        },
+      ),
       GoRoute(
         path: AppRoutePaths.discover,
         name: AppRouteNames.discover,
@@ -82,69 +82,70 @@ final List<RouteBase> guestRoutes = [
         pageBuilder: (context, state) =>
             buildFadeSlidePage(state, const BiopayHomeScreen()),
       ),
-    ],
-  ),
-  GoRoute(
-    path: AppRoutePaths.cart,
-    name: AppRouteNames.cart,
-    pageBuilder: (context, state) =>
-        buildFadeSlidePage(state, const CartScreen()),
-  ),
-  GoRoute(
-    path: AppRoutePaths.itemDetail,
-    name: AppRouteNames.itemDetail,
-    pageBuilder: (context, state) {
-      final id = state.pathParameters[AppRouteParams.id]!;
-      return buildFadeSlidePage(state, ItemDetailScreen(itemId: id));
-    },
-  ),
-  GoRoute(
-    path: AppRoutePaths.orderSuccess,
-    name: AppRouteNames.orderSuccess,
-    pageBuilder: (context, state) {
-      final orderId = state.uri.queryParameters[AppRouteParams.id] ?? '';
-      final orderNumber = state.uri.queryParameters[AppRouteParams.orderNumber];
-      return buildFadeSlidePage(
-        state,
-        OrderSuccessScreen(orderId: orderId, orderNumber: orderNumber),
-      );
-    },
-  ),
-  GoRoute(
-    path: AppRoutePaths.orderStatus,
-    name: AppRouteNames.orderStatus,
-    pageBuilder: (context, state) {
-      final id = state.pathParameters[AppRouteParams.id]!;
-      return buildFadeSlidePage(state, OrderStatusScreen(orderId: id));
-    },
-  ),
-  GoRoute(
-    path: AppRoutePaths.orderDetails,
-    name: AppRouteNames.orderDetails,
-    pageBuilder: (context, state) {
-      final id = state.pathParameters[AppRouteParams.id]!;
-      return buildFadeSlidePage(state, OrderDetailsScreen(orderId: id));
-    },
-  ),
-  GoRoute(
-    path: AppRoutePaths.venueDetail,
-    name: AppRouteNames.venueDetail,
-    builder: (context, state) {
-      final slug = state.pathParameters[AppRouteParams.slug]!;
-      return VenueDetailScreen(slug: slug);
-    },
-    routes: [
       GoRoute(
-        path: AppRoutePaths.venueMenuChild,
-        name: AppRouteNames.menu,
-        builder: (context, state) {
-          final extra = state.extra;
-          final venueId = extra is String ? extra : null;
-          return MenuScreen(
-            venueId: venueId,
-            venueSlug: state.pathParameters[AppRouteParams.slug],
+        path: AppRoutePaths.cart,
+        name: AppRouteNames.cart,
+        pageBuilder: (context, state) =>
+            buildFadeSlidePage(state, const CartScreen()),
+      ),
+      GoRoute(
+        path: AppRoutePaths.itemDetail,
+        name: AppRouteNames.itemDetail,
+        pageBuilder: (context, state) {
+          final id = state.pathParameters[AppRouteParams.id]!;
+          return buildFadeSlidePage(state, ItemDetailScreen(itemId: id));
+        },
+      ),
+      GoRoute(
+        path: AppRoutePaths.orderSuccess,
+        name: AppRouteNames.orderSuccess,
+        pageBuilder: (context, state) {
+          final orderId = state.uri.queryParameters[AppRouteParams.id] ?? '';
+          final orderNumber =
+              state.uri.queryParameters[AppRouteParams.orderNumber];
+          return buildFadeSlidePage(
+            state,
+            OrderSuccessScreen(orderId: orderId, orderNumber: orderNumber),
           );
         },
+      ),
+      GoRoute(
+        path: AppRoutePaths.orderStatus,
+        name: AppRouteNames.orderStatus,
+        pageBuilder: (context, state) {
+          final id = state.pathParameters[AppRouteParams.id]!;
+          return buildFadeSlidePage(state, OrderStatusScreen(orderId: id));
+        },
+      ),
+      GoRoute(
+        path: AppRoutePaths.orderDetails,
+        name: AppRouteNames.orderDetails,
+        pageBuilder: (context, state) {
+          final id = state.pathParameters[AppRouteParams.id]!;
+          return buildFadeSlidePage(state, OrderDetailsScreen(orderId: id));
+        },
+      ),
+      GoRoute(
+        path: AppRoutePaths.venueDetail,
+        name: AppRouteNames.venueDetail,
+        builder: (context, state) {
+          final slug = state.pathParameters[AppRouteParams.slug]!;
+          return VenueDetailScreen(slug: slug);
+        },
+        routes: [
+          GoRoute(
+            path: AppRoutePaths.venueMenuChild,
+            name: AppRouteNames.menu,
+            builder: (context, state) {
+              final extra = state.extra;
+              final venueId = extra is String ? extra : null;
+              return MenuScreen(
+                venueId: venueId,
+                venueSlug: state.pathParameters[AppRouteParams.slug],
+              );
+            },
+          ),
+        ],
       ),
     ],
   ),

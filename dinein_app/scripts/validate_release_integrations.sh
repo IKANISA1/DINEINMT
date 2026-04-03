@@ -134,6 +134,10 @@ asset_links_template="$app_root/docs/release/app-links/assetlinks.json"
 apple_app_site_association_template="$app_root/docs/release/app-links/apple-app-site-association"
 asset_links="$well_known_dir/assetlinks.json"
 apple_app_site_association="$well_known_dir/apple-app-site-association"
+web_headers="$app_root/web/_headers"
+web_index="$app_root/web/index.html"
+web_manifest="$app_root/web/manifest.json"
+web_offline="$app_root/web/offline.html"
 
 require_contains \
   "$android_manifest" \
@@ -225,6 +229,32 @@ if [[ "$android_only" != "true" ]]; then
 fi
 
 require_file "$asset_links_template" 'Android assetlinks template is missing.'
+require_file "$web_headers" 'Web headers config is missing.'
+require_file "$web_index" 'Web index.html is missing.'
+require_file "$web_manifest" 'Web manifest.json is missing.'
+require_file "$web_offline" 'Offline fallback page is missing.'
+if [[ -f "$web_headers" ]]; then
+  require_contains \
+    "$web_headers" \
+    'Permissions-Policy: camera=(), microphone=(), geolocation=(self)' \
+    'Web headers are missing the geolocation permissions policy.'
+fi
+if [[ -f "$web_index" ]]; then
+  require_contains \
+    "$web_index" \
+    'app-loader' \
+    'Web index.html is missing the branded startup loader.'
+  require_contains \
+    "$web_index" \
+    'beforeinstallprompt' \
+    'Web index.html is missing the install prompt bridge.'
+fi
+if [[ -f "$web_manifest" ]]; then
+  require_contains \
+    "$web_manifest" \
+    '"display": "standalone"' \
+    'Web manifest is missing standalone display mode.'
+fi
 require_file \
   "$asset_links" \
   'Generated Android assetlinks file is missing. Run ./scripts/render_app_links.sh.'

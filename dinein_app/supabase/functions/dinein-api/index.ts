@@ -2993,6 +2993,9 @@ async function handleGetVenues(
   const category = stringValue(body.category)?.toLowerCase();
   const orderingOnly = booleanValue(body.ordering_only ?? body.orderingOnly) ??
     false;
+  const includeSummary = booleanValue(
+    body.include_summary ?? body.includeSummary,
+  ) ?? false;
   const latitude = numberValue(body.latitude ?? body.lat);
   const longitude = numberValue(body.longitude ?? body.lng);
   const { data, error } = await supabase
@@ -3046,16 +3049,30 @@ async function handleGetVenues(
       );
     });
   const visible = limit == null ? venues : venues.slice(offset, offset + limit);
-
-  return ok(
-    visible.map((venue) =>
-      publicVenueListPayload(venue, {
-        distanceKm: latitude != null && longitude != null
-          ? venueDistanceKm(venue, latitude, longitude)
-          : null,
-      })
-    ),
+  const items = visible.map((venue) =>
+    publicVenueListPayload(venue, {
+      distanceKm: latitude != null && longitude != null
+        ? venueDistanceKm(venue, latitude, longitude)
+        : null,
+    })
   );
+
+  if (includeSummary) {
+    const categories = [...new Set(venues
+      .map((venue) => stringValue(asRecord(venue).category)?.trim() ?? "")
+      .filter((value) => value.length > 0))]
+      .sort((left, right) => left.localeCompare(right))
+      .slice(0, 8);
+
+    return ok({
+      items,
+      categories,
+      total_count: venues.length,
+      has_more: limit != null ? offset + visible.length < venues.length : false,
+    });
+  }
+
+  return ok(items);
 }
 
 async function handleGetAllVenues(

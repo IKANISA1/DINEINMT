@@ -2,6 +2,7 @@ import 'package:dinein_app/core/config/country_config.dart';
 import 'package:dinein_app/core/providers/permission_providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
+import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/core/services/app_permission_service.dart';
 import 'package:dinein_app/main.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    AppBootstrapService.instance.markReadyForTest();
   });
 
   testWidgets('guest discover route shows the location popup when missing', (

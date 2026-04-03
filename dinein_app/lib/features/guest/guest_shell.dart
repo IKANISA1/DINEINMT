@@ -8,6 +8,7 @@ import '../../core/config/country_config.dart';
 import '../../core/config/country_config_provider.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_layout.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/shared_widgets.dart';
 
@@ -19,8 +20,14 @@ class GuestShell extends ConsumerWidget {
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     if (location.startsWith(AppRoutePaths.venuesBrowse)) return 1;
+    if (location.startsWith('/venue/') ||
+        location.startsWith('/cart') ||
+        location.startsWith('/item/')) {
+      return 1;
+    }
     if (location.startsWith(AppRoutePaths.orderHistory) ||
-        location.startsWith(AppRoutePaths.orderBase)) {
+        location.startsWith(AppRoutePaths.orderBase) ||
+        location.startsWith(AppRoutePaths.orderSuccess)) {
       return 2;
     }
     if (location.startsWith(AppRoutePaths.guestSettings)) return 3;
@@ -33,14 +40,20 @@ class GuestShell extends ConsumerWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= 900) {
-          return _WideGuestShell(currentIndex: index, child: child);
+        if (constraints.maxWidth >= AppLayout.guestRailBreakpoint) {
+          return _WideGuestShell(
+            currentIndex: index,
+            screenWidth: constraints.maxWidth,
+            child: child,
+          );
         }
 
         return Scaffold(
           body: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 448),
+              constraints: BoxConstraints(
+                maxWidth: AppLayout.guestContentMaxWidth(constraints.maxWidth),
+              ),
               child: Column(
                 children: [
                   const _TopAppBar(),
@@ -59,8 +72,13 @@ class GuestShell extends ConsumerWidget {
 class _WideGuestShell extends StatelessWidget {
   final Widget child;
   final int currentIndex;
+  final double screenWidth;
 
-  const _WideGuestShell({required this.child, required this.currentIndex});
+  const _WideGuestShell({
+    required this.child,
+    required this.currentIndex,
+    required this.screenWidth,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +88,7 @@ class _WideGuestShell extends StatelessWidget {
       body: Row(
         children: [
           SizedBox(
-            width: 280,
+            width: AppLayout.guestRailWidth(screenWidth),
             child: AdaptiveGlassSurface(
               decoration: BoxDecoration(
                 color: cs.surface.withValues(alpha: 0.92),
@@ -137,11 +155,18 @@ class _WideGuestShell extends StatelessWidget {
           ),
           VerticalDivider(width: 1, color: AppColors.white5),
           Expanded(
-            child: Column(
-              children: [
-                const _TopAppBar(),
-                Expanded(child: child),
-              ],
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: AppLayout.guestContentMaxWidth(screenWidth),
+                ),
+                child: Column(
+                  children: [
+                    const _TopAppBar(),
+                    Expanded(child: child),
+                  ],
+                ),
+              ),
             ),
           ),
         ],

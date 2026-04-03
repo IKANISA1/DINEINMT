@@ -1,6 +1,7 @@
 import 'package:dinein_app/core/config/country_config.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
+import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/main.dart';
 import 'package:dinein_app/shared/widgets/brand_mark.dart';
 import 'package:flutter/material.dart';
@@ -13,10 +14,17 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    AppBootstrapService.instance.resetForTest();
     appRouter.goNamed(AppRouteNames.splash);
   });
 
-  Future<void> pumpApp(WidgetTester tester) async {
+  Future<void> pumpApp(
+    WidgetTester tester, {
+    bool bootstrapReady = true,
+  }) async {
+    if (bootstrapReady) {
+      AppBootstrapService.instance.markReadyForTest();
+    }
     await tester.pumpWidget(
       ProviderScope(child: DineInApp(config: CountryConfig.mt)),
     );
@@ -46,7 +54,7 @@ void main() {
   }
 
   testWidgets('renders the splash screen on startup', (tester) async {
-    await pumpApp(tester);
+    await pumpApp(tester, bootstrapReady: false);
 
     // Wait for animations to settle enough to show content
     await tester.pump(const Duration(milliseconds: 1200));
@@ -60,15 +68,14 @@ void main() {
     await disposeApp(tester);
   });
 
-  testWidgets('splash auto-navigates to discover after timeout', (
+  testWidgets('splash redirects to discover once bootstrap completes', (
     tester,
   ) async {
-    await pumpApp(tester);
+    await pumpApp(tester, bootstrapReady: false);
 
-    // Pump in increments to let Timer callbacks fire
-    for (var i = 0; i < 35; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
+    AppBootstrapService.instance.markReadyForTest();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(appRouter.state.uri.path, AppRoutePaths.discover);
 

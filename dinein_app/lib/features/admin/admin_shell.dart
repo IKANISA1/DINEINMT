@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_layout.dart';
 import '../../core/theme/app_theme.dart';
 import '../../shared/widgets/shared_widgets.dart';
 
@@ -31,19 +32,27 @@ class AdminShell extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= 1040) {
-          return _WideAdminShell(currentIndex: index, child: child);
+        if (constraints.maxWidth >= AppLayout.opsRailBreakpoint) {
+          return _WideAdminShell(
+            currentIndex: index,
+            screenWidth: constraints.maxWidth,
+            child: child,
+          );
         }
 
         return Scaffold(
-          body: Column(
-            children: [
-              // ─── Branded Top Bar ───
-              const _AdminTopBar(),
-
-              // ─── Content ───
-              Expanded(child: child),
-            ],
+          body: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: AppLayout.opsContentMaxWidth(constraints.maxWidth),
+              ),
+              child: Column(
+                children: [
+                  const _AdminTopBar(),
+                  Expanded(child: child),
+                ],
+              ),
+            ),
           ),
           bottomNavigationBar: _AdminBottomNav(currentIndex: index),
         );
@@ -55,8 +64,13 @@ class AdminShell extends StatelessWidget {
 class _WideAdminShell extends StatelessWidget {
   final Widget child;
   final int currentIndex;
+  final double screenWidth;
 
-  const _WideAdminShell({required this.child, required this.currentIndex});
+  const _WideAdminShell({
+    required this.child,
+    required this.currentIndex,
+    required this.screenWidth,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +80,7 @@ class _WideAdminShell extends StatelessWidget {
       body: Row(
         children: [
           SizedBox(
-            width: 292,
+            width: AppLayout.opsRailWidth(screenWidth),
             child: AdaptiveGlassSurface(
               decoration: BoxDecoration(
                 color: cs.surface.withValues(alpha: 0.92),
@@ -143,11 +157,18 @@ class _WideAdminShell extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.05),
           ),
           Expanded(
-            child: Column(
-              children: [
-                const _AdminTopBar(),
-                Expanded(child: child),
-              ],
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: AppLayout.opsContentMaxWidth(screenWidth),
+                ),
+                child: Column(
+                  children: [
+                    const _AdminTopBar(),
+                    Expanded(child: child),
+                  ],
+                ),
+              ),
             ),
           ),
         ],

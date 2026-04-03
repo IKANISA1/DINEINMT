@@ -1,22 +1,14 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../core/router/app_routes.dart';
-import '../../../core/router/web_entry_routing.dart';
-import '../../../core/services/auth_repository.dart';
+import '../../../core/services/app_bootstrap_service.dart';
 import '../../../shared/widgets/brand_mark.dart';
 
 const _splashWordmarkGold = Color(0xFF624A1F);
 
-/// DineIn animated splash screen.
-///
-/// Premium brand intro: animated logo sequence → auto-navigate based on role.
-/// Matches the provided reference design.
+/// DineIn startup screen while core services hydrate in the background.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -26,111 +18,56 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _exitController;
-  late final Animation<double> _exitOpacity;
-  late final Animation<double> _exitScale;
-  Timer? _navTimer;
+  late final AnimationController _pulseController;
 
   @override
   void initState() {
     super.initState();
-
-    // Exit animation: fade out + slight zoom at 2.5s mark
-    _exitController = AnimationController(
+    _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-    _exitOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _exitController, curve: Curves.easeInCubic),
-    );
-    _exitScale = Tween<double>(begin: 1.0, end: 1.08).animate(
-      CurvedAnimation(parent: _exitController, curve: Curves.easeInCubic),
-    );
-
-    if (kIsWeb) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _navigateToHome();
-      });
-      return;
-    }
-
-    // Schedule exit animation at 2.5s, navigate at 3s
-    _navTimer = Timer(const Duration(milliseconds: 2500), () {
-      if (!mounted) return;
-      _exitController.forward().then((_) {
-        if (!mounted) return;
-        _navigateToHome();
-      });
-    });
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _navTimer?.cancel();
-    _exitController.dispose();
+    _pulseController.dispose();
     super.dispose();
-  }
-
-  void _navigateToHome() {
-    if (kIsWeb) {
-      final webRoute = resolveCurrentWebRootRoute(Uri.base);
-      if (webRoute != null) {
-        context.go(webRoute);
-        return;
-      }
-    }
-
-    final auth = AuthRepository.instance;
-    if (auth.hasAdminAccess) {
-      context.goNamed(AppRouteNames.adminOverview);
-    } else if (auth.hasVenueAccess) {
-      context.goNamed(AppRouteNames.venueDashboard);
-    } else {
-      context.goNamed(AppRouteNames.discover);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Force light status-bar icons on dark background
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
 
     final screenHeight = MediaQuery.sizeOf(context).height;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
-      body: AnimatedBuilder(
-        animation: _exitController,
-        builder: (context, child) => Opacity(
-          opacity: _exitOpacity.value,
-          child: Transform.scale(scale: _exitScale.value, child: child),
-        ),
-        child: Stack(
-          children: [
-            // ─── Subtle radial vignette glow ───
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.center,
-                    radius: 0.9,
-                    colors: [const Color(0xFF1A1A18), const Color(0xFF0A0A0A)],
-                    stops: const [0.0, 1.0],
-                  ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.center,
+                  radius: 0.9,
+                  colors: [const Color(0xFF1A1A18), const Color(0xFF0A0A0A)],
+                  stops: const [0.0, 1.0],
                 ),
               ),
             ),
-
-            // ─── Content ───
-            Center(
+          ),
+          Center(
+            child: AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, child) => Transform.scale(
+                scale: 0.985 + (_pulseController.value * 0.015),
+                child: child,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Push content up from center
                   SizedBox(height: screenHeight * 0.10),
-
-                  // ─── Single splash wordmark ───
                   const DineInLogoText(
                         fontSize: 72,
                         dineColor: _splashWordmarkGold,
@@ -151,11 +88,7 @@ class _SplashScreenState extends State<SplashScreen>
                         duration: 700.ms,
                         curve: Curves.easeOutCubic,
                       ),
-
-                  // ─── Spacer to push tagline toward bottom ───
-                  SizedBox(height: screenHeight * 0.28),
-
-                  // ─── Divider line ───
+                  SizedBox(height: screenHeight * 0.18),
                   Container(
                         width: 32,
                         height: 1,
@@ -169,10 +102,7 @@ class _SplashScreenState extends State<SplashScreen>
                         duration: 500.ms,
                         curve: Curves.easeOutCubic,
                       ),
-
                   const SizedBox(height: 20),
-
-                  // ─── Tagline: "DINE IN, STAND OUT." ───
                   Text(
                         'DINE IN, STAND OUT.',
                         style: TextStyle(
@@ -185,11 +115,80 @@ class _SplashScreenState extends State<SplashScreen>
                       )
                       .animate(delay: 900.ms)
                       .fadeIn(duration: 600.ms, curve: Curves.easeOut),
+                  const SizedBox(height: 24),
+                  AnimatedBuilder(
+                    animation: AppBootstrapService.instance,
+                    builder: (context, _) {
+                      final bootstrap = AppBootstrapService.instance;
+                      final statusLabel = switch (bootstrap.phase) {
+                        AppBootstrapPhase.failed =>
+                          'STARTUP REQUIRES ATTENTION',
+                        AppBootstrapPhase.ready => 'OPENING EXPERIENCE',
+                        AppBootstrapPhase.running || AppBootstrapPhase.idle =>
+                          kIsWeb
+                              ? 'PREPARING WEB EXPERIENCE'
+                              : 'PREPARING YOUR SESSION',
+                      };
+                      final statusCopy = switch (bootstrap.phase) {
+                        AppBootstrapPhase.failed =>
+                          'Startup could not complete. Check configuration or connection, then retry.',
+                        AppBootstrapPhase.ready =>
+                          'Finishing the last setup steps.',
+                        AppBootstrapPhase.running || AppBootstrapPhase.idle =>
+                          'Loading venue access, menus, and your saved session in the background.',
+                      };
+
+                      return Column(
+                        children: [
+                          Text(
+                            statusLabel,
+                            style: TextStyle(
+                              color: bootstrap.hasError
+                                  ? Colors.red.shade200
+                                  : Colors.white.withValues(alpha: 0.62),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 2.8,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: 320,
+                            child: Text(
+                              statusCopy,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.55),
+                                fontSize: 14,
+                                height: 1.6,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          if (bootstrap.hasError)
+                            FilledButton(
+                              onPressed: () => bootstrap.retry(),
+                              child: const Text('Retry startup'),
+                            )
+                          else
+                            SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white.withValues(alpha: 0.72),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

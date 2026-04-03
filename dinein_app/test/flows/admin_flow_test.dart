@@ -1,6 +1,7 @@
 import 'package:dinein_app/core/config/country_config.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
+import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,11 +13,14 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    AppBootstrapService.instance.markReadyForTest();
     appRouter.goNamed(AppRouteNames.splash);
   });
 
   Future<void> pumpApp(WidgetTester tester) async {
-    await tester.pumpWidget(ProviderScope(child: DineInApp(config: CountryConfig.mt)));
+    await tester.pumpWidget(
+      ProviderScope(child: DineInApp(config: CountryConfig.mt)),
+    );
     await tester.pump();
   }
 

@@ -6,12 +6,18 @@ Page<void> buildFadeSlidePage(GoRouterState state, Widget child) {
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 350),
-    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionDuration: const Duration(milliseconds: 220),
+    reverseTransitionDuration: const Duration(milliseconds: 160),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final reduceMotion =
+          MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      if (reduceMotion) {
+        return child;
+      }
+
       final curve = CurvedAnimation(
         parent: animation,
-        curve: Curves.easeOutBack,
+        curve: Curves.easeOutCubic,
         reverseCurve: Curves.easeInCubic,
       );
 
@@ -19,7 +25,7 @@ Page<void> buildFadeSlidePage(GoRouterState state, Widget child) {
         opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
         child: SlideTransition(
           position: Tween<Offset>(
-            begin: const Offset(0.0, 0.03),
+            begin: const Offset(0.0, 0.02),
             end: Offset.zero,
           ).animate(curve),
           child: child,

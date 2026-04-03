@@ -1,3 +1,4 @@
+import '../models/guest_venue_feed.dart';
 import '../models/models.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
@@ -40,6 +41,47 @@ class VenueRepository {
         await DineinApiService.invoke('get_venues', payload: payload)
             as List<dynamic>;
     return data.map((e) => Venue.fromJson(e)).toList();
+  }
+
+  Future<GuestVenueFeed> getVenueFeed({
+    int? limit,
+    int? offset,
+    String? query,
+    String? category,
+    bool orderingOnly = false,
+    double? latitude,
+    double? longitude,
+  }) async {
+    final payload = <String, dynamic>{
+      'limit': ?limit,
+      'offset': ?offset,
+      'query': ?query,
+      'category': ?category,
+      if (orderingOnly) 'ordering_only': true,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
+      'include_summary': true,
+    };
+    final data = await DineinApiService.invoke('get_venues', payload: payload);
+    if (data is List) {
+      return GuestVenueFeed.fromVenues(
+        data.map((entry) => Venue.fromJson(entry)).toList(growable: false),
+      );
+    }
+
+    final json = Map<String, dynamic>.from(data as Map);
+    final items = (json['items'] as List<dynamic>? ?? const [])
+        .map((entry) => Venue.fromJson(Map<String, dynamic>.from(entry as Map)))
+        .toList(growable: false);
+    final categories = (json['categories'] as List<dynamic>? ?? const [])
+        .map((entry) => entry.toString())
+        .toList(growable: false);
+    return GuestVenueFeed(
+      items: items,
+      categories: categories,
+      totalCount: (json['total_count'] as num?)?.toInt() ?? items.length,
+      hasMore: json['has_more'] as bool? ?? false,
+    );
   }
 
   /// Fetch all venues (admin view — includes inactive and pending).

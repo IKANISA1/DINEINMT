@@ -3,6 +3,7 @@ import 'package:dinein_app/core/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
+import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/features/guest/venue_detail/venue_detail_screen.dart';
 import 'package:dinein_app/main.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    AppBootstrapService.instance.markReadyForTest();
   });
 
   group('Error state edge cases', () {
@@ -96,7 +98,10 @@ void main() {
   });
 
   group('Order success edge cases', () {
-    setUp(() => appRouter.goNamed(AppRouteNames.splash));
+    setUp(() {
+      AppBootstrapService.instance.markReadyForTest();
+      appRouter.goNamed(AppRouteNames.splash);
+    });
 
     testWidgets('order success with empty orderId still renders', (
       tester,
@@ -126,7 +131,10 @@ void main() {
   });
 
   group('Admin flow edge cases', () {
-    setUp(() => appRouter.goNamed(AppRouteNames.splash));
+    setUp(() {
+      AppBootstrapService.instance.markReadyForTest();
+      appRouter.goNamed(AppRouteNames.splash);
+    });
 
     testWidgets('admin overview redirects to login when not authenticated', (
       tester,

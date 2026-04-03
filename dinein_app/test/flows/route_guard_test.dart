@@ -1,6 +1,7 @@
 import 'package:dinein_app/core/config/country_config.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
+import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/core/services/auth_repository.dart';
 import 'package:dinein_app/main.dart';
 import 'package:flutter/material.dart';
@@ -13,6 +14,7 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    AppBootstrapService.instance.markReadyForTest();
     await AuthRepository.instance.clearVenueSession();
     await AuthRepository.instance.clearAdminSession();
     appRouter.goNamed(AppRouteNames.splash);

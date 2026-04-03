@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/theme/motion_preferences.dart';
+
 /// Provides a press-down scale effect on any interactive element.
 ///
 /// Matches the React reference's `whileTap={{ scale: 0.95 }}` pattern.
@@ -61,19 +63,27 @@ class _PressableScaleState extends State<PressableScale>
   }
 
   void _onTapDown(TapDownDetails _) {
+    if (reduceMotionOf(context)) return;
     _controller.forward();
   }
 
   void _onTapUp(TapUpDetails _) {
-    _controller.reverse();
+    if (!reduceMotionOf(context)) {
+      _controller.reverse();
+    }
     widget.onTap?.call();
   }
 
   void _onTapCancel() {
+    if (reduceMotionOf(context)) return;
     _controller.reverse();
   }
 
   void _handleKeyActivation() {
+    if (reduceMotionOf(context)) {
+      widget.onTap?.call();
+      return;
+    }
     _controller.forward().then((_) {
       _controller.reverse();
       widget.onTap?.call();
@@ -82,6 +92,7 @@ class _PressableScaleState extends State<PressableScale>
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion = reduceMotionOf(context);
     final constrainedChild = widget.minTouchTargetSize == null
         ? widget.child
         : ConstrainedBox(
@@ -125,7 +136,9 @@ class _PressableScaleState extends State<PressableScale>
           onTapCancel: _onTapCancel,
           behavior: HitTestBehavior.opaque,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 150),
             decoration: _isFocused
                 ? BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
@@ -135,10 +148,9 @@ class _PressableScaleState extends State<PressableScale>
                     ),
                   )
                 : null,
-            child: ScaleTransition(
-              scale: _scaleAnimation,
-              child: semanticChild,
-            ),
+            child: reduceMotion
+                ? semanticChild
+                : ScaleTransition(scale: _scaleAnimation, child: semanticChild),
           ),
         ),
       ),

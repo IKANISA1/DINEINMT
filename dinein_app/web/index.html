@@ -180,15 +180,20 @@
       <p class="loader-copy">
         Preparing venues, menus, and your saved session.
       </p>
+      <p class="loader-kicker" id="connection-state" hidden>OFFLINE</p>
+      <p class="loader-kicker" id="install-state" hidden>INSTALL APP</p>
       <div class="loader-bar" aria-hidden="true"></div>
     </div>
   </div>
   <script>
     (function () {
       const loader = document.getElementById('app-loader');
+      const connectionState = document.getElementById('connection-state');
+      const installState = document.getElementById('install-state');
       if (!loader) return;
 
       let hidden = false;
+      let deferredInstallPrompt = null;
       const hideLoader = function () {
         if (hidden) return;
         hidden = true;
@@ -198,10 +203,57 @@
         }, 320);
       };
 
+      const updateConnectionState = function () {
+        const online = navigator.onLine;
+        window.__dineinPwaState = {
+          ...(window.__dineinPwaState || {}),
+          online: online
+        };
+        if (connectionState) {
+          connectionState.hidden = online;
+        }
+        window.dispatchEvent(new CustomEvent('dinein-pwa-connection-change', {
+          detail: { online: online }
+        }));
+      };
+
+      const updateInstallState = function (visible) {
+        window.__dineinPwaState = {
+          ...(window.__dineinPwaState || {}),
+          installAvailable: visible
+        };
+        if (installState) {
+          installState.hidden = !visible;
+        }
+        if (visible) {
+          window.dispatchEvent(new CustomEvent('dinein-pwa-install-available'));
+        }
+      };
+
       window.addEventListener('flutter-first-frame', hideLoader, { once: true });
       window.addEventListener('load', function () {
+        updateConnectionState();
         window.setTimeout(hideLoader, 12000);
       }, { once: true });
+      window.addEventListener('online', updateConnectionState);
+      window.addEventListener('offline', updateConnectionState);
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        window.__dineinDeferredInstallPrompt = event;
+        updateInstallState(true);
+      });
+      window.addEventListener('appinstalled', function () {
+        deferredInstallPrompt = null;
+        window.__dineinDeferredInstallPrompt = null;
+        updateInstallState(false);
+      });
+      if (installState) {
+        installState.addEventListener('click', function () {
+          if (!deferredInstallPrompt) return;
+          deferredInstallPrompt.prompt();
+        });
+      }
     })();
   </script>
   <script src="flutter_bootstrap.js" async></script>

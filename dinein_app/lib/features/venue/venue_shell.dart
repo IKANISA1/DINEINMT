@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_layout.dart';
 import '../../core/providers/providers.dart';
 import '../../core/providers/bell_providers.dart';
 import '../../shared/widgets/shared_widgets.dart';
@@ -63,26 +64,34 @@ class VenueShell extends ConsumerWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= 1000) {
+        if (constraints.maxWidth >= AppLayout.opsRailBreakpoint) {
           return _WideVenueShell(
             currentIndex: index,
             venueName: venueName,
             venueId: venueId,
             avatarUrl: venueImageUrl,
+            screenWidth: constraints.maxWidth,
             child: child,
           );
         }
 
         return Scaffold(
-          body: Column(
-            children: [
-              _VenueTopBar(
-                venueName: venueName,
-                avatarUrl: venueImageUrl,
-                venueId: venueId,
+          body: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: AppLayout.opsContentMaxWidth(constraints.maxWidth),
               ),
-              Expanded(child: child),
-            ],
+              child: Column(
+                children: [
+                  _VenueTopBar(
+                    venueName: venueName,
+                    avatarUrl: venueImageUrl,
+                    venueId: venueId,
+                  ),
+                  Expanded(child: child),
+                ],
+              ),
+            ),
           ),
           bottomNavigationBar: _VenueBottomNav(currentIndex: index),
         );
@@ -97,6 +106,7 @@ class _WideVenueShell extends StatelessWidget {
   final String venueName;
   final String? avatarUrl;
   final String? venueId;
+  final double screenWidth;
 
   const _WideVenueShell({
     required this.child,
@@ -104,6 +114,7 @@ class _WideVenueShell extends StatelessWidget {
     required this.venueName,
     required this.avatarUrl,
     required this.venueId,
+    required this.screenWidth,
   });
 
   @override
@@ -114,7 +125,7 @@ class _WideVenueShell extends StatelessWidget {
       body: Row(
         children: [
           SizedBox(
-            width: 288,
+            width: AppLayout.opsRailWidth(screenWidth),
             child: AdaptiveGlassSurface(
               decoration: BoxDecoration(
                 color: cs.surface.withValues(alpha: 0.92),
@@ -200,15 +211,22 @@ class _WideVenueShell extends StatelessWidget {
             color: Colors.white.withValues(alpha: 0.05),
           ),
           Expanded(
-            child: Column(
-              children: [
-                _VenueTopBar(
-                  venueName: venueName,
-                  avatarUrl: avatarUrl,
-                  venueId: venueId,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: AppLayout.opsContentMaxWidth(screenWidth),
                 ),
-                Expanded(child: child),
-              ],
+                child: Column(
+                  children: [
+                    _VenueTopBar(
+                      venueName: venueName,
+                      avatarUrl: avatarUrl,
+                      venueId: venueId,
+                    ),
+                    Expanded(child: child),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -246,14 +264,11 @@ class _VenueRailSummary extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: avatarUrl != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      avatarUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          Icon(LucideIcons.store, size: 18, color: cs.primary),
-                    ),
+                ? DineInImage(
+                    imageUrl: avatarUrl,
+                    fit: BoxFit.cover,
+                    borderRadius: 12,
+                    fallbackIcon: LucideIcons.store,
                   )
                 : Icon(LucideIcons.store, size: 18, color: cs.primary),
           ),
@@ -419,19 +434,13 @@ class _VenueTopBar extends ConsumerWidget {
                   ),
                 ),
                 child: avatarUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.network(
-                          avatarUrl!,
-                          width: 32,
-                          height: 32,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => Icon(
-                            LucideIcons.user,
-                            size: 16,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
+                    ? DineInImage(
+                        imageUrl: avatarUrl,
+                        width: 32,
+                        height: 32,
+                        fit: BoxFit.cover,
+                        borderRadius: 12,
+                        fallbackIcon: LucideIcons.user,
                       )
                     : Center(
                         child: Text(

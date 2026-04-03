@@ -5,16 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/country_config.dart';
 import 'core/config/country_config_provider.dart';
 import 'core/config/country_runtime.dart';
+import 'core/services/app_bootstrap_service.dart';
 import 'features/guest/permissions/guest_location_permission_host.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/router/url_strategy.dart';
-import 'core/services/app_notification_service.dart'
-    if (dart.library.html) 'core/services/app_notification_service_web.dart';
-import 'core/services/app_telemetry_service.dart'
-    if (dart.library.html) 'core/services/app_telemetry_service_web.dart';
-import 'core/services/auth_repository.dart';
-import 'core/services/supabase_config.dart';
 
 /// Malta entry point.
 Future<void> main() async => _boot(CountryConfig.mt);
@@ -24,26 +19,14 @@ Future<void> _boot(CountryConfig config) async {
   WidgetsFlutterBinding.ensureInitialized();
   configureWebUrlStrategy();
   CountryRuntime.configure(config);
+  unawaited(AppBootstrapService.instance.ensureStarted());
 
-  await Future.wait<void>([
-    SupabaseConfig.initialize(),
-    AuthRepository.instance.restoreVenueSession(),
-    AuthRepository.instance.restoreAdminSession(),
-    AppNotificationService.initialize(),
-  ]);
   runApp(
     ProviderScope(
       overrides: [countryConfigProvider.overrideWithValue(config)],
       child: DineInApp(config: config),
     ),
   );
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    unawaited(AppTelemetryService.initialize());
-    final venueSession = AuthRepository.instance.currentVenueSession;
-    if (venueSession != null) {
-      unawaited(AppNotificationService.handleVenueSessionUpdated(venueSession));
-    }
-  });
 }
 
 /// Root widget for the DineIn app.

@@ -132,6 +132,28 @@ if [[ -f "${project_dir}/web/_redirects" ]] && [[ ! -f "${build_output}/_redirec
   echo "✅ Copied _redirects to build output"
 fi
 
+if ! grep -q 'app-loader' "${build_output}/index.html"; then
+  echo "⛔ Built index.html is missing the branded startup loader." >&2
+  exit 1
+fi
+
+if ! grep -q 'Permissions-Policy: camera=(), microphone=(), geolocation=(self)' "${build_output}/_headers"; then
+  echo "⛔ Built _headers is missing the expected geolocation policy." >&2
+  exit 1
+fi
+
+if ! grep -q '"display": "standalone"' "${build_output}/manifest.json"; then
+  echo "⛔ Built manifest.json is missing standalone display mode." >&2
+  exit 1
+fi
+
+if [[ ! -f "${build_output}/offline.html" ]]; then
+  echo "⛔ Built web output is missing offline.html." >&2
+  exit 1
+fi
+
+echo "✅ Verified startup loader, headers, manifest, and offline fallback"
+
 echo ""
 echo "═══════════════════════════════════════════════════════"
 echo "  Web build complete (${flavor})"
