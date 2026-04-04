@@ -18,6 +18,7 @@ import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/services/app_telemetry.dart';
 import 'package:dinein_app/core/services/order_repository.dart';
 import 'package:dinein_app/core/services/pwa_install_service.dart';
+import 'package:dinein_app/shared/widgets/safari_install_guide.dart';
 import 'package:dinein_app/core/services/venue_repository.dart';
 import 'package:ui/widgets/pressable_scale.dart';
 
@@ -209,6 +210,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
       // G-21: Trigger PWA install prompt after successful order
       PwaInstallService.triggerIfEligible(reason: 'order_placed');
+
+      // iOS Safari install guide (no beforeinstallprompt on iOS)
+      if (mounted) {
+        SafariInstallGuide.showIfEligible(context);
+      }
 
       if (mounted) {
         ref.invalidate(userOrdersProvider);

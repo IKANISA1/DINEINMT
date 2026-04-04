@@ -7,6 +7,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:core_pkg/config/country_runtime.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/services/auth_repository.dart';
+import 'package:dinein_app/core/services/pwa_install_service.dart';
 import 'package:dinein_app/core/services/whatsapp_otp_service.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
@@ -272,6 +273,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       }
 
       await AuthRepository.instance.saveAdminSession(adminSession);
+      PwaInstallService.triggerIfEligible(reason: 'admin_login');
 
       if (!mounted) return;
       context.go(_postLoginTarget(context) ?? AppRoutePaths.adminOverview);

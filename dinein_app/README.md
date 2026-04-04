@@ -110,11 +110,18 @@ For a guarded one-command Android release flow:
 For iOS release builds:
 
 ```bash
-cp ios/Runner/GoogleService-Info-rw.plist.example ios/Runner/GoogleService-Info-rw.plist
-# replace the placeholder values above with the real Rwanda Firebase iOS app config
+python3 scripts/sync_firebase_configs.py
 
 ./scripts/build_ios_release.sh --flavor mt
 ./scripts/build_ios_release.sh --flavor rw
+```
+
+Firebase app IDs for both DineIn flavors are committed in `firebase.json`.
+When the Firebase project changes, re-pull the live Android, iOS, web, and
+`firebase_options.dart` config from the configured project with:
+
+```bash
+python3 scripts/sync_firebase_configs.py
 ```
 
 For a live backend sanity check against the hosted Supabase project:
@@ -130,11 +137,6 @@ For platform release integration checks before store submission:
 ./scripts/validate_release_integrations.sh --flavor mt
 ./scripts/validate_release_integrations.sh --flavor rw --android-only
 ```
-
-The Rwanda iOS path is scaffolded in-repo but still needs a real
-`ios/Runner/GoogleService-Info-rw.plist` before `--flavor rw` iOS archives can
-be produced. The committed `.example` file is intentionally non-secret and
-non-buildable.
 
 The project now reads Android signing values from `android/key.properties` or
 the environment variables `ANDROID_KEYSTORE_FILE`,

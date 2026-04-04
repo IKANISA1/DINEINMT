@@ -35,7 +35,9 @@ case "$flavor" in
   mt)
     expected_host="dineinmt.ikanisa.com"
     expected_android_package="com.dineinmalta.app"
+    expected_android_app_id="1:1074154147498:android:1dd401b016b8c501dc4ad3"
     expected_ios_bundle="com.dineinmalta.app"
+    expected_ios_app_id="1:1074154147498:ios:f9338408dab88c45dc4ad3"
     android_google_services="$app_root/android/app/src/mt/google-services.json"
     android_manifest_task=":app:processMtReleaseMainManifest"
     merged_android_manifest="$app_root/build/app/intermediates/merged_manifests/mtRelease/processMtReleaseManifest/AndroidManifest.xml"
@@ -46,7 +48,9 @@ case "$flavor" in
   rw)
     expected_host="dineinrw.ikanisa.com"
     expected_android_package="com.dineinrw.app"
+    expected_android_app_id="1:1074154147498:android:cbd8a51892a2ee93dc4ad3"
     expected_ios_bundle="com.dineinrw.app"
+    expected_ios_app_id="1:1074154147498:ios:a44ce46db3c51bfcdc4ad3"
     android_google_services="$app_root/android/app/src/rw/google-services.json"
     android_manifest_task=":app:processRwReleaseMainManifest"
     merged_android_manifest="$app_root/build/app/intermediates/merged_manifests/rwRelease/processRwReleaseManifest/AndroidManifest.xml"
@@ -212,6 +216,10 @@ if [[ -f "$android_google_services" ]]; then
     "$android_google_services" \
     "$expected_android_package" \
     "Android Firebase config for $expected_android_package is missing."
+  require_contains \
+    "$android_google_services" \
+    "$expected_android_app_id" \
+    "Android Firebase app id for $expected_android_package is missing."
 fi
 
 if [[ "$android_only" != "true" ]]; then
@@ -221,6 +229,10 @@ if [[ "$android_only" != "true" ]]; then
       "$ios_google_service_info" \
       "$expected_ios_bundle" \
       "iOS Firebase config for $expected_ios_bundle is missing."
+    require_contains \
+      "$ios_google_service_info" \
+      "$expected_ios_app_id" \
+      "iOS Firebase app id for $expected_ios_bundle is missing."
   fi
   require_no_placeholder \
     "$firebase_options" \
@@ -233,6 +245,8 @@ require_file "$web_headers" 'Web headers config is missing.'
 require_file "$web_index" 'Web index.html is missing.'
 require_file "$web_manifest" 'Web manifest.json is missing.'
 require_file "$web_offline" 'Offline fallback page is missing.'
+require_file "${app_root}/web/custom_sw.js" 'Custom web service worker is missing.'
+require_file "${app_root}/web/flutter_bootstrap.js" 'Custom flutter_bootstrap.js is missing.'
 if [[ -f "$web_headers" ]]; then
   require_contains \
     "$web_headers" \
@@ -248,12 +262,20 @@ if [[ -f "$web_index" ]]; then
     "$web_index" \
     'beforeinstallprompt' \
     'Web index.html is missing the install prompt bridge.'
+  require_contains \
+    "$web_index" \
+    'custom_sw.js' \
+    'Web index.html is missing the custom service worker registration.'
 fi
 if [[ -f "$web_manifest" ]]; then
   require_contains \
     "$web_manifest" \
     '"display": "standalone"' \
     'Web manifest is missing standalone display mode.'
+  require_contains \
+    "$web_manifest" \
+    '"shortcuts"' \
+    'Web manifest is missing launcher shortcuts.'
 fi
 require_file \
   "$asset_links" \

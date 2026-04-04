@@ -9,6 +9,7 @@ import 'package:core_pkg/config/country_config_provider.dart';
 import 'package:core_pkg/config/country_runtime.dart';
 import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/core/services/pwa_install_service.dart';
+import 'package:dinein_app/shared/widgets/offline_banner.dart';
 import 'features/guest/permissions/guest_location_permission_host.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:dinein_app/core/router/app_router.dart';
@@ -68,8 +69,11 @@ class DineInApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
       routerConfig: appRouter,
-      builder: (context, child) =>
-          GuestLocationPermissionHost(child: child ?? const SizedBox.shrink()),
+      builder: (context, child) => OfflineBanner(
+        child: GuestLocationPermissionHost(
+          child: child ?? const SizedBox.shrink(),
+        ),
+      ),
       scrollBehavior: const _DineInScrollBehavior(),
     );
   }

@@ -18,21 +18,16 @@ class FirebaseRuntimeService {
   }
 
   static Future<bool> _initialize() async {
-    if (kIsWeb) {
-      debugPrint('[firebase] Web runtime uses no-op initialization.');
-      _initialized = true;
-      _initializing = null;
-      return true;
-    }
-
-    try {
-      await Firebase.initializeApp();
-      _initialized = true;
-      _initializing = null;
-      return true;
-    } catch (error, stackTrace) {
-      debugPrint('[firebase] Native initialization unavailable: $error');
-      debugPrintStack(stackTrace: stackTrace);
+    if (!kIsWeb) {
+      try {
+        await Firebase.initializeApp();
+        _initialized = true;
+        _initializing = null;
+        return true;
+      } catch (error, stackTrace) {
+        debugPrint('[firebase] Native initialization unavailable: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
     }
 
     if (!DefaultFirebaseOptions.hasCurrentPlatformConfig) {

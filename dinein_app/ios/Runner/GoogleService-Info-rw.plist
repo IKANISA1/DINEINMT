@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyC3wczTXHP3fkryFydOTu6RIbxZ5vRUbg0</string>
+	<string>AIzaSyC8dE6DUHuVTK9tFkNx31EcEqNeNogUpjw</string>
 	<key>GCM_SENDER_ID</key>
 	<string>1074154147498</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.dineinmalta.app</string>
+	<string>com.dineinrw.app</string>
 	<key>PROJECT_ID</key>
 	<string>gen-lang-client-0172279957</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1074154147498:ios:f9338408dab88c45dc4ad3</string>
+	<string>1:1074154147498:ios:a44ce46db3c51bfcdc4ad3</string>
 </dict>
 </plist>

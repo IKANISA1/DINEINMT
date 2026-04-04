@@ -1,9 +1,21 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { postWhatsAppMessage } from "../_shared/whatsapp.ts";
-import { getEnv, optionalEnv, intEnv, boolEnv } from "../_shared/env.ts";
-import { digitsOnly, sha256Hex, bytesToBase64Url, base64UrlEncode, hmacSha256Base64Url } from "../_shared/crypto.ts";
-import { corsHeaders, jsonResponse, errorResponse } from "../_shared/http.ts";
+import { boolEnv, getEnv, intEnv, optionalEnv } from "../_shared/env.ts";
+import {
+  base64UrlEncode,
+  bytesToBase64Url,
+  digitsOnly,
+  hmacSha256Base64Url,
+  sha256Hex,
+} from "../_shared/crypto.ts";
+import {
+  applyCorsHeaders,
+  assertAllowedAppOrigin,
+  buildResponseHeaders,
+  errorResponse,
+  jsonResponse,
+} from "../_shared/http.ts";
 
 const tableName = "venue_whatsapp_otp_challenges";
 const otpTtlMinutes = intEnv("WHATSAPP_OTP_TTL_MINUTES", 10);
@@ -983,40 +995,74 @@ async function handleVerify(
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  if (req.method !== "POST") {
-    return errorResponse("Method not allowed.", 405);
-  }
-
-  let body: JsonRecord;
-  try {
-    body = (await req.json()) as JsonRecord;
-  } catch {
-    return errorResponse("A JSON body is required.", 400);
-  }
-
-  const action = String(body.action ?? "").trim().toLowerCase();
-  if (!action) {
-    return errorResponse("An action is required.", 400);
-  }
+  let allowedOrigin: string | null = null;
 
   try {
+    allowedOrigin = assertAllowedAppOrigin(req);
+    if (req.method === "OPTIONS") {
+      return new Response("ok", {
+        headers: buildResponseHeaders(allowedOrigin, {
+          fallbackWildcard: false,
+        }),
+      });
+    }
+
+    if (req.method !== "POST") {
+      return errorResponse(
+        "Method not allowed.",
+        405,
+        undefined,
+        allowedOrigin,
+      );
+    }
+
+    let body: JsonRecord;
+    try {
+      body = (await req.json()) as JsonRecord;
+    } catch {
+      return errorResponse(
+        "A JSON body is required.",
+        400,
+        undefined,
+        allowedOrigin,
+      );
+    }
+
+    const action = String(body.action ?? "").trim().toLowerCase();
+    if (!action) {
+      return errorResponse(
+        "An action is required.",
+        400,
+        undefined,
+        allowedOrigin,
+      );
+    }
+
     const supabase = adminClient();
+    let response: Response;
 
     if (action === "send") {
-      return await handleSend(supabase, body, req);
+      response = await handleSend(supabase, body, req);
+      return applyCorsHeaders(response, allowedOrigin, {
+        fallbackWildcard: false,
+      });
     }
 
     if (action === "verify") {
-      return await handleVerify(supabase, body);
+      response = await handleVerify(supabase, body);
+      return applyCorsHeaders(response, allowedOrigin, {
+        fallbackWildcard: false,
+      });
     }
 
-    return errorResponse("Unsupported action.", 400);
+    return errorResponse("Unsupported action.", 400, undefined, allowedOrigin);
   } catch (error) {
     console.error("[whatsapp-otp] unhandled error", error);
-    return errorResponse("Unexpected OTP service failure.", 500);
+    return errorResponse(
+      "Unexpected OTP service failure.",
+      500,
+      undefined,
+      allowedOrigin,
+    );
   }
 });

@@ -233,19 +233,22 @@ class StatusBadge extends StatelessWidget {
     final bgColor = color ?? cs.primaryContainer.withValues(alpha: 0.20);
     final fgColor = textColor ?? cs.primary;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          color: fgColor,
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.5,
+    return Semantics(
+      label: 'Status: $label',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+        ),
+        child: Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: fgColor,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.5,
+          ),
         ),
       ),
     );
@@ -291,29 +294,46 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return RepaintBoundary(
-          child: Container(
-            width: widget.width,
-            height: widget.height,
+    // Respect prefers-reduced-motion: show a static placeholder
+    if (reduceMotion) {
+      return ExcludeSemantics(
+        child: Container(
+          width: widget.width,
+          height: widget.height,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(widget.borderRadius),
-            gradient: LinearGradient(
-              begin: Alignment(-1.0 + 2.0 * _controller.value, 0),
-              end: Alignment(-1.0 + 2.0 * _controller.value + 1, 0),
-              colors: [
-                cs.surfaceContainerHigh,
-                cs.surfaceContainerHighest,
-                cs.surfaceContainerHigh,
-              ],
+            color: cs.surfaceContainerHigh,
+          ),
+        ),
+      );
+    }
+
+    return ExcludeSemantics(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return RepaintBoundary(
+            child: Container(
+              width: widget.width,
+              height: widget.height,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(widget.borderRadius),
+                gradient: LinearGradient(
+                  begin: Alignment(-1.0 + 2.0 * _controller.value, 0),
+                  end: Alignment(-1.0 + 2.0 * _controller.value + 1, 0),
+                  colors: [
+                    cs.surfaceContainerHigh,
+                    cs.surfaceContainerHighest,
+                    cs.surfaceContainerHigh,
+                  ],
+                ),
+              ),
             ),
-          ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

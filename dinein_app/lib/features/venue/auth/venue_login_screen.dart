@@ -8,6 +8,7 @@ import 'package:core_pkg/config/country_runtime.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/services/auth_repository.dart';
+import 'package:dinein_app/core/services/pwa_install_service.dart';
 import 'package:dinein_app/core/services/whatsapp_otp_service.dart';
 import 'package:dinein_app/core/infrastructure/support_contact_service.dart';
 import 'package:ui/theme/app_colors.dart';
@@ -367,6 +368,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
     final venueSession = result.venueSession;
     if (venueSession != null) {
       await _saveVenueSession(venueSession);
+      PwaInstallService.triggerIfEligible(reason: 'venue_login');
       if (!mounted) return;
       context.go(_postLoginTarget(context) ?? AppRoutePaths.venueDashboard);
       return;

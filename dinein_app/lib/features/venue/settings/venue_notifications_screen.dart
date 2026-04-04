@@ -12,6 +12,7 @@ import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/services/venue_notification_repository.dart';
+import 'package:dinein_app/shared/widgets/notification_pre_permission.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
 /// Venue Notifications settings — full-page screen.
@@ -96,6 +97,12 @@ class _VenueNotificationsScreenState
     required bool orderPushEnabled,
     required bool whatsAppUpdatesEnabled,
   }) async {
+    // Show pre-permission dialog when enabling push for the first time
+    if (orderPushEnabled && !_orderPush) {
+      final consented = await NotificationPrePermission.show(context);
+      if (!consented || !mounted) return;
+    }
+
     final previousOrderPush = _orderPush;
     final previousWhatsAppUpdates = _whatsAppUpdates;
 

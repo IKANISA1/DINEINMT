@@ -14,6 +14,45 @@
           "appId": "1:1074154147498:ios:f9338408dab88c45dc4ad3",
           "fileOutput": "ios/Runner/GoogleService-Info.plist"
         }
+      },
+      "web": {
+        "default": {
+          "projectId": "gen-lang-client-0172279957",
+          "appId": "1:1074154147498:web:40ff2d11ccfa7d2cdc4ad3"
+        }
+      }
+    }
+  },
+  "dinein": {
+    "projectId": "gen-lang-client-0172279957",
+    "projectNumber": "1074154147498",
+    "web": {
+      "appId": "1:1074154147498:web:40ff2d11ccfa7d2cdc4ad3"
+    },
+    "flavors": {
+      "mt": {
+        "android": {
+          "applicationId": "com.dineinmalta.app",
+          "appId": "1:1074154147498:android:1dd401b016b8c501dc4ad3",
+          "fileOutput": "android/app/src/mt/google-services.json"
+        },
+        "ios": {
+          "bundleId": "com.dineinmalta.app",
+          "appId": "1:1074154147498:ios:f9338408dab88c45dc4ad3",
+          "fileOutput": "ios/Runner/GoogleService-Info-mt.plist"
+        }
+      },
+      "rw": {
+        "android": {
+          "applicationId": "com.dineinrw.app",
+          "appId": "1:1074154147498:android:cbd8a51892a2ee93dc4ad3",
+          "fileOutput": "android/app/src/rw/google-services.json"
+        },
+        "ios": {
+          "bundleId": "com.dineinrw.app",
+          "appId": "1:1074154147498:ios:a44ce46db3c51bfcdc4ad3",
+          "fileOutput": "ios/Runner/GoogleService-Info-rw.plist"
+        }
       }
     }
   }

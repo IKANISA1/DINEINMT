@@ -51,11 +51,15 @@ jobs:
 
       - name: Validate release scripts syntax
         run: |
+          bash -n scripts/build_web_release.sh
           bash -n scripts/build_android_release.sh
           bash -n scripts/build_ios_release.sh
           bash -n scripts/render_app_links.sh
           bash -n scripts/smoke_live_backend.sh
           bash -n scripts/validate_release_integrations.sh
+          python3 -m py_compile scripts/stamp_pwa_bundle.py
+          python3 -m py_compile scripts/serve_spa_build.py
+          python3 -m py_compile scripts/assert_pwa_lighthouse.py
 
       - name: Render app-link artifacts
         env:
@@ -125,3 +129,78 @@ jobs:
           cd packages/ui
           flutter pub get
           flutter analyze
+
+  lighthouse-pwa:
+    runs-on: ubuntu-latest
+    needs: flutter
+    defaults:
+      run:
+        working-directory: dinein_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Build web (mt flavor)
+        run: |
+          cat > env/release.mt.ci.json <<'JSON'
+          {
+            "SUPABASE_URL": "https://mock-ci.supabase.co",
+            "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock.signature"
+          }
+          JSON
+          ./scripts/build_web_release.sh \
+            --flavor mt \
+            --env-file env/release.mt.ci.json \
+            --skip-checks
+
+      - name: Run Lighthouse route audits
+        run: |
+          python3 scripts/serve_spa_build.py build/web --port 4173 >/tmp/dinein-spa.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill ${SERVER_PID}' EXIT
+
+          python3 - <<'PY'
+          import time
+          import urllib.request
+
+          url = "http://127.0.0.1:4173/discover"
+          for _ in range(60):
+              try:
+                  urllib.request.urlopen(url, timeout=2)
+                  break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit("Timed out waiting for local SPA server.")
+          PY
+
+          mkdir -p /tmp/dinein-lh
+          for route in guest:/discover venue:/venue/login admin:/admin/login; do
+            name="${route%%:*}"
+            path="${route#*:}"
+            npx --yes lighthouse "http://127.0.0.1:4173${path}" \
+              --chrome-flags="--headless=new --no-sandbox" \
+              --only-categories=performance,accessibility,best-practices,seo \
+              --output=json \
+              --quiet \
+              --output-path="/tmp/dinein-lh/${name}.json"
+          done
+
+          python3 scripts/assert_pwa_lighthouse.py \
+            /tmp/dinein-lh/guest.json \
+            /tmp/dinein-lh/venue.json \
+            /tmp/dinein-lh/admin.json
