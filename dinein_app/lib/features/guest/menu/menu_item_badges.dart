@@ -84,18 +84,25 @@ _MenuItemBadgeTone _toneForBadge(String label) {
       foreground: AppColors.secondary,
     );
   }
-  if (normalized == 'halal') {
+  if (normalized == 'halal' || normalized == 'kosher') {
     return _MenuItemBadgeTone(
       background: AppColors.tertiary.withValues(alpha: 0.14),
       border: AppColors.tertiary.withValues(alpha: 0.26),
       foreground: AppColors.tertiary,
     );
   }
-  if (normalized == 'gluten-free') {
+  if (normalized.endsWith('-free') || normalized == 'gluten-free') {
     return _MenuItemBadgeTone(
       background: AppColors.warning.withValues(alpha: 0.14),
       border: AppColors.warning.withValues(alpha: 0.22),
       foreground: AppColors.warning,
+    );
+  }
+  if (normalized.startsWith('contains ') || normalized == 'spicy') {
+    return _MenuItemBadgeTone(
+      background: AppColors.error.withValues(alpha: 0.14),
+      border: AppColors.error.withValues(alpha: 0.22),
+      foreground: AppColors.error,
     );
   }
   return _MenuItemBadgeTone(

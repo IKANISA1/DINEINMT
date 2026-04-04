@@ -133,10 +133,41 @@ bool _isSignatureMenuTag(String raw) {
 String? _normalizeDietaryMenuTag(String raw) {
   final normalized = raw.trim().toLowerCase();
   return switch (normalized) {
+    // Dietary labels
     'vegetarian' || 'veg' => 'Vegetarian',
     'vegan' => 'Vegan',
     'halal' => 'Halal',
+    'kosher' => 'Kosher',
+    // EU 14 mandatory allergens
     'gluten free' || 'gluten-free' || 'gf' => 'Gluten-Free',
+    'dairy free' || 'dairy-free' || 'lactose free' || 'lactose-free' =>
+      'Dairy-Free',
+    'nut free' || 'nut-free' || 'tree nut free' => 'Nut-Free',
+    'peanut free' || 'peanut-free' => 'Peanut-Free',
+    'egg free' || 'egg-free' => 'Egg-Free',
+    'soy free' || 'soy-free' || 'soya free' => 'Soy-Free',
+    'fish free' || 'fish-free' => 'Fish-Free',
+    'shellfish free' || 'shellfish-free' || 'crustacean free' =>
+      'Shellfish-Free',
+    'sesame free' || 'sesame-free' => 'Sesame-Free',
+    'celery free' || 'celery-free' => 'Celery-Free',
+    'mustard free' || 'mustard-free' => 'Mustard-Free',
+    'sulphite free' || 'sulphite-free' || 'sulfite free' || 'sulfite-free' =>
+      'Sulphite-Free',
+    'lupin free' || 'lupin-free' => 'Lupin-Free',
+    'mollusc free' || 'mollusc-free' || 'mollusk free' => 'Mollusc-Free',
+    // Contains-style tags (also useful for EU disclosure)
+    'contains nuts' || 'contains tree nuts' => 'Contains Nuts',
+    'contains gluten' || 'contains wheat' => 'Contains Gluten',
+    'contains dairy' || 'contains milk' || 'contains lactose' =>
+      'Contains Dairy',
+    'contains eggs' || 'contains egg' => 'Contains Eggs',
+    'contains soy' || 'contains soya' => 'Contains Soy',
+    'contains fish' => 'Contains Fish',
+    'contains shellfish' || 'contains crustaceans' => 'Contains Shellfish',
+    'contains sesame' => 'Contains Sesame',
+    'contains peanuts' || 'contains peanut' => 'Contains Peanuts',
+    'spicy' || 'hot' => 'Spicy',
     _ => null,
   };
 }
