@@ -8,22 +8,34 @@ import 'package:dinein_app/core/services/pwa_install_service.dart';
 class CartItem {
   final String menuItemId;
   final String name;
+  final String description;
+  final String? imageUrl;
   final double price;
   final int quantity;
 
   const CartItem({
     required this.menuItemId,
     required this.name,
+    this.description = '',
+    this.imageUrl,
     required this.price,
     this.quantity = 1,
   });
 
   double get subtotal => price * quantity;
 
-  CartItem copyWith({int? quantity}) => CartItem(
+  CartItem copyWith({
+    String? name,
+    String? description,
+    String? imageUrl,
+    double? price,
+    int? quantity,
+  }) => CartItem(
     menuItemId: menuItemId,
-    name: name,
-    price: price,
+    name: name ?? this.name,
+    description: description ?? this.description,
+    imageUrl: imageUrl ?? this.imageUrl,
+    price: price ?? this.price,
     quantity: quantity ?? this.quantity,
   );
 
@@ -31,6 +43,8 @@ class CartItem {
   OrderItem toOrderItem() => OrderItem(
     menuItemId: menuItemId,
     name: name,
+    description: description,
+    imageUrl: imageUrl,
     price: price,
     quantity: quantity,
   );
@@ -167,7 +181,13 @@ class CartNotifier extends Notifier<CartState> {
       state = state.copyWith(
         items: [
           ...state.items,
-          CartItem(menuItemId: item.id, name: item.name, price: item.price),
+          CartItem(
+            menuItemId: item.id,
+            name: item.name,
+            description: item.description,
+            imageUrl: item.imageUrl,
+            price: item.price,
+          ),
         ],
       );
     }
@@ -198,6 +218,8 @@ class CartNotifier extends Notifier<CartState> {
     String menuItemId,
     int quantity, {
     String? name,
+    String? description,
+    String? imageUrl,
     double? price,
   }) {
     if (quantity <= 0) {
@@ -220,6 +242,8 @@ class CartNotifier extends Notifier<CartState> {
           CartItem(
             menuItemId: menuItemId,
             name: name,
+            description: description ?? '',
+            imageUrl: imageUrl,
             price: price,
             quantity: quantity,
           ),

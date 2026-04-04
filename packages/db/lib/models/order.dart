@@ -4,6 +4,8 @@ part of 'models.dart';
 class OrderItem extends Equatable {
   final String menuItemId;
   final String name;
+  final String description;
+  final String? imageUrl;
   final double price;
   final int quantity;
   final String? note;
@@ -11,6 +13,8 @@ class OrderItem extends Equatable {
   const OrderItem({
     required this.menuItemId,
     required this.name,
+    this.description = '',
+    this.imageUrl,
     required this.price,
     required this.quantity,
     this.note,
@@ -22,6 +26,14 @@ class OrderItem extends Equatable {
     return OrderItem(
       menuItemId: json['menu_item_id'] as String,
       name: json['name'] as String,
+      description:
+          json['description'] as String? ??
+          json['menu_item_description'] as String? ??
+          '',
+      imageUrl:
+          json['image_url'] as String? ??
+          json['imageUrl'] as String? ??
+          json['menu_item_image_url'] as String?,
       price: (json['price'] as num).toDouble(),
       quantity: json['quantity'] as int,
       note: json['note'] as String?,
@@ -31,6 +43,8 @@ class OrderItem extends Equatable {
   OrderItem copyWith({
     String? menuItemId,
     String? name,
+    String? description,
+    String? imageUrl,
     double? price,
     int? quantity,
     String? note,
@@ -38,6 +52,8 @@ class OrderItem extends Equatable {
     return OrderItem(
       menuItemId: menuItemId ?? this.menuItemId,
       name: name ?? this.name,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
       price: price ?? this.price,
       quantity: quantity ?? this.quantity,
       note: note ?? this.note,
@@ -47,13 +63,23 @@ class OrderItem extends Equatable {
   Map<String, dynamic> toJson() => {
     'menu_item_id': menuItemId,
     'name': name,
+    'description': description,
+    'image_url': imageUrl,
     'price': price,
     'quantity': quantity,
     'note': note,
   };
 
   @override
-  List<Object?> get props => [menuItemId, name, price, quantity, note];
+  List<Object?> get props => [
+    menuItemId,
+    name,
+    description,
+    imageUrl,
+    price,
+    quantity,
+    note,
+  ];
 }
 
 /// A placed order.

@@ -49,6 +49,28 @@ void main() {
       expect(route, AppRoutePaths.adminOverview);
     });
 
+    test('routes Rwanda guest host even when config falls back to Malta', () {
+      final route = resolveWebRootRoute(
+        uri: Uri.parse('https://dineinrwg.ikanisa.com/'),
+        config: CountryConfig.mt,
+        hasVenueAccess: false,
+        hasAdminAccess: false,
+      );
+
+      expect(route, AppRoutePaths.discover);
+    });
+
+    test('routes Rwanda venue host even when config falls back to Malta', () {
+      final route = resolveWebRootRoute(
+        uri: Uri.parse('https://dineinrwv.ikanisa.com/'),
+        config: CountryConfig.mt,
+        hasVenueAccess: false,
+        hasAdminAccess: false,
+      );
+
+      expect(route, AppRoutePaths.venueLogin);
+    });
+
     test('returns null for unknown hosts', () {
       final route = resolveWebRootRoute(
         uri: Uri.parse('https://example.com/'),

@@ -1,5 +1,10 @@
 import 'app_telemetry_shared.dart';
 
+const _webGuestTelemetryEnabled = bool.fromEnvironment(
+  'ENABLE_WEB_GUEST_TELEMETRY',
+  defaultValue: false,
+);
+
 class AppTelemetryService {
   AppTelemetryService._();
 
@@ -18,6 +23,9 @@ class AppTelemetryService {
     String? orderId,
     Map<String, Object?> details = const {},
   }) {
+    if (!_webGuestTelemetryEnabled) {
+      return Future<void>.value();
+    }
     return recordGuestTelemetryEvent(
       eventName,
       route: route,

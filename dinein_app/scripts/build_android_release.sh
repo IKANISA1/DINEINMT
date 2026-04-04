@@ -4,6 +4,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd "${script_dir}/.." && pwd)"
 key_properties="${project_dir}/android/key.properties"
+materialize_env_script="${project_dir}/scripts/materialize_release_env.sh"
 
 skip_checks=false
 flavor="mt"
@@ -63,6 +64,10 @@ has_env_signing() {
     [[ -n "${ANDROID_KEY_ALIAS:-}" ]] &&
     [[ -n "${ANDROID_KEY_PASSWORD:-}" ]]
 }
+
+if [[ -f "${materialize_env_script}" ]]; then
+  "${materialize_env_script}" --flavor "${flavor}" --output "${env_file}"
+fi
 
 require_file "${env_file}" "release env file"
 

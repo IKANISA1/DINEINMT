@@ -11,12 +11,13 @@ set -euo pipefail
 # Output:  build/web/  (ready to deploy to Cloudflare Pages)
 #
 # Deployment:
-#   MT build → Cloudflare Pages → dineinmtg/dineinmtv/dineinmta.ikanisa.com
-#   RW build → Cloudflare Pages → dineinrwg/dineinrwv/dineinrwa.ikanisa.com
+#   MT build → Cloudflare Pages project dinein-mt-pwa → dineinmtg/dineinmtv/dineinmta.ikanisa.com
+#   RW build → Cloudflare Pages project dinein-rw-pwa → dineinrwg/dineinrwv/dineinrwa.ikanisa.com
 # ═══════════════════════════════════════════════════════════════════════════════
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd "${script_dir}/.." && pwd)"
+materialize_env_script="${project_dir}/scripts/materialize_release_env.sh"
 
 flavor="mt"
 env_file=""
@@ -57,6 +58,11 @@ if [[ -z "$env_file" ]]; then
 fi
 
 entrypoint="lib/main_${flavor}.dart"
+
+# ── Materialize env file from CI/local environment when provided ───────────
+if [[ -f "${materialize_env_script}" ]]; then
+  "${materialize_env_script}" --flavor "${flavor}" --output "${env_file}"
+fi
 
 # ── Validate env file exists ────────────────────────────────────────────────
 if [[ ! -f "${env_file}" ]]; then
@@ -116,6 +122,7 @@ rm -rf "${project_dir}/build/web"
 flutter build web \
   --release \
   --pwa-strategy=none \
+  --no-web-resources-cdn \
   --no-wasm-dry-run \
   -t "${entrypoint}" \
   --dart-define-from-file="${env_file}"
@@ -169,6 +176,11 @@ if [[ ! -f "${build_output}/pwa-shell-manifest.json" ]]; then
   exit 1
 fi
 
+if [[ ! -d "${build_output}/canvaskit" ]]; then
+  echo "⛔ canvaskit/ is missing from build output. Web engine assets must be self-hosted." >&2
+  exit 1
+fi
+
 if [[ -f "${build_output}/flutter_service_worker.js" ]]; then
   echo "⛔ flutter_service_worker.js should not be shipped when using the custom PWA worker." >&2
   exit 1
@@ -176,6 +188,11 @@ fi
 
 if ! grep -q 'custom_sw.js' "${build_output}/index.html"; then
   echo "⛔ index.html is not registering custom_sw.js." >&2
+  exit 1
+fi
+
+if ! grep -q 'main.dart.js?v=' "${build_output}/flutter_bootstrap.js"; then
+  echo "⛔ flutter_bootstrap.js is not requesting a versioned main.dart.js entrypoint." >&2
   exit 1
 fi
 
@@ -234,6 +251,13 @@ load_call = bootstrap_text[load_idx:]
 if "serviceWorkerSettings" in load_call:
     print(
         "⛔ flutter_bootstrap.js still enables Flutter's generated service worker.",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+if '"useLocalCanvasKit":true' not in bootstrap_text and '"useLocalCanvasKit":!0' not in bootstrap_text:
+    print(
+        "⛔ flutter_bootstrap.js is not configured to self-host CanvasKit resources.",
         file=sys.stderr,
     )
     raise SystemExit(1)

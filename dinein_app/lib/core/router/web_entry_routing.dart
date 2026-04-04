@@ -18,23 +18,45 @@ String? resolveWebRootRoute({
   final host = uri.host.toLowerCase();
   if (host.isEmpty) return null;
 
-  if (host == config.guestWebHost) {
+  if (_isGuestHost(host, config)) {
     return AppRoutePaths.discover;
   }
 
-  if (host == config.venueWebHost) {
+  if (_isVenueHost(host, config)) {
     return hasVenueAccess
         ? AppRoutePaths.venueDashboard
         : AppRoutePaths.venueLogin;
   }
 
-  if (host == config.adminWebHost) {
+  if (_isAdminHost(host, config)) {
     return hasAdminAccess
         ? AppRoutePaths.adminOverview
         : AppRoutePaths.adminLogin;
   }
 
   return null;
+}
+
+bool _isGuestHost(String host, CountryConfig config) {
+  return host == config.guestWebHost || _matchesRoleHost(host, roleSuffix: 'g');
+}
+
+bool _isVenueHost(String host, CountryConfig config) {
+  return host == config.venueWebHost || _matchesRoleHost(host, roleSuffix: 'v');
+}
+
+bool _isAdminHost(String host, CountryConfig config) {
+  return host == config.adminWebHost || _matchesRoleHost(host, roleSuffix: 'a');
+}
+
+bool _matchesRoleHost(String host, {required String roleSuffix}) {
+  final normalizedHost = host.trim().toLowerCase();
+  if (!normalizedHost.endsWith('.ikanisa.com')) {
+    return false;
+  }
+  return RegExp(
+    r'^dinein[a-z0-9]*' + roleSuffix + r'\.ikanisa\.com$',
+  ).hasMatch(normalizedHost);
 }
 
 /// Convenience wrapper using the current app singleton state.

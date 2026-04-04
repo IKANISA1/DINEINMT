@@ -4,6 +4,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 app_root="$(cd "$script_dir/.." && pwd)"
+materialize_env_script="$app_root/scripts/materialize_release_env.sh"
 flavor="mt"
 android_only=false
 well_known_dir=""
@@ -34,6 +35,9 @@ done
 case "$flavor" in
   mt)
     expected_host="dineinmt.ikanisa.com"
+    expected_firebase_project_number="1074154147498"
+    expected_firebase_project_id="gen-lang-client-0172279957"
+    expected_firebase_storage_bucket="gen-lang-client-0172279957.firebasestorage.app"
     expected_android_package="com.dineinmalta.app"
     expected_android_app_id="1:1074154147498:android:1dd401b016b8c501dc4ad3"
     expected_ios_bundle="com.dineinmalta.app"
@@ -47,6 +51,9 @@ case "$flavor" in
     ;;
   rw)
     expected_host="dineinrw.ikanisa.com"
+    expected_firebase_project_number="1074154147498"
+    expected_firebase_project_id="gen-lang-client-0172279957"
+    expected_firebase_storage_bucket="gen-lang-client-0172279957.firebasestorage.app"
     expected_android_package="com.dineinrw.app"
     expected_android_app_id="1:1074154147498:android:cbd8a51892a2ee93dc4ad3"
     expected_ios_bundle="com.dineinrw.app"
@@ -69,6 +76,10 @@ failures=0
 
 # ── Supabase credential validation in env file ──────────────────────────────
 env_file="$app_root/env/release.${flavor}.json"
+if [[ -f "$materialize_env_script" ]]; then
+  "$materialize_env_script" --flavor "$flavor" --output "$env_file"
+fi
+
 if [[ ! -f "$env_file" ]]; then
   echo "FAIL: Missing release env file ($env_file)"
   failures=$((failures + 1))
@@ -220,6 +231,18 @@ if [[ -f "$android_google_services" ]]; then
     "$android_google_services" \
     "$expected_android_app_id" \
     "Android Firebase app id for $expected_android_package is missing."
+  require_contains \
+    "$android_google_services" \
+    "\"project_number\": \"$expected_firebase_project_number\"" \
+    "Android Firebase project number is missing or incorrect."
+  require_contains \
+    "$android_google_services" \
+    "\"project_id\": \"$expected_firebase_project_id\"" \
+    "Android Firebase project id is missing or incorrect."
+  require_contains \
+    "$android_google_services" \
+    "\"storage_bucket\": \"$expected_firebase_storage_bucket\"" \
+    "Android Firebase storage bucket is missing or incorrect."
 fi
 
 if [[ "$android_only" != "true" ]]; then
@@ -233,11 +256,35 @@ if [[ "$android_only" != "true" ]]; then
       "$ios_google_service_info" \
       "$expected_ios_app_id" \
       "iOS Firebase app id for $expected_ios_bundle is missing."
+    require_contains \
+      "$ios_google_service_info" \
+      "<string>$expected_firebase_project_number</string>" \
+      "iOS Firebase project number is missing or incorrect."
+    require_contains \
+      "$ios_google_service_info" \
+      "<string>$expected_firebase_project_id</string>" \
+      "iOS Firebase project id is missing or incorrect."
+    require_contains \
+      "$ios_google_service_info" \
+      "<string>$expected_firebase_storage_bucket</string>" \
+      "iOS Firebase storage bucket is missing or incorrect."
   fi
   require_no_placeholder \
     "$firebase_options" \
     'REPLACE_WITH_ACTUAL_' \
     'firebase_options.dart still contains placeholder values.'
+  require_contains \
+    "$firebase_options" \
+    "projectId: '$expected_firebase_project_id'" \
+    'firebase_options.dart is missing the expected Firebase project id.'
+  require_contains \
+    "$firebase_options" \
+    "messagingSenderId: '$expected_firebase_project_number'" \
+    'firebase_options.dart is missing the expected Firebase project number.'
+  require_contains \
+    "$firebase_options" \
+    "storageBucket: '$expected_firebase_storage_bucket'" \
+    'firebase_options.dart is missing the expected Firebase storage bucket.'
 fi
 
 require_file "$asset_links_template" 'Android assetlinks template is missing.'

@@ -20,7 +20,7 @@ import 'package:dinein_app/core/services/order_repository.dart';
 import 'package:dinein_app/core/services/pwa_install_service.dart';
 import 'package:dinein_app/shared/widgets/safari_install_guide.dart';
 import 'package:dinein_app/core/services/venue_repository.dart';
-import 'package:ui/widgets/pressable_scale.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 /// Cart / Order Summary screen — exact match of React OrderSummary.tsx.
 ///
@@ -775,19 +775,18 @@ class _CartItemCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Image placeholder
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Center(
-              child: Icon(
-                LucideIcons.chefHat,
-                size: 32,
-                color: cs.onSurfaceVariant.withValues(alpha: 0.30),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: DineInImage(
+                imageUrl: item.imageUrl,
+                width: 72,
+                height: 72,
+                fit: BoxFit.cover,
+                fallbackIcon: LucideIcons.chefHat,
+                semanticLabel: '${item.name} photo',
               ),
             ),
           ),
@@ -831,9 +830,17 @@ class _CartItemCard extends StatelessWidget {
                   ],
                 ),
 
-                // Note (if any)
-                if (item.name.isNotEmpty) ...[
-                  // placeholder for note
+                if (item.description.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    item.description.trim(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: tt.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.72),
+                      height: 1.3,
+                    ),
+                  ),
                 ],
 
                 const SizedBox(height: 8),

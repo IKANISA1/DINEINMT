@@ -318,26 +318,52 @@ class OrderDetailsScreen extends ConsumerWidget {
                       boxShadow: AppTheme.ambientShadow,
                     ),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(
-                              AppTheme.radiusMd,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${item.quantity}x',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                color: cs.primary,
-                                fontSize: 14,
+                        Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusLg,
+                              ),
+                              child: SizedBox(
+                                width: 72,
+                                height: 72,
+                                child: DineInImage(
+                                  imageUrl: item.imageUrl,
+                                  width: 72,
+                                  height: 72,
+                                  fit: BoxFit.cover,
+                                  fallbackIcon: LucideIcons.chefHat,
+                                  semanticLabel: '${item.name} photo',
+                                ),
                               ),
                             ),
-                          ),
+                            Positioned(
+                              right: 6,
+                              bottom: 6,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.72),
+                                  borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusFull,
+                                  ),
+                                ),
+                                child: Text(
+                                  '${item.quantity}x',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(width: AppTheme.space5),
                         Expanded(
@@ -351,8 +377,23 @@ class OrderDetailsScreen extends ConsumerWidget {
                                   fontSize: 18,
                                 ),
                               ),
+                              if (item.description.trim().isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  item.description.trim(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant.withValues(
+                                      alpha: 0.72,
+                                    ),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 6),
                               Text(
-                                '${order.currencySymbol}${item.price.toStringAsFixed(2)} each',
+                                '${order.currencySymbol}${item.price.toStringAsFixed(2)}',
                                 style: tt.bodySmall?.copyWith(
                                   color: cs.onSurfaceVariant.withValues(
                                     alpha: 0.60,
@@ -362,12 +403,27 @@ class OrderDetailsScreen extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        Text(
-                          '${order.currencySymbol}${item.subtotal.toStringAsFixed(2)}',
-                          style: tt.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                          ),
+                        const SizedBox(width: AppTheme.space4),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${order.currencySymbol}${item.subtotal.toStringAsFixed(2)}',
+                              style: tt.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${item.quantity} item${item.quantity == 1 ? '' : 's'}',
+                              style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant.withValues(
+                                  alpha: 0.60,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

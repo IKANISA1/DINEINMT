@@ -51,6 +51,7 @@ jobs:
 
       - name: Validate release scripts syntax
         run: |
+          bash -n scripts/materialize_release_env.sh
           bash -n scripts/build_web_release.sh
           bash -n scripts/build_android_release.sh
           bash -n scripts/build_ios_release.sh
@@ -65,6 +66,10 @@ jobs:
         env:
           PLAY_APP_SIGNING_SHA256: AA:BB:CC:DD:EE:FF
           APPLE_TEAM_ID: ABCDE12345
+          SUPABASE_URL_MT: https://mock-ci-mt.supabase.co
+          SUPABASE_ANON_KEY_MT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mt.mock.signature
+          SUPABASE_URL_RW: https://mock-ci-rw.supabase.co
+          SUPABASE_ANON_KEY_RW: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.rw.mock.signature
         run: |
           tmp_dir="$(mktemp -d)"
           ./scripts/render_app_links.sh --flavor "${{ matrix.flavor }}" --output-dir "${tmp_dir}"

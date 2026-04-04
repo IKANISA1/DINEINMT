@@ -609,7 +609,8 @@
     // and runtime update prompts.
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/custom_sw.js', { scope: '/' })
+        var serviceWorkerUrl = '/custom_sw.js?v=__DINEIN_PWA_VERSION__';
+        navigator.serviceWorker.register(serviceWorkerUrl, { scope: '/' })
           .then(function (reg) {
             if (reg.waiting) {
               window.dispatchEvent(

@@ -99,6 +99,32 @@ def main() -> int:
         encoding="utf-8",
     )
 
+    index_path = build_dir / "index.html"
+    index_contents = index_path.read_text(encoding="utf-8")
+    index_contents = index_contents.replace("__DINEIN_PWA_VERSION__", version)
+    if "__DINEIN_PWA_" in index_contents:
+        print("index.html still contains unresolved PWA placeholders.", file=sys.stderr)
+        return 1
+    index_path.write_text(index_contents, encoding="utf-8")
+
+    bootstrap_path = build_dir / "flutter_bootstrap.js"
+    if bootstrap_path.is_file():
+        bootstrap_contents = bootstrap_path.read_text(encoding="utf-8")
+        versioned_main_path = f'"mainJsPath":"main.dart.js?v={version}"'
+        if versioned_main_path not in bootstrap_contents:
+            if '"mainJsPath":"main.dart.js"' not in bootstrap_contents:
+                print(
+                    "flutter_bootstrap.js is missing the expected mainJsPath marker.",
+                    file=sys.stderr,
+                )
+                return 1
+            bootstrap_contents = bootstrap_contents.replace(
+                '"mainJsPath":"main.dart.js"',
+                versioned_main_path,
+                1,
+            )
+            bootstrap_path.write_text(bootstrap_contents, encoding="utf-8")
+
     sw_contents = custom_sw_path.read_text(encoding="utf-8")
     sw_contents = sw_contents.replace("__DINEIN_PWA_VERSION__", version)
     sw_contents = sw_contents.replace(

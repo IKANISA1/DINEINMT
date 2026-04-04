@@ -39,11 +39,12 @@ final appRouter = GoRouter(
 
     if (kIsWeb) {
       return resolveWebRootRoute(
-        uri: Uri.base,
-        config: CountryRuntime.config,
-        hasVenueAccess: AuthRepository.instance.hasVenueAccess,
-        hasAdminAccess: AuthRepository.instance.hasAdminAccess,
-      );
+            uri: Uri.base,
+            config: CountryRuntime.config,
+            hasVenueAccess: AuthRepository.instance.hasVenueAccess,
+            hasAdminAccess: AuthRepository.instance.hasAdminAccess,
+          ) ??
+          AppRoutePaths.discover;
     }
 
     if (AuthRepository.instance.hasAdminAccess) {

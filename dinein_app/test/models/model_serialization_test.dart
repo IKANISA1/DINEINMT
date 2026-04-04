@@ -442,6 +442,8 @@ void main() {
       final json = {
         'menu_item_id': 'item_1',
         'name': 'Ribeye',
+        'description': 'Char-grilled premium ribeye',
+        'image_url': 'https://example.com/ribeye.jpg',
         'price': 48.0,
         'quantity': 2,
         'note': 'Medium rare',
@@ -452,6 +454,8 @@ void main() {
 
       final output = item.toJson();
       expect(output['menu_item_id'], 'item_1');
+      expect(output['description'], 'Char-grilled premium ribeye');
+      expect(output['image_url'], 'https://example.com/ribeye.jpg');
       expect(output['quantity'], 2);
       expect(output['note'], 'Medium rare');
     });
@@ -460,13 +464,21 @@ void main() {
       const item = OrderItem(
         menuItemId: 'm1',
         name: 'X',
+        description: 'Original description',
+        imageUrl: 'https://example.com/original.jpg',
         price: 10,
         quantity: 1,
       );
-      final copy = item.copyWith(quantity: 3, note: 'No salt');
+      final copy = item.copyWith(
+        quantity: 3,
+        note: 'No salt',
+        description: 'Updated description',
+      );
 
       expect(copy.quantity, 3);
       expect(copy.note, 'No salt');
+      expect(copy.description, 'Updated description');
+      expect(copy.imageUrl, 'https://example.com/original.jpg');
       expect(copy.price, 10);
     });
   });
@@ -484,7 +496,14 @@ void main() {
         'user_id': 'u1',
         'user_name': 'Alex',
         'items': [
-          {'menu_item_id': 'm1', 'name': 'X', 'price': 10.0, 'quantity': 2},
+          {
+            'menu_item_id': 'm1',
+            'name': 'X',
+            'description': 'One-line description',
+            'image_url': 'https://example.com/x.jpg',
+            'price': 10.0,
+            'quantity': 2,
+          },
         ],
         'subtotal': 20.0,
         'service_fee': 1.0,
@@ -515,6 +534,8 @@ void main() {
       expect(order.serviceFee, 1.0);
       expect(order.total, 21.0);
       expect(order.itemCount, 2);
+      expect(order.items.single.description, 'One-line description');
+      expect(order.items.single.imageUrl, 'https://example.com/x.jpg');
 
       final output = order.toJson();
       expect(output['venue_image_url'], 'https://example.com/venue.jpg');

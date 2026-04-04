@@ -12,25 +12,27 @@ Map<String, dynamic> _orderJson({
   String status = 'placed',
   String paymentMethod = 'cash',
   List<Map<String, dynamic>>? items,
-}) =>
-    {
-      'id': id,
-      'venue_id': venueId,
-      'venue_name': venueName,
-      'status': status,
-      'payment_method': paymentMethod,
-      'items': items ??
-          [
-            {
-              'menu_item_id': 'item-1',
-              'name': 'Espresso',
-              'price': 2.50,
-              'quantity': 1,
-            },
-          ],
-      'total': 2.50,
-      'created_at': '2026-04-03T12:00:00Z',
-    };
+}) => {
+  'id': id,
+  'venue_id': venueId,
+  'venue_name': venueName,
+  'status': status,
+  'payment_method': paymentMethod,
+  'items':
+      items ??
+      [
+        {
+          'menu_item_id': 'item-1',
+          'name': 'Espresso',
+          'description': 'Single-shot espresso',
+          'image_url': 'https://example.com/espresso.jpg',
+          'price': 2.50,
+          'quantity': 1,
+        },
+      ],
+  'total': 2.50,
+  'created_at': '2026-04-03T12:00:00Z',
+};
 
 void main() {
   late MockApiInvoker mock;
@@ -53,6 +55,11 @@ void main() {
       expect(orders, hasLength(2));
       expect(orders[0].id, 'o1');
       expect(orders[1].id, 'o2');
+      expect(orders[0].items.single.description, 'Single-shot espresso');
+      expect(
+        orders[0].items.single.imageUrl,
+        'https://example.com/espresso.jpg',
+      );
     });
 
     test('passes venueId and pagination params', () async {
@@ -77,9 +84,7 @@ void main() {
 
   group('getOrdersForUser', () {
     test('returns parsed order list', () async {
-      mock.registerResponse('get_orders_for_user', [
-        _orderJson(id: 'u-o1'),
-      ]);
+      mock.registerResponse('get_orders_for_user', [_orderJson(id: 'u-o1')]);
 
       final orders = await repo.getOrdersForUser('user-123');
 
@@ -156,10 +161,7 @@ void main() {
         Exception('Server unavailable'),
       );
 
-      expect(
-        () => repo.getOrdersForVenue('v1'),
-        throwsA(isA<Exception>()),
-      );
+      expect(() => repo.getOrdersForVenue('v1'), throwsA(isA<Exception>()));
     });
   });
 }

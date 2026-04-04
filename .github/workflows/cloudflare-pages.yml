@@ -19,17 +19,9 @@ jobs:
       matrix:
         include:
           - flavor: mt
-            project: dineinmtg
-          - flavor: mt
-            project: dineinmtv
-          - flavor: mt
-            project: dineinmta
+            project: dinein-mt-pwa
           - flavor: rw
-            project: dineinrwg
-          - flavor: rw
-            project: dineinrwv
-          - flavor: rw
-            project: dineinrwa
+            project: dinein-rw-pwa
     defaults:
       run:
         working-directory: dinein_app
@@ -52,6 +44,20 @@ jobs:
 
       - name: Install Flutter dependencies
         run: flutter pub get
+
+      - name: Materialize Malta release env
+        if: matrix.flavor == 'mt'
+        env:
+          SUPABASE_URL_MT: ${{ secrets.SUPABASE_URL_MT }}
+          SUPABASE_ANON_KEY_MT: ${{ secrets.SUPABASE_ANON_KEY_MT }}
+        run: ./scripts/materialize_release_env.sh --flavor mt --require-secrets
+
+      - name: Materialize Rwanda release env
+        if: matrix.flavor == 'rw'
+        env:
+          SUPABASE_URL_RW: ${{ secrets.SUPABASE_URL_RW }}
+          SUPABASE_ANON_KEY_RW: ${{ secrets.SUPABASE_ANON_KEY_RW }}
+        run: ./scripts/materialize_release_env.sh --flavor rw --require-secrets
 
       - name: Build web release
         run: ./scripts/build_web_release.sh --flavor "${{ matrix.flavor }}" --skip-checks

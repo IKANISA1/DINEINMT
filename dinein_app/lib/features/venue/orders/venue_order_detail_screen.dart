@@ -584,28 +584,52 @@ class VenueOrderDetailScreen extends ConsumerWidget {
       child: Column(
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Quantity badge
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: cs.primary.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                ),
-                child: Center(
-                  child: Text(
-                    '${item.quantity}x',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      color: cs.primary,
-                      fontSize: 13,
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                    child: SizedBox(
+                      width: 72,
+                      height: 72,
+                      child: DineInImage(
+                        imageUrl: item.imageUrl,
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.cover,
+                        fallbackIcon: LucideIcons.chefHat,
+                        semanticLabel: '${item.name} photo',
+                      ),
                     ),
                   ),
-                ),
+                  Positioned(
+                    right: 6,
+                    bottom: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.72),
+                        borderRadius: BorderRadius.circular(
+                          AppTheme.radiusFull,
+                        ),
+                      ),
+                      child: Text(
+                        '${item.quantity}x',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: AppTheme.space3),
-              // Name + per-unit price
+              const SizedBox(width: AppTheme.space4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -616,6 +640,19 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (item.description.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        item.description.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.72),
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
                     Text(
                       '$currencySymbol${item.price.toStringAsFixed(2)} each',
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
@@ -623,7 +660,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              // Total
+              const SizedBox(width: AppTheme.space3),
               Text(
                 '$currencySymbol${item.subtotal.toStringAsFixed(2)}',
                 style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),

@@ -53,11 +53,11 @@ import {
   WAVE_RATE_LIMIT,
 } from "./rate-limit.ts";
 import {
+  asRecord,
   getEnv,
+  numberValue,
   optionalEnv,
   stringValue,
-  numberValue,
-  asRecord,
 } from "../_shared/env.ts";
 
 // Re-export domain error types so index.ts can catch them
@@ -188,7 +188,11 @@ export function ok(data: unknown, status = 200): Response {
   });
 }
 
-export function fail(message: string, status = 400, details?: JsonRecord): Response {
+export function fail(
+  message: string,
+  status = 400,
+  details?: JsonRecord,
+): Response {
   return new Response(
     JSON.stringify({ error: message, ...(details ?? {}) }),
     {
@@ -2974,7 +2978,10 @@ export async function handleTrackGuestEvent(
 
   if (error) {
     console.error("[dinein-api] track guest event failed", error);
-    throw new HttpError(500, "Could not record the analytics event.");
+    // Guest analytics must never degrade the browse/order flow. Production can
+    // legitimately lag a migration on one region, so treat telemetry writes as
+    // best-effort and keep the client path clean.
+    return ok(false, 202);
   }
 
   return ok(true, 201);
@@ -3056,9 +3063,13 @@ export async function handleGetVenues(
   );
 
   if (includeSummary) {
-    const categories = [...new Set(venues
-      .map((venue) => stringValue(asRecord(venue).category)?.trim() ?? "")
-      .filter((value) => value.length > 0))]
+    const categories = [
+      ...new Set(
+        venues
+          .map((venue) => stringValue(asRecord(venue).category)?.trim() ?? "")
+          .filter((value) => value.length > 0),
+      ),
+    ]
       .sort((left, right) => left.localeCompare(right))
       .slice(0, 8);
 
@@ -5381,7 +5392,7 @@ export async function handlePlaceOrder(
   ];
   const { data: menuData, error: menuError } = await supabase
     .from("dinein_menu_items")
-    .select("id, venue_id, name, price, is_available")
+    .select("id, venue_id, name, description, image_url, price, is_available")
     .eq("venue_id", venueId)
     .in("id", uniqueItemIds);
 
@@ -5430,6 +5441,8 @@ export async function handlePlaceOrder(
     return {
       menu_item_id: item.menuItemId,
       name: stringValue(menuItem.name) ?? "Menu Item",
+      description: stringValue(menuItem.description) ?? "",
+      image_url: stringValue(menuItem.image_url) ?? null,
       price: roundCurrency(price),
       quantity: item.quantity,
       note: item.note,
@@ -5487,7 +5500,7 @@ export async function handlePlaceOrder(
   }, 201);
 }
 
-async function attachVenueImagesToOrders(
+async function attachPresentationDataToOrders(
   supabase: ReturnType<typeof adminClient>,
   orders: unknown[],
 ): Promise<JsonRecord[]> {
@@ -5499,31 +5512,108 @@ async function attachVenueImagesToOrders(
         .filter((value): value is string => Boolean(value)),
     ),
   ];
+  const menuItemIds = [
+    ...new Set(
+      normalizedOrders.flatMap((order) => {
+        if (!Array.isArray(order.items)) {
+          return [];
+        }
+        return order.items
+          .map((rawItem) => {
+            const item = asRecord(rawItem);
+            return stringValue(item.menu_item_id) ??
+              stringValue(item.menuItemId);
+          })
+          .filter((value): value is string => Boolean(value));
+      }),
+    ),
+  ];
 
-  if (venueIds.length == 0) {
-    return normalizedOrders;
-  }
-
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .select("id, image_url")
-    .in("id", venueIds);
-
-  if (error) {
-    console.error("[dinein-api] order venue image lookup failed", error);
+  if (venueIds.length == 0 && menuItemIds.length == 0) {
     return normalizedOrders;
   }
 
   const imageByVenueId = new Map<string, string | null>();
-  for (const entry of (data ?? [])) {
-    const venue = asRecord(entry);
-    const venueId = stringValue(venue.id);
-    if (!venueId) continue;
-    imageByVenueId.set(venueId, stringValue(venue.image_url) ?? null);
+  if (venueIds.length > 0) {
+    const { data, error } = await supabase
+      .from("dinein_venues")
+      .select("id, image_url")
+      .in("id", venueIds);
+
+    if (error) {
+      console.error("[dinein-api] order venue image lookup failed", error);
+    } else {
+      for (const entry of (data ?? [])) {
+        const venue = asRecord(entry);
+        const venueId = stringValue(venue.id);
+        if (!venueId) continue;
+        imageByVenueId.set(venueId, stringValue(venue.image_url) ?? null);
+      }
+    }
+  }
+
+  const menuById = new Map<string, JsonRecord>();
+  if (menuItemIds.length > 0) {
+    const { data, error } = await supabase
+      .from("dinein_menu_items")
+      .select("id, name, description, image_url, price")
+      .in("id", menuItemIds);
+
+    if (error) {
+      console.error(
+        "[dinein-api] order item presentation lookup failed",
+        error,
+      );
+    } else {
+      for (const entry of (data ?? [])) {
+        const menuItem = asRecord(entry);
+        const menuItemId = stringValue(menuItem.id);
+        if (!menuItemId) continue;
+        menuById.set(menuItemId, menuItem);
+      }
+    }
   }
 
   return normalizedOrders.map((order) => {
     const venueId = stringValue(order.venue_id);
+    const hydratedItems = Array.isArray(order.items)
+      ? order.items.map((rawItem) => {
+        const item = asRecord(rawItem);
+        const menuItemId = stringValue(item.menu_item_id) ??
+          stringValue(item.menuItemId);
+        const menuItem = menuItemId == null ? null : menuById.get(menuItemId);
+        if (menuItem == null) {
+          return item;
+        }
+
+        const existingDescription = stringValue(item.description) ??
+          stringValue(item.menu_item_description);
+        const normalizedDescription = existingDescription?.trim();
+        const existingImageUrl = stringValue(item.image_url) ??
+          stringValue(item.imageUrl) ??
+          stringValue(item.menu_item_image_url);
+        const normalizedImageUrl = existingImageUrl?.trim();
+        const existingName = stringValue(item.name)?.trim();
+
+        return {
+          ...item,
+          name: existingName != null && existingName.length > 0
+            ? existingName
+            : stringValue(menuItem.name) ?? "Menu Item",
+          description: normalizedDescription != null &&
+              normalizedDescription.length > 0
+            ? normalizedDescription
+            : stringValue(menuItem.description) ?? "",
+          image_url: normalizedImageUrl != null && normalizedImageUrl.length > 0
+            ? normalizedImageUrl
+            : stringValue(menuItem.image_url) ?? null,
+          price: numberValue(item.price) ??
+            numberValue(menuItem.price) ??
+            0,
+        };
+      })
+      : order.items;
+
     return {
       ...order,
       venue_image_url: venueId == null
@@ -5531,6 +5621,7 @@ async function attachVenueImagesToOrders(
         : imageByVenueId.get(venueId) ??
           stringValue(order.venue_image_url) ??
           null,
+      items: hydratedItems,
     };
   });
 }
@@ -5554,7 +5645,7 @@ export async function handleGetOrdersForVenue(
     throw new HttpError(500, "Could not load venue orders.");
   }
 
-  return ok(await attachVenueImagesToOrders(supabase, data ?? []));
+  return ok(await attachPresentationDataToOrders(supabase, data ?? []));
 }
 
 export async function handleGetOrdersForUser(
@@ -5576,7 +5667,7 @@ export async function handleGetOrdersForUser(
     throw new HttpError(500, "Could not load the user's orders.");
   }
 
-  return ok(await attachVenueImagesToOrders(supabase, data ?? []));
+  return ok(await attachPresentationDataToOrders(supabase, data ?? []));
 }
 
 export async function handleImageHealth(
@@ -5637,7 +5728,7 @@ export async function handleGetAllOrders(
     throw new HttpError(500, "Could not load orders.");
   }
 
-  return ok(await attachVenueImagesToOrders(supabase, data ?? []));
+  return ok(await attachPresentationDataToOrders(supabase, data ?? []));
 }
 
 export async function handleGetOrderById(
@@ -5665,17 +5756,23 @@ export async function handleGetOrderById(
   }
 
   if (receiptToken && await verifyOrderReceiptToken(receiptToken, orderId)) {
-    return ok((await attachVenueImagesToOrders(supabase, [data]))[0] ?? data);
+    return ok(
+      (await attachPresentationDataToOrders(supabase, [data]))[0] ?? data,
+    );
   }
 
   if (await adminUserId(supabase, req)) {
-    return ok((await attachVenueImagesToOrders(supabase, [data]))[0] ?? data);
+    return ok(
+      (await attachPresentationDataToOrders(supabase, [data]))[0] ?? data,
+    );
   }
 
   const order = asRecord(data);
   const user = await currentUser(req);
   if (user && stringValue(order.user_id) == user.id) {
-    return ok((await attachVenueImagesToOrders(supabase, [data]))[0] ?? data);
+    return ok(
+      (await attachPresentationDataToOrders(supabase, [data]))[0] ?? data,
+    );
   }
 
   const venueClaims = await venueSessionClaims(req);
@@ -5683,7 +5780,9 @@ export async function handleGetOrderById(
     stringValue(venueClaims?.venue_id) != undefined &&
     stringValue(venueClaims?.venue_id) == stringValue(order.venue_id)
   ) {
-    return ok((await attachVenueImagesToOrders(supabase, [data]))[0] ?? data);
+    return ok(
+      (await attachPresentationDataToOrders(supabase, [data]))[0] ?? data,
+    );
   }
 
   throw new HttpError(403, "You are not allowed to access this order.");

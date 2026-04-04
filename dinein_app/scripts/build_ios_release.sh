@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd "${script_dir}/.." && pwd)"
+materialize_env_script="${project_dir}/scripts/materialize_release_env.sh"
 
 skip_checks=false
 flavor="mt"
@@ -60,6 +61,10 @@ require_file() {
 flavor_plist="${project_dir}/ios/Runner/GoogleService-Info-${flavor}.plist"
 if [[ "$flavor" == "mt" && ! -f "$flavor_plist" ]]; then
   flavor_plist="${project_dir}/ios/Runner/GoogleService-Info.plist"
+fi
+
+if [[ -f "${materialize_env_script}" ]]; then
+  "${materialize_env_script}" --flavor "${flavor}" --output "${env_file}"
 fi
 
 require_file "${env_file}" "release env file"

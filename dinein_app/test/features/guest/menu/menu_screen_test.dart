@@ -20,22 +20,39 @@ class MockCartNotifier extends Notifier<CartState> implements CartNotifier {
     Country? venueCountry,
     String? tableNumber,
   }) {}
-  @override void setTableNumber(String? tableNumber) {}
-  @override void setSpecialRequests(String? specialRequests) {}
-  @override void addItem(MenuItem item) {}
-  @override void removeItem(String menuItemId) {}
-  @override void setQuantity(String menuItemId, int quantity, {String? name, double? price}) {}
-  @override void clear() {}
+  @override
+  void setTableNumber(String? tableNumber) {}
+  @override
+  void setSpecialRequests(String? specialRequests) {}
+  @override
+  void addItem(MenuItem item) {}
+  @override
+  void removeItem(String menuItemId) {}
+  @override
+  void setQuantity(
+    String menuItemId,
+    int quantity, {
+    String? name,
+    String? description,
+    String? imageUrl,
+    double? price,
+  }) {}
+  @override
+  void clear() {}
 
-  @override int quantityOf(String menuItemId) => 0;
+  @override
+  int quantityOf(String menuItemId) => 0;
 
-  @override Order buildOrder({required PaymentMethod paymentMethod, String? userId}) {
+  @override
+  Order buildOrder({required PaymentMethod paymentMethod, String? userId}) {
     throw UnimplementedError();
   }
 }
 
 void main() {
-  testWidgets('menu screen renders loading state initially', (WidgetTester tester) async {
+  testWidgets('menu screen renders loading state initially', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -49,9 +66,12 @@ void main() {
     );
 
     await tester.pump();
-    
+
     // We expect skeletons or loading state to appear before data loads
     // Since riverpod handles loading in the build methods
-    expect(find.byType(CircularProgressIndicator), findsNothing); // Should be using skeleton loader
+    expect(
+      find.byType(CircularProgressIndicator),
+      findsNothing,
+    ); // Should be using skeleton loader
   });
 }

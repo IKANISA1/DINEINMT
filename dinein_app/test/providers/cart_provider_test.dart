@@ -45,6 +45,8 @@ void main() {
     expect(order.total, expectedSubtotal + expectedServiceFee);
     expect(order.items, hasLength(1));
     expect(order.items.single.quantity, 2);
+    expect(order.items.single.description, item.description);
+    expect(order.items.single.imageUrl, item.imageUrl);
   });
 
   test(
