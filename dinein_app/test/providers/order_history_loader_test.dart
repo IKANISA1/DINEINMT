@@ -1,5 +1,5 @@
-import 'package:dinein_app/core/constants/enums.dart';
-import 'package:dinein_app/core/models/models.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/order_history_loader.dart';
 import 'package:dinein_app/core/services/order_receipt_service.dart';
 import 'package:flutter_test/flutter_test.dart';

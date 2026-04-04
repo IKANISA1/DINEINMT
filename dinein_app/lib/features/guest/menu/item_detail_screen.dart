@@ -6,15 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/config/country_config_provider.dart';
-import '../../../core/models/models.dart';
-import '../../../core/providers/providers.dart';
-import '../../../core/providers/cart_provider.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/services/app_telemetry.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/providers/providers.dart';
+import 'package:dinein_app/core/providers/cart_provider.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 import 'menu_item_badges.dart';
 
 /// Full-page item detail screen — exact match of React ItemDetail.tsx.
@@ -478,7 +478,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                                     child: Row(
                                       children: [
                                         // Minus
-                                        GestureDetector(
+                                        PressableScale(
                                           onTap: _quantity > 1
                                               ? () =>
                                                     setState(() => _quantity--)
@@ -517,7 +517,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                                         ),
 
                                         // Plus
-                                        GestureDetector(
+                                        PressableScale(
                                           onTap: () =>
                                               setState(() => _quantity++),
                                           child: Container(
@@ -699,7 +699,7 @@ class _FloatingControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),

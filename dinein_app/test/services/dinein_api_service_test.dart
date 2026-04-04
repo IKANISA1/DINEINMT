@@ -1,5 +1,5 @@
-import 'package:dinein_app/core/config/country_config.dart';
-import 'package:dinein_app/core/config/country_runtime.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_runtime.dart';
 import 'package:dinein_app/core/services/dinein_api_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 

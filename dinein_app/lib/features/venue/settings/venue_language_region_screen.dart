@@ -3,10 +3,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 /// Venue Language & Region settings — full-page screen.
 ///

@@ -3,13 +3,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/constants/enums.dart';
-import '../../../core/models/models.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
-import '../../../core/services/venue_repository.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/services/venue_repository.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 /// Opening Hours manager — full-page screen.
 ///
@@ -230,7 +230,7 @@ class _VenueHoursScreenState extends ConsumerState<VenueHoursScreen> {
                                       fontWeight: FontWeight.w700)),
                             ),
                             // Time range chip
-                            GestureDetector(
+                            PressableScale(
                               onTap: () => _editDayTimes(day, dh),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
@@ -477,7 +477,7 @@ class _MiniToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),

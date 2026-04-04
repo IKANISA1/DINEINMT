@@ -1,0 +1,27 @@
+{
+  "name": "rw-fixed-v2",
+  "finalUrl": "https://ad4f3bdf.dinein-rw-pwa.pages.dev/",
+  "send": {
+    "verificationId": "c3dcadfe-e7e5-4d98-8559-22b30077f5a2",
+    "deliveryMethod": "test_override"
+  },
+  "verify": {
+    "verified": true,
+    "verifiedAt": "2026-04-03T17:39:21.862Z"
+  },
+  "consoleLogTail": [
+    "[warning] [.WebGL-0x12400120a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "[debug] Installing/Activating first service worker.",
+    "[warning] Exception while loading service worker: Error: prepareServiceWorker took more than 4000ms to resolve. Moving on.\n    at https://ad4f3bdf.dinein-rw-pwa.pages.dev/flutter_bootstrap.js:1:3698",
+    "[debug] Injecting <script> tag. Using callback.",
+    "[warning] [.WebGL-0x12400c81a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "[warning] [.WebGL-0x12400c82600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)",
+    "[debug] Activated new service worker.",
+    "[debug] Loading from existing service worker.",
+    "[debug] Service worker already active.",
+    "[debug] Injecting <script> tag. Using callback."
+  ],
+  "hasTypeError": false,
+  "hasKpiText": false,
+  "bodyTextSample": ""
+}

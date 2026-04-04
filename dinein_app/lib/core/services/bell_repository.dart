@@ -1,10 +1,16 @@
-import '../models/bell_request.dart';
+import 'package:db_pkg/models/bell_request.dart';
+import 'api_invoker.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 
 class BellRepository {
+  final ApiInvoker _invoke;
+
   static final BellRepository instance = BellRepository._();
-  BellRepository._();
+  BellRepository._() : _invoke = DineinApiService.invoke;
+
+  /// Test-only constructor that accepts a mock invoker.
+  BellRepository.forTesting({required ApiInvoker invoker}) : _invoke = invoker;
 
   static const _pollInterval = Duration(seconds: 4);
 
@@ -21,7 +27,7 @@ class BellRepository {
     required String tableNumber,
     String? userId,
   }) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'send_wave',
       payload: {
         'venueId': venueId,
@@ -32,7 +38,7 @@ class BellRepository {
   }
 
   Future<void> resolveWave(String requestId) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'resolve_bell_request',
       payload: {'requestId': requestId, ..._venueSessionPayload()},
     );
@@ -43,7 +49,7 @@ class BellRepository {
     WaveStatus? status,
   }) async {
     final data =
-        await DineinApiService.invoke(
+        await _invoke(
               'get_bell_requests',
               payload: {
                 'venueId': venueId,

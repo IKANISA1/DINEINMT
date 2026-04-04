@@ -1,7 +1,7 @@
-import 'package:dinein_app/core/config/country_config.dart';
-import 'package:dinein_app/core/config/country_runtime.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_runtime.dart';
 import 'package:dinein_app/features/admin/auth/admin_login_screen.dart';
-import 'package:dinein_app/shared/widgets/pressable_scale.dart';
+import 'package:ui/widgets/pressable_scale.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

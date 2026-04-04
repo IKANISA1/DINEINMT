@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/guest_venue_feed.dart';
-import '../models/models.dart';
+import 'package:db_pkg/models/guest_venue_feed.dart';
+import 'package:db_pkg/models/models.dart';
 import '../services/venue_repository.dart';
 import 'menu_providers.dart';
 import 'venue_providers.dart';
@@ -70,14 +70,23 @@ final guestMenuBundleProvider =
     ) async {
       if (request.venueId != null) {
         final venueId = request.venueId!;
-        final results = await Future.wait<Object?>([
-          ref.watch(venueByIdProvider(venueId).future),
-          ref.watch(menuItemsProvider(venueId).future),
-        ]);
-        return GuestMenuBundle(
-          venue: results[0] as Venue?,
-          items: results[1] as List<MenuItem>,
+        final items = await ref.watch(menuItemsProvider(venueId).future);
+        Venue? venue;
+        try {
+          venue = await ref.watch(venueByIdProvider(venueId).future);
+        } catch (_) {
+          venue = null;
+        }
+
+        venue ??= Venue(
+          id: venueId,
+          name: 'Menu',
+          slug: venueId,
+          category: 'Restaurant',
+          description: '',
+          address: '',
         );
+        return GuestMenuBundle(venue: venue, items: items);
       }
 
       final venue = await ref.watch(

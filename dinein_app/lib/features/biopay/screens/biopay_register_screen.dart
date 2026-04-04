@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 import '../biopay_providers.dart';
 import '../biopay_strings.dart';
 import '../models/biopay_models.dart';
@@ -166,7 +166,7 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
           ),
         ),
         const SizedBox(height: AppTheme.space6),
-        GestureDetector(
+        PressableScale(
           onTap: () => setState(() => _consentAccepted = !_consentAccepted),
           child: Container(
             padding: const EdgeInsets.all(AppTheme.space4),
@@ -543,7 +543,7 @@ class _BiopayRegisterScreenState extends ConsumerState<BiopayRegisterScreen> {
                       ],
                     ),
                     const SizedBox(height: AppTheme.space4),
-                    GestureDetector(
+                    PressableScale(
                       onTap: () {
                         Clipboard.setData(
                           ClipboardData(text: _result!.managementCode!),

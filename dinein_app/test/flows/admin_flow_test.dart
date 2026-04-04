@@ -1,4 +1,4 @@
-import 'package:dinein_app/core/config/country_config.dart';
+import 'package:core_pkg/config/country_config.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/services/app_bootstrap_service.dart';

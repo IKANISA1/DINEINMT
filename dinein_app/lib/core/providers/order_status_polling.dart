@@ -1,4 +1,4 @@
-import '../constants/enums.dart';
+import 'package:core_pkg/constants/enums.dart';
 
 typedef FetchOrderStatus = Future<OrderStatus?> Function();
 

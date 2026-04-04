@@ -1,0 +1,24 @@
+{
+  "name": "mt-fixed-v2",
+  "finalUrl": "https://4f36e4a4.dinein-mt-pwa.pages.dev/",
+  "send": {
+    "verificationId": "c2eb065b-a70d-4eb5-b7d4-f06be49b50aa",
+    "deliveryMethod": "test_override"
+  },
+  "verify": {
+    "verified": true,
+    "verifiedAt": "2026-04-03T17:22:05.572Z"
+  },
+  "consoleLogTail": [
+    "[debug] Installing/Activating first service worker.",
+    "[warning] Exception while loading service worker: Error: prepareServiceWorker took more than 4000ms to resolve. Moving on.\n    at https://4f36e4a4.dinein-mt-pwa.pages.dev/flutter_bootstrap.js:1:3698",
+    "[debug] Injecting <script> tag. Using callback.",
+    "[debug] Activated new service worker.",
+    "[debug] Loading from existing service worker.",
+    "[debug] Service worker already active.",
+    "[debug] Injecting <script> tag. Using callback."
+  ],
+  "hasTypeError": false,
+  "hasKpiText": false,
+  "bodyTextSample": ""
+}

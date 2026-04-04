@@ -1,8 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:equatable/equatable.dart';
 
-import '../config/country_runtime.dart';
-import '../models/models.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:db_pkg/models/models.dart';
 import '../services/auth_repository.dart';
 import '../services/discovery_location_service.dart';
 import '../services/venue_repository.dart';

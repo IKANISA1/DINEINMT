@@ -9,13 +9,13 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../core/models/models.dart';
+import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/config/country_config_provider.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 import 'venue_table_qr_pdf.dart';
 
 const _qrExportBoundaryKey = Key('venue-table-qr-export-boundary');
@@ -279,11 +279,7 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
                                     mainAxisSize: MainAxisSize.min,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      InkWell(
-                                        borderRadius:
-                                            const BorderRadius.vertical(
-                                              top: Radius.circular(10),
-                                            ),
+                                      PressableScale(
                                         onTap: () =>
                                             _setTableNumber(_tableNumber + 1),
                                         child: const SizedBox(
@@ -304,11 +300,7 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
                                           alpha: 0.06,
                                         ),
                                       ),
-                                      InkWell(
-                                        borderRadius:
-                                            const BorderRadius.vertical(
-                                              bottom: Radius.circular(10),
-                                            ),
+                                      PressableScale(
                                         onTap: () =>
                                             _setTableNumber(_tableNumber - 1),
                                         child: const SizedBox(

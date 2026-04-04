@@ -1,0 +1,39 @@
+{
+  "name": "rw",
+  "send": {
+    "success": true,
+    "verificationId": "e771d5c0-937f-4354-b52d-974a5b092d56",
+    "expiresAt": "2026-04-03T16:44:21.725Z",
+    "usesMock": false,
+    "deliveryMethod": "test_override"
+  },
+  "verify": {
+    "success": true,
+    "verified": true,
+    "verifiedAt": "2026-04-03T16:34:23.171Z",
+    "hasAdminSession": true
+  },
+  "finalUrl": "https://dineinrwa.ikanisa.com/#/admin/overview",
+  "consoleLogTail": [
+    "[debug] Installing/Activating first service worker.",
+    "[warning] Exception while loading service worker: Error: prepareServiceWorker took more than 4000ms to resolve. Moving on.\n    at https://dineinrwa.ikanisa.com/flutter_bootstrap.js:1:3698",
+    "[debug] Injecting <script> tag. Using callback.",
+    "[debug] Activated new service worker.",
+    "[warning] [.WebGL-0x11c0096e600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "[warning] [.WebGL-0x11c0096f800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)",
+    "[debug] Loading from existing service worker.",
+    "[debug] Service worker already active.",
+    "[debug] Injecting <script> tag. Using callback.",
+    "[log] TypeError: Instance of 'minified:qb': type 'minified:qb' is not a subtype of type 'minified:at'",
+    "[log] at mK.bEr [as a] (https://dineinrwa.ikanisa.com/main.dart.js:4896:23)",
+    "[log]     at a0t.bp (https://dineinrwa.ikanisa.com/main.dart.js:93913:15)",
+    "[log]     at a0t.cD (https://dineinrwa.ikanisa.com/main.dart.js:91870:33)",
+    "[log]     at a0Y.bp (https://dineinrwa.ikanisa.com/main.dart.js:96014:4)",
+    "[log]     at a0Y.bp (https://dineinrwa.ikanisa.com/main.dart.js:96098:6)",
+    "[log]     at a0Y.cD (https://dineinrwa.ikanisa.com/main.dart.js:91870:33)",
+    "[log]     at q3.C1 (https://dineinrwa.ikanisa.com/main.dart.js:96698:3)",
+    "[log]     at q3.MS (https://dineinrwa.ikanisa.com/main.dart.js:96977:10)",
+    "[log]     at q3.bp (https://dineinrwa.ikanisa.com/main.dart.js:96938:5)",
+    "[log]     at q3.cD (https://dineinrwa.ikanisa.com/main.dart.js:91870:33)"
+  ]
+}

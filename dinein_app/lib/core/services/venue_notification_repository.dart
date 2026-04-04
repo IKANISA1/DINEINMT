@@ -1,13 +1,19 @@
-import '../models/models.dart';
-import 'app_notification_service.dart'
-    if (dart.library.html) 'app_notification_service_web.dart';
+import 'package:dinein_app/core/infrastructure/app_notification_service.dart';
+import 'package:db_pkg/models/models.dart';
+import 'api_invoker.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 
 class VenueNotificationRepository {
-  VenueNotificationRepository._();
+  final ApiInvoker _invoke;
+
+  VenueNotificationRepository._() : _invoke = DineinApiService.invoke;
 
   static final instance = VenueNotificationRepository._();
+
+  /// Test-only constructor that accepts a mock invoker.
+  VenueNotificationRepository.forTesting({required ApiInvoker invoker})
+      : _invoke = invoker;
 
   Map<String, dynamic> _venueSessionPayload() {
     final session = AuthRepository.instance.currentVenueSession;
@@ -18,7 +24,7 @@ class VenueNotificationRepository {
   }
 
   Future<VenueNotificationSettings> getSettings(String venueId) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'get_venue_notification_settings',
       payload: {'venueId': venueId, ..._venueSessionPayload()},
     );
@@ -32,7 +38,7 @@ class VenueNotificationRepository {
     String venueId,
     VenueNotificationSettings settings,
   ) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'update_venue_notification_settings',
       payload: {
         'venueId': venueId,

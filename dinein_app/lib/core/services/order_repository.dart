@@ -1,13 +1,19 @@
-import '../constants/enums.dart';
-import '../models/models.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
+import 'api_invoker.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 import 'order_receipt_service.dart';
 
 /// Repository for order data access via the DineIn edge API.
 class OrderRepository {
-  OrderRepository._();
+  OrderRepository._() : _invoke = DineinApiService.invoke;
   static final instance = OrderRepository._();
+
+  /// Test-only constructor: inject a mock [ApiInvoker].
+  OrderRepository.forTesting({required ApiInvoker invoker}) : _invoke = invoker;
+
+  final ApiInvoker _invoke;
 
   Map<String, dynamic> _venueSessionPayload() {
     final session = AuthRepository.instance.currentVenueSession;
@@ -19,7 +25,7 @@ class OrderRepository {
 
   /// Place a new order.
   Future<Order> placeOrder(Order order) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'place_order',
       payload: {'order': order.toJson()},
     );
@@ -43,7 +49,7 @@ class OrderRepository {
     int? offset,
   }) async {
     final data =
-        await DineinApiService.invoke(
+        await _invoke(
               'get_orders_for_venue',
               payload: {
                 'venueId': venueId,
@@ -65,7 +71,7 @@ class OrderRepository {
     int? offset,
   }) async {
     final data =
-        await DineinApiService.invoke(
+        await _invoke(
               'get_orders_for_user',
               payload: {
                 'userId': userId,
@@ -82,7 +88,7 @@ class OrderRepository {
   /// Use [limit] and [offset] for pagination. Omit both to fetch all.
   Future<List<Order>> getAllOrders({int? limit, int? offset}) async {
     final data =
-        await DineinApiService.invoke(
+        await _invoke(
               'get_all_orders',
               useAdminSession: true,
               payload: {
@@ -99,7 +105,7 @@ class OrderRepository {
     final receiptToken = await OrderReceiptService.instance.getReceiptToken(
       orderId,
     );
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'get_order_by_id',
       payload: {
         'orderId': orderId,
@@ -111,7 +117,7 @@ class OrderRepository {
 
   /// Update order status (venue owner action).
   Future<void> updateOrderStatus(String orderId, OrderStatus status) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'update_order_status',
       payload: {
         'orderId': orderId,

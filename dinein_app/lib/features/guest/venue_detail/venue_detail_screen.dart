@@ -11,16 +11,16 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/constants/app_download_links.dart';
-import '../../../core/config/country_config_provider.dart';
-import '../../../core/models/models.dart';
-import '../../../core/providers/cart_provider.dart';
-import '../../../core/providers/providers.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/services/app_telemetry.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:core_pkg/constants/app_download_links.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/providers/cart_provider.dart';
+import 'package:dinein_app/core/providers/providers.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 class VenueDetailScreen extends ConsumerStatefulWidget {
   final String slug;
@@ -1057,12 +1057,8 @@ void _showWifiSheet(BuildContext ctx, Venue venue) {
             ),
             const SizedBox(height: 20),
             if (hasPassword)
-              Material(
-                color: cs.primaryContainer.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () {
+              PressableScale(
+                onTap: () {
                     Clipboard.setData(ClipboardData(text: password));
                     ScaffoldMessenger.of(ctx).showSnackBar(
                       SnackBar(
@@ -1074,6 +1070,11 @@ void _showWifiSheet(BuildContext ctx, Venue venue) {
                       ),
                     );
                   },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,

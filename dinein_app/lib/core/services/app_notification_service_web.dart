@@ -1,4 +1,4 @@
-import '../models/models.dart';
+import 'package:db_pkg/models/models.dart';
 
 Future<void> firebaseMessagingBackgroundHandler(Object message) async {}
 

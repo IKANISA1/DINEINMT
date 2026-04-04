@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import 'package:dinein_app/core/config/country_config.dart';
-import 'package:dinein_app/core/constants/enums.dart';
-import 'package:dinein_app/core/models/models.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/features/venue/settings/venue_table_qr_pdf.dart';
 
 Future<void> main(List<String> args) async {

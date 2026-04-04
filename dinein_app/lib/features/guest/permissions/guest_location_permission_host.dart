@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/providers/permission_providers.dart';
-import '../../../core/router/app_router.dart';
-import '../../../shared/widgets/permission_access_dialog.dart';
+import 'package:dinein_app/core/providers/permission_providers.dart';
+import 'package:dinein_app/core/router/app_router.dart';
+import 'package:ui/widgets/permission_access_dialog.dart';
 
 class GuestLocationPermissionHost extends ConsumerStatefulWidget {
   const GuestLocationPermissionHost({super.key, required this.child});

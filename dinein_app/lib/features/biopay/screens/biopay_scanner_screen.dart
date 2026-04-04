@@ -10,9 +10,9 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/providers/permission_providers.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 import '../biopay_providers.dart';
 import '../biopay_strings.dart';
 import '../models/biopay_models.dart';

@@ -2,14 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/config/country_config.dart';
-import 'core/config/country_config_provider.dart';
-import 'core/config/country_runtime.dart';
-import 'core/services/app_bootstrap_service.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'features/guest/permissions/guest_location_permission_host.dart';
-import 'core/theme/app_theme.dart';
-import 'core/router/app_router.dart';
-import 'core/router/url_strategy.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:dinein_app/core/router/app_router.dart';
+import 'package:dinein_app/core/router/url_strategy.dart';
 
 /// Malta entry point.
 Future<void> main() async => _boot(CountryConfig.mt);

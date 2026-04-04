@@ -1,12 +1,18 @@
-import '../models/guest_venue_feed.dart';
-import '../models/models.dart';
+import 'package:db_pkg/models/guest_venue_feed.dart';
+import 'package:db_pkg/models/models.dart';
+import 'api_invoker.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 
 /// Repository for venue data access via Supabase.
 class VenueRepository {
-  VenueRepository._();
+  VenueRepository._() : _invoke = DineinApiService.invoke;
   static final instance = VenueRepository._();
+
+  /// Test-only constructor: inject a mock [ApiInvoker].
+  VenueRepository.forTesting({required ApiInvoker invoker}) : _invoke = invoker;
+
+  final ApiInvoker _invoke;
 
   Map<String, dynamic> _venueSessionPayload() {
     final session = AuthRepository.instance.currentVenueSession;
@@ -38,7 +44,7 @@ class VenueRepository {
       'longitude': ?longitude,
     };
     final data =
-        await DineinApiService.invoke('get_venues', payload: payload)
+        await _invoke('get_venues', payload: payload)
             as List<dynamic>;
     return data.map((e) => Venue.fromJson(e)).toList();
   }
@@ -62,7 +68,7 @@ class VenueRepository {
       'longitude': ?longitude,
       'include_summary': true,
     };
-    final data = await DineinApiService.invoke('get_venues', payload: payload);
+    final data = await _invoke('get_venues', payload: payload);
     if (data is List) {
       return GuestVenueFeed.fromVenues(
         data.map((entry) => Venue.fromJson(entry)).toList(growable: false),
@@ -90,7 +96,7 @@ class VenueRepository {
   Future<List<Venue>> getAllVenues({int? limit, int? offset}) async {
     final payload = <String, dynamic>{'limit': ?limit, 'offset': ?offset};
     final data =
-        await DineinApiService.invoke(
+        await _invoke(
               'get_all_venues',
               useAdminSession: true,
               payload: payload,
@@ -101,7 +107,7 @@ class VenueRepository {
 
   /// Fetch a single venue by slug (for deep link resolution).
   Future<Venue?> getVenueBySlug(String slug) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'get_venue_by_slug',
       payload: {'slug': slug, ..._venueSessionPayload()},
     );
@@ -110,7 +116,7 @@ class VenueRepository {
 
   /// Fetch a single venue by ID.
   Future<Venue?> getVenueById(String id) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'get_venue_by_id',
       payload: {'venueId': id, ..._venueSessionPayload()},
     );
@@ -118,7 +124,7 @@ class VenueRepository {
   }
 
   Future<Venue> createVenue(Map<String, dynamic> venue) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'create_venue',
       useAdminSession: true,
       payload: {'venue': venue},
@@ -128,7 +134,7 @@ class VenueRepository {
 
   /// Fetch the venue owned by a given user ID.
   Future<Venue?> getVenueForOwner(String ownerId) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'get_venue_for_owner',
       payload: {'ownerId': ownerId},
     );
@@ -137,7 +143,7 @@ class VenueRepository {
 
   /// Update venue info (for venue owner).
   Future<void> updateVenue(String id, Map<String, dynamic> updates) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'update_venue',
       payload: {'venueId': id, 'updates': updates, ..._venueSessionPayload()},
     );
@@ -147,7 +153,7 @@ class VenueRepository {
     String venueId,
     Map<String, dynamic> updates,
   ) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'update_venue',
       useAdminSession: true,
       payload: {
@@ -178,7 +184,7 @@ class VenueRepository {
 
   /// Search for venues on Google Maps through the backend-only grounded path.
   Future<List<Map<String, dynamic>>> searchGoogleMaps(String query) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'search_google_maps',
       payload: {'query': query},
     );
@@ -193,7 +199,7 @@ class VenueRepository {
     bool skipSearchGrounding = false,
     bool useAdminSession = false,
   }) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'enrich_venue_profile',
       useAdminSession: useAdminSession,
       payload: {
@@ -216,7 +222,7 @@ class VenueRepository {
     bool skipSearchGrounding = false,
     bool useAdminSession = false,
   }) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'backfill_venue_profiles',
       useAdminSession: useAdminSession,
       payload: {

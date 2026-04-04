@@ -4,9 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-import '../../../core/config/country_config.dart';
-import '../../../core/constants/app_download_links.dart';
-import '../../../core/models/models.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/constants/app_download_links.dart';
+import 'package:db_pkg/models/models.dart';
 
 class VenueTableQrEntry {
   final int tableNumber;

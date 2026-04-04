@@ -1,13 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { postWhatsAppMessage } from "../_shared/whatsapp.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { getEnv, optionalEnv, intEnv, boolEnv } from "../_shared/env.ts";
+import { digitsOnly, sha256Hex, bytesToBase64Url, base64UrlEncode, hmacSha256Base64Url } from "../_shared/crypto.ts";
+import { corsHeaders, jsonResponse, errorResponse } from "../_shared/http.ts";
 
 const tableName = "venue_whatsapp_otp_challenges";
 const otpTtlMinutes = intEnv("WHATSAPP_OTP_TTL_MINUTES", 10);
@@ -52,31 +48,7 @@ type VenueAccessRow = {
   owner_whatsapp_number?: string | null;
 };
 
-function boolEnv(key: string, fallback: boolean): boolean {
-  const raw = Deno.env.get(key)?.trim().toLowerCase();
-  if (!raw) return fallback;
-  return raw === "1" || raw === "true" || raw === "yes" || raw === "on";
-}
-
-function intEnv(key: string, fallback: number): number {
-  const raw = Deno.env.get(key)?.trim();
-  if (!raw) return fallback;
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function getEnv(name: string): string {
-  const value = Deno.env.get(name)?.trim();
-  if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
-  }
-  return value;
-}
-
-function optionalEnv(name: string): string | null {
-  const value = Deno.env.get(name)?.trim();
-  return value && value.length > 0 ? value : null;
-}
+// Imported from env.ts
 
 function getSigningSecret(primary: string, fallback?: string): string {
   return optionalEnv(primary) ??
@@ -91,9 +63,7 @@ function adminClient() {
   );
 }
 
-function digitsOnly(phone: string): string {
-  return phone.replace(/\D/g, "");
-}
+// Imported from crypto.ts
 
 function normalizePhone(raw: string): string {
   const trimmed = raw.trim();
@@ -166,47 +136,7 @@ function numericOtp(length = 6): string {
   return code;
 }
 
-async function sha256Hex(value: string): Promise<string> {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(
-    /=+$/g,
-    "",
-  );
-}
-
-function base64UrlEncode(value: string): string {
-  return bytesToBase64Url(new TextEncoder().encode(value));
-}
-
-async function hmacSha256Base64Url(
-  value: string,
-  secret: string,
-): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(value),
-  );
-  return bytesToBase64Url(new Uint8Array(signature));
-}
+// Imported from crypto.ts
 
 async function signAdminSessionJwt(payload: JsonRecord): Promise<string> {
   const header = { alg: "HS256", typ: "JWT" };
@@ -240,27 +170,7 @@ async function otpHash(phone: string, code: string): Promise<string> {
   return await sha256Hex(`${digitsOnly(phone)}:${code}:${pepper}`);
 }
 
-function jsonResponse(status: number, body: JsonRecord): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-    },
-  });
-}
-
-function errorResponse(
-  message: string,
-  status = 400,
-  details?: JsonRecord,
-): Response {
-  return jsonResponse(status, {
-    success: false,
-    message,
-    ...(details ?? {}),
-  });
-}
+// Imported from http.ts
 
 function extractMessageId(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;

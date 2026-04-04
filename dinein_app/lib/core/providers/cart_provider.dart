@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../config/country_runtime.dart';
-import '../models/models.dart';
-import '../constants/enums.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:core_pkg/constants/enums.dart';
 
 /// Represents one item in the cart.
 class CartItem {

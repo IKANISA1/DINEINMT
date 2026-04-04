@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'auth_repository.dart';
-import '../config/country_runtime.dart';
+import 'package:core_pkg/config/country_runtime.dart';
 import 'supabase_config.dart';
 
 class DineinApiInvocation {

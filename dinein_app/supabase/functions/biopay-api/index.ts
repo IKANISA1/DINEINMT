@@ -1,8 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-const corsAllowHeaders = "authorization, x-client-info, apikey, content-type";
-const corsAllowMethods = "GET, POST, OPTIONS";
+import { getEnv, optionalEnv, intEnv, numberValue, stringValue, asRecord } from "../_shared/env.ts";
+import { collapseWhitespace, digitsOnly, sha256Hex, bytesToBase64Url, base64UrlEncode, base64UrlDecode, hmacSha256Base64Url } from "../_shared/crypto.ts";
+import { corsAllowHeaders, corsAllowMethods, corsHeaders, HttpError, buildResponseHeaders, ok, fail, parseBody } from "../_shared/http.ts";
 const defaultBiopayAllowedOrigins = [
   "https://dineinmt.ikanisa.com",
   "https://www.dineinmt.ikanisa.com",
@@ -72,72 +72,7 @@ type MatchRateLimitSubject = {
   source: "anonymous" | "client_install_id" | "ip_hash";
 };
 
-class HttpError extends Error {
-  status: number;
-  details?: JsonRecord;
-
-  constructor(status: number, message: string, details?: JsonRecord) {
-    super(message);
-    this.status = status;
-    this.details = details;
-  }
-}
-
-function getEnv(name: string): string {
-  const value = Deno.env.get(name)?.trim();
-  if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
-  }
-  return value;
-}
-
-function optionalEnv(name: string): string | null {
-  const value = Deno.env.get(name)?.trim();
-  return value && value.length > 0 ? value : null;
-}
-
-function intEnv(name: string, fallback: number): number {
-  const raw = Deno.env.get(name)?.trim();
-  if (!raw) return fallback;
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function numberValue(value: unknown): number | undefined {
-  if (typeof value == "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value == "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  return undefined;
-}
-
-function stringValue(value: unknown): string | undefined {
-  if (typeof value == "string") {
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-  }
-  if (typeof value == "number" || typeof value == "boolean") {
-    return String(value);
-  }
-  return undefined;
-}
-
-function asRecord(value: unknown): JsonRecord {
-  return value && typeof value == "object" && !Array.isArray(value)
-    ? value as JsonRecord
-    : {};
-}
-
-async function parseBody(req: Request): Promise<JsonRecord> {
-  try {
-    return asRecord(await req.json());
-  } catch {
-    return {};
-  }
-}
+// Imported from _shared
 
 export function normalizeOrigin(value: string): string | null {
   const trimmed = value.trim();
@@ -188,56 +123,7 @@ function assertAllowedBiopayOrigin(req: Request): string | null {
   return allowedOrigin;
 }
 
-function buildResponseHeaders(origin: string | null): Headers {
-  const headers = new Headers();
-  headers.set("Access-Control-Allow-Headers", corsAllowHeaders);
-  headers.set("Access-Control-Allow-Methods", corsAllowMethods);
-  headers.set("Cache-Control", "no-store");
-  headers.set("Pragma", "no-cache");
-  headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("Vary", "Origin");
-  if (origin) {
-    headers.set("Access-Control-Allow-Origin", origin);
-  }
-  return headers;
-}
-
-function ok(
-  data: unknown,
-  status = 200,
-  origin: string | null = null,
-): Response {
-  const headers = buildResponseHeaders(origin);
-  headers.set("Content-Type", "application/json");
-  return new Response(JSON.stringify({ data }), {
-    status,
-    headers,
-  });
-}
-
-function fail(
-  message: string,
-  status = 400,
-  details?: JsonRecord,
-  origin: string | null = null,
-): Response {
-  const headers = buildResponseHeaders(origin);
-  headers.set("Content-Type", "application/json");
-  const retryAfterSeconds = numberValue(details?.retry_after_seconds);
-  if (status == 429 && retryAfterSeconds !== undefined) {
-    headers.set(
-      "Retry-After",
-      String(Math.max(1, Math.ceil(retryAfterSeconds))),
-    );
-  }
-  return new Response(
-    JSON.stringify({ error: message, ...(details ?? {}) }),
-    {
-      status,
-      headers,
-    },
-  );
-}
+// Imported from http.ts
 
 function adminClient() {
   return createClient(
@@ -247,63 +133,7 @@ function adminClient() {
   );
 }
 
-function digitsOnly(value: string): string {
-  return value.replace(/\D/g, "");
-}
-
-function collapseWhitespace(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
-}
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(
-    /=+$/g,
-    "",
-  );
-}
-
-function base64UrlEncode(value: string): string {
-  return bytesToBase64Url(new TextEncoder().encode(value));
-}
-
-function base64UrlDecode(value: string): string {
-  let normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  while (normalized.length % 4 != 0) {
-    normalized += "=";
-  }
-  return atob(normalized);
-}
-
-async function hmacSha256Base64Url(
-  value: string,
-  secret: string,
-): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(value),
-  );
-  return bytesToBase64Url(new Uint8Array(signature));
-}
-
-async function sha256Hex(value: string): Promise<string> {
-  const encoded = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", encoded);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
+// Imported from crypto.ts
 
 function ownerTokenSecret(): string {
   return getEnv("BIOPAY_OWNER_TOKEN_SECRET");

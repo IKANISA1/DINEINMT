@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../../../core/services/app_bootstrap_service.dart';
-import '../../../shared/widgets/brand_mark.dart';
+import 'package:dinein_app/core/services/app_bootstrap_service.dart';
+import 'package:ui/widgets/brand_mark.dart';
 
 const _splashWordmarkGold = Color(0xFF624A1F);
 

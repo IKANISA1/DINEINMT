@@ -4,13 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../core/config/country_config.dart';
-import '../../core/config/country_config_provider.dart';
-import '../../core/router/app_routes.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_layout.dart';
-import '../../core/theme/app_theme.dart';
-import '../../shared/widgets/shared_widgets.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_layout.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 class GuestShell extends ConsumerWidget {
   final Widget child;

@@ -1,9 +1,9 @@
-import 'package:dinein_app/core/config/country_config.dart';
+import 'package:core_pkg/config/country_config.dart';
 import 'package:dinein_app/core/providers/permission_providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/services/app_bootstrap_service.dart';
-import 'package:dinein_app/core/services/app_permission_service.dart';
+import 'package:dinein_app/core/infrastructure/app_permission_service.dart';
 import 'package:dinein_app/main.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -43,7 +43,8 @@ void main() {
     expect(find.text('LOCATION SHARING'), findsOneWidget);
 
     await tester.tap(find.text('GRANT ACCESS'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     expect(openedSettings, 1);
   });

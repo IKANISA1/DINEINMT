@@ -1,5 +1,5 @@
-import '../config/country_runtime.dart';
-import '../config/country_config.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:core_pkg/config/country_config.dart';
 import '../services/auth_repository.dart';
 import 'app_routes.dart';
 

@@ -1,0 +1,9 @@
+{
+  "admin_user_id": "31535c9a-b9b4-4107-83bc-5ba68255acd9",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaW5laW4td2hhdHNhcHAtb3RwIiwiYXVkIjoiZGluZWluLWFkbWluIiwic3ViIjoiMzE1MzVjOWEtYjliNC00MTA3LTgzYmMtNWJhNjgyNTVhY2Q5Iiwicm9sZSI6ImFkbWluIiwibmFtZSI6IkRpbmVJbiBBZG1pbiA3ODE2IiwiZW1haWwiOiJhZG1pbi0yNTA3ODg3Njc4MTZAZGluZWluLmxvY2FsIiwicGhvbmUiOiIrMjUwNzg4NzY3ODE2IiwiaWF0IjoxNzc1MjM4MDk2LCJleHAiOjE3NzUyODEyOTZ9.fxJhCypUEX1IBcUHykg6wbfpXSr65K6Cc2jzad8jw8s",
+  "display_name": "DineIn Admin 7816",
+  "whatsapp_number": "+250788767816",
+  "email": "admin-250788767816@dinein.local",
+  "issued_at": "2026-04-03T17:41:36.076Z",
+  "expires_at": "2026-04-04T05:41:36.076Z"
+}

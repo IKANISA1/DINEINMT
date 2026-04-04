@@ -7,18 +7,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../core/models/models.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/config/country_config_provider.dart';
-import '../../../core/constants/enums.dart';
-import '../../../core/providers/cart_provider.dart';
-import '../../../core/providers/providers.dart';
-import '../../../core/services/app_telemetry.dart';
-import '../../../core/services/order_repository.dart';
-import '../../../core/services/venue_repository.dart';
-import '../../../shared/widgets/pressable_scale.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:dinein_app/core/providers/cart_provider.dart';
+import 'package:dinein_app/core/providers/providers.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
+import 'package:dinein_app/core/services/order_repository.dart';
+import 'package:dinein_app/core/services/venue_repository.dart';
+import 'package:ui/widgets/pressable_scale.dart';
 
 /// Cart / Order Summary screen — exact match of React OrderSummary.tsx.
 ///
@@ -342,7 +342,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               // ─── Header ───
               Row(
                 children: [
-                  GestureDetector(
+                  PressableScale(
                     onTap: () {
                       _syncDraftFields(clearError: false);
                       Navigator.of(context).pop();
@@ -535,7 +535,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               const SizedBox(height: AppTheme.space8),
 
               // ─── Add More Items CTA ───
-              GestureDetector(
+              PressableScale(
                 onTap: () {
                   _syncDraftFields(clearError: false);
                   Navigator.of(context).pop();

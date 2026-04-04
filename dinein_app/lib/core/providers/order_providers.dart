@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../constants/enums.dart';
-import '../models/models.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
 import '../services/order_repository.dart';
 import '../services/order_receipt_service.dart';
 import 'auth_providers.dart';

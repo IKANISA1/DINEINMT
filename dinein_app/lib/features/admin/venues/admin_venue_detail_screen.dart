@@ -3,19 +3,21 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/config/country_config_provider.dart';
-import '../../../core/constants/app_download_links.dart';
-import '../../../core/constants/enums.dart';
-import '../../../core/models/models.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:core_pkg/constants/app_download_links.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/services/venue_repository.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/venue_repository.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
+import 'widgets/admin_venue_form_widgets.dart';
+import 'widgets/admin_venue_sheets.dart';
 
 class AdminVenueDetailScreen extends ConsumerStatefulWidget {
   final String? venueId;
@@ -66,7 +68,7 @@ class _AdminVenueDetailScreenState
     'Sunday',
   ];
 
-  final Map<String, _DayHours> _schedule = <String, _DayHours>{};
+  final Map<String, DayHours> _schedule = <String, DayHours>{};
   VenueStatus _status = VenueStatus.inactive;
   bool _orderingEnabled = false;
   String _wifiSecurity = 'WPA';
@@ -132,7 +134,7 @@ class _AdminVenueDetailScreenState
     _schedule.clear();
     for (final day in _days) {
       final hours = venue?.openingHours?[day];
-      _schedule[day] = _DayHours(
+      _schedule[day] = DayHours(
         isOpen: hours?.isOpen ?? true,
         open: hours?.open ?? '09:00',
         close: hours?.close ?? '22:00',
@@ -258,151 +260,6 @@ class _AdminVenueDetailScreenState
     }
   }
 
-  Future<void> _showVenueAccessEditor(Venue venue) async {
-    final config = ref.read(countryConfigProvider);
-    final expectedPhoneLength = config.country.code == 'RW' ? 10 : 8;
-    final controller = TextEditingController(
-      text: normalizePhoneLocalInput(
-        venue.effectiveAccessPhone ?? '',
-        countryCode: config.defaultCountryCode,
-        maxDigits: expectedPhoneLength,
-      ),
-    );
-    var isSaving = false;
-    final hadExistingAccessNumber = venue.hasAssignedAccessPhone;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (sheetContext, setSheetState) {
-            final localPhone = normalizePhoneLocalInput(
-              controller.text,
-              countryCode: config.defaultCountryCode,
-              maxDigits: expectedPhoneLength,
-            );
-            final canSave =
-                !isSaving &&
-                (isValidPhoneLocalInput(
-                      controller.text,
-                      countryCode: config.defaultCountryCode,
-                      expectedLength: expectedPhoneLength,
-                    ) ||
-                    (hadExistingAccessNumber && localPhone.isEmpty));
-
-            Future<void> save() async {
-              if (!canSave) return;
-              setSheetState(() => isSaving = true);
-              try {
-                final isClearing = localPhone.isEmpty;
-                final updates = {
-                  'phone': isClearing
-                      ? null
-                      : '${config.countryDialCode}$localPhone',
-                };
-                await (widget.onUpdateVenueOverride?.call(venue.id, updates) ??
-                    VenueRepository.instance.updateVenueAsAdmin(
-                      venue.id,
-                      updates,
-                    ));
-                _phoneCtrl.text = updates['phone']?.toString() ?? '';
-                _invalidateVenueCaches(venue.id);
-                if (sheetContext.mounted) {
-                  Navigator.of(sheetContext).pop();
-                }
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      isClearing
-                          ? 'Venue WhatsApp access cleared'
-                          : venue.isOpen
-                          ? 'Venue WhatsApp access updated'
-                          : 'WhatsApp saved. Activate the venue to validate access.',
-                    ),
-                  ),
-                );
-              } catch (error) {
-                if (sheetContext.mounted) {
-                  setSheetState(() => isSaving = false);
-                }
-                final raw = error.toString();
-                final message =
-                    raw.contains('already assigned to another venue')
-                    ? 'This WhatsApp number is already assigned to another venue.'
-                    : 'Update failed: $error';
-                if (!mounted) return;
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(message)));
-              }
-            }
-
-            final cs = Theme.of(sheetContext).colorScheme;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppTheme.space4,
-                AppTheme.space4,
-                AppTheme.space4,
-                MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space4,
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(AppTheme.space6),
-                decoration: BoxDecoration(
-                  color: cs.surface,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                  border: Border.all(color: AppColors.white5),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Venue WhatsApp Access',
-                      style: Theme.of(sheetContext).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: AppTheme.space2),
-                    Text(
-                      'Save the WhatsApp number assigned to this venue. Once the venue is active, staff can log in directly with OTP.',
-                      style: Theme.of(sheetContext).textTheme.bodyMedium
-                          ?.copyWith(
-                            color: Theme.of(
-                              sheetContext,
-                            ).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                    const SizedBox(height: AppTheme.space5),
-                    CountryPhoneInput.fromConfig(
-                      config: config,
-                      controller: controller,
-                      onChanged: (_) => setSheetState(() {}),
-                      onSubmitted: canSave ? save : null,
-                    ),
-                    const SizedBox(height: AppTheme.space5),
-                    SizedBox(
-                      width: double.infinity,
-                      child: PremiumButton(
-                        label: isSaving
-                            ? 'SAVING...'
-                            : localPhone.isEmpty && hadExistingAccessNumber
-                            ? 'CLEAR WHATSAPP NUMBER'
-                            : 'SAVE WHATSAPP NUMBER',
-                        icon: LucideIcons.messageCircle,
-                        onPressed: canSave ? save : null,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   Future<void> _copyLink(String label, Uri uri) async {
     await Clipboard.setData(ClipboardData(text: uri.toString()));
     _showSnack('$label copied.');
@@ -439,157 +296,6 @@ class _AdminVenueDetailScreenState
         setState(() => _syncingProfile = false);
       }
     }
-  }
-
-  void _showQrSheet({
-    required String title,
-    required String subtitle,
-    required Uri uri,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => SafeArea(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.20),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Text(
-                title,
-                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: QrImageView(
-                  data: uri.toString(),
-                  version: QrVersions.auto,
-                  size: 220,
-                  backgroundColor: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 20),
-              PremiumButton(
-                label: 'COPY URL',
-                icon: LucideIcons.copy,
-                isOutlined: true,
-                onPressed: () => _copyLink(title, uri),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _editDayTimes(String day) {
-    final hours = _schedule[day]!;
-    final openCtrl = TextEditingController(text: hours.open);
-    final closeCtrl = TextEditingController(text: hours.close);
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        final tt = Theme.of(ctx).textTheme;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppTheme.space4,
-            AppTheme.space4,
-            AppTheme.space4,
-            MediaQuery.of(ctx).viewInsets.bottom + AppTheme.space4,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(AppTheme.space6),
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-              border: Border.all(color: AppColors.white5),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$day Hours',
-                  style: tt.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: AppTheme.space4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _InlineField(
-                        label: 'OPEN',
-                        controller: openCtrl,
-                        hint: '09:00',
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.space4),
-                    Expanded(
-                      child: _InlineField(
-                        label: 'CLOSE',
-                        controller: closeCtrl,
-                        hint: '22:00',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.space4),
-                PremiumButton(
-                  label: 'APPLY HOURS',
-                  icon: LucideIcons.check,
-                  onPressed: () {
-                    setState(() {
-                      _schedule[day] = hours.copyWith(
-                        open: openCtrl.text.trim().isEmpty
-                            ? hours.open
-                            : openCtrl.text.trim(),
-                        close: closeCtrl.text.trim().isEmpty
-                            ? hours.close
-                            : closeCtrl.text.trim(),
-                      );
-                    });
-                    Navigator.of(ctx).pop();
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   void _showSnack(String message) {
@@ -669,676 +375,25 @@ class _AdminVenueDetailScreenState
                 160,
               ),
               children: [
-                Row(
-                  children: [
-                    PressableScale(
-                      onTap: () {
-                        if (Navigator.of(context).canPop()) {
-                          context.pop();
-                        } else {
-                          context.goNamed(AppRouteNames.adminVenues);
-                        }
-                      },
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: AppColors.white5),
-                        ),
-                        child: Icon(
-                          LucideIcons.chevronLeft,
-                          size: 22,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.space4),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.isCreate ? 'New Venue' : 'Venue Management',
-                            style: tt.headlineLarge?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          Text(
-                            widget.isCreate
-                                ? 'CREATE ADMIN VENUE'
-                                : 'ADMIN · VENUE',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (venue != null)
-                      StatusBadge(
-                        label: venue.status.label,
-                        color: venue.status == VenueStatus.active
-                            ? cs.secondary.withValues(alpha: 0.12)
-                            : cs.error.withValues(alpha: 0.12),
-                        textColor: venue.status == VenueStatus.active
-                            ? cs.secondary
-                            : cs.error,
-                      ),
-                  ],
-                ),
+                _buildHeader(cs, tt, venue),
                 const SizedBox(height: AppTheme.space6),
-                ClayCard(
-                  padding: const EdgeInsets.all(AppTheme.space5),
-                  child: Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                        child: SizedBox(
-                          width: 88,
-                          height: 88,
-                          child: DineInImage(
-                            imageUrl: _imageCtrl.text.trim().isEmpty
-                                ? venue?.imageUrl
-                                : _imageCtrl.text.trim(),
-                            fit: BoxFit.cover,
-                            fallbackIcon: LucideIcons.store,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppTheme.space4),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _nameCtrl.text.trim().isEmpty
-                                  ? 'Venue preview'
-                                  : _nameCtrl.text.trim(),
-                              style: tt.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              slug.isEmpty ? 'slug-pending' : slug,
-                              style: tt.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: AppTheme.space3),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                StatusBadge(
-                                  label: _status.label,
-                                  color: _status == VenueStatus.active
-                                      ? cs.secondary.withValues(alpha: 0.12)
-                                      : cs.surfaceContainerHighest,
-                                  textColor: _status == VenueStatus.active
-                                      ? cs.secondary
-                                      : cs.onSurface,
-                                ),
-                                StatusBadge(
-                                  label: _orderingEnabled
-                                      ? 'Ordering Enabled'
-                                      : 'Browse Only',
-                                  color: _orderingEnabled
-                                      ? cs.primary.withValues(alpha: 0.12)
-                                      : cs.surfaceContainerHighest,
-                                  textColor: _orderingEnabled
-                                      ? cs.primary
-                                      : cs.onSurface,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _buildPreviewCard(cs, tt, slug, venue),
                 if (venue != null) ...[
                   const SizedBox(height: AppTheme.space4),
-                  ClayCard(
-                    padding: const EdgeInsets.all(AppTheme.space5),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Discovery Data',
-                                    style: tt.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Refresh Maps-backed profile data used across guest discovery, venue detail, and admin review surfaces.',
-                                    style: tt.bodyMedium?.copyWith(
-                                      color: cs.onSurfaceVariant,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (venue.enrichmentStatus != null)
-                              StatusBadge(
-                                label: venue.enrichmentStatus!,
-                                color: cs.primary.withValues(alpha: 0.12),
-                                textColor: cs.primary,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: AppTheme.space4),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            StatusBadge(
-                              label: '${venue.ratingCount} ratings',
-                              color: cs.surfaceContainerHigh,
-                              textColor: cs.onSurfaceVariant,
-                            ),
-                            if (venue.priceLevelLabel != null)
-                              StatusBadge(
-                                label: venue.priceLevelLabel!,
-                                color: cs.surfaceContainerHigh,
-                                textColor: cs.onSurfaceVariant,
-                              ),
-                            StatusBadge(
-                              label:
-                                  venue.latitude != null &&
-                                      venue.longitude != null
-                                  ? 'Geo Ready'
-                                  : 'Geo Missing',
-                              color:
-                                  venue.latitude != null &&
-                                      venue.longitude != null
-                                  ? cs.primary.withValues(alpha: 0.12)
-                                  : cs.error.withValues(alpha: 0.12),
-                              textColor:
-                                  venue.latitude != null &&
-                                      venue.longitude != null
-                                  ? cs.primary
-                                  : cs.error,
-                            ),
-                          ],
-                        ),
-                        if (venue.primaryReviewSnippet != null) ...[
-                          const SizedBox(height: AppTheme.space4),
-                          Text(
-                            venue.primaryReviewSnippet!,
-                            style: tt.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              height: 1.55,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: AppTheme.space5),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: PremiumButton(
-                                label: _syncingProfile
-                                    ? 'SYNCING...'
-                                    : 'SYNC PROFILE DATA',
-                                icon: LucideIcons.sparkles,
-                                onPressed: _syncingProfile
-                                    ? null
-                                    : () => _syncProfileData(venue),
-                              ),
-                            ),
-                            if (venue.googleMapsUri != null) ...[
-                              const SizedBox(width: AppTheme.space3),
-                              PressableScale(
-                                onTap: () => _openLink(
-                                  'Map',
-                                  Uri.parse(venue.googleMapsUri!),
-                                ),
-                                child: Container(
-                                  width: 52,
-                                  height: 52,
-                                  decoration: BoxDecoration(
-                                    color: cs.surfaceContainerHigh,
-                                    borderRadius: BorderRadius.circular(
-                                      AppTheme.radiusLg,
-                                    ),
-                                    border: Border.all(color: AppColors.white5),
-                                  ),
-                                  child: Icon(
-                                    LucideIcons.mapPin,
-                                    size: 20,
-                                    color: cs.primary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildDiscoveryDataCard(cs, tt, venue),
                 ],
                 const SizedBox(height: AppTheme.space4),
-                _SectionCard(
-                  title: 'Core Details',
-                  children: [
-                    _LabeledField(
-                      label: 'NAME',
-                      controller: _nameCtrl,
-                      hint: 'Harbor Table',
-                      onChanged: _handleNameChanged,
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _LabeledField(
-                            label: 'SLUG',
-                            controller: _slugCtrl,
-                            hint: 'harbor-table',
-                            onChanged: (_) {
-                              _slugDirty = true;
-                              setState(() {});
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.space4),
-                        Expanded(
-                          child: _LabeledField(
-                            label: 'CATEGORY',
-                            controller: _categoryCtrl,
-                            hint: 'restaurant',
-                          ),
-                        ),
-                      ],
-                    ),
-                    _LabeledField(
-                      label: 'ADDRESS',
-                      controller: _addressCtrl,
-                      hint: config.addressHint,
-                    ),
-                    _LabeledField(
-                      label: 'DESCRIPTION',
-                      controller: _descriptionCtrl,
-                      hint: 'Short guest-facing venue summary',
-                      maxLines: 4,
-                    ),
-                  ],
-                ),
+                _buildCoreDetailsSection(config),
                 const SizedBox(height: AppTheme.space4),
-                _SectionCard(
-                  title: 'Profile Data',
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _LabeledField(
-                            label: 'PHONE',
-                            controller: _phoneCtrl,
-                            hint: '${config.countryDialCode}...',
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.space4),
-                        Expanded(
-                          child: _LabeledField(
-                            label: 'EMAIL',
-                            controller: _emailCtrl,
-                            hint: 'venue@example.com',
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-                        ),
-                      ],
-                    ),
-                    _LabeledField(
-                      label: 'IMAGE URL',
-                      controller: _imageCtrl,
-                      hint: 'https://images.example.com/venue.jpg',
-                      keyboardType: TextInputType.url,
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _LabeledField(
-                            label: 'WEBSITE',
-                            controller: _websiteCtrl,
-                            hint: 'https://venue.example.com',
-                            keyboardType: TextInputType.url,
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.space4),
-                        Expanded(
-                          child: _LabeledField(
-                            label: 'RESERVATION URL',
-                            controller: _reservationCtrl,
-                            hint: 'https://reserve.example.com',
-                            keyboardType: TextInputType.url,
-                          ),
-                        ),
-                      ],
-                    ),
-                    _LabeledField(
-                      label: 'REVOLUT URL',
-                      controller: _revolutCtrl,
-                      hint: 'https://revolut.me/venue',
-                      keyboardType: TextInputType.url,
-                    ),
-                  ],
-                ),
+                _buildProfileDataSection(config),
                 const SizedBox(height: AppTheme.space4),
-                _SectionCard(
-                  title: 'Operational Controls',
-                  children: [
-                    DropdownButtonFormField<VenueStatus>(
-                      initialValue: _status,
-                      decoration: const InputDecoration(labelText: 'STATUS'),
-                      items: VenueStatus.values
-                          .map((status) {
-                            return DropdownMenuItem<VenueStatus>(
-                              value: status,
-                              child: Text(status.label),
-                            );
-                          })
-                          .toList(growable: false),
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _status = value);
-                      },
-                    ),
-                    const SizedBox(height: AppTheme.space4),
-                    SwitchListTile(
-                      value: _orderingEnabled,
-                      onChanged: (value) =>
-                          setState(() => _orderingEnabled = value),
-                      title: const Text('Guest ordering enabled'),
-                      subtitle: const Text(
-                        'When off, guests can browse the menu but cannot order.',
-                      ),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    const SizedBox(height: AppTheme.space2),
-                    if (venue != null)
-                      Container(
-                        padding: const EdgeInsets.all(AppTheme.space4),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainer,
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusLg,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Venue WhatsApp Access',
-                                    style: tt.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    venue.hasAssignedAccessPhone
-                                        ? venue.effectiveAccessPhone!
-                                        : 'No WhatsApp access number assigned.',
-                                    style: tt.bodySmall?.copyWith(
-                                      color: cs.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: AppTheme.space4),
-                            PremiumButton(
-                              label: venue.hasAssignedAccessPhone
-                                  ? 'Edit WhatsApp Number'
-                                  : 'Add WhatsApp Number',
-                              icon: LucideIcons.messageCircle,
-                              isOutlined: true,
-                              isSmall: true,
-                              onPressed: () => _showVenueAccessEditor(venue),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      Text(
-                        'Save the venue first to manage WhatsApp access and QR sharing.',
-                        style: tt.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                  ],
-                ),
+                _buildOperationalSection(cs, tt, venue),
                 const SizedBox(height: AppTheme.space4),
-                _SectionCard(
-                  title: 'Guest Access',
-                  children: [
-                    if (guestUri == null || appUri == null)
-                      Text(
-                        'Enter a valid slug to generate the guest URL, venue app URL, and guest QR code.',
-                        style: tt.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      )
-                    else ...[
-                      _LinkAccessRow(
-                        label: 'Guest URL',
-                        value: guestUri.toString(),
-                        onCopy: () => _copyLink('Guest URL', guestUri),
-                        onOpen: () => _openLink('Guest URL', guestUri),
-                      ),
-                      const SizedBox(height: AppTheme.space3),
-                      _LinkAccessRow(
-                        label: 'Venue App URL',
-                        value: appUri.toString(),
-                        onCopy: () => _copyLink('Venue app URL', appUri),
-                        onOpen: () => _openLink('Venue app URL', appUri),
-                      ),
-                      const SizedBox(height: AppTheme.space4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _QrPreviewCard(
-                              label: 'Guest View QR',
-                              uri: guestUri,
-                              onTap: () => _showQrSheet(
-                                title: '${_nameCtrl.text.trim()} guest view',
-                                subtitle:
-                                    'Guests open the direct venue experience.',
-                                uri: guestUri,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppTheme.space4),
-                          Expanded(
-                            child: _QrPreviewCard(
-                              label: 'Venue App QR',
-                              uri: appUri,
-                              onTap: () => _showQrSheet(
-                                title: '${_nameCtrl.text.trim()} venue app',
-                                subtitle:
-                                    'Guests use the smart redirect into the venue experience.',
-                                uri: appUri,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
+                _buildGuestAccessSection(tt, guestUri, appUri),
                 const SizedBox(height: AppTheme.space4),
-                _SectionCard(
-                  title: 'WiFi & Social',
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _LabeledField(
-                            label: 'WIFI SSID',
-                            controller: _wifiSsidCtrl,
-                            hint: 'Guest WiFi',
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.space4),
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _wifiSecurity,
-                            decoration: const InputDecoration(
-                              labelText: 'WIFI SECURITY',
-                            ),
-                            items: const ['WPA', 'WEP', 'Open']
-                                .map((value) {
-                                  return DropdownMenuItem<String>(
-                                    value: value,
-                                    child: Text(value),
-                                  );
-                                })
-                                .toList(growable: false),
-                            onChanged: (value) {
-                              if (value == null) return;
-                              setState(() => _wifiSecurity = value);
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    _LabeledField(
-                      label: 'WIFI PASSWORD',
-                      controller: _wifiPasswordCtrl,
-                      hint: 'Network password',
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _LabeledField(
-                            label: 'INSTAGRAM',
-                            controller: _instagramCtrl,
-                            hint: 'https://instagram.com/venue',
-                            keyboardType: TextInputType.url,
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.space4),
-                        Expanded(
-                          child: _LabeledField(
-                            label: 'FACEBOOK',
-                            controller: _facebookCtrl,
-                            hint: 'https://facebook.com/venue',
-                            keyboardType: TextInputType.url,
-                          ),
-                        ),
-                      ],
-                    ),
-                    _LabeledField(
-                      label: 'TIKTOK',
-                      controller: _tiktokCtrl,
-                      hint: 'https://tiktok.com/@venue',
-                      keyboardType: TextInputType.url,
-                    ),
-                  ],
-                ),
+                _buildWifiSocialSection(),
                 const SizedBox(height: AppTheme.space4),
-                _SectionCard(
-                  title: 'Opening Hours',
-                  children: [
-                    ..._days.map((day) {
-                      final hours = _schedule[day]!;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppTheme.space2),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainer,
-                            borderRadius: BorderRadius.circular(
-                              AppTheme.radiusLg,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  day,
-                                  style: tt.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              PressableScale(
-                                onTap: () => setState(() {
-                                  _schedule[day] = hours.copyWith(
-                                    isOpen: !hours.isOpen,
-                                  );
-                                }),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: hours.isOpen
-                                        ? cs.secondary.withValues(alpha: 0.12)
-                                        : cs.error.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    hours.isOpen ? 'Open' : 'Closed',
-                                    style: tt.labelSmall?.copyWith(
-                                      color: hours.isOpen
-                                          ? cs.secondary
-                                          : cs.error,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: AppTheme.space3),
-                              PressableScale(
-                                onTap: () => _editDayTimes(day),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: cs.surfaceContainerHigh,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    hours.isOpen
-                                        ? '${hours.open} - ${hours.close}'
-                                        : 'Closed',
-                                    style: tt.bodySmall?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-                  ],
-                ),
+                _buildOpeningHoursSection(cs, tt),
               ],
             ),
             Positioned(
@@ -1357,253 +412,733 @@ class _AdminVenueDetailScreenState
       ),
     );
   }
-}
 
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
+  // ── Header ──────────────────────────────────────────────────────────
 
-  const _SectionCard({required this.title, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return ClayCard(
-      padding: const EdgeInsets.all(AppTheme.space5),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title.toUpperCase(),
-            style: tt.labelSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2.2,
-              color: cs.primary,
+  Widget _buildHeader(ColorScheme cs, TextTheme tt, Venue? venue) {
+    return Row(
+      children: [
+        PressableScale(
+          onTap: () {
+            if (Navigator.of(context).canPop()) {
+              context.pop();
+            } else {
+              context.goNamed(AppRouteNames.adminVenues);
+            }
+          },
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.white5),
+            ),
+            child: Icon(
+              LucideIcons.chevronLeft,
+              size: 22,
+              color: cs.onSurface,
             ),
           ),
-          const SizedBox(height: AppTheme.space4),
-          ...children,
-        ],
-      ),
+        ),
+        const SizedBox(width: AppTheme.space4),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.isCreate ? 'New Venue' : 'Venue Management',
+                style: tt.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              Text(
+                widget.isCreate
+                    ? 'CREATE ADMIN VENUE'
+                    : 'ADMIN · VENUE',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (venue != null)
+          StatusBadge(
+            label: venue.status.label,
+            color: venue.status == VenueStatus.active
+                ? cs.secondary.withValues(alpha: 0.12)
+                : cs.error.withValues(alpha: 0.12),
+            textColor: venue.status == VenueStatus.active
+                ? cs.secondary
+                : cs.error,
+          ),
+      ],
     );
   }
-}
 
-class _LabeledField extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final String hint;
-  final int maxLines;
-  final TextInputType? keyboardType;
-  final ValueChanged<String>? onChanged;
+  // ── Preview Card ────────────────────────────────────────────────────
 
-  const _LabeledField({
-    required this.label,
-    required this.controller,
-    required this.hint,
-    this.maxLines = 1,
-    this.keyboardType,
-    this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppTheme.space4),
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        keyboardType: keyboardType,
-        onChanged: onChanged,
-        decoration: InputDecoration(labelText: label, hintText: hint),
-      ),
-    );
-  }
-}
-
-class _InlineField extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final String hint;
-
-  const _InlineField({
-    required this.label,
-    required this.controller,
-    required this.hint,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(labelText: label, hintText: hint),
-    );
-  }
-}
-
-class _LinkAccessRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final VoidCallback onCopy;
-  final VoidCallback onOpen;
-
-  const _LinkAccessRow({
-    required this.label,
-    required this.value,
-    required this.onCopy,
-    required this.onOpen,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.space3),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-      ),
+  Widget _buildPreviewCard(
+    ColorScheme cs,
+    TextTheme tt,
+    String slug,
+    Venue? venue,
+  ) {
+    return ClayCard(
+      padding: const EdgeInsets.all(AppTheme.space5),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            child: SizedBox(
+              width: 88,
+              height: 88,
+              child: DineInImage(
+                imageUrl: _imageCtrl.text.trim().isEmpty
+                    ? venue?.imageUrl
+                    : _imageCtrl.text.trim(),
+                fit: BoxFit.cover,
+                fallbackIcon: LucideIcons.store,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppTheme.space4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label.toUpperCase(),
-                  style: tt.labelSmall?.copyWith(
+                  _nameCtrl.text.trim().isEmpty
+                      ? 'Venue preview'
+                      : _nameCtrl.text.trim(),
+                  style: tt.titleLarge?.copyWith(
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 1.8,
-                    color: cs.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  value,
+                  slug.isEmpty ? 'slug-pending' : slug,
                   style: tt.bodySmall?.copyWith(
-                    color: cs.onSurface,
-                    fontWeight: FontWeight.w700,
+                    color: cs.onSurfaceVariant,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: AppTheme.space3),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    StatusBadge(
+                      label: _status.label,
+                      color: _status == VenueStatus.active
+                          ? cs.secondary.withValues(alpha: 0.12)
+                          : cs.surfaceContainerHighest,
+                      textColor: _status == VenueStatus.active
+                          ? cs.secondary
+                          : cs.onSurface,
+                    ),
+                    StatusBadge(
+                      label: _orderingEnabled
+                          ? 'Ordering Enabled'
+                          : 'Browse Only',
+                      color: _orderingEnabled
+                          ? cs.primary.withValues(alpha: 0.12)
+                          : cs.surfaceContainerHighest,
+                      textColor: _orderingEnabled
+                          ? cs.primary
+                          : cs.onSurface,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: AppTheme.space2),
-          Column(
+        ],
+      ),
+    );
+  }
+
+  // ── Discovery Data ──────────────────────────────────────────────────
+
+  Widget _buildDiscoveryDataCard(ColorScheme cs, TextTheme tt, Venue venue) {
+    return ClayCard(
+      padding: const EdgeInsets.all(AppTheme.space5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              PressableScale(
-                onTap: onCopy,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(LucideIcons.copy, size: 16, color: cs.onSurface),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Discovery Data',
+                      style: tt.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Refresh Maps-backed profile data used across guest discovery, venue detail, and admin review surfaces.',
+                      style: tt.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 6),
-              PressableScale(
-                onTap: onOpen,
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    LucideIcons.externalLink,
-                    size: 16,
-                    color: cs.onSurface,
-                  ),
+              if (venue.enrichmentStatus != null)
+                StatusBadge(
+                  label: venue.enrichmentStatus!,
+                  color: cs.primary.withValues(alpha: 0.12),
+                  textColor: cs.primary,
+                ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.space4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              StatusBadge(
+                label: '${venue.ratingCount} ratings',
+                color: cs.surfaceContainerHigh,
+                textColor: cs.onSurfaceVariant,
+              ),
+              if (venue.priceLevelLabel != null)
+                StatusBadge(
+                  label: venue.priceLevelLabel!,
+                  color: cs.surfaceContainerHigh,
+                  textColor: cs.onSurfaceVariant,
+                ),
+              StatusBadge(
+                label:
+                    venue.latitude != null &&
+                        venue.longitude != null
+                    ? 'Geo Ready'
+                    : 'Geo Missing',
+                color:
+                    venue.latitude != null &&
+                        venue.longitude != null
+                    ? cs.primary.withValues(alpha: 0.12)
+                    : cs.error.withValues(alpha: 0.12),
+                textColor:
+                    venue.latitude != null &&
+                        venue.longitude != null
+                    ? cs.primary
+                    : cs.error,
+              ),
+            ],
+          ),
+          if (venue.primaryReviewSnippet != null) ...[
+            const SizedBox(height: AppTheme.space4),
+            Text(
+              venue.primaryReviewSnippet!,
+              style: tt.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+                height: 1.55,
+              ),
+            ),
+          ],
+          const SizedBox(height: AppTheme.space5),
+          Row(
+            children: [
+              Expanded(
+                child: PremiumButton(
+                  label: _syncingProfile
+                      ? 'SYNCING...'
+                      : 'SYNC PROFILE DATA',
+                  icon: LucideIcons.sparkles,
+                  onPressed: _syncingProfile
+                      ? null
+                      : () => _syncProfileData(venue),
                 ),
               ),
+              if (venue.googleMapsUri != null) ...[
+                const SizedBox(width: AppTheme.space3),
+                PressableScale(
+                  onTap: () => _openLink(
+                    'Map',
+                    Uri.parse(venue.googleMapsUri!),
+                  ),
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(
+                        AppTheme.radiusLg,
+                      ),
+                      border: Border.all(color: AppColors.white5),
+                    ),
+                    child: Icon(
+                      LucideIcons.mapPin,
+                      size: 20,
+                      color: cs.primary,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
       ),
     );
   }
-}
 
-class _QrPreviewCard extends StatelessWidget {
-  final String label;
-  final Uri uri;
-  final VoidCallback onTap;
+  // ── Core Details ────────────────────────────────────────────────────
 
-  const _QrPreviewCard({
-    required this.label,
-    required this.uri,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tt = Theme.of(context).textTheme;
-
-    return PressableScale(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(AppTheme.space4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+  Widget _buildCoreDetailsSection(CountryConfig config) {
+    return AdminVenueSectionCard(
+      title: 'Core Details',
+      children: [
+        AdminVenueLabeledField(
+          label: 'NAME',
+          controller: _nameCtrl,
+          hint: 'Harbor Table',
+          onChanged: _handleNameChanged,
         ),
-        child: Column(
+        Row(
           children: [
-            QrImageView(
-              data: uri.toString(),
-              version: QrVersions.auto,
-              size: 96,
-              backgroundColor: Colors.white,
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'SLUG',
+                controller: _slugCtrl,
+                hint: 'harbor-table',
+                onChanged: (_) {
+                  _slugDirty = true;
+                  setState(() {});
+                },
+              ),
             ),
-            const SizedBox(height: AppTheme.space3),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: tt.labelSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: const Color(0xFF121416),
+            const SizedBox(width: AppTheme.space4),
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'CATEGORY',
+                controller: _categoryCtrl,
+                hint: 'restaurant',
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _DayHours {
-  final bool isOpen;
-  final String open;
-  final String close;
-
-  const _DayHours({
-    required this.isOpen,
-    required this.open,
-    required this.close,
-  });
-
-  _DayHours copyWith({bool? isOpen, String? open, String? close}) {
-    return _DayHours(
-      isOpen: isOpen ?? this.isOpen,
-      open: open ?? this.open,
-      close: close ?? this.close,
+        AdminVenueLabeledField(
+          label: 'ADDRESS',
+          controller: _addressCtrl,
+          hint: config.addressHint,
+        ),
+        AdminVenueLabeledField(
+          label: 'DESCRIPTION',
+          controller: _descriptionCtrl,
+          hint: 'Short guest-facing venue summary',
+          maxLines: 4,
+        ),
+      ],
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'is_open': isOpen,
-    'open': open,
-    'close': close,
-  };
+  // ── Profile Data ────────────────────────────────────────────────────
+
+  Widget _buildProfileDataSection(CountryConfig config) {
+    return AdminVenueSectionCard(
+      title: 'Profile Data',
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'PHONE',
+                controller: _phoneCtrl,
+                hint: '${config.countryDialCode}...',
+              ),
+            ),
+            const SizedBox(width: AppTheme.space4),
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'EMAIL',
+                controller: _emailCtrl,
+                hint: 'venue@example.com',
+                keyboardType: TextInputType.emailAddress,
+              ),
+            ),
+          ],
+        ),
+        AdminVenueLabeledField(
+          label: 'IMAGE URL',
+          controller: _imageCtrl,
+          hint: 'https://images.example.com/venue.jpg',
+          keyboardType: TextInputType.url,
+          onChanged: (_) => setState(() {}),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'WEBSITE',
+                controller: _websiteCtrl,
+                hint: 'https://venue.example.com',
+                keyboardType: TextInputType.url,
+              ),
+            ),
+            const SizedBox(width: AppTheme.space4),
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'RESERVATION URL',
+                controller: _reservationCtrl,
+                hint: 'https://reserve.example.com',
+                keyboardType: TextInputType.url,
+              ),
+            ),
+          ],
+        ),
+        AdminVenueLabeledField(
+          label: 'REVOLUT URL',
+          controller: _revolutCtrl,
+          hint: 'https://revolut.me/venue',
+          keyboardType: TextInputType.url,
+        ),
+      ],
+    );
+  }
+
+  // ── Operational Controls ────────────────────────────────────────────
+
+  Widget _buildOperationalSection(ColorScheme cs, TextTheme tt, Venue? venue) {
+    return AdminVenueSectionCard(
+      title: 'Operational Controls',
+      children: [
+        DropdownButtonFormField<VenueStatus>(
+          initialValue: _status,
+          decoration: const InputDecoration(labelText: 'STATUS'),
+          items: VenueStatus.values
+              .map((status) {
+                return DropdownMenuItem<VenueStatus>(
+                  value: status,
+                  child: Text(status.label),
+                );
+              })
+              .toList(growable: false),
+          onChanged: (value) {
+            if (value == null) return;
+            setState(() => _status = value);
+          },
+        ),
+        const SizedBox(height: AppTheme.space4),
+        SwitchListTile(
+          value: _orderingEnabled,
+          onChanged: (value) =>
+              setState(() => _orderingEnabled = value),
+          title: const Text('Guest ordering enabled'),
+          subtitle: const Text(
+            'When off, guests can browse the menu but cannot order.',
+          ),
+          contentPadding: EdgeInsets.zero,
+        ),
+        const SizedBox(height: AppTheme.space2),
+        if (venue != null)
+          Container(
+            padding: const EdgeInsets.all(AppTheme.space4),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainer,
+              borderRadius: BorderRadius.circular(
+                AppTheme.radiusLg,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Venue WhatsApp Access',
+                        style: tt.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        venue.hasAssignedAccessPhone
+                            ? venue.effectiveAccessPhone!
+                            : 'No WhatsApp access number assigned.',
+                        style: tt.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppTheme.space4),
+                PremiumButton(
+                  label: venue.hasAssignedAccessPhone
+                      ? 'Edit WhatsApp Number'
+                      : 'Add WhatsApp Number',
+                  icon: LucideIcons.messageCircle,
+                  isOutlined: true,
+                  isSmall: true,
+                  onPressed: () => AdminVenueSheets.showAccessEditor(
+                    context: context,
+                    venue: venue,
+                    config: ref.read(countryConfigProvider),
+                    phoneCtrl: _phoneCtrl,
+                    onCachesInvalidated: () =>
+                        _invalidateVenueCaches(venue.id),
+                    onUpdateVenueOverride: widget.onUpdateVenueOverride,
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Text(
+            'Save the venue first to manage WhatsApp access and QR sharing.',
+            style: tt.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ── Guest Access ────────────────────────────────────────────────────
+
+  Widget _buildGuestAccessSection(TextTheme tt, Uri? guestUri, Uri? appUri) {
+    return AdminVenueSectionCard(
+      title: 'Guest Access',
+      children: [
+        if (guestUri == null || appUri == null)
+          Text(
+            'Enter a valid slug to generate the guest URL, venue app URL, and guest QR code.',
+            style: tt.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          )
+        else ...[
+          AdminVenueLinkAccessRow(
+            label: 'Guest URL',
+            value: guestUri.toString(),
+            onCopy: () => _copyLink('Guest URL', guestUri),
+            onOpen: () => _openLink('Guest URL', guestUri),
+          ),
+          const SizedBox(height: AppTheme.space3),
+          AdminVenueLinkAccessRow(
+            label: 'Venue App URL',
+            value: appUri.toString(),
+            onCopy: () => _copyLink('Venue app URL', appUri),
+            onOpen: () => _openLink('Venue app URL', appUri),
+          ),
+          const SizedBox(height: AppTheme.space4),
+          Row(
+            children: [
+              Expanded(
+                child: AdminVenueQrPreviewCard(
+                  label: 'Guest View QR',
+                  uri: guestUri,
+                  onTap: () => AdminVenueSheets.showQr(
+                    context: context,
+                    title: '${_nameCtrl.text.trim()} guest view',
+                    subtitle:
+                        'Guests open the direct venue experience.',
+                    uri: guestUri,
+                    onCopyLink: _copyLink,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppTheme.space4),
+              Expanded(
+                child: AdminVenueQrPreviewCard(
+                  label: 'Venue App QR',
+                  uri: appUri,
+                  onTap: () => AdminVenueSheets.showQr(
+                    context: context,
+                    title: '${_nameCtrl.text.trim()} venue app',
+                    subtitle:
+                        'Guests use the smart redirect into the venue experience.',
+                    uri: appUri,
+                    onCopyLink: _copyLink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ── WiFi & Social ───────────────────────────────────────────────────
+
+  Widget _buildWifiSocialSection() {
+    return AdminVenueSectionCard(
+      title: 'WiFi & Social',
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'WIFI SSID',
+                controller: _wifiSsidCtrl,
+                hint: 'Guest WiFi',
+              ),
+            ),
+            const SizedBox(width: AppTheme.space4),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                initialValue: _wifiSecurity,
+                decoration: const InputDecoration(
+                  labelText: 'WIFI SECURITY',
+                ),
+                items: const ['WPA', 'WEP', 'Open']
+                    .map((value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    })
+                    .toList(growable: false),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _wifiSecurity = value);
+                },
+              ),
+            ),
+          ],
+        ),
+        AdminVenueLabeledField(
+          label: 'WIFI PASSWORD',
+          controller: _wifiPasswordCtrl,
+          hint: 'Network password',
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'INSTAGRAM',
+                controller: _instagramCtrl,
+                hint: 'https://instagram.com/venue',
+                keyboardType: TextInputType.url,
+              ),
+            ),
+            const SizedBox(width: AppTheme.space4),
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'FACEBOOK',
+                controller: _facebookCtrl,
+                hint: 'https://facebook.com/venue',
+                keyboardType: TextInputType.url,
+              ),
+            ),
+          ],
+        ),
+        AdminVenueLabeledField(
+          label: 'TIKTOK',
+          controller: _tiktokCtrl,
+          hint: 'https://tiktok.com/@venue',
+          keyboardType: TextInputType.url,
+        ),
+      ],
+    );
+  }
+
+  // ── Opening Hours ───────────────────────────────────────────────────
+
+  Widget _buildOpeningHoursSection(ColorScheme cs, TextTheme tt) {
+    return AdminVenueSectionCard(
+      title: 'Opening Hours',
+      children: [
+        ..._days.map((day) {
+          final hours = _schedule[day]!;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppTheme.space2),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainer,
+                borderRadius: BorderRadius.circular(
+                  AppTheme.radiusLg,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      day,
+                      style: tt.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  PressableScale(
+                    onTap: () => setState(() {
+                      _schedule[day] = hours.copyWith(
+                        isOpen: !hours.isOpen,
+                      );
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: hours.isOpen
+                            ? cs.secondary.withValues(alpha: 0.12)
+                            : cs.error.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        hours.isOpen ? 'Open' : 'Closed',
+                        style: tt.labelSmall?.copyWith(
+                          color: hours.isOpen
+                              ? cs.secondary
+                              : cs.error,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.space3),
+                  PressableScale(
+                    onTap: () => AdminVenueSheets.showScheduleEditor(
+                      context: context,
+                      day: day,
+                      hours: hours,
+                      onApply: (updated) {
+                        setState(() => _schedule[day] = updated);
+                      },
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        hours.isOpen
+                            ? '${hours.open} - ${hours.close}'
+                            : 'Closed',
+                        style: tt.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
 }

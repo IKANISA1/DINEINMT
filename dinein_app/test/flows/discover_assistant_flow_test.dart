@@ -1,4 +1,5 @@
-import 'package:dinein_app/core/models/models.dart';
+import 'package:db_pkg/models/guest_venue_feed.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/features/guest/discover/discover_screen.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +30,13 @@ const _discoverTestVenues = [
   ),
 ];
 
+final _discoverTestFeed = GuestVenueFeed.fromVenues(_discoverTestVenues);
+final _discoverSearchFeed = GuestVenueFeed.fromVenues(
+  _discoverTestVenues
+      .where((venue) => venue.description.toLowerCase().contains('waterfront'))
+      .toList(growable: false),
+);
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -45,7 +53,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          venuesProvider.overrideWith((ref) async => _discoverTestVenues),
+          guestVenueFeedProvider(
+            const GuestVenueQuery(limit: 12),
+          ).overrideWith((ref) async => _discoverTestFeed),
         ],
         child: const MaterialApp(home: Scaffold(body: DiscoverScreen())),
       ),
@@ -72,7 +82,12 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          venuesProvider.overrideWith((ref) async => _discoverTestVenues),
+          guestVenueFeedProvider(
+            const GuestVenueQuery(limit: 12),
+          ).overrideWith((ref) async => _discoverTestFeed),
+          guestVenueFeedProvider(
+            const GuestVenueQuery(limit: 12, query: 'waterfront'),
+          ).overrideWith((ref) async => _discoverSearchFeed),
         ],
         child: const MaterialApp(home: Scaffold(body: DiscoverScreen())),
       ),

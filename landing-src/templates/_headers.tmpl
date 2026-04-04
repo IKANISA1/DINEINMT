@@ -1,0 +1,31 @@
+# ─── Cloudflare Pages Headers for DineIn {{COUNTRY}} Landing ───
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.supabase.co; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'
+
+/.well-known/*
+  Access-Control-Allow-Origin: *
+  Content-Type: application/json
+
+/index.html
+  Cache-Control: no-cache
+
+/index.css
+  Cache-Control: public, max-age=604800
+
+/logo.png
+  Cache-Control: public, max-age=2592000
+
+/app-mockup.png
+  Cache-Control: public, max-age=2592000
+
+/privacy.html
+  Cache-Control: public, max-age=86400
+
+/terms.html
+  Cache-Control: public, max-age=86400

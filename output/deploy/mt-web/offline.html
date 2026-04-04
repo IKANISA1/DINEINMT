@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <meta name="theme-color" content="#111111">
+  <title>DineIn Offline</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --dinein-bg: #111111;
+      --dinein-panel: rgba(255, 255, 255, 0.06);
+      --dinein-border: rgba(255, 255, 255, 0.08);
+      --dinein-text: rgba(255, 255, 255, 0.94);
+      --dinein-muted: rgba(255, 255, 255, 0.64);
+      --dinein-gold: #c8a96b;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(200, 169, 107, 0.16), transparent 34%),
+        linear-gradient(180deg, #191919 0%, #111111 100%);
+      color: var(--dinein-text);
+      font-family: "SF Pro Display", "Segoe UI", sans-serif;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .offline-card {
+      width: min(100%, 420px);
+      padding: 28px;
+      border-radius: 28px;
+      border: 1px solid var(--dinein-border);
+      background: var(--dinein-panel);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+      backdrop-filter: blur(18px);
+      text-align: center;
+    }
+
+    .kicker {
+      margin: 0 0 10px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.34em;
+      color: var(--dinein-muted);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    h1 span:first-child {
+      color: var(--dinein-gold);
+    }
+
+    p {
+      margin: 18px 0 0;
+      color: var(--dinein-muted);
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    button {
+      margin-top: 24px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--dinein-gold);
+      color: #111111;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      padding: 14px 22px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <section class="offline-card">
+    <p class="kicker">PWA OFFLINE MODE</p>
+    <h1><span>DINE</span><span>IN</span></h1>
+    <p>Your connection dropped before the live app could finish loading. Reconnect to keep browsing venues, menus, and saved orders.</p>
+    <button type="button" onclick="window.location.reload()">TRY AGAIN</button>
+  </section>
+</body>
+</html>

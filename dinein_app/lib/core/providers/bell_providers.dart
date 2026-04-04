@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/bell_request.dart';
+import 'package:db_pkg/models/bell_request.dart';
 import '../services/bell_repository.dart';
 
 /// Stream of ALL pending waves for a given venue. Used by venue admin.

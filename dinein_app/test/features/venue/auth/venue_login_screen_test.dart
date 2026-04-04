@@ -1,6 +1,6 @@
-import 'package:dinein_app/core/config/country_config.dart';
-import 'package:dinein_app/core/config/country_runtime.dart';
-import 'package:dinein_app/core/models/models.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/services/whatsapp_otp_service.dart';
 import 'package:dinein_app/features/venue/auth/venue_login_screen.dart';
 import 'package:flutter/material.dart';

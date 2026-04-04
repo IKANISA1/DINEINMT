@@ -1,4 +1,4 @@
-import 'package:dinein_app/core/config/country_config.dart';
+import 'package:core_pkg/config/country_config.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/web_entry_routing.dart';
 import 'package:flutter_test/flutter_test.dart';

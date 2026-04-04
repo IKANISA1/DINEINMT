@@ -1,5 +1,5 @@
-import 'package:dinein_app/core/constants/enums.dart';
-import 'package:dinein_app/core/models/models.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
 
 /// Mock data ported from React constants.ts.
 /// Used as fallback when Supabase is unavailable.

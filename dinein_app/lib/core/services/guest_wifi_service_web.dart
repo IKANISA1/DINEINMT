@@ -1,4 +1,4 @@
-import '../models/models.dart';
+import 'package:db_pkg/models/models.dart';
 
 enum GuestWifiConnectStatus { connected, fallbackRequired, unavailable }
 

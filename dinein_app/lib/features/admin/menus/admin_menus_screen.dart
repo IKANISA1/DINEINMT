@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../../core/constants/enums.dart';
-import '../../../core/models/models.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 import 'admin_menu_item_screen.dart';
 
 enum _MenuAdminTab { catalog, queue }
@@ -627,7 +627,7 @@ class _TabButton extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return Expanded(
-      child: GestureDetector(
+      child: PressableScale(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 240),

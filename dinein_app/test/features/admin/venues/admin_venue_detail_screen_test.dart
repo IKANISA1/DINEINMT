@@ -1,6 +1,6 @@
-import 'package:dinein_app/core/config/country_config.dart';
-import 'package:dinein_app/core/config/country_runtime.dart';
-import 'package:dinein_app/core/models/models.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/features/admin/venues/admin_venue_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

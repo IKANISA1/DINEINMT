@@ -4,14 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../../core/config/country_runtime.dart';
-import '../../../core/models/models.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/services/auth_repository.dart';
-import '../../../core/services/whatsapp_otp_service.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/auth_repository.dart';
+import 'package:dinein_app/core/services/whatsapp_otp_service.dart';
+import 'package:dinein_app/core/infrastructure/support_contact_service.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 class VenueLoginScreen extends StatefulWidget {
   final Future<WhatsAppOtpChallenge> Function(String phone, {String appScope})?
@@ -213,8 +214,11 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
       message: message,
       ctaLabel: 'Contact Admin',
       showWhatsAppBadge: true,
-      whatsAppNumber: CountryRuntime.config.venueAccessWhatsApp,
-      email: CountryRuntime.config.venueAccessEmail,
+      onContactSupport: () => SupportContactService.contactSupport(
+        context,
+        whatsAppNumber: CountryRuntime.config.venueAccessWhatsApp,
+        email: CountryRuntime.config.venueAccessEmail,
+      ),
     );
   }
 

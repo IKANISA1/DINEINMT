@@ -47,3 +47,5 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 /android/.kotlin/
+test_output.txt
+tmp/

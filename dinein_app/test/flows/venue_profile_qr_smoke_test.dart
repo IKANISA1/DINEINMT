@@ -1,4 +1,4 @@
-import 'package:dinein_app/core/models/models.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/features/venue/settings/venue_profile_screen.dart';
 import 'package:dinein_app/features/venue/settings/venue_table_qr_screen.dart';
@@ -44,6 +44,12 @@ void main() {
     expect(find.text('SAVE CHANGES'), findsOneWidget);
     expect(find.text('VENUE NAME'), findsOneWidget);
     expect(find.text('Ocean Pearl'), findsAtLeast(1));
+    await tester.scrollUntilVisible(
+      find.text('REVOLUT LINK'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.text('REVOLUT LINK'), findsOneWidget);
   });
 

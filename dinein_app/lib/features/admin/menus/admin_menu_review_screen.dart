@@ -3,11 +3,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../../core/models/models.dart';
+import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
-import '../../../core/services/menu_repository.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/services/menu_repository.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 class AdminMenuReviewScreen extends ConsumerStatefulWidget {
   final String venueId;

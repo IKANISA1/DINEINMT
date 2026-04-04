@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../../core/constants/enums.dart';
-import '../../../core/models/models.dart';
-import '../../../core/config/country_runtime.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 bool _hasVenueAccessReady(Venue venue) => venue.isAccessReady;
 
@@ -24,6 +24,102 @@ class AdminDashboardScreen extends ConsumerWidget {
 
     final venuesAsync = ref.watch(allVenuesProvider);
     final ordersAsync = ref.watch(allOrdersProvider);
+    final kpiCards = <Widget>[
+      _AdminKpi(
+        label: 'TOTAL VENUES',
+        value: venuesAsync.when(
+          loading: () => '—',
+          error: (_, _) => '—',
+          data: (v) => '${v.length}',
+        ),
+        delta: venuesAsync.when(
+          loading: () => 'Loading...',
+          error: (_, _) => 'Error',
+          data: (v) {
+            final active = v.where((v) => v.isOpen).length;
+            return '$active active';
+          },
+        ),
+        icon: LucideIcons.store,
+        color: cs.primary,
+      ),
+      _AdminKpi(
+        label: 'ORDERS TODAY',
+        value: ordersAsync.when(
+          loading: () => '—',
+          error: (_, _) => '—',
+          data: (orders) {
+            final today = DateTime.now();
+            final todayOrders = orders.where(
+              (o) =>
+                  o.createdAt.day == today.day &&
+                  o.createdAt.month == today.month &&
+                  o.createdAt.year == today.year,
+            );
+            return '${todayOrders.length}';
+          },
+        ),
+        delta: ordersAsync.when(
+          loading: () => 'Loading...',
+          error: (_, _) => 'Error',
+          data: (orders) {
+            final today = DateTime.now();
+            final todayRevenue = orders
+                .where(
+                  (o) =>
+                      o.createdAt.day == today.day &&
+                      o.createdAt.month == today.month &&
+                      o.createdAt.year == today.year,
+                )
+                .fold<double>(0, (sum, o) => sum + o.total);
+            final cs = CountryRuntime.config.country.currencySymbol;
+            return '$cs${todayRevenue.toStringAsFixed(0)} total';
+          },
+        ),
+        icon: LucideIcons.shoppingBag,
+        color: cs.tertiary,
+      ),
+      _AdminKpi(
+        label: 'ACCESS READY',
+        value: venuesAsync.when(
+          loading: () => '—',
+          error: (_, _) => '—',
+          data: (venues) => '${venues.where(_hasVenueAccessReady).length}',
+        ),
+        delta: venuesAsync.when(
+          loading: () => 'Loading...',
+          error: (_, _) => 'Error',
+          data: (venues) {
+            final ready = venues.where(_hasVenueAccessReady).length;
+            final remaining = venues.length - ready;
+            return remaining == 0
+                ? 'All venue access configured'
+                : '$remaining still need setup';
+          },
+        ),
+        icon: LucideIcons.messageCircle,
+        color: AppColors.warning,
+      ),
+      _AdminKpi(
+        label: 'TOTAL ORDERS',
+        value: ordersAsync.when(
+          loading: () => '—',
+          error: (_, _) => '—',
+          data: (o) => '${o.length}',
+        ),
+        delta: ordersAsync.when(
+          loading: () => 'Loading...',
+          error: (_, _) => 'Error',
+          data: (o) {
+            final total = o.fold<double>(0, (sum, o) => sum + o.total);
+            final cs = CountryRuntime.config.country.currencySymbol;
+            return '$cs${total.toStringAsFixed(0)} lifetime';
+          },
+        ),
+        icon: LucideIcons.activity,
+        color: cs.secondary,
+      ),
+    ];
 
     return Scaffold(
       body: CustomScrollView(
@@ -51,114 +147,34 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
 
           // ─── System KPIs ───
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
-            sliver: SliverGrid.count(
-              crossAxisCount: 2,
-              crossAxisSpacing: AppTheme.space4,
-              mainAxisSpacing: AppTheme.space4,
-              childAspectRatio: 1.2,
-              children: [
-                _AdminKpi(
-                  label: 'TOTAL VENUES',
-                  value: venuesAsync.when(
-                    loading: () => '—',
-                    error: (_, _) => '—',
-                    data: (v) => '${v.length}',
-                  ),
-                  delta: venuesAsync.when(
-                    loading: () => 'Loading...',
-                    error: (_, _) => 'Error',
-                    data: (v) {
-                      final active = v.where((v) => v.isOpen).length;
-                      return '$active active';
-                    },
-                  ),
-                  icon: LucideIcons.store,
-                  color: cs.primary,
-                ),
-                _AdminKpi(
-                  label: 'ORDERS TODAY',
-                  value: ordersAsync.when(
-                    loading: () => '—',
-                    error: (_, _) => '—',
-                    data: (orders) {
-                      final today = DateTime.now();
-                      final todayOrders = orders.where(
-                        (o) =>
-                            o.createdAt.day == today.day &&
-                            o.createdAt.month == today.month &&
-                            o.createdAt.year == today.year,
-                      );
-                      return '${todayOrders.length}';
-                    },
-                  ),
-                  delta: ordersAsync.when(
-                    loading: () => 'Loading...',
-                    error: (_, _) => 'Error',
-                    data: (orders) {
-                      final today = DateTime.now();
-                      final todayRevenue = orders
-                          .where(
-                            (o) =>
-                                o.createdAt.day == today.day &&
-                                o.createdAt.month == today.month &&
-                                o.createdAt.year == today.year,
-                          )
-                          .fold<double>(0, (sum, o) => sum + o.total);
-                      final cs = CountryRuntime.config.country.currencySymbol;
-                      return '$cs${todayRevenue.toStringAsFixed(0)} total';
-                    },
-                  ),
-                  icon: LucideIcons.shoppingBag,
-                  color: cs.tertiary,
-                ),
-                _AdminKpi(
-                  label: 'ACCESS READY',
-                  value: venuesAsync.when(
-                    loading: () => '—',
-                    error: (_, _) => '—',
-                    data: (venues) =>
-                        '${venues.where(_hasVenueAccessReady).length}',
-                  ),
-                  delta: venuesAsync.when(
-                    loading: () => 'Loading...',
-                    error: (_, _) => 'Error',
-                    data: (venues) {
-                      final ready = venues.where(_hasVenueAccessReady).length;
-                      final remaining = venues.length - ready;
-                      return remaining == 0
-                          ? 'All venue access configured'
-                          : '$remaining still need setup';
-                    },
-                  ),
-                  icon: LucideIcons.messageCircle,
-                  color: AppColors.warning,
-                ),
-                _AdminKpi(
-                  label: 'TOTAL ORDERS',
-                  value: ordersAsync.when(
-                    loading: () => '—',
-                    error: (_, _) => '—',
-                    data: (o) => '${o.length}',
-                  ),
-                  delta: ordersAsync.when(
-                    loading: () => 'Loading...',
-                    error: (_, _) => 'Error',
-                    data: (o) {
-                      final total = o.fold<double>(
-                        0,
-                        (sum, o) => sum + o.total,
-                      );
-                      final cs = CountryRuntime.config.country.currencySymbol;
-                      return '$cs${total.toStringAsFixed(0)} lifetime';
-                    },
-                  ),
-                  icon: LucideIcons.activity,
-                  color: cs.secondary,
-                ),
-              ],
-            ).animate().fadeIn(duration: 500.ms),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final availableWidth = constraints.maxWidth;
+                  final cardWidth =
+                      availableWidth <= AppTheme.space4
+                          ? availableWidth
+                          : (availableWidth - AppTheme.space4) / 2;
+                  return Wrap(
+                    spacing: AppTheme.space4,
+                    runSpacing: AppTheme.space4,
+                    children:
+                        kpiCards.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final card = entry.value;
+                          return SizedBox(
+                            width: cardWidth,
+                            child: card
+                                .animate(delay: (80 + 80 * index).ms)
+                                .fadeIn(duration: 500.ms),
+                          );
+                        }).toList(),
+                  );
+                },
+              ),
+            ),
           ),
 
           // ─── Venue Access Setup ───

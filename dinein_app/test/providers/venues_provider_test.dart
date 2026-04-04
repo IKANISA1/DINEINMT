@@ -1,9 +1,9 @@
-import 'package:dinein_app/core/models/models.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/services/auth_repository.dart';
-import 'package:dinein_app/core/config/country_config.dart';
-import 'package:dinein_app/core/config/country_runtime.dart';
-import 'package:dinein_app/core/constants/enums.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:core_pkg/constants/enums.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

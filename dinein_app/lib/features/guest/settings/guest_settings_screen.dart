@@ -6,13 +6,13 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/config/country_config.dart';
-import '../../../core/config/country_config_provider.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/services/support_contact_service.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/infrastructure/support_contact_service.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 class GuestSettingsScreen extends ConsumerWidget {
   const GuestSettingsScreen({super.key});

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DINEIN {{COUNTRY}}</title>
+  <meta name="description" content="Open your DINEIN {{COUNTRY}} table QR. Android users can install the app from Google Play.">
+  <style>
+    :root {
+      --bg: #121416;
+      --bg-soft: #1a1c1e;
+      --card: rgba(255, 255, 255, 0.04);
+      --line: rgba(255, 255, 255, 0.08);
+      --gold: #e1c28e;
+      --mint: #a1d494;
+      --text: #e2e2e5;
+      --muted: #b8b0a4;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+      --radius: 28px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "SF Pro Display", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(225, 194, 142, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(161, 212, 148, 0.12), transparent 26%),
+        linear-gradient(180deg, #15181a 0%, var(--bg) 100%);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .shell {
+      width: min(100%, 520px);
+      background: rgba(18, 20, 22, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 36px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+    }
+
+    .hero {
+      padding: 32px 28px 16px;
+      background:
+        linear-gradient(135deg, rgba(225, 194, 142, 0.12), rgba(161, 212, 148, 0.08)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #0c0c0b;
+      flex: 0 0 auto;
+    }
+
+    .brand-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 6vw, 2.7rem);
+      line-height: 0.98;
+      letter-spacing: -0.05em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .content {
+      padding: 24px 28px 28px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .status {
+      display: grid;
+      gap: 10px;
+      padding: 18px 20px;
+      border-radius: var(--radius);
+      background: var(--card);
+      border: 1px solid var(--line);
+    }
+
+    .status strong {
+      font-size: 1rem;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .meta-card {
+      padding: 16px;
+      border-radius: 22px;
+      background: var(--card);
+      border: 1px solid var(--line);
+    }
+
+    .meta-card span {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.2em;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+
+    .meta-card strong {
+      display: block;
+      font-size: 1.4rem;
+      letter-spacing: -0.04em;
+    }
+
+    .buttons {
+      display: grid;
+      gap: 12px;
+    }
+
+    .button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 56px;
+      padding: 14px 18px;
+      border-radius: 22px;
+      border: 1px solid transparent;
+      text-decoration: none;
+      color: #0d120f;
+      background: linear-gradient(135deg, var(--mint), rgba(225, 194, 142, 0.92));
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .button.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.02);
+      border-color: var(--line);
+    }
+
+    .note {
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 520px) {
+      .meta {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="brand">
+        <div class="brand-icon">
+          <img src="../logo.png" alt="DINEIN {{COUNTRY}} logo">
+        </div>
+        <div>
+          <p class="eyebrow">DINEIN {{COUNTRY}}</p>
+          <p id="platform-label">Preparing your table link</p>
+        </div>
+      </div>
+      <h1 id="headline">Preparing your table experience.</h1>
+    </section>
+
+    <section class="content">
+      <div class="status">
+        <strong id="status-title">Redirecting you now...</strong>
+        <p id="status-copy">Android devices go to Google Play. Other devices open the venue page directly for now.</p>
+      </div>
+
+      <div class="meta">
+        <div class="meta-card">
+          <span>Venue</span>
+          <strong id="venue-name">DINEIN Venue</strong>
+        </div>
+        <div class="meta-card">
+          <span>Table</span>
+          <strong id="table-number">Table —</strong>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <a class="button" id="primary-link" href="#">Continue</a>
+        <a class="button secondary" id="target-link" href="#">Already installed? Open venue page</a>
+      </div>
+
+      <p class="note">
+        If the automatic redirect does not happen, use the button above. iOS app distribution can be added later without changing the QR layout.
+      </p>
+    </section>
+  </main>
+
+  <script>
+    const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id={{PLAY_STORE_ID}}';
+
+    const params = new URLSearchParams(window.location.search);
+    const venue = params.get('venue') || params.get('slug') || 'DINEIN Venue';
+    const table = params.get('t');
+    const target = params.get('target') || 'https://{{DOMAIN}}';
+
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const platformLabel = isAndroid ? 'Google Play detected' : 'Web fallback active';
+    const destination = isAndroid ? PLAY_STORE_URL : target;
+    const primaryLabel = isAndroid ? 'Open Google Play' : 'Open Venue Page';
+
+    document.getElementById('platform-label').textContent = platformLabel;
+    document.getElementById('headline').textContent = table
+      ? `Table ${table} is ready in DINEIN {{COUNTRY}}.`
+      : 'Open DINEIN {{COUNTRY}} to continue.';
+    document.getElementById('status-title').textContent = isAndroid
+      ? 'Redirecting you to Google Play...'
+      : 'Opening the venue page...';
+    document.getElementById('status-copy').textContent = isAndroid
+      ? 'Install DINEIN from Google Play to unlock the Android app experience.'
+      : 'Android is launching first. Until iOS is live, this QR opens the venue page directly.';
+
+    document.getElementById('venue-name').textContent = venue;
+    document.getElementById('table-number').textContent = table ? `Table ${table}` : 'Table —';
+
+    const primaryLink = document.getElementById('primary-link');
+    primaryLink.href = destination;
+    primaryLink.textContent = primaryLabel;
+
+    const targetLink = document.getElementById('target-link');
+    targetLink.href = target;
+
+    window.setTimeout(() => {
+      window.location.replace(destination);
+    }, 900);
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import 'package:dinein_app/core/config/country_config.dart';
+import 'package:core_pkg/config/country_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

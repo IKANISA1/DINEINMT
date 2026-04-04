@@ -1,5 +1,5 @@
-import 'package:dinein_app/core/config/country_config.dart';
-import 'package:dinein_app/core/models/models.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';

@@ -3,13 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../../core/models/bell_request.dart';
+import 'package:db_pkg/models/bell_request.dart';
 import '../../../core/providers/bell_providers.dart';
-import '../../../core/services/auth_repository.dart';
-import '../../../core/services/bell_repository.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/services/auth_repository.dart';
+import 'package:dinein_app/core/services/bell_repository.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 class VenueWavesScreen extends ConsumerWidget {
   const VenueWavesScreen({super.key});
@@ -71,7 +71,18 @@ class _WavesBody extends ConsumerWidget {
         ),
       ),
       body: wavesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => Padding(
+          padding: const EdgeInsets.all(AppTheme.space6),
+          child: Column(
+            children: List.generate(
+              4,
+              (_) => const Padding(
+                padding: EdgeInsets.only(bottom: AppTheme.space4),
+                child: SkeletonLoader(width: double.infinity, height: 80),
+              ),
+            ),
+          ),
+        ),
         error: (err, _) => Center(
           child: Text('Error loading waves: $err'),
         ),

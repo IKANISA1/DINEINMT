@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'admin_routes.dart';
-import '../config/country_runtime.dart';
+import 'package:core_pkg/config/country_runtime.dart';
 import '../services/app_bootstrap_service.dart';
 import '../services/auth_repository.dart';
 import 'app_routes.dart';

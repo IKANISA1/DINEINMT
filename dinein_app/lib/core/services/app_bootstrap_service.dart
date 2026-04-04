@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import 'app_notification_service.dart'
+import '../infrastructure/app_notification_service.dart'
     if (dart.library.html) 'app_notification_service_web.dart';
-import 'app_telemetry_service.dart'
+import '../infrastructure/app_telemetry_service.dart'
     if (dart.library.html) 'app_telemetry_service_web.dart';
 import 'auth_repository.dart';
 import 'supabase_config.dart';

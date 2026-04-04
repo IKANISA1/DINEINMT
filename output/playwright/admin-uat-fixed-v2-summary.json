@@ -1,0 +1,53 @@
+[
+  {
+    "name": "rw-fixed-v2",
+    "finalUrl": "https://ad4f3bdf.dinein-rw-pwa.pages.dev/",
+    "send": {
+      "verificationId": "b028f8ee-56fd-4958-adf8-b4870af6debc",
+      "deliveryMethod": "test_override"
+    },
+    "verify": {
+      "verified": true,
+      "verifiedAt": "2026-04-03T17:21:15.760Z"
+    },
+    "consoleLogTail": [
+      "[warning] [.WebGL-0x1240011f200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[debug] Installing/Activating first service worker.",
+      "[warning] Exception while loading service worker: Error: prepareServiceWorker took more than 4000ms to resolve. Moving on.\n    at https://ad4f3bdf.dinein-rw-pwa.pages.dev/flutter_bootstrap.js:1:3698",
+      "[debug] Injecting <script> tag. Using callback.",
+      "[warning] [.WebGL-0x12400c1e000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[warning] [.WebGL-0x12400c1ec00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)",
+      "[debug] Activated new service worker.",
+      "[debug] Loading from existing service worker.",
+      "[debug] Service worker already active.",
+      "[debug] Injecting <script> tag. Using callback."
+    ],
+    "hasTypeError": false,
+    "hasKpiText": false,
+    "bodyTextSample": ""
+  },
+  {
+    "name": "mt-fixed-v2",
+    "finalUrl": "https://4f36e4a4.dinein-mt-pwa.pages.dev/",
+    "send": {
+      "verificationId": "c2eb065b-a70d-4eb5-b7d4-f06be49b50aa",
+      "deliveryMethod": "test_override"
+    },
+    "verify": {
+      "verified": true,
+      "verifiedAt": "2026-04-03T17:22:05.572Z"
+    },
+    "consoleLogTail": [
+      "[debug] Installing/Activating first service worker.",
+      "[warning] Exception while loading service worker: Error: prepareServiceWorker took more than 4000ms to resolve. Moving on.\n    at https://4f36e4a4.dinein-mt-pwa.pages.dev/flutter_bootstrap.js:1:3698",
+      "[debug] Injecting <script> tag. Using callback.",
+      "[debug] Activated new service worker.",
+      "[debug] Loading from existing service worker.",
+      "[debug] Service worker already active.",
+      "[debug] Injecting <script> tag. Using callback."
+    ],
+    "hasTypeError": false,
+    "hasKpiText": false,
+    "bodyTextSample": ""
+  }
+]

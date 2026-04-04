@@ -1,5 +1,5 @@
-import 'package:dinein_app/core/constants/enums.dart';
-import 'package:dinein_app/core/models/models.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/menu_providers.dart';
 import 'package:dinein_app/core/providers/venue_providers.dart';
 import 'package:dinein_app/features/admin/menus/admin_menu_review_screen.dart';

@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/services/auth_repository.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/auth_repository.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 /// Admin settings — matches React admin/Settings.tsx exactly.
 ///
@@ -195,7 +195,8 @@ class AdminSettingsScreen extends StatelessWidget {
                     final item = iEntry.value;
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppTheme.space3),
-                      child:
+                      child: RepaintBoundary(
+                        child:
                           PressableScale(
                                 onTap: () => _showSettingPreview(
                                   context,
@@ -273,6 +274,7 @@ class AdminSettingsScreen extends StatelessWidget {
                               .animate(delay: ((sIdx * 100) + (iIdx * 50)).ms)
                               .fadeIn(duration: 300.ms)
                               .slideY(begin: 0.05, end: 0),
+                      ),
                     );
                   }),
                 ],

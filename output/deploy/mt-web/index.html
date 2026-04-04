@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="DineIn — scan a QR code, browse the menu, and order from your table. No app download required.">
+  <meta name="theme-color" content="#111111">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DineIn">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>DineIn</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      color-scheme: dark;
+      --dinein-bg: #111111;
+      --dinein-panel: rgba(255, 255, 255, 0.06);
+      --dinein-border: rgba(255, 255, 255, 0.08);
+      --dinein-text: rgba(255, 255, 255, 0.94);
+      --dinein-muted: rgba(255, 255, 255, 0.62);
+      --dinein-gold: #c8a96b;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--dinein-bg);
+    }
+
+    body {
+      color: var(--dinein-text);
+      font-family: "SF Pro Display", "Segoe UI", sans-serif;
+    }
+
+    #app-loader {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+      background:
+        radial-gradient(circle at top, rgba(200, 169, 107, 0.18), transparent 34%),
+        linear-gradient(180deg, #191919 0%, #111111 100%);
+      z-index: 9999;
+      transition: opacity 260ms ease, visibility 260ms ease;
+    }
+
+    #app-loader.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loader-shell {
+      width: min(100%, 420px);
+      padding: 28px;
+      border-radius: 28px;
+      border: 1px solid var(--dinein-border);
+      background: var(--dinein-panel);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+      backdrop-filter: blur(18px);
+      text-align: center;
+    }
+
+    .loader-mark {
+      width: 92px;
+      height: 92px;
+      margin: 0 auto 18px;
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+      animation: loaderPulse 1.8s ease-in-out infinite;
+    }
+
+    .loader-mark img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .loader-brand {
+      margin: 0;
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .loader-brand span:first-child {
+      color: var(--dinein-gold);
+    }
+
+    .loader-kicker {
+      margin: 10px 0 0;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.34em;
+      color: var(--dinein-muted);
+    }
+
+    .loader-copy {
+      margin: 18px 0 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--dinein-muted);
+    }
+
+    .loader-bar {
+      height: 4px;
+      margin-top: 24px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .loader-bar::after {
+      content: "";
+      display: block;
+      width: 34%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(200, 169, 107, 0.12), var(--dinein-gold));
+      animation: loaderProgress 1.5s ease-in-out infinite;
+    }
+
+    @keyframes loaderPulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+      }
+      50% {
+        transform: scale(0.98);
+        box-shadow: 0 22px 44px rgba(0, 0, 0, 0.36);
+      }
+    }
+
+    @keyframes loaderProgress {
+      0% {
+        transform: translateX(-130%);
+      }
+      100% {
+        transform: translateX(380%);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app-loader" aria-live="polite">
+    <div class="loader-shell">
+      <div class="loader-mark" aria-hidden="true">
+        <img src="assets/branding/dinein-brand-icon-512.png" alt="" />
+      </div>
+      <p class="loader-brand"><span>DINE</span><span>IN</span></p>
+      <p class="loader-kicker">GUEST EXPERIENCE</p>
+      <p class="loader-copy">
+        Preparing venues, menus, and your saved session.
+      </p>
+      <p class="loader-kicker" id="connection-state" hidden>OFFLINE</p>
+      <p class="loader-kicker" id="install-state" hidden>INSTALL APP</p>
+      <div class="loader-bar" aria-hidden="true"></div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const loader = document.getElementById('app-loader');
+      const connectionState = document.getElementById('connection-state');
+      const installState = document.getElementById('install-state');
+      if (!loader) return;
+
+      let hidden = false;
+      let deferredInstallPrompt = null;
+      const hideLoader = function () {
+        if (hidden) return;
+        hidden = true;
+        loader.classList.add('is-hidden');
+        window.setTimeout(function () {
+          loader.remove();
+        }, 320);
+      };
+
+      const updateConnectionState = function () {
+        const online = navigator.onLine;
+        window.__dineinPwaState = {
+          ...(window.__dineinPwaState || {}),
+          online: online
+        };
+        if (connectionState) {
+          connectionState.hidden = online;
+        }
+        window.dispatchEvent(new CustomEvent('dinein-pwa-connection-change', {
+          detail: { online: online }
+        }));
+      };
+
+      const updateInstallState = function (visible) {
+        window.__dineinPwaState = {
+          ...(window.__dineinPwaState || {}),
+          installAvailable: visible
+        };
+        if (installState) {
+          installState.hidden = !visible;
+        }
+        if (visible) {
+          window.dispatchEvent(new CustomEvent('dinein-pwa-install-available'));
+        }
+      };
+
+      window.addEventListener('flutter-first-frame', hideLoader, { once: true });
+      window.addEventListener('load', function () {
+        updateConnectionState();
+        window.setTimeout(hideLoader, 12000);
+      }, { once: true });
+      window.addEventListener('online', updateConnectionState);
+      window.addEventListener('offline', updateConnectionState);
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        window.__dineinDeferredInstallPrompt = event;
+        updateInstallState(true);
+      });
+      window.addEventListener('appinstalled', function () {
+        deferredInstallPrompt = null;
+        window.__dineinDeferredInstallPrompt = null;
+        updateInstallState(false);
+      });
+      if (installState) {
+        installState.addEventListener('click', function () {
+          if (!deferredInstallPrompt) return;
+          deferredInstallPrompt.prompt();
+        });
+      }
+    })();
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

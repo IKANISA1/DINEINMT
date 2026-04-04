@@ -3,16 +3,22 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../models/models.dart';
-import '../services/app_notification_service.dart'
-    if (dart.library.html) '../services/app_notification_service_web.dart';
+import 'package:db_pkg/models/models.dart';
+import '../services/api_invoker.dart';
+import '../infrastructure/app_notification_service.dart'
+    if (dart.library.html) 'app_notification_service_web.dart';
 import '../services/dinein_api_service.dart';
 import '../services/supabase_config.dart';
 
 /// Repository for authentication via Supabase Auth.
 class AuthRepository {
-  AuthRepository._();
+  final ApiInvoker _invoke;
+
+  AuthRepository._() : _invoke = DineinApiService.invoke;
   static final instance = AuthRepository._();
+
+  /// Test-only constructor that accepts a mock invoker.
+  AuthRepository.forTesting({required ApiInvoker invoker}) : _invoke = invoker;
 
   static const _venueSessionKey = 'dinein.venue_session';
   static const _adminSessionKey = 'dinein.admin_session';
@@ -213,7 +219,7 @@ class AuthRepository {
     String? email,
     String role = 'customer',
   }) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'create_profile',
       payload: {
         'userId': userId,
@@ -226,7 +232,7 @@ class AuthRepository {
 
   /// Get the current user's profile role.
   Future<String?> getUserRole(String userId) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'get_user_role',
       payload: {'userId': userId},
     );

@@ -4,12 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../core/config/country_config.dart';
-import '../../../core/config/country_config_provider.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 /// Venue Legal & Policies — full-page screen.
 ///

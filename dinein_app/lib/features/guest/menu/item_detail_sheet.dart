@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/models/models.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 import 'menu_item_badges.dart';
 
 /// Item detail bottom sheet — shown when tapping a menu item.
@@ -280,7 +280,7 @@ class _StepperButton extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDisabled = onTap == null;
 
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
       child: Container(
         width: 48,

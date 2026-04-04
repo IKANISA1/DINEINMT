@@ -1,7 +1,7 @@
-import 'package:dinein_app/core/config/country_config.dart';
-import 'package:dinein_app/core/config/country_config_provider.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
-import 'package:dinein_app/shared/widgets/role_switch_footer.dart';
+import 'package:ui/widgets/role_switch_footer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

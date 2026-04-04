@@ -1,6 +1,6 @@
-import 'package:dinein_app/core/config/country_config.dart';
-import 'package:dinein_app/core/config/country_config_provider.dart';
-import 'package:dinein_app/core/config/country_runtime.dart';
+import 'package:core_pkg/config/country_config.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:core_pkg/config/country_runtime.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/guest_routes.dart';
 import 'package:dinein_app/features/guest/settings/guest_settings_screen.dart';

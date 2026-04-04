@@ -1,0 +1,27 @@
+{
+  "name": "rw-custom-final",
+  "finalUrl": "https://dineinrwa.ikanisa.com/#/admin/overview",
+  "hasTypeError": true,
+  "consoleLogTail": [
+    "[warning] [.WebGL-0x1040012a200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "[debug] Installing/Activating first service worker.",
+    "[warning] Exception while loading service worker: Error: prepareServiceWorker took more than 4000ms to resolve. Moving on.\n    at https://dineinrwa.ikanisa.com/flutter_bootstrap.js:1:3698",
+    "[debug] Injecting <script> tag. Using callback.",
+    "[warning] [.WebGL-0x10400b77c00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "[debug] Installing/Activating first service worker.",
+    "[warning] Exception while loading service worker: Error: prepareServiceWorker took more than 4000ms to resolve. Moving on.\n    at https://dineinrwa.ikanisa.com/flutter_bootstrap.js:1:3698",
+    "[debug] Injecting <script> tag. Using callback.",
+    "[debug] Activated new service worker.",
+    "[log] TypeError: Instance of 'minified:qb': type 'minified:qb' is not a subtype of type 'minified:at'",
+    "[log] at mK.bEr [as a] (https://dineinrwa.ikanisa.com/main.dart.js:4896:23)",
+    "[log]     at a0t.bp (https://dineinrwa.ikanisa.com/main.dart.js:93913:15)",
+    "[log]     at a0t.cD (https://dineinrwa.ikanisa.com/main.dart.js:91870:33)",
+    "[log]     at a0Y.bp (https://dineinrwa.ikanisa.com/main.dart.js:96014:4)",
+    "[log]     at a0Y.bp (https://dineinrwa.ikanisa.com/main.dart.js:96098:6)",
+    "[log]     at a0Y.cD (https://dineinrwa.ikanisa.com/main.dart.js:91870:33)",
+    "[log]     at q3.C1 (https://dineinrwa.ikanisa.com/main.dart.js:96698:3)",
+    "[log]     at q3.MS (https://dineinrwa.ikanisa.com/main.dart.js:96977:10)",
+    "[log]     at q3.bp (https://dineinrwa.ikanisa.com/main.dart.js:96938:5)",
+    "[log]     at q3.cD (https://dineinrwa.ikanisa.com/main.dart.js:91870:33)"
+  ]
+}

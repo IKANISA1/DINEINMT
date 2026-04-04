@@ -1,12 +1,23 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/assert@1": "1.0.19",
+    "jsr:@std/internal@^1.0.12": "1.0.12",
     "jsr:@supabase/functions-js@*": "2.99.1",
     "npm:@supabase/supabase-js@2": "2.99.1",
     "npm:google-auth-library@9": "9.15.1",
     "npm:openai@^4.52.5": "4.104.0"
   },
   "jsr": {
+    "@std/assert@1.0.19": {
+      "integrity": "eaada96ee120cb980bc47e040f82814d786fe8162ecc53c91d8df60b8755991e",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/internal@1.0.12": {
+      "integrity": "972a634fd5bc34b242024402972cd5143eac68d8dffaca5eaa4dba30ce17b027"
+    },
     "@supabase/functions-js@2.99.1": {
       "integrity": "6ef232d016e3fa13d3f58991295e02d42b5f2a4c3d283f406fcdd67d3f80b2a0",
       "dependencies": [

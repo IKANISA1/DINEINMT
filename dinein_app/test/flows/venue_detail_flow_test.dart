@@ -1,6 +1,6 @@
-import 'package:dinein_app/core/models/models.dart';
+import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
-import 'package:dinein_app/core/services/guest_wifi_service.dart';
+import 'package:dinein_app/core/infrastructure/guest_wifi_service.dart';
 import 'package:dinein_app/features/guest/venue_detail/venue_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

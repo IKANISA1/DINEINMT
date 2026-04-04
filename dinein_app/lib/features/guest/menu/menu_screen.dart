@@ -6,14 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/models/models.dart';
-import '../../../core/providers/providers.dart';
-import '../../../core/providers/cart_provider.dart';
-import '../../../core/services/app_telemetry.dart';
-import '../../../core/theme/motion_preferences.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/providers/providers.dart';
+import 'package:dinein_app/core/providers/cart_provider.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
+import 'package:ui/theme/motion_preferences.dart';
+import 'package:ui/widgets/shared_widgets.dart';
+import 'package:dinein_app/features/guest/widgets/wave_bottom_sheet.dart';
 import 'menu_item_badges.dart';
 
 /// Menu screen with sticky category tabs and add-to-cart interactions.

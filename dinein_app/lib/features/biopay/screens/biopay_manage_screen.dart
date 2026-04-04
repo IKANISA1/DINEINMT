@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 import '../biopay_providers.dart';
 import '../biopay_strings.dart';
 import '../models/biopay_models.dart';
@@ -79,7 +79,18 @@ class _BiopayManageScreenState extends ConsumerState<BiopayManageScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Manage BioPay')),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Padding(
+              padding: const EdgeInsets.all(AppTheme.space6),
+              child: Column(
+                children: const [
+                  SkeletonLoader(width: double.infinity, height: 200),
+                  SizedBox(height: AppTheme.space4),
+                  SkeletonLoader(width: double.infinity, height: 60),
+                  SizedBox(height: AppTheme.space4),
+                  SkeletonLoader(width: double.infinity, height: 60),
+                ],
+              ),
+            )
           : _error != null
           ? _buildError(cs, tt)
           : _buildProfile(cs, tt),

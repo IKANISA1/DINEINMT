@@ -1,4 +1,4 @@
-import 'package:dinein_app/core/constants/enums.dart';
+import 'package:core_pkg/constants/enums.dart';
 import '../fixtures/mock_data.dart';
 import 'package:dinein_app/core/providers/cart_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

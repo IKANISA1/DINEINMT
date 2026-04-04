@@ -6,16 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../../core/models/guest_venue_feed.dart';
-import '../../../core/models/models.dart';
-import '../../../core/providers/providers.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/services/app_telemetry.dart';
-import '../../../core/services/discovery_location_service.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/theme/motion_preferences.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:db_pkg/models/guest_venue_feed.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/providers/providers.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
+import 'package:dinein_app/core/services/discovery_location_service.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/theme/motion_preferences.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 const _baseVenueFilters = ['All', 'Open Now', 'Ordering'];
 
@@ -631,10 +631,12 @@ class _VenuesBody extends StatelessWidget {
                   onTap: () => onOpenVenue(venue),
                 );
                 if (!shouldAnimateVenues) return card;
-                return card
+                return RepaintBoundary(
+                  child: card
                     .animate(delay: (50 * index).ms)
                     .fadeIn(duration: 350.ms)
-                    .slideY(begin: 0.08, end: 0);
+                    .slideY(begin: 0.08, end: 0),
+                );
               }, childCount: venues.length),
             ),
           )
@@ -657,10 +659,12 @@ class _VenuesBody extends StatelessWidget {
                 );
                 if (!shouldAnimateVenues) return card;
 
-                return card
+                return RepaintBoundary(
+                  child: card
                     .animate(delay: (50 * index).ms)
                     .fadeIn(duration: 350.ms)
-                    .slideY(begin: 0.08, end: 0);
+                    .slideY(begin: 0.08, end: 0),
+                );
               },
             ),
           ),

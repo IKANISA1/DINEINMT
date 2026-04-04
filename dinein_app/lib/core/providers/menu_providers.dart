@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/models.dart';
+import 'package:db_pkg/models/models.dart';
 import '../services/menu_repository.dart';
 
 /// Menu items for a given venue.

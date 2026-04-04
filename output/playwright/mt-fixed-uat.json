@@ -1,0 +1,34 @@
+{
+  "name": "mt-fixed",
+  "finalUrl": "https://dineinmta.ikanisa.com/#/admin/overview",
+  "send": {
+    "verificationId": "5e3dae23-04c7-4edb-b965-dd251d562c0a",
+    "deliveryMethod": "test_override"
+  },
+  "verify": {
+    "verified": true,
+    "verifiedAt": "2026-04-03T17:06:40.821Z"
+  },
+  "consoleLogTail": [
+    "[debug] Installing/Activating first service worker.",
+    "[warning] Exception while loading service worker: Error: prepareServiceWorker took more than 4000ms to resolve. Moving on.\n    at https://dineinmta.ikanisa.com/flutter_bootstrap.js:1:3698",
+    "[debug] Injecting <script> tag. Using callback.",
+    "[debug] Activated new service worker.",
+    "[debug] Loading from existing service worker.",
+    "[debug] Service worker already active.",
+    "[debug] Injecting <script> tag. Using callback.",
+    "[log] TypeError: Instance of 'minified:qa': type 'minified:qa' is not a subtype of type 'minified:at'",
+    "[log] at mJ.bEs [as a] (https://dineinmta.ikanisa.com/main.dart.js:4896:23)",
+    "[log]     at a0t.bp (https://dineinmta.ikanisa.com/main.dart.js:93896:15)",
+    "[log]     at a0t.cD (https://dineinmta.ikanisa.com/main.dart.js:91853:33)",
+    "[log]     at a0Y.bp (https://dineinmta.ikanisa.com/main.dart.js:95997:4)",
+    "[log]     at a0Y.bp (https://dineinmta.ikanisa.com/main.dart.js:96081:6)",
+    "[log]     at a0Y.cD (https://dineinmta.ikanisa.com/main.dart.js:91853:33)",
+    "[log]     at q2.C1 (https://dineinmta.ikanisa.com/main.dart.js:96681:3)",
+    "[log]     at q2.MS (https://dineinmta.ikanisa.com/main.dart.js:96960:10)",
+    "[log]     at q2.bp (https://dineinmta.ikanisa.com/main.dart.js:96921:5)",
+    "[log]     at q2.cD (https://dineinmta.ikanisa.com/main.dart.js:91853:33)"
+  ],
+  "hasTypeError": true,
+  "hasKpiText": false
+}

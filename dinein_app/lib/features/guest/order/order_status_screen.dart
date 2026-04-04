@@ -3,12 +3,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/constants/enums.dart';
-import '../../../core/providers/providers.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_colors.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:dinein_app/core/providers/providers.dart';
+import 'package:ui/widgets/shared_widgets.dart';
+import 'package:dinein_app/features/guest/widgets/wave_bottom_sheet.dart';
 
 /// Order status tracking screen with step indicator.
 /// Uses [orderByIdProvider] for initial data + [orderStreamProvider] for real-time updates.
@@ -350,7 +351,8 @@ class _StepIndicator extends StatelessWidget {
                     if (isActive)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child:
+                        child: RepaintBoundary(
+                          child:
                             Text(
                                   'IN PROGRESS',
                                   style: TextStyle(
@@ -364,6 +366,7 @@ class _StepIndicator extends StatelessWidget {
                                 .fadeIn(duration: 1000.ms)
                                 .then()
                                 .fade(begin: 1, end: 0.4, duration: 1000.ms),
+                        ),
                       ),
                   ],
                 ),

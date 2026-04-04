@@ -7,14 +7,14 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/config/country_config_provider.dart';
-import '../../../core/constants/app_download_links.dart';
-import '../../../core/constants/enums.dart';
-import '../../../core/models/models.dart';
+import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:core_pkg/constants/app_download_links.dart';
+import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
-import '../../../core/router/app_routes.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/shared_widgets.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 class AdminVenuesScreen extends ConsumerStatefulWidget {
   const AdminVenuesScreen({super.key});
@@ -384,7 +384,7 @@ class _TabButton extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return Expanded(
-      child: GestureDetector(
+      child: PressableScale(
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),

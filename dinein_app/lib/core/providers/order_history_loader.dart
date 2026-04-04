@@ -1,4 +1,4 @@
-import '../models/models.dart';
+import 'package:db_pkg/models/models.dart';
 
 typedef FetchOrdersForUser = Future<List<Order>> Function(String userId);
 typedef FetchTrackedOrderIds = Future<List<String>> Function();

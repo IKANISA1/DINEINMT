@@ -3,15 +3,21 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/models.dart';
+import 'package:db_pkg/models/models.dart';
+import 'api_invoker.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 import 'menu_image_generation_service.dart';
 
 /// Repository for menu item data access via Supabase.
 class MenuRepository {
-  MenuRepository._();
+  final ApiInvoker _invoke;
+
+  MenuRepository._() : _invoke = DineinApiService.invoke;
   static final instance = MenuRepository._();
+
+  /// Test-only constructor that accepts a mock invoker.
+  MenuRepository.forTesting({required ApiInvoker invoker}) : _invoke = invoker;
 
   static const _localMenuPrefix = 'dinein.local_menu.';
 
@@ -33,7 +39,7 @@ class MenuRepository {
     bool useAdminSession = false,
   }) async {
     final data =
-        await DineinApiService.invoke(
+        await _invoke(
               'get_menu_items',
               useAdminSession: useAdminSession,
               payload: {'venueId': venueId},
@@ -54,7 +60,7 @@ class MenuRepository {
     String itemId, {
     bool useAdminSession = false,
   }) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'get_menu_item_by_id',
       useAdminSession: useAdminSession,
       payload: {'itemId': itemId},
@@ -66,7 +72,7 @@ class MenuRepository {
   /// Fetch the admin menu review queue across all venues.
   Future<List<AdminMenuQueueEntry>> getAdminMenuQueue() async {
     final data =
-        await DineinApiService.invoke(
+        await _invoke(
               'get_admin_menu_queue',
               useAdminSession: true,
             )
@@ -82,7 +88,7 @@ class MenuRepository {
 
   Future<List<AdminMenuCatalogEntry>> getAdminMenuCatalog() async {
     final data =
-        await DineinApiService.invoke(
+        await _invoke(
               'get_admin_menu_catalog',
               useAdminSession: true,
             )
@@ -100,7 +106,7 @@ class MenuRepository {
     String groupId,
   ) async {
     final data =
-        await DineinApiService.invoke(
+        await _invoke(
               'get_admin_menu_group_assignments',
               useAdminSession: true,
               payload: {'groupId': groupId},
@@ -120,7 +126,7 @@ class MenuRepository {
     List<String> venueIds = const [],
     bool assignAll = false,
   }) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'create_admin_menu_groups',
       useAdminSession: true,
       payload: {'items': items, 'venueIds': venueIds, 'assignAll': assignAll},
@@ -132,7 +138,7 @@ class MenuRepository {
     List<String> venueIds = const [],
     bool assignAll = false,
   }) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'assign_admin_menu_group',
       useAdminSession: true,
       payload: {
@@ -144,7 +150,7 @@ class MenuRepository {
   }
 
   Future<void> deleteAdminMenuGroup(String groupId) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'delete_admin_menu_group',
       useAdminSession: true,
       payload: {'groupId': groupId},
@@ -159,7 +165,7 @@ class MenuRepository {
 
   /// Toggle availability of a menu item.
   Future<void> toggleAvailability(String itemId, bool isAvailable) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'toggle_menu_item_availability',
       payload: {
         'itemId': itemId,
@@ -175,7 +181,7 @@ class MenuRepository {
 
   /// Create a new menu item.
   Future<MenuItem> createMenuItem(MenuItem item) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'create_menu_item',
       payload: {'item': item.toJson(), ..._venueSessionPayload()},
     );
@@ -193,7 +199,7 @@ class MenuRepository {
     Map<String, dynamic> updates, {
     bool useAdminSession = false,
   }) async {
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'update_menu_item',
       useAdminSession: useAdminSession,
       payload: {
@@ -221,7 +227,7 @@ class MenuRepository {
       if (normalizedIds.length == 3) break;
     }
 
-    final data = await DineinApiService.invoke(
+    final data = await _invoke(
       'set_menu_item_highlights',
       payload: {
         'venueId': venueId,
@@ -238,7 +244,7 @@ class MenuRepository {
 
   /// Delete a menu item.
   Future<void> deleteMenuItem(String itemId) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'delete_menu_item',
       payload: {'itemId': itemId, ..._venueSessionPayload()},
     );
@@ -278,7 +284,7 @@ class MenuRepository {
     bool imageLocked, {
     bool useAdminSession = false,
   }) async {
-    await DineinApiService.invoke(
+    await _invoke(
       'update_menu_item',
       useAdminSession: useAdminSession,
       payload: {

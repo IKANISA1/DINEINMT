@@ -1,4 +1,4 @@
-import 'package:dinein_app/shared/widgets/permission_access_dialog.dart';
+import 'package:ui/widgets/permission_access_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

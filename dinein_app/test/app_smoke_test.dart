@@ -1,9 +1,9 @@
-import 'package:dinein_app/core/config/country_config.dart';
+import 'package:core_pkg/config/country_config.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/main.dart';
-import 'package:dinein_app/shared/widgets/brand_mark.dart';
+import 'package:ui/widgets/brand_mark.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

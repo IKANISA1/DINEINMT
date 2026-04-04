@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
-import '../config/country_runtime.dart';
+import 'package:core_pkg/config/country_runtime.dart';
 import '../../features/biopay/biopay_route_surface_native.dart'
     if (dart.library.html) '../../features/biopay/biopay_route_surface_web.dart';
 import '../../features/guest/cart/cart_screen.dart';
