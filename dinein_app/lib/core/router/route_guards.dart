@@ -33,6 +33,7 @@ String? venueAuthGuard(BuildContext context, GoRouterState state) {
 ///
 /// Checks custom admin session first (expiry-aware), then falls back to
 /// Supabase auth + role lookup for initial login flow.
+/// Preserves the intended URL as `returnTo` so login can resume it.
 Future<String?> adminRoleGuard(
   BuildContext context,
   GoRouterState state,
@@ -40,24 +41,31 @@ Future<String?> adminRoleGuard(
   // Fast path: valid non-expired admin session.
   if (AuthRepository.instance.hasAdminAccess) return null;
 
+  String adminLoginRedirect() {
+    return Uri(
+      path: AppRoutePaths.adminLogin,
+      queryParameters: {AppRouteParams.returnTo: state.uri.toString()},
+    ).toString();
+  }
+
   // Expired admin session — clear it and redirect.
   final adminSession = AuthRepository.instance.currentAdminSession;
   if (adminSession == null) {
     // Check if this is a fresh login via Supabase auth with admin role.
     if (!AuthRepository.instance.isAuthenticated) {
-      return AppRoutePaths.adminLogin;
+      return adminLoginRedirect();
     }
 
     final user = AuthRepository.instance.currentUser;
-    if (user == null) return AppRoutePaths.adminLogin;
+    if (user == null) return adminLoginRedirect();
 
     final role = await AuthRepository.instance.getUserRole(user.id);
-    if (role != 'admin') return AppRoutePaths.adminLogin;
+    if (role != 'admin') return adminLoginRedirect();
 
     return null;
   }
 
   // Session object exists but is expired (hasAdminAccess returned false).
   await AuthRepository.instance.clearAdminSession();
-  return AppRoutePaths.adminLogin;
+  return adminLoginRedirect();
 }

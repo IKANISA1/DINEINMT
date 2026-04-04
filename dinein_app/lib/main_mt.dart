@@ -70,14 +70,16 @@ class DineInApp extends StatelessWidget {
       routerConfig: appRouter,
       builder: (context, child) =>
           GuestLocationPermissionHost(child: child ?? const SizedBox.shrink()),
-      scrollBehavior: const _NoScrollbarBehavior(),
+      scrollBehavior: const _DineInScrollBehavior(),
     );
   }
 }
 
-/// Custom scroll behavior that suppresses scrollbars for full-screen surfaces.
-class _NoScrollbarBehavior extends ScrollBehavior {
-  const _NoScrollbarBehavior();
+/// Platform-aware scroll behavior:
+/// - Mobile (iOS/Android): suppress platform scrollbars for a native-like feel.
+/// - Desktop/Web: preserve visible scroll affordance for discoverability.
+class _DineInScrollBehavior extends ScrollBehavior {
+  const _DineInScrollBehavior();
 
   @override
   Widget buildScrollbar(
@@ -85,7 +87,11 @@ class _NoScrollbarBehavior extends ScrollBehavior {
     Widget child,
     ScrollableDetails details,
   ) {
-    return child;
+    final platform = Theme.of(context).platform;
+    if (platform == TargetPlatform.iOS || platform == TargetPlatform.android) {
+      return child;
+    }
+    return super.buildScrollbar(context, child, details);
   }
 }
 

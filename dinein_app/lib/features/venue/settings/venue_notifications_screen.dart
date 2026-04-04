@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -233,20 +234,24 @@ class _VenueNotificationsScreenState
               ),
               const SizedBox(height: AppTheme.space3),
 
-              // ─── New Order Push ───
+              // ─── New Order Push (disabled on web — backend only supports mobile) ───
               _ToggleTile(
                     icon: LucideIcons.smartphone,
                     iconColor: cs.primary,
                     title: 'New Order Push',
-                    subtitle: 'INSTANT MOBILE NOTIFICATIONS',
-                    value: _orderPush,
-                    onChanged: canEditToggles
-                        ? (v) => _persistSettings(
-                            venue.id,
-                            orderPushEnabled: v,
-                            whatsAppUpdatesEnabled: _whatsAppUpdates,
-                          )
-                        : null,
+                    subtitle: kIsWeb
+                        ? 'AVAILABLE ON MOBILE APP ONLY'
+                        : 'INSTANT MOBILE NOTIFICATIONS',
+                    value: kIsWeb ? false : _orderPush,
+                    onChanged: kIsWeb
+                        ? null
+                        : canEditToggles
+                            ? (v) => _persistSettings(
+                                venue.id,
+                                orderPushEnabled: v,
+                                whatsAppUpdatesEnabled: _whatsAppUpdates,
+                              )
+                            : null,
                   )
                   .animate()
                   .fadeIn(duration: 300.ms)

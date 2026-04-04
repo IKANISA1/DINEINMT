@@ -100,3 +100,28 @@ jobs:
           deno test --allow-all _shared/venue-profile-image_test.ts
           deno test --allow-all _shared/gemini-image-config_test.ts
           deno test --allow-all dinein-api/security_test.ts
+
+  shared-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Analyze and test packages/core
+        run: |
+          cd packages/core
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Analyze packages/ui
+        run: |
+          cd packages/ui
+          flutter pub get
+          flutter analyze

@@ -136,6 +136,20 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
     }
   }
 
+  /// Resolve the admin route to navigate to after successful login.
+  /// Mirrors [VenueLoginScreen._postLoginTarget].
+  String? _postLoginTarget(BuildContext context) {
+    final raw = GoRouterState.of(
+      context,
+    ).uri.queryParameters[AppRouteParams.returnTo];
+    if (raw == null || raw.trim().isEmpty) return null;
+
+    final target = Uri.tryParse(raw);
+    if (target == null || !target.path.startsWith('/admin')) return null;
+    if (target.path == AppRoutePaths.adminLogin) return null;
+    return target.toString();
+  }
+
   bool _requiresSupportContact(Object error) {
     final raw = error.toString().toLowerCase();
     return raw.contains('not registered for admin');
@@ -260,7 +274,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       await AuthRepository.instance.saveAdminSession(adminSession);
 
       if (!mounted) return;
-      context.goNamed(AppRouteNames.adminOverview);
+      context.go(_postLoginTarget(context) ?? AppRoutePaths.adminOverview);
     } catch (error) {
       if (!mounted) return;
       if (_requiresSupportContact(error)) {

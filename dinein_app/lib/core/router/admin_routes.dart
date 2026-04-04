@@ -21,9 +21,19 @@ final List<RouteBase> adminRoutes = [
   GoRoute(
     path: AppRoutePaths.adminLogin,
     name: AppRouteNames.adminLogin,
-    redirect: (context, state) => AuthRepository.instance.hasAdminAccess
-        ? AppRoutePaths.adminOverview
-        : null,
+    redirect: (context, state) {
+      if (!AuthRepository.instance.hasAdminAccess) return null;
+      final returnTo = state.uri.queryParameters[AppRouteParams.returnTo];
+      if (returnTo != null && returnTo.trim().isNotEmpty) {
+        final target = Uri.tryParse(returnTo);
+        if (target != null &&
+            target.path.startsWith('/admin') &&
+            target.path != AppRoutePaths.adminLogin) {
+          return target.toString();
+        }
+      }
+      return AppRoutePaths.adminOverview;
+    },
     builder: (context, state) => const AdminLoginScreen(),
   ),
   // Redirect /admin → /admin/overview

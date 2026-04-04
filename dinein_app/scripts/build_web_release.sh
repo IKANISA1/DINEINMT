@@ -152,7 +152,18 @@ if [[ ! -f "${build_output}/offline.html" ]]; then
   exit 1
 fi
 
-echo "✅ Verified startup loader, headers, manifest, and offline fallback"
+# ── Service worker hygiene ──────────────────────────────────────────────────
+if [[ ! -f "${build_output}/flutter_service_worker.js" ]]; then
+  echo "⛔ flutter_service_worker.js is missing from build output." >&2
+  exit 1
+fi
+
+if grep -q 'dinein-sw.js' "${build_output}/index.html"; then
+  echo "⛔ index.html still references dinein-sw.js (removed)." >&2
+  exit 1
+fi
+
+echo "✅ Verified startup loader, headers, manifest, offline fallback, and single service worker"
 
 echo ""
 echo "═══════════════════════════════════════════════════════"

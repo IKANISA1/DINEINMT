@@ -256,16 +256,6 @@
       }
     })();
   </script>
-  <script>
-    // Register custom DineIn service worker for offline support + asset caching
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/dinein-sw.js').catch(function () {
-          // SW registration failed — app remains functional without it
-        });
-      });
-    }
-  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
