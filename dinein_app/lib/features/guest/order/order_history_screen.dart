@@ -210,6 +210,7 @@ class _EmptyOrderHistoryState extends StatelessWidget {
             const SizedBox(height: AppTheme.space8),
             PressableScale(
               onTap: () => context.goNamed(AppRouteNames.discover),
+              semanticLabel: 'Discover venues',
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppTheme.space8,
@@ -270,6 +271,7 @@ class _OrderHistoryCard extends StatelessWidget {
 
     return PressableScale(
       onTap: onTap,
+      semanticLabel: 'View order ${order.displayNumber}',
       child: Container(
         padding: const EdgeInsets.all(AppTheme.space5),
         decoration: BoxDecoration(
@@ -290,6 +292,7 @@ class _OrderHistoryCard extends StatelessWidget {
                   imageUrl: order.venueImageUrl,
                   fit: BoxFit.cover,
                   fallbackIcon: LucideIcons.store,
+                  semanticLabel: '${order.venueName} photo',
                 ),
               ),
             ),

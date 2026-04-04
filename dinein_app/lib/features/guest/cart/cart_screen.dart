@@ -17,6 +17,7 @@ import 'package:dinein_app/core/providers/cart_provider.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/services/app_telemetry.dart';
 import 'package:dinein_app/core/services/order_repository.dart';
+import 'package:dinein_app/core/services/pwa_install_service.dart';
 import 'package:dinein_app/core/services/venue_repository.dart';
 import 'package:ui/widgets/pressable_scale.dart';
 
@@ -206,6 +207,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
       cartNotifier.clear();
 
+      // G-21: Trigger PWA install prompt after successful order
+      PwaInstallService.triggerIfEligible(reason: 'order_placed');
+
       if (mounted) {
         ref.invalidate(userOrdersProvider);
         context.goNamed(
@@ -343,6 +347,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               Row(
                 children: [
                   PressableScale(
+                    semanticLabel: 'Go back',
                     onTap: () {
                       _syncDraftFields(clearError: false);
                       Navigator.of(context).pop();
@@ -536,6 +541,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
               // ─── Add More Items CTA ───
               PressableScale(
+                semanticLabel: 'Add more items',
                 onTap: () {
                   _syncDraftFields(clearError: false);
                   Navigator.of(context).pop();
@@ -800,6 +806,7 @@ class _CartItemCard extends StatelessWidget {
                     ),
                     PressableScale(
                       onTap: onRemove,
+                      semanticLabel: 'Remove ${item.name}',
                       minTouchTargetSize: const Size(44, 44),
                       child: Container(
                         width: 40,
@@ -854,6 +861,7 @@ class _CartItemCard extends StatelessWidget {
                         children: [
                           PressableScale(
                             onTap: () => onUpdateQty(item.quantity - 1),
+                            semanticLabel: 'Decrease quantity',
                             minTouchTargetSize: const Size(44, 44),
                             child: Padding(
                               padding: const EdgeInsets.all(4),
@@ -876,6 +884,7 @@ class _CartItemCard extends StatelessWidget {
                           ),
                           PressableScale(
                             onTap: () => onUpdateQty(item.quantity + 1),
+                            semanticLabel: 'Increase quantity',
                             minTouchTargetSize: const Size(44, 44),
                             child: Padding(
                               padding: const EdgeInsets.all(4),

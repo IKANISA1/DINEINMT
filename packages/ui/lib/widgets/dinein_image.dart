@@ -25,6 +25,9 @@ class DineInImage extends StatelessWidget {
   final Alignment gradientBegin;
   final Alignment gradientEnd;
 
+  /// Accessibility label for screen readers (alt text).
+  final String? semanticLabel;
+
   const DineInImage({
     super.key,
     this.imageUrl,
@@ -36,6 +39,7 @@ class DineInImage extends StatelessWidget {
     this.fallbackIcon = LucideIcons.utensils,
     this.gradientBegin = Alignment.bottomCenter,
     this.gradientEnd = Alignment.topCenter,
+    this.semanticLabel,
   });
 
   @override
@@ -112,6 +116,15 @@ class DineInImage extends StatelessWidget {
               ),
           ],
         ),
+      );
+    }
+
+    if (semanticLabel != null) {
+      child = Semantics(
+        image: true,
+        label: semanticLabel,
+        excludeSemantics: true,
+        child: child,
       );
     }
 

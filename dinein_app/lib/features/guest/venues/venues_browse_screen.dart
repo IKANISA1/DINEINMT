@@ -449,6 +449,7 @@ class _VenuesBody extends StatelessWidget {
                     const SizedBox(width: AppTheme.space4),
                     PressableScale(
                       onTap: requestingLocation ? null : onUseMyLocation,
+                      semanticLabel: 'Use my location',
                       child: Container(
                         width: 56,
                         height: 56,
@@ -540,6 +541,7 @@ class _VenuesBody extends StatelessWidget {
                 final isSelected = selectedCategories.contains(category);
                 return PressableScale(
                   onTap: () => onCategorySelected(category),
+                  semanticLabel: 'Filter by $category',
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
@@ -726,6 +728,7 @@ class _VenueCard extends StatelessWidget {
 
     return PressableScale(
       onTap: onTap,
+      semanticLabel: 'View ${venue.name}',
       child: Column(
         children: [
           AspectRatio(
@@ -969,6 +972,7 @@ class _EmptyVenuesState extends StatelessWidget {
             const SizedBox(height: AppTheme.space8),
             PressableScale(
               onTap: onResetFilters,
+              semanticLabel: 'Reset filters',
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppTheme.space8,

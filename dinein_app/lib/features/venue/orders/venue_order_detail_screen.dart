@@ -267,6 +267,70 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppTheme.space5),
 
+                // ─── Special Requests (if any) ───
+                if (order.specialRequests != null &&
+                    order.specialRequests!.trim().isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppTheme.space4),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                      border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusSm,
+                            ),
+                          ),
+                          child: Icon(
+                            LucideIcons.messageSquare,
+                            size: 16,
+                            color: AppColors.warning,
+                          ),
+                        ),
+                        const SizedBox(width: AppTheme.space3),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'SPECIAL REQUESTS',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 2,
+                                  color: AppColors.warning,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                order.specialRequests!.trim(),
+                                style: tt.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FontStyle.italic,
+                                  color: cs.onSurface,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.space5),
+                ],
+
                 // ─── Summary Section ───
                 Container(
                   padding: const EdgeInsets.all(AppTheme.space5),

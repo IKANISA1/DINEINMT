@@ -37,4 +37,18 @@ void main() {
       expect(request.body['venue_session'], {'access_token': 'venue-token'});
     },
   );
+
+  test(
+    'buildInvocation throws DineinApiException when admin session is missing',
+    () {
+      expect(
+        () => DineinApiService.buildInvocation(
+          'get_all_venues',
+          useAdminSession: true,
+          adminAccessToken: null,
+        ),
+        throwsA(isA<DineinApiException>()),
+      );
+    },
+  );
 }

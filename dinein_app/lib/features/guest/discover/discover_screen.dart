@@ -490,6 +490,7 @@ class _DiscoverHero extends StatelessWidget {
             child: DineInImage(
               imageUrl: _discoverHeroImageUrl,
               fit: BoxFit.cover,
+              semanticLabel: 'Discover dining hero banner',
             ),
           ),
           Positioned.fill(
@@ -571,6 +572,7 @@ class _DiscoverHero extends StatelessWidget {
                           if (query.isNotEmpty)
                             PressableScale(
                               onTap: onClear,
+                              semanticLabel: 'Clear search',
                               minTouchTargetSize: const Size(44, 44),
                               child: Icon(
                                 LucideIcons.x,
@@ -584,6 +586,7 @@ class _DiscoverHero extends StatelessWidget {
                     const SizedBox(height: AppTheme.space4),
                     PressableScale(
                       onTap: requestingLocation ? null : onUseMyLocation,
+                      semanticLabel: 'Use my location',
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -673,6 +676,7 @@ class _SectionHeader extends StatelessWidget {
           if (actionLabel != null && onTap != null)
             PressableScale(
               onTap: onTap,
+              semanticLabel: '$actionLabel action',
               minTouchTargetSize: const Size(96, 44),
               child: Row(
                 children: [
@@ -714,6 +718,7 @@ class _FeaturedVenueCard extends StatelessWidget {
 
     return PressableScale(
       onTap: onTap,
+      semanticLabel: 'View ${venue.name}',
       child: SizedBox(
         width: 288,
         child: Container(
@@ -726,7 +731,7 @@ class _FeaturedVenueCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              DineInImage(imageUrl: venue.imageUrl, fit: BoxFit.cover),
+              DineInImage(imageUrl: venue.imageUrl, fit: BoxFit.cover, semanticLabel: '${venue.name} photo'),
               Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -815,6 +820,7 @@ class _NearbyVenueCard extends StatelessWidget {
 
     return PressableScale(
       onTap: onTap,
+      semanticLabel: 'View ${venue.name}',
       child: Container(
         padding: const EdgeInsets.all(AppTheme.space6),
         decoration: BoxDecoration(
@@ -833,6 +839,7 @@ class _NearbyVenueCard extends StatelessWidget {
                 child: DineInImage(
                   imageUrl: venue.imageUrl,
                   fit: BoxFit.cover,
+                  semanticLabel: '${venue.name} photo',
                   fallbackIcon: LucideIcons.store,
                 ),
               ),
@@ -977,6 +984,7 @@ class _DiscoverCta extends StatelessWidget {
           const SizedBox(height: AppTheme.space6),
           PressableScale(
             onTap: onTap,
+            semanticLabel: 'Browse all venues',
             child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: AppTheme.space8,

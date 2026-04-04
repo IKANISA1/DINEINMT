@@ -24,6 +24,9 @@ class ClayCard extends StatefulWidget {
   final bool elevated;
   final bool accentGradient;
 
+  /// Accessibility label for screen readers when tappable.
+  final String? semanticLabel;
+
   const ClayCard({
     super.key,
     required this.child,
@@ -32,6 +35,7 @@ class ClayCard extends StatefulWidget {
     this.onTap,
     this.elevated = false,
     this.accentGradient = false,
+    this.semanticLabel,
   });
 
   @override
@@ -78,7 +82,11 @@ class _ClayCardState extends State<ClayCard> {
         onTapDown: (_) => setState(() => _isPressed = true),
         onTapUp: (_) => setState(() => _isPressed = false),
         onTapCancel: () => setState(() => _isPressed = false),
-        child: PressableScale(onTap: widget.onTap, child: container),
+        child: PressableScale(
+          onTap: widget.onTap,
+          semanticLabel: widget.semanticLabel,
+          child: container,
+        ),
       );
     }
 

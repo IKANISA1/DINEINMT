@@ -282,6 +282,7 @@ class _StepperButton extends StatelessWidget {
 
     return PressableScale(
       onTap: onTap,
+      semanticLabel: 'Item action',
       child: Container(
         width: 48,
         height: 48,

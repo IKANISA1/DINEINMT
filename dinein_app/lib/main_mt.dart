@@ -8,6 +8,7 @@ import 'package:core_pkg/config/country_config.dart';
 import 'package:core_pkg/config/country_config_provider.dart';
 import 'package:core_pkg/config/country_runtime.dart';
 import 'package:dinein_app/core/services/app_bootstrap_service.dart';
+import 'package:dinein_app/core/services/pwa_install_service.dart';
 import 'features/guest/permissions/guest_location_permission_host.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:dinein_app/core/router/app_router.dart';
@@ -39,6 +40,9 @@ Future<void> _boot(CountryConfig config) async {
     ErrorWidget.builder = (details) => const ProductionErrorWidget();
   }
   // ────────────────────────────────────────────────────────────────────────
+
+  // PWA install prompt — engagement timer starts here (web-only, no-op on mobile)
+  PwaInstallService.init();
 
   unawaited(AppBootstrapService.instance.ensureStarted());
 

@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_layout.dart';
+import 'package:core_pkg/constants/enums.dart';
 import '../../core/providers/providers.dart';
 import '../../core/providers/bell_providers.dart';
 import 'package:ui/widgets/shared_widgets.dart';
@@ -42,6 +43,7 @@ class VenueShell extends ConsumerWidget {
     final venueImageUrl = venueAsync.value?.imageUrl;
 
     if (venueId != null) {
+      // ─── New bell request alerts ───
       ref.listen(pendingWavesProvider(venueId), (previous, next) {
         if (next.hasValue && next.value != null && previous?.value != null) {
           if (next.value!.length > previous!.value!.length) {
@@ -56,6 +58,64 @@ class VenueShell extends ConsumerWidget {
                   behavior: SnackBarBehavior.floating,
                 ),
               );
+            }
+          }
+        }
+      });
+
+      // ─── New order alerts (G-19) ───
+      ref.listen(venueOrdersProvider(venueId), (previous, next) {
+        if (next.hasValue && next.value != null && previous?.value != null) {
+          final prevPlaced = previous!.value!
+              .where((o) => o.status == OrderStatus.placed)
+              .length;
+          final nextPlaced = next.value!
+              .where((o) => o.status == OrderStatus.placed)
+              .length;
+          if (nextPlaced > prevPlaced) {
+            // New order arrived — haptic + vibrate + visual alert
+            HapticFeedback.heavyImpact();
+            if (context.mounted) {
+              final latestOrder = next.value!
+                  .where((o) => o.status == OrderStatus.placed)
+                  .toList()
+                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              final newest = latestOrder.firstOrNull;
+              final tableInfo = newest?.tableNumber != null
+                  ? ' • Table ${newest!.tableNumber}'
+                  : '';
+              ScaffoldMessenger.of(context)
+                ..clearSnackBars()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        Icon(
+                          LucideIcons.shoppingBag,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSecondary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '🧾 New order received$tableInfo',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                    backgroundColor: AppColors.secondary,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 5),
+                    action: SnackBarAction(
+                      label: 'VIEW',
+                      textColor:
+                          Theme.of(context).colorScheme.onSecondary,
+                      onPressed: () =>
+                          context.goNamed(AppRouteNames.venueOrders),
+                    ),
+                  ),
+                );
             }
           }
         }

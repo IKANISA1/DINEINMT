@@ -73,9 +73,22 @@ class BellRepository {
     String venueId, {
     WaveStatus? status,
   }) async* {
-    yield await getBellRequests(venueId, status: status);
+    var lastGood = <BellRequest>[];
+    try {
+      lastGood = await getBellRequests(venueId, status: status);
+    } catch (_) {
+      // Yield empty on first fetch failure — UI will show empty state.
+    }
+    yield lastGood;
     yield* Stream<List<BellRequest>>.periodic(
       _pollInterval,
-    ).asyncMap((_) => getBellRequests(venueId, status: status));
+    ).asyncMap((_) async {
+      try {
+        lastGood = await getBellRequests(venueId, status: status);
+      } catch (_) {
+        // On transient failure, return last successful result.
+      }
+      return lastGood;
+    });
   }
 }

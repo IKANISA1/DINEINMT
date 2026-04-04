@@ -336,6 +336,7 @@ class _SettingsTile extends StatelessWidget {
 
     return PressableScale(
       onTap: onTap,
+      semanticLabel: title,
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: AppTheme.space5,

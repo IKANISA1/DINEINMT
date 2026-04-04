@@ -1,8 +1,26 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_repository.dart';
 import 'package:core_pkg/config/country_runtime.dart';
 import 'supabase_config.dart';
+
+/// User-friendly exception thrown by [DineinApiService].
+///
+/// Carries a short [message] safe to display in UI, plus the original [cause]
+/// for logging/Crashlytics.
+class DineinApiException implements Exception {
+  final String message;
+  final String action;
+  final Object? cause;
+
+  const DineinApiException(this.message, {required this.action, this.cause});
+
+  @override
+  String toString() => 'DineinApiException($action): $message';
+}
 
 class DineinApiInvocation {
   final Map<String, String> headers;
@@ -33,7 +51,10 @@ class DineinApiService {
 
     if (useAdminSession) {
       if (adminAccessToken == null || adminAccessToken.isEmpty) {
-        throw Exception('Admin session required');
+        throw DineinApiException(
+          'Admin session expired. Please sign in again.',
+          action: action,
+        );
       }
       headers['Authorization'] = 'Bearer $adminAccessToken';
       return DineinApiInvocation(headers: headers, body: bodyPayload);
@@ -71,22 +92,55 @@ class DineinApiService {
           AuthRepository.instance.currentAdminSession?.accessToken,
     );
 
-    final response = await SupabaseConfig.client.functions.invoke(
-      'dinein-api',
-      headers: request.headers.isEmpty ? null : request.headers,
-      body: request.body,
-    );
+    try {
+      final response = await SupabaseConfig.client.functions.invoke(
+        'dinein-api',
+        headers: request.headers.isEmpty ? null : request.headers,
+        body: request.body,
+      );
 
-    final raw = response.data;
-    if (raw is Map<String, dynamic>) {
-      if (raw['error'] case final Object error) {
-        throw Exception(error.toString());
+      final raw = response.data;
+      if (raw is Map<String, dynamic>) {
+        if (raw['error'] case final Object error) {
+          throw DineinApiException(
+            error.toString(),
+            action: action,
+            cause: raw,
+          );
+        }
+        if (raw.containsKey('data')) {
+          return raw['data'];
+        }
       }
-      if (raw.containsKey('data')) {
-        return raw['data'];
-      }
+
+      return raw;
+    } on DineinApiException {
+      rethrow;
+    } on SocketException catch (e) {
+      throw DineinApiException(
+        'No internet connection. Please check your network and try again.',
+        action: action,
+        cause: e,
+      );
+    } on AuthException catch (e) {
+      throw DineinApiException(
+        'Your session has expired. Please sign in again.',
+        action: action,
+        cause: e,
+      );
+    } on FunctionException catch (e) {
+      throw DineinApiException(
+        'Service temporarily unavailable. Please try again shortly.',
+        action: action,
+        cause: e,
+      );
+    } catch (e) {
+      // FormatException, TypeError, TimeoutException, etc.
+      throw DineinApiException(
+        'Something went wrong. Please try again.',
+        action: action,
+        cause: e,
+      );
     }
-
-    return raw;
   }
 }

@@ -220,6 +220,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                             imageUrl: item.imageUrl,
                             fit: BoxFit.cover,
                             fallbackIcon: LucideIcons.chefHat,
+                            semanticLabel: '${item.name} photo',
                           ),
                           // Gradient overlay
                           Positioned.fill(
@@ -483,6 +484,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                                               ? () =>
                                                     setState(() => _quantity--)
                                               : null,
+                                          semanticLabel: 'Decrease quantity',
                                           child: Container(
                                             width: 40,
                                             height: 40,
@@ -520,6 +522,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                                         PressableScale(
                                           onTap: () =>
                                               setState(() => _quantity++),
+                                          semanticLabel: 'Increase quantity',
                                           child: Container(
                                             width: 40,
                                             height: 40,
@@ -582,6 +585,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                         _FloatingControl(
                           icon: LucideIcons.chevronLeft,
                           onTap: () => context.pop(),
+                          semanticLabel: 'Go back',
                         ),
                         Row(
                           children: [
@@ -589,6 +593,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                             _FloatingControl(
                               icon: LucideIcons.share2,
                               onTap: () => _shareItem(item),
+                              semanticLabel: 'Share item',
                             ),
                             const SizedBox(width: 12),
                             // Heart
@@ -598,6 +603,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                                   : LucideIcons.heartOff,
                               iconColor: _isSaved ? AppColors.primary : null,
                               onTap: () => _toggleSavedItem(item),
+                              semanticLabel: _isSaved ? 'Remove from saved' : 'Save item',
                             ),
                           ],
                         ),
@@ -690,17 +696,20 @@ class _FloatingControl extends StatelessWidget {
   final IconData icon;
   final Color? iconColor;
   final VoidCallback onTap;
+  final String semanticLabel;
 
   const _FloatingControl({
     required this.icon,
     this.iconColor,
     required this.onTap,
+    required this.semanticLabel,
   });
 
   @override
   Widget build(BuildContext context) {
     return PressableScale(
       onTap: onTap,
+      semanticLabel: semanticLabel,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: BackdropFilter(

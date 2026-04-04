@@ -439,6 +439,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                           if (_query.isNotEmpty)
                             PressableScale(
                               onTap: _clearSearch,
+                              semanticLabel: 'Clear search',
                               minTouchTargetSize: const Size(44, 44),
                               child: Icon(
                                 LucideIcons.x,
@@ -741,6 +742,7 @@ class _MenuItemCard extends StatelessWidget {
 
     return PressableScale(
       onTap: onTap,
+      semanticLabel: 'View ${item.name}',
       child: Container(
         padding: const EdgeInsets.all(AppTheme.space5),
         decoration: BoxDecoration(
@@ -764,6 +766,7 @@ class _MenuItemCard extends StatelessWidget {
                       height: 96,
                       fit: BoxFit.cover,
                       fallbackIcon: LucideIcons.chefHat,
+                      semanticLabel: '${item.name} photo',
                     ),
                   ),
                 ),
@@ -886,6 +889,7 @@ class _QuantityStepper extends StatelessWidget {
     if (quantity == 0) {
       return PressableScale(
         onTap: onAdd,
+        semanticLabel: 'Add to cart',
         minTouchTargetSize: const Size(44, 44),
         child: Container(
           width: 40,
@@ -909,6 +913,7 @@ class _QuantityStepper extends StatelessWidget {
         children: [
           PressableScale(
             onTap: onRemove,
+            semanticLabel: 'Remove one',
             minTouchTargetSize: const Size(44, 44),
             child: Container(
               width: 36,
@@ -932,6 +937,7 @@ class _QuantityStepper extends StatelessWidget {
           ),
           PressableScale(
             onTap: onAdd,
+            semanticLabel: 'Add one more',
             minTouchTargetSize: const Size(44, 44),
             child: Container(
               width: 36,

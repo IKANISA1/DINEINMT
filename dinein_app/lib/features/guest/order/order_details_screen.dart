@@ -99,6 +99,7 @@ class OrderDetailsScreen extends ConsumerWidget {
                 children: [
                   PressableScale(
                     onTap: () => context.pop(),
+                    semanticLabel: 'Go back',
                     child: Container(
                       width: 56,
                       height: 56,

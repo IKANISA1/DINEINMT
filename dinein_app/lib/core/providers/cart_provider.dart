@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core_pkg/config/country_runtime.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:core_pkg/constants/enums.dart';
+import 'package:dinein_app/core/services/pwa_install_service.dart';
 
 /// Represents one item in the cart.
 class CartItem {
@@ -169,6 +170,11 @@ class CartNotifier extends Notifier<CartState> {
           CartItem(menuItemId: item.id, name: item.name, price: item.price),
         ],
       );
+    }
+
+    // G-21: Trigger PWA install prompt when 2+ items are in cart
+    if (state.items.length >= 2) {
+      PwaInstallService.triggerIfEligible(reason: 'cart_2_items');
     }
   }
 
