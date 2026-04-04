@@ -6,16 +6,40 @@ import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_layout.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
+import 'package:dinein_app/shared/widgets/shell_scroll_chrome.dart';
 
 /// Admin portal shell — matches React AdminLayout.tsx exactly.
 ///
 /// Top bar: ShieldCheck logo (primary) + "DineIn HQ" + "Admin Console" label + bell + avatar
 /// Bottom nav: 5 tabs with primary-bg pill + indicator dot
 /// Both bars use BackdropFilter glass blur.
-class AdminShell extends StatelessWidget {
+class AdminShell extends StatefulWidget {
   final Widget child;
 
   const AdminShell({super.key, required this.child});
+
+  @override
+  State<AdminShell> createState() => _AdminShellState();
+}
+
+class _AdminShellState extends State<AdminShell> {
+  bool _topBarVisible = true;
+  String? _lastLocation;
+
+  void _setTopBarVisible(bool visible) {
+    if (!mounted || _topBarVisible == visible) return;
+    setState(() => _topBarVisible = visible);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final location = GoRouterState.of(context).uri.toString();
+    if (_lastLocation != location) {
+      _lastLocation = location;
+      _topBarVisible = true;
+    }
+  }
 
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
@@ -36,7 +60,9 @@ class AdminShell extends StatelessWidget {
           return _WideAdminShell(
             currentIndex: index,
             screenWidth: constraints.maxWidth,
-            child: child,
+            topBarVisible: _topBarVisible,
+            onTopBarVisibilityChanged: _setTopBarVisible,
+            child: widget.child,
           );
         }
 
@@ -48,13 +74,29 @@ class AdminShell extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  const _AdminTopBar(),
-                  Expanded(child: child),
+                  CollapsibleShellBar(
+                    visible: _topBarVisible,
+                    child: const _AdminTopBar(),
+                  ),
+                  Expanded(
+                    child: ShellScrollNotificationHost(
+                      onTopBarVisibilityChanged: _setTopBarVisible,
+                      child: widget.child,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-          bottomNavigationBar: _AdminBottomNav(currentIndex: index),
+          bottomNavigationBar: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.space4,
+              0,
+              AppTheme.space4,
+              AppTheme.space4,
+            ),
+            child: _AdminBottomNav(currentIndex: index),
+          ),
         );
       },
     );
@@ -65,11 +107,15 @@ class _WideAdminShell extends StatelessWidget {
   final Widget child;
   final int currentIndex;
   final double screenWidth;
+  final bool topBarVisible;
+  final ValueChanged<bool> onTopBarVisibilityChanged;
 
   const _WideAdminShell({
     required this.child,
     required this.currentIndex,
     required this.screenWidth,
+    required this.topBarVisible,
+    required this.onTopBarVisibilityChanged,
   });
 
   @override
@@ -164,8 +210,16 @@ class _WideAdminShell extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    const _AdminTopBar(),
-                    Expanded(child: child),
+                    CollapsibleShellBar(
+                      visible: topBarVisible,
+                      child: const _AdminTopBar(),
+                    ),
+                    Expanded(
+                      child: ShellScrollNotificationHost(
+                        onTopBarVisibilityChanged: onTopBarVisibilityChanged,
+                        child: child,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -289,95 +343,102 @@ class _AdminBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(AppTheme.radiusXxl);
 
-    return AdaptiveGlassSurface(
-      decoration: BoxDecoration(
-        color: cs.surface.withValues(alpha: 0.60),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+    return ClipRRect(
+      borderRadius: radius,
+      child: AdaptiveGlassSurface(
+        decoration: BoxDecoration(
+          color: cs.surface.withValues(alpha: 0.60),
+          borderRadius: radius,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTheme.space4,
-            vertical: AppTheme.space4,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_adminNavItems.length, (i) {
-              final item = _adminNavItems[i];
-              final isActive = currentIndex == i;
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.space4,
+              vertical: AppTheme.space4,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(_adminNavItems.length, (i) {
+                final item = _adminNavItems[i];
+                final isActive = currentIndex == i;
 
-              return PressableScale(
-                onTap: () => context.goNamed(item.routeName),
-                semanticLabel: 'Open ${item.label}',
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Icon pill — active gets primary bg + shadow
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeOutCubic,
-                      width: 56,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: isActive ? cs.primary : Colors.transparent,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: isActive ? AppTheme.clayShadow : [],
-                      ),
-                      child: Center(
-                        child: AnimatedScale(
-                          scale: isActive ? 1.1 : 1.0,
-                          duration: const Duration(milliseconds: 300),
-                          child: Icon(
-                            item.icon,
-                            size: 20,
-                            color: isActive
-                                ? cs.onPrimary
-                                : cs.onSurface.withValues(alpha: 0.40),
+                return PressableScale(
+                  onTap: () => context.goNamed(item.routeName),
+                  semanticLabel: 'Open ${item.label}',
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        width: 56,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: isActive ? cs.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: isActive ? AppTheme.clayShadow : [],
+                        ),
+                        child: Center(
+                          child: AnimatedScale(
+                            scale: isActive ? 1.1 : 1.0,
+                            duration: const Duration(milliseconds: 300),
+                            child: Icon(
+                              item.icon,
+                              size: 20,
+                              color: isActive
+                                  ? cs.onPrimary
+                                  : cs.onSurface.withValues(alpha: 0.40),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    // Label: 9px font-black uppercase
-                    AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 300),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.5,
-                        color: isActive
-                            ? cs.primary
-                            : cs.onSurface.withValues(alpha: 0.20),
+                      const SizedBox(height: 6),
+                      AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 300),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                          color: isActive
+                              ? cs.primary
+                              : cs.onSurface.withValues(alpha: 0.20),
+                        ),
+                        child: Text(item.label.toUpperCase()),
                       ),
-                      child: Text(item.label.toUpperCase()),
-                    ),
-                    const SizedBox(height: 4),
-                    // ─── Indicator dot ───
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOutCubic,
-                      width: isActive ? 6 : 0,
-                      height: isActive ? 6 : 0,
-                      decoration: BoxDecoration(
-                        color: cs.primary,
-                        shape: BoxShape.circle,
-                        boxShadow: isActive
-                            ? [
-                                BoxShadow(
-                                  color: cs.primary.withValues(alpha: 0.80),
-                                  blurRadius: 8,
-                                ),
-                              ]
-                            : [],
+                      const SizedBox(height: 4),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
+                        width: isActive ? 6 : 0,
+                        height: isActive ? 6 : 0,
+                        decoration: BoxDecoration(
+                          color: cs.primary,
+                          shape: BoxShape.circle,
+                          boxShadow: isActive
+                              ? [
+                                  BoxShadow(
+                                    color: cs.primary.withValues(alpha: 0.80),
+                                    blurRadius: 8,
+                                  ),
+                                ]
+                              : [],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+                    ],
+                  ),
+                );
+              }),
+            ),
           ),
         ),
       ),

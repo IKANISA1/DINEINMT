@@ -11,11 +11,35 @@ import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_layout.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
+import 'package:dinein_app/shared/widgets/shell_scroll_chrome.dart';
 
-class GuestShell extends ConsumerWidget {
+class GuestShell extends ConsumerStatefulWidget {
   final Widget child;
 
   const GuestShell({super.key, required this.child});
+
+  @override
+  ConsumerState<GuestShell> createState() => _GuestShellState();
+}
+
+class _GuestShellState extends ConsumerState<GuestShell> {
+  bool _topBarVisible = true;
+  String? _lastLocation;
+
+  void _setTopBarVisible(bool visible) {
+    if (!mounted || _topBarVisible == visible) return;
+    setState(() => _topBarVisible = visible);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final location = GoRouterState.of(context).uri.toString();
+    if (_lastLocation != location) {
+      _lastLocation = location;
+      _topBarVisible = true;
+    }
+  }
 
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
@@ -35,7 +59,7 @@ class GuestShell extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final index = _currentIndex(context);
 
     return LayoutBuilder(
@@ -44,7 +68,9 @@ class GuestShell extends ConsumerWidget {
           return _WideGuestShell(
             currentIndex: index,
             screenWidth: constraints.maxWidth,
-            child: child,
+            topBarVisible: _topBarVisible,
+            onTopBarVisibilityChanged: _setTopBarVisible,
+            child: widget.child,
           );
         }
 
@@ -56,13 +82,29 @@ class GuestShell extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  const _TopAppBar(),
-                  Expanded(child: child),
+                  CollapsibleShellBar(
+                    visible: _topBarVisible,
+                    child: const _TopAppBar(),
+                  ),
+                  Expanded(
+                    child: ShellScrollNotificationHost(
+                      onTopBarVisibilityChanged: _setTopBarVisible,
+                      child: widget.child,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-          bottomNavigationBar: _BottomNav(currentIndex: index),
+          bottomNavigationBar: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.space4,
+              0,
+              AppTheme.space4,
+              AppTheme.space4,
+            ),
+            child: _BottomNav(currentIndex: index),
+          ),
         );
       },
     );
@@ -73,11 +115,15 @@ class _WideGuestShell extends StatelessWidget {
   final Widget child;
   final int currentIndex;
   final double screenWidth;
+  final bool topBarVisible;
+  final ValueChanged<bool> onTopBarVisibilityChanged;
 
   const _WideGuestShell({
     required this.child,
     required this.currentIndex,
     required this.screenWidth,
+    required this.topBarVisible,
+    required this.onTopBarVisibilityChanged,
   });
 
   @override
@@ -162,8 +208,16 @@ class _WideGuestShell extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    const _TopAppBar(),
-                    Expanded(child: child),
+                    CollapsibleShellBar(
+                      visible: topBarVisible,
+                      child: const _TopAppBar(),
+                    ),
+                    Expanded(
+                      child: ShellScrollNotificationHost(
+                        onTopBarVisibilityChanged: onTopBarVisibilityChanged,
+                        child: child,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -293,84 +347,96 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(AppTheme.radiusXxl);
 
-    return AdaptiveGlassSurface(
-      decoration: BoxDecoration(
-        color: cs.surface.withValues(alpha: 0.92),
-        border: Border(top: BorderSide(color: AppColors.white5)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTheme.space6,
-            vertical: AppTheme.space3,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(_guestNavItems.length, (index) {
-              final item = _guestNavItems[index];
-              final isActive = currentIndex == index;
+    return ClipRRect(
+      borderRadius: radius,
+      child: AdaptiveGlassSurface(
+        decoration: BoxDecoration(
+          color: cs.surface.withValues(alpha: 0.92),
+          borderRadius: radius,
+          border: Border.all(color: AppColors.white5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.space6,
+              vertical: AppTheme.space3,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(_guestNavItems.length, (index) {
+                final item = _guestNavItems[index];
+                final isActive = currentIndex == index;
 
-              return Expanded(
-                child: PressableScale(
-                  onTap: () => context.goNamed(item.routeName),
-                  semanticLabel: 'Open ${item.label}',
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOutCubic,
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: isActive ? cs.primary : Colors.transparent,
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusLg,
+                return Expanded(
+                  child: PressableScale(
+                    onTap: () => context.goNamed(item.routeName),
+                    semanticLabel: 'Open ${item.label}',
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOutCubic,
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: isActive ? cs.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusLg,
+                            ),
+                            boxShadow: isActive
+                                ? [
+                                    BoxShadow(
+                                      color: cs.primary.withValues(alpha: 0.28),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ]
+                                : null,
                           ),
-                          boxShadow: isActive
-                              ? [
-                                  BoxShadow(
-                                    color: cs.primary.withValues(alpha: 0.28),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Transform.translate(
-                          offset: Offset(0, isActive ? -1 : 0),
-                          child: Icon(
-                            item.icon,
-                            size: 24,
-                            color: isActive
-                                ? cs.onPrimary
-                                : cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      AnimatedOpacity(
-                        duration: const Duration(milliseconds: 250),
-                        opacity: isActive ? 1 : 0.55,
-                        child: Text(
-                          item.label.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.8,
-                            color: isActive
-                                ? cs.onSurface
-                                : cs.onSurfaceVariant,
+                          child: Transform.translate(
+                            offset: Offset(0, isActive ? -1 : 0),
+                            child: Icon(
+                              item.icon,
+                              size: 24,
+                              color: isActive
+                                  ? cs.onPrimary
+                                  : cs.onSurfaceVariant,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 250),
+                          opacity: isActive ? 1 : 0.55,
+                          child: Text(
+                            item.label.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.8,
+                              color: isActive
+                                  ? cs.onSurface
+                                  : cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
       ),

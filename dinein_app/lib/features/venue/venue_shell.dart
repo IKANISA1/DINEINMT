@@ -5,11 +5,13 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_layout.dart';
+import 'package:ui/theme/app_theme.dart';
 import 'package:core_pkg/constants/enums.dart';
 import '../../core/providers/providers.dart';
 import '../../core/providers/bell_providers.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 import 'package:flutter/services.dart';
+import 'package:dinein_app/shared/widgets/shell_scroll_chrome.dart';
 import 'shared/bell_requests_sheet.dart';
 
 /// Venue portal shell — matches React VenueLayout.tsx exactly.
@@ -17,10 +19,33 @@ import 'shared/bell_requests_sheet.dart';
 /// Top bar: V badge (secondary) + venue name + "VENUE MANAGER" label + bell + avatar
 /// Bottom nav: 4 tabs with secondary-colored active pill + shadow + lift
 /// Both bars use BackdropFilter glass blur.
-class VenueShell extends ConsumerWidget {
+class VenueShell extends ConsumerStatefulWidget {
   final Widget child;
 
   const VenueShell({super.key, required this.child});
+
+  @override
+  ConsumerState<VenueShell> createState() => _VenueShellState();
+}
+
+class _VenueShellState extends ConsumerState<VenueShell> {
+  bool _topBarVisible = true;
+  String? _lastLocation;
+
+  void _setTopBarVisible(bool visible) {
+    if (!mounted || _topBarVisible == visible) return;
+    setState(() => _topBarVisible = visible);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final location = GoRouterState.of(context).uri.toString();
+    if (_lastLocation != location) {
+      _lastLocation = location;
+      _topBarVisible = true;
+    }
+  }
 
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
@@ -35,7 +60,7 @@ class VenueShell extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final index = _currentIndex(context);
     final venueAsync = ref.watch(currentVenueProvider);
     final venueId = venueAsync.value?.id;
@@ -76,10 +101,11 @@ class VenueShell extends ConsumerWidget {
             // New order arrived — haptic + vibrate + visual alert
             HapticFeedback.heavyImpact();
             if (context.mounted) {
-              final latestOrder = next.value!
-                  .where((o) => o.status == OrderStatus.placed)
-                  .toList()
-                ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+              final latestOrder =
+                  next.value!
+                      .where((o) => o.status == OrderStatus.placed)
+                      .toList()
+                    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
               final newest = latestOrder.firstOrNull;
               final tableInfo = newest?.tableNumber != null
                   ? ' • Table ${newest!.tableNumber}'
@@ -109,8 +135,7 @@ class VenueShell extends ConsumerWidget {
                     duration: const Duration(seconds: 5),
                     action: SnackBarAction(
                       label: 'VIEW',
-                      textColor:
-                          Theme.of(context).colorScheme.onSecondary,
+                      textColor: Theme.of(context).colorScheme.onSecondary,
                       onPressed: () =>
                           context.goNamed(AppRouteNames.venueOrders),
                     ),
@@ -131,7 +156,9 @@ class VenueShell extends ConsumerWidget {
             venueId: venueId,
             avatarUrl: venueImageUrl,
             screenWidth: constraints.maxWidth,
-            child: child,
+            topBarVisible: _topBarVisible,
+            onTopBarVisibilityChanged: _setTopBarVisible,
+            child: widget.child,
           );
         }
 
@@ -143,17 +170,28 @@ class VenueShell extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  _VenueTopBar(
-                    venueName: venueName,
-                    avatarUrl: venueImageUrl,
-                    venueId: venueId,
+                  CollapsibleShellBar(
+                    visible: _topBarVisible,
+                    child: _VenueTopBar(
+                      venueName: venueName,
+                      avatarUrl: venueImageUrl,
+                      venueId: venueId,
+                    ),
                   ),
-                  Expanded(child: child),
+                  Expanded(
+                    child: ShellScrollNotificationHost(
+                      onTopBarVisibilityChanged: _setTopBarVisible,
+                      child: widget.child,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-          bottomNavigationBar: _VenueBottomNav(currentIndex: index),
+          bottomNavigationBar: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: _VenueBottomNav(currentIndex: index),
+          ),
         );
       },
     );
@@ -167,6 +205,8 @@ class _WideVenueShell extends StatelessWidget {
   final String? avatarUrl;
   final String? venueId;
   final double screenWidth;
+  final bool topBarVisible;
+  final ValueChanged<bool> onTopBarVisibilityChanged;
 
   const _WideVenueShell({
     required this.child,
@@ -175,6 +215,8 @@ class _WideVenueShell extends StatelessWidget {
     required this.avatarUrl,
     required this.venueId,
     required this.screenWidth,
+    required this.topBarVisible,
+    required this.onTopBarVisibilityChanged,
   });
 
   @override
@@ -278,12 +320,20 @@ class _WideVenueShell extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _VenueTopBar(
-                      venueName: venueName,
-                      avatarUrl: avatarUrl,
-                      venueId: venueId,
+                    CollapsibleShellBar(
+                      visible: topBarVisible,
+                      child: _VenueTopBar(
+                        venueName: venueName,
+                        avatarUrl: avatarUrl,
+                        venueId: venueId,
+                      ),
                     ),
-                    Expanded(child: child),
+                    Expanded(
+                      child: ShellScrollNotificationHost(
+                        onTopBarVisibilityChanged: onTopBarVisibilityChanged,
+                        child: child,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -536,85 +586,95 @@ class _VenueBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(AppTheme.radiusXxl);
 
-    return AdaptiveGlassSurface(
-      decoration: BoxDecoration(
-        color: cs.surface.withValues(alpha: 0.60),
-        border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+    return ClipRRect(
+      borderRadius: radius,
+      child: AdaptiveGlassSurface(
+        decoration: BoxDecoration(
+          color: cs.surface.withValues(alpha: 0.60),
+          borderRadius: radius,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(_venueNavItems.length, (i) {
-              final item = _venueNavItems[i];
-              final isActive = currentIndex == i;
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(_venueNavItems.length, (i) {
+                final item = _venueNavItems[i];
+                final isActive = currentIndex == i;
 
-              return PressableScale(
-                onTap: () => context.goNamed(item.routeName),
-                semanticLabel: 'Open ${item.label}',
-                child: SizedBox(
-                  width: 56,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Icon pill — active gets secondary bg + shadow + lift
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.all(8),
-                        transform: Matrix4.translationValues(
-                          0,
-                          isActive ? -2 : 0,
-                          0,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isActive
-                              ? AppColors.secondary
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: isActive
-                              ? [
-                                  BoxShadow(
-                                    color: AppColors.secondary.withValues(
-                                      alpha: 0.20,
-                                    ),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ]
-                              : [],
-                        ),
-                        child: Icon(
-                          item.icon,
-                          size: 20,
-                          color: isActive ? Colors.white : cs.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Label: 8px font-black uppercase
-                      AnimatedOpacity(
-                        duration: const Duration(milliseconds: 300),
-                        opacity: isActive ? 1.0 : 0.4,
-                        child: Text(
-                          item.label.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
-                            color: cs.onSurface,
+                return PressableScale(
+                  onTap: () => context.goNamed(item.routeName),
+                  semanticLabel: 'Open ${item.label}',
+                  child: SizedBox(
+                    width: 56,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.all(8),
+                          transform: Matrix4.translationValues(
+                            0,
+                            isActive ? -2 : 0,
+                            0,
                           ),
-                          textAlign: TextAlign.center,
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? AppColors.secondary
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: isActive
+                                ? [
+                                    BoxShadow(
+                                      color: AppColors.secondary.withValues(
+                                        alpha: 0.20,
+                                      ),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: Icon(
+                            item.icon,
+                            size: 20,
+                            color: isActive
+                                ? Colors.white
+                                : cs.onSurfaceVariant,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 300),
+                          opacity: isActive ? 1.0 : 0.4,
+                          child: Text(
+                            item.label.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.2,
+                              color: cs.onSurface,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
       ),
