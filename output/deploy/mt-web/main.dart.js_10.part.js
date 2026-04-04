@@ -1,0 +1,21 @@
+((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B={bfS:function bfS(){}}
+A=c[0]
+B=a.updateHolder(c[27],B)
+var z=a.updateTypes([])
+B.bfS.prototype={
+$1(d){return this.aga(d)},
+aga(d){var x=0,w=A.p(y.d),v
+var $async$$1=A.l(function(e,f){if(e===1)return A.m(f,w)
+for(;;)switch(x){case 0:x=3
+return A.f($.pL().E7(),$async$$1)
+case 3:v=f
+x=1
+break
+case 1:return A.n(v,w)}})
+return A.o($async$$1,w)},
+$S:241};(function inheritance(){var x=a.inherit
+x(B.bfS,A.cW)})()
+var y={d:A.L("y<bM>")};(function lazyInitializers(){var x=a.lazyFinal
+x($,"c_G","bj6",()=>A.xy(new B.bfS(),y.d))})()};
+(a=>{a["cOeZDCPKCxNzSPMFuIJAWy15+zE="]=a.current})($__dart_deferred_initializers__);

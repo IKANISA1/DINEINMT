@@ -8,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/infrastructure/app_notification_service.dart'
+    if (dart.library.html) 'package:dinein_app/core/services/app_notification_service_web.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
@@ -169,6 +171,7 @@ class _VenueNotificationsScreenState
           }
 
           final canEditToggles = !_isLoadingSettings && !_isSavingSettings;
+          final pushAvailable = AppNotificationService.venuePushAvailable;
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -241,24 +244,24 @@ class _VenueNotificationsScreenState
               ),
               const SizedBox(height: AppTheme.space3),
 
-              // ─── New Order Push (disabled on web — backend only supports mobile) ───
+              // ─── New Order Push ───
               _ToggleTile(
                     icon: LucideIcons.smartphone,
                     iconColor: cs.primary,
                     title: 'New Order Push',
                     subtitle: kIsWeb
-                        ? 'AVAILABLE ON MOBILE APP ONLY'
+                        ? pushAvailable
+                            ? 'INSTANT BROWSER NOTIFICATIONS'
+                            : 'AVAILABLE ON MOBILE APP ONLY'
                         : 'INSTANT MOBILE NOTIFICATIONS',
-                    value: kIsWeb ? false : _orderPush,
-                    onChanged: kIsWeb
-                        ? null
-                        : canEditToggles
-                            ? (v) => _persistSettings(
-                                venue.id,
-                                orderPushEnabled: v,
-                                whatsAppUpdatesEnabled: _whatsAppUpdates,
-                              )
-                            : null,
+                    value: pushAvailable ? _orderPush : false,
+                    onChanged: pushAvailable && canEditToggles
+                        ? (v) => _persistSettings(
+                            venue.id,
+                            orderPushEnabled: v,
+                            whatsAppUpdatesEnabled: _whatsAppUpdates,
+                          )
+                        : null,
                   )
                   .animate()
                   .fadeIn(duration: 300.ms)

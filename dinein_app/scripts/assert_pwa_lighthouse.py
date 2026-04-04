@@ -70,6 +70,16 @@ def main() -> int:
             if score != 1:
                 failures.append(f"{path}: audit '{audit_name}' scored {score!r}, expected 1.")
 
+        if available_pwa_audits != len(PWA_SIGNAL_AUDITS):
+            missing = [
+                audit_name
+                for audit_name in PWA_SIGNAL_AUDITS
+                if audits.get(audit_name) is None
+            ]
+            failures.append(
+                f"{path}: missing required PWA audits: {', '.join(missing)}."
+            )
+
         metrics = {
             "lcp": audits.get("largest-contentful-paint", {}).get("numericValue"),
             "tbt": audits.get("total-blocking-time", {}).get("numericValue"),

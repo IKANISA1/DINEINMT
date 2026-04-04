@@ -1,0 +1,11 @@
+# DineIn PWA — robots.txt
+# Public guest discovery routes may be indexed; admin and venue portals must not be.
+
+User-agent: *
+Disallow: /admin/
+Disallow: /venue/
+Allow: /discover
+Allow: /v/
+Allow: /offline.html
+
+Sitemap: https://dineinmtg.ikanisa.com/sitemap.xml

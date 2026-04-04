@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
 
 // Conditional import — uses the web implementation on web, stub elsewhere
 import 'pwa_install_stub.dart'
@@ -54,6 +55,12 @@ class PwaInstallService {
     _engagementTimer?.cancel();
 
     debugPrint('[pwa-install] Triggering install prompt (reason: $reason)');
+    unawaited(
+      AppTelemetryService.trackGuestEvent(
+        'pwa_install_prompt_requested',
+        details: {'reason': reason},
+      ),
+    );
 
     try {
       platform.triggerInstallPrompt();

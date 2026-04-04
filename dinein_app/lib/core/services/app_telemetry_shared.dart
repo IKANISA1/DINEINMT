@@ -61,6 +61,7 @@ Future<void> recordGuestTelemetryEvent(
   try {
     await DineinApiService.invoke(
       'track_guest_event',
+      extraHeaders: const {'X-DineIn-Offline-Queue': 'telemetry'},
       payload: {
         'event_name': eventName,
         'session_id': _guestTelemetrySessionId,

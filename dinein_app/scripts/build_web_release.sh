@@ -45,7 +45,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$flavor" in
-  mt|rw) ;;
+  mt)
+    guest_origin="https://dineinmtg.ikanisa.com"
+    mt_guest_origin="https://dineinmtg.ikanisa.com"
+    rw_guest_origin="https://dineinrwg.ikanisa.com"
+    ;;
+  rw)
+    guest_origin="https://dineinrwg.ikanisa.com"
+    mt_guest_origin="https://dineinmtg.ikanisa.com"
+    rw_guest_origin="https://dineinrwg.ikanisa.com"
+    ;;
   *)
     echo "Unsupported flavor: $flavor" >&2
     echo "Use --flavor mt or --flavor rw." >&2
@@ -73,6 +82,7 @@ fi
 # ── Supabase credential validation (same gate as Android build) ─────────────
 supabase_url=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('SUPABASE_URL',''))" "${env_file}" 2>/dev/null || true)
 supabase_anon_key=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('SUPABASE_ANON_KEY',''))" "${env_file}" 2>/dev/null || true)
+web_vapid_key=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('FCM_WEB_VAPID_KEY',''))" "${env_file}" 2>/dev/null || true)
 
 supabase_cred_ok=true
 
@@ -99,6 +109,9 @@ if [[ "${supabase_cred_ok}" != "true" ]]; then
 fi
 
 echo "✅ Supabase credentials validated in ${env_file}"
+if [[ -z "${web_vapid_key}" ]]; then
+  echo "⚠️  FCM_WEB_VAPID_KEY is missing in ${env_file}; venue web push notifications will remain disabled." >&2
+fi
 
 cd "${project_dir}"
 
@@ -143,6 +156,47 @@ if [[ -f "${project_dir}/web/_redirects" ]] && [[ ! -f "${build_output}/_redirec
   echo "✅ Copied _redirects to build output"
 fi
 
+# Ensure auxiliary crawlability files survive the Flutter web build.
+for extra_file in robots.txt sitemap.xml; do
+  if [[ -f "${project_dir}/web/${extra_file}" ]] && [[ ! -f "${build_output}/${extra_file}" ]]; then
+    cp "${project_dir}/web/${extra_file}" "${build_output}/${extra_file}"
+    echo "✅ Copied ${extra_file} to build output"
+  fi
+done
+
+if [[ -d "${project_dir}/web/screenshots" ]]; then
+  mkdir -p "${build_output}/screenshots"
+  rsync -a "${project_dir}/web/screenshots/" "${build_output}/screenshots/"
+  echo "✅ Copied manifest screenshots to build output"
+fi
+
+python3 - "${build_output}" "${guest_origin}" <<'PY'
+import sys
+from pathlib import Path
+
+build_dir = Path(sys.argv[1])
+guest_origin = sys.argv[2].rstrip("/")
+
+placeholder = "__DINEIN_GUEST_ORIGIN__"
+for relative_path in ("index.html", "robots.txt", "sitemap.xml"):
+    target = build_dir / relative_path
+    if not target.is_file():
+        continue
+    contents = target.read_text(encoding="utf-8")
+    contents = contents.replace(placeholder, guest_origin)
+    if placeholder in contents:
+        print(f"⛔ {relative_path} still contains unresolved guest-origin placeholders.", file=sys.stderr)
+        raise SystemExit(1)
+    target.write_text(contents, encoding="utf-8")
+PY
+
+python3 \
+  "${project_dir}/scripts/prerender_public_routes.py" \
+  "${build_output}" \
+  "${guest_origin}" \
+  "${mt_guest_origin}" \
+  "${rw_guest_origin}"
+
 python3 "${project_dir}/scripts/stamp_pwa_bundle.py" "${build_output}"
 
 if ! grep -q 'app-loader' "${build_output}/index.html"; then
@@ -165,9 +219,36 @@ if [[ ! -f "${build_output}/offline.html" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${build_output}/robots.txt" ]]; then
+  echo "⛔ Built web output is missing robots.txt." >&2
+  exit 1
+fi
+
+if [[ ! -f "${build_output}/sitemap.xml" ]]; then
+  echo "⛔ Built web output is missing sitemap.xml." >&2
+  exit 1
+fi
+
+for prerendered_route in discover venues; do
+  if [[ ! -f "${build_output}/${prerendered_route}/index.html" ]]; then
+    echo "⛔ Built web output is missing ${prerendered_route}/index.html prerender." >&2
+    exit 1
+  fi
+done
+
+if grep -q '__DINEIN_GUEST_ORIGIN__' "${build_output}/index.html" "${build_output}/robots.txt" "${build_output}/sitemap.xml"; then
+  echo "⛔ Built crawlability files still contain unresolved guest-origin placeholders." >&2
+  exit 1
+fi
+
 # ── Service worker hygiene ──────────────────────────────────────────────────
 if [[ ! -f "${build_output}/custom_sw.js" ]]; then
   echo "⛔ custom_sw.js is missing from build output." >&2
+  exit 1
+fi
+
+if [[ ! -f "${build_output}/firebase-messaging-sw.js" ]]; then
+  echo "⛔ firebase-messaging-sw.js is missing from build output." >&2
   exit 1
 fi
 
@@ -175,6 +256,13 @@ if [[ ! -f "${build_output}/pwa-shell-manifest.json" ]]; then
   echo "⛔ pwa-shell-manifest.json is missing from build output." >&2
   exit 1
 fi
+
+for screenshot in discover-mobile.png venues-desktop.png; do
+  if [[ ! -f "${build_output}/screenshots/${screenshot}" ]]; then
+    echo "⛔ Build output is missing manifest screenshot screenshots/${screenshot}." >&2
+    exit 1
+  fi
+done
 
 if [[ ! -d "${build_output}/canvaskit" ]]; then
   echo "⛔ canvaskit/ is missing from build output. Web engine assets must be self-hosted." >&2
@@ -201,6 +289,14 @@ if [[ "${service_worker_registrations}" != "1" ]]; then
   echo "⛔ Expected exactly one manual service worker registration in index.html, found ${service_worker_registrations}." >&2
   exit 1
 fi
+
+for prerendered_route in discover venues; do
+  route_file="${build_output}/${prerendered_route}/index.html"
+  if ! grep -q 'hreflang="en-MT"' "${route_file}" || ! grep -q 'hreflang="en-RW"' "${route_file}"; then
+    echo "⛔ ${prerendered_route}/index.html is missing hreflang alternates." >&2
+    exit 1
+  fi
+done
 
 if grep -q '__DINEIN_PWA_' "${build_output}/custom_sw.js"; then
   echo "⛔ custom_sw.js still contains unresolved PWA placeholders." >&2
@@ -241,6 +337,12 @@ if "/index.html" not in manifest["resources"] or "/offline.html" not in manifest
     print("⛔ PWA shell manifest is missing the HTML fallback assets.", file=sys.stderr)
     raise SystemExit(1)
 
+web_manifest = json.loads((build_dir / "manifest.json").read_text(encoding="utf-8"))
+screenshots = web_manifest.get("screenshots") or []
+if len(screenshots) < 2:
+    print("⛔ manifest.json is missing install screenshots.", file=sys.stderr)
+    raise SystemExit(1)
+
 bootstrap_text = (build_dir / "flutter_bootstrap.js").read_text(encoding="utf-8")
 needle = "_flutter.loader.load({"
 load_idx = bootstrap_text.rfind(needle)
@@ -267,7 +369,7 @@ print(
 )
 PY
 
-echo "✅ Verified startup loader, headers, manifest, offline fallback, precache manifest, and single custom service worker"
+echo "✅ Verified startup loader, headers, manifest, offline fallback, public-route prerenders, install screenshots, and service workers"
 
 echo ""
 echo "═══════════════════════════════════════════════════════"

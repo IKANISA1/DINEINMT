@@ -2,7 +2,7 @@ import 'app_telemetry_shared.dart';
 
 const _webGuestTelemetryEnabled = bool.fromEnvironment(
   'ENABLE_WEB_GUEST_TELEMETRY',
-  defaultValue: false,
+  defaultValue: true,
 );
 
 class AppTelemetryService {

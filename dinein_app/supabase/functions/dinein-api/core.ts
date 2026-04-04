@@ -99,7 +99,7 @@ const orderPaymentStatuses = new Set([
 const accessVerificationMethods = new Set(["otp", "admin_override"]);
 const menuImageStatuses = new Set(["pending", "generating", "ready", "failed"]);
 const menuImageSources = new Set(["manual", "ai_gemini"]);
-const pushPlatforms = new Set(["android", "ios"]);
+const pushPlatforms = new Set(["android", "ios", "web"]);
 const FIREBASE_MESSAGING_SCOPE =
   "https://www.googleapis.com/auth/firebase.messaging";
 const VENUE_PUSH_ALERT_ROUTE_ORDERS = "/venue/orders";

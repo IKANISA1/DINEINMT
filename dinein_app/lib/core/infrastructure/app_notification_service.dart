@@ -25,6 +25,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class AppNotificationService {
   AppNotificationService._();
 
+  static bool get venuePushAvailable => _pushPlatform() != null;
+
   static const _deviceKeyStorageKey = 'dinein.push.device_key';
   static const _secureStorageTimeout = Duration(seconds: 1);
   static const _secureStorage = FlutterSecureStorage();

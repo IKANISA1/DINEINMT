@@ -8,4 +8,4 @@ Allow: /discover
 Allow: /v/
 Allow: /offline.html
 
-Sitemap: https://dineinmt.ikanisa.com/sitemap.xml
+Sitemap: __DINEIN_GUEST_ORIGIN__/sitemap.xml

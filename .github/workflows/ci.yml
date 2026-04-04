@@ -199,7 +199,6 @@ jobs:
             path="${route#*:}"
             npx --yes lighthouse "http://127.0.0.1:4173${path}" \
               --chrome-flags="--headless=new --no-sandbox" \
-              --only-categories=performance,accessibility,best-practices,seo \
               --output=json \
               --quiet \
               --output-path="/tmp/dinein-lh/${name}.json"

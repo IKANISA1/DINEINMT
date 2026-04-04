@@ -86,6 +86,7 @@ if [[ ! -f "$env_file" ]]; then
 else
   sb_url=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('SUPABASE_URL',''))" "$env_file" 2>/dev/null || true)
   sb_key=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('SUPABASE_ANON_KEY',''))" "$env_file" 2>/dev/null || true)
+  web_vapid_key=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('FCM_WEB_VAPID_KEY',''))" "$env_file" 2>/dev/null || true)
 
   if [[ -z "$sb_url" ]] || echo "$sb_url" | grep -qiE 'your-project|your-malta|your-rwanda|placeholder'; then
     echo "FAIL: SUPABASE_URL is missing or contains a placeholder in $env_file"
@@ -101,6 +102,10 @@ else
   elif [[ "$sb_key" != eyJ* ]]; then
     echo "FAIL: SUPABASE_ANON_KEY does not look like a valid JWT in $env_file"
     failures=$((failures + 1))
+  fi
+
+  if [[ -z "$web_vapid_key" ]]; then
+    echo "WARN: FCM_WEB_VAPID_KEY is missing in $env_file; venue web push notifications will remain disabled."
   fi
 fi
 # ─────────────────────────────────────────────────────────────────────────────
@@ -153,6 +158,10 @@ web_headers="$app_root/web/_headers"
 web_index="$app_root/web/index.html"
 web_manifest="$app_root/web/manifest.json"
 web_offline="$app_root/web/offline.html"
+web_robots="$app_root/web/robots.txt"
+web_sitemap="$app_root/web/sitemap.xml"
+web_push_worker="$app_root/web/firebase-messaging-sw.js"
+web_screenshots_dir="$app_root/web/screenshots"
 
 require_contains \
   "$android_manifest" \
@@ -292,6 +301,11 @@ require_file "$web_headers" 'Web headers config is missing.'
 require_file "$web_index" 'Web index.html is missing.'
 require_file "$web_manifest" 'Web manifest.json is missing.'
 require_file "$web_offline" 'Offline fallback page is missing.'
+require_file "$web_robots" 'Web robots.txt is missing.'
+require_file "$web_sitemap" 'Web sitemap.xml is missing.'
+require_file "$web_push_worker" 'Firebase Messaging web service worker is missing.'
+require_file "$web_screenshots_dir/discover-mobile.png" 'Manifest mobile screenshot is missing.'
+require_file "$web_screenshots_dir/venues-desktop.png" 'Manifest desktop screenshot is missing.'
 require_file "${app_root}/web/custom_sw.js" 'Custom web service worker is missing.'
 require_file "${app_root}/web/flutter_bootstrap.js" 'Custom flutter_bootstrap.js is missing.'
 if [[ -f "$web_headers" ]]; then
@@ -313,6 +327,10 @@ if [[ -f "$web_index" ]]; then
     "$web_index" \
     'custom_sw.js' \
     'Web index.html is missing the custom service worker registration.'
+  require_contains \
+    "$web_index" \
+    'firebase-messaging-sw.js' \
+    'Web index.html is missing the Firebase Messaging service worker registration.'
 fi
 if [[ -f "$web_manifest" ]]; then
   require_contains \
@@ -323,6 +341,10 @@ if [[ -f "$web_manifest" ]]; then
     "$web_manifest" \
     '"shortcuts"' \
     'Web manifest is missing launcher shortcuts.'
+  require_contains \
+    "$web_manifest" \
+    '"screenshots"' \
+    'Web manifest is missing install screenshots.'
 fi
 require_file \
   "$asset_links" \

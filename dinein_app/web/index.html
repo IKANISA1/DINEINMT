@@ -28,11 +28,12 @@
   <meta property="og:title" content="DineIn Guest">
   <meta property="og:description" content="Discover nearby venues, browse live menus, and order from your table with DineIn.">
   <meta property="og:image" content="/icons/Icon-512.png">
+  <meta property="og:url" content="__DINEIN_GUEST_ORIGIN__/discover">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="DineIn Guest">
   <meta name="twitter:description" content="Discover nearby venues, browse live menus, and order from your table with DineIn.">
   <meta name="twitter:image" content="/icons/Icon-512.png">
-  <link rel="canonical" id="canonical-link" href="https://dineinmtg.ikanisa.com/discover">
+  <link rel="canonical" id="canonical-link" href="__DINEIN_GUEST_ORIGIN__/discover">
 
   <!-- Performance: preconnect to critical origins -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -59,7 +60,7 @@
       "description": "Discover nearby venues, browse live menus, and order from your table with DineIn.",
       "applicationCategory": "FoodAndDrinkApplication",
       "operatingSystem": "Any",
-      "url": "https://dineinmtg.ikanisa.com/discover"
+      "url": "__DINEIN_GUEST_ORIGIN__/discover"
     }
   </script>
   <style>
@@ -580,6 +581,7 @@
         setMetaContent('meta[property="og:title"]', roleConfig.title);
         setMetaContent('meta[property="og:description"]', roleConfig.description);
         setMetaContent('meta[property="og:image"]', roleConfig.shareImage);
+        setMetaContent('meta[property="og:url"]', roleConfig.canonicalUrl);
         setMetaContent('meta[name="twitter:title"]', roleConfig.title);
         setMetaContent('meta[name="twitter:description"]', roleConfig.description);
         setMetaContent('meta[name="twitter:image"]', roleConfig.shareImage);
@@ -605,8 +607,8 @@
     })();
   </script>
   <script>
-    // Register the single DineIn service worker for shell caching, offline,
-    // and runtime update prompts.
+    // Register the DineIn shell worker plus the dedicated Firebase Messaging
+    // worker used for background web push delivery.
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
         var serviceWorkerUrl = '/custom_sw.js?v=__DINEIN_PWA_VERSION__';
@@ -632,6 +634,14 @@
           })
           .catch(function (err) {
             console.warn('[dinein-sw] Registration failed:', err);
+          });
+
+        navigator.serviceWorker
+          .register('/firebase-messaging-sw.js', {
+            scope: '/firebase-cloud-messaging-push-scope',
+          })
+          .catch(function (err) {
+            console.warn('[dinein-fcm-sw] Registration failed:', err);
           });
       });
     }

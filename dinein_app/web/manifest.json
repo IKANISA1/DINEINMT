@@ -77,5 +77,21 @@
                 }
             ]
         }
+    ],
+    "screenshots": [
+        {
+            "src": "screenshots/discover-mobile.png",
+            "sizes": "390x844",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Guest discovery on mobile"
+        },
+        {
+            "src": "screenshots/venues-desktop.png",
+            "sizes": "1440x900",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "Venue browsing on desktop"
+        }
     ]
 }

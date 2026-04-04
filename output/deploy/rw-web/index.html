@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -14,13 +14,31 @@
     This is a placeholder for base href that will be replaced by the value of
     the `--base-href` argument provided to `flutter build`.
   -->
-  <base href="/">
+  <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="DineIn — scan a QR code, browse the menu, and order from your table. No app download required.">
+  <meta name="application-name" content="DineIn">
+  <meta name="description" content="DineIn — discover nearby venues, browse live menus, and order from your table.">
   <meta name="theme-color" content="#111111">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="DineIn">
+  <meta property="og:title" content="DineIn Guest">
+  <meta property="og:description" content="Discover nearby venues, browse live menus, and order from your table with DineIn.">
+  <meta property="og:image" content="/icons/Icon-512.png">
+  <meta property="og:url" content="https://dineinrwg.ikanisa.com/discover">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="DineIn Guest">
+  <meta name="twitter:description" content="Discover nearby venues, browse live menus, and order from your table with DineIn.">
+  <meta name="twitter:image" content="/icons/Icon-512.png">
+  <link rel="canonical" id="canonical-link" href="https://dineinrwg.ikanisa.com/discover">
+
+  <!-- Performance: preconnect to critical origins -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://firebaseinstallations.googleapis.com">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -34,6 +52,17 @@
 
   <title>DineIn</title>
   <link rel="manifest" href="manifest.json">
+  <script type="application/ld+json" id="structured-data">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "DineIn Guest",
+      "description": "Discover nearby venues, browse live menus, and order from your table with DineIn.",
+      "applicationCategory": "FoodAndDrinkApplication",
+      "operatingSystem": "Any",
+      "url": "https://dineinrwg.ikanisa.com/discover"
+    }
+  </script>
   <style>
     :root {
       color-scheme: dark;
@@ -130,6 +159,44 @@
       color: var(--dinein-muted);
     }
 
+    .loader-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      margin-top: 10px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(200, 169, 107, 0.22);
+      background: rgba(200, 169, 107, 0.08);
+      color: var(--dinein-gold);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .loader-chip[hidden] {
+      display: none;
+    }
+
+    .loader-chip-button {
+      width: 100%;
+      cursor: pointer;
+      appearance: none;
+      transition: transform 180ms ease, background 180ms ease;
+    }
+
+    .loader-chip-button:hover {
+      background: rgba(200, 169, 107, 0.14);
+      transform: translateY(-1px);
+    }
+
+    .loader-chip-button:focus-visible {
+      outline: 2px solid rgba(200, 169, 107, 0.5);
+      outline-offset: 2px;
+    }
+
     .loader-bar {
       height: 4px;
       margin-top: 24px;
@@ -167,22 +234,121 @@
         transform: translateX(380%);
       }
     }
+
+    #app-update-banner {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      left: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border: 1px solid rgba(200, 169, 107, 0.24);
+      border-radius: 18px;
+      background: rgba(17, 17, 17, 0.96);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(18px);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(16px);
+      transition: opacity 200ms ease, transform 200ms ease, visibility 200ms ease;
+      z-index: 10000;
+    }
+
+    #app-update-banner.is-visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .update-copy {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--dinein-text);
+    }
+
+    .update-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .update-button {
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(200, 169, 107, 0.22);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--dinein-text);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .update-button--primary {
+      background: rgba(200, 169, 107, 0.14);
+      color: var(--dinein-gold);
+    }
+
+    .update-button:focus-visible {
+      outline: 2px solid rgba(200, 169, 107, 0.5);
+      outline-offset: 2px;
+    }
+
+    @media (max-width: 640px) {
+      #app-update-banner {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .update-actions {
+        width: 100%;
+      }
+
+      .update-button {
+        flex: 1 1 auto;
+      }
+    }
   </style>
 </head>
 <body>
   <div id="app-loader" aria-live="polite">
     <div class="loader-shell">
       <div class="loader-mark" aria-hidden="true">
-        <img src="assets/branding/dinein-brand-icon-512.png" alt="" />
+        <img src="assets/assets/branding/dinein-brand-icon-512.png" alt="" />
       </div>
       <p class="loader-brand"><span>DINE</span><span>IN</span></p>
-      <p class="loader-kicker">GUEST EXPERIENCE</p>
-      <p class="loader-copy">
+      <p class="loader-kicker" id="loader-role">GUEST EXPERIENCE</p>
+      <p class="loader-copy" id="loader-copy">
         Preparing venues, menus, and your saved session.
       </p>
-      <p class="loader-kicker" id="connection-state" hidden>OFFLINE</p>
-      <p class="loader-kicker" id="install-state" hidden>INSTALL APP</p>
+      <p class="loader-chip" id="connection-state" hidden>Offline</p>
+      <button
+        type="button"
+        class="loader-chip loader-chip-button"
+        id="install-state"
+        hidden
+      >
+        Install app
+      </button>
       <div class="loader-bar" aria-hidden="true"></div>
+    </div>
+  </div>
+  <div id="app-update-banner" role="status" aria-live="polite" hidden>
+    <p class="update-copy">A new version of DineIn is ready.</p>
+    <div class="update-actions">
+      <button type="button" class="update-button" id="app-update-dismiss">
+        Later
+      </button>
+      <button
+        type="button"
+        class="update-button update-button--primary"
+        id="app-update-reload"
+      >
+        Reload
+      </button>
     </div>
   </div>
   <script>
@@ -190,10 +356,27 @@
       const loader = document.getElementById('app-loader');
       const connectionState = document.getElementById('connection-state');
       const installState = document.getElementById('install-state');
+      const roleState = document.getElementById('loader-role');
+      const loaderCopy = document.getElementById('loader-copy');
+      const updateBanner = document.getElementById('app-update-banner');
+      const updateReload = document.getElementById('app-update-reload');
+      const updateDismiss = document.getElementById('app-update-dismiss');
       if (!loader) return;
 
       let hidden = false;
       let deferredInstallPrompt = null;
+      let waitingWorker = null;
+      let pendingReload = false;
+
+      const roleConfig = resolveRoleConfig();
+      if (roleState) {
+        roleState.textContent = roleConfig.kicker;
+      }
+      if (loaderCopy) {
+        loaderCopy.textContent = roleConfig.copy;
+      }
+      applyDocumentMeta(roleConfig);
+
       const hideLoader = function () {
         if (hidden) return;
         hidden = true;
@@ -201,6 +384,23 @@
         window.setTimeout(function () {
           loader.remove();
         }, 320);
+      };
+
+      const hideUpdateBanner = function () {
+        if (!updateBanner) return;
+        updateBanner.classList.remove('is-visible');
+        window.setTimeout(function () {
+          if (!updateBanner.classList.contains('is-visible')) {
+            updateBanner.hidden = true;
+          }
+        }, 200);
+      };
+
+      const showUpdateBanner = function (worker) {
+        waitingWorker = worker || waitingWorker;
+        if (!updateBanner || !waitingWorker) return;
+        updateBanner.hidden = false;
+        updateBanner.classList.add('is-visible');
       };
 
       const updateConnectionState = function () {
@@ -217,7 +417,22 @@
         }));
       };
 
+      const isIosManualInstallAvailable = function () {
+        const ua = window.navigator.userAgent || '';
+        const isIos = /iphone|ipad|ipod/i.test(ua);
+        const isSafari = /safari/i.test(ua) && !/crios|fxios|edgios/i.test(ua);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+          window.navigator.standalone === true;
+        return isIos && isSafari && !isStandalone;
+      };
+
+      const refreshInstallCapability = function () {
+        window.__dineinCanTriggerInstallPrompt =
+          Boolean(deferredInstallPrompt) || isIosManualInstallAvailable();
+      };
+
       const updateInstallState = function (visible) {
+        refreshInstallCapability();
         window.__dineinPwaState = {
           ...(window.__dineinPwaState || {}),
           installAvailable: visible
@@ -230,9 +445,28 @@
         }
       };
 
+      const showManualInstallGuide = function () {
+        window.alert(
+          'To install DineIn on iPhone or iPad, tap Share and then Add to Home Screen.'
+        );
+      };
+
+      window.__dineinTriggerInstallPrompt = function () {
+        if (deferredInstallPrompt) {
+          deferredInstallPrompt.prompt();
+          return true;
+        }
+        if (isIosManualInstallAvailable()) {
+          showManualInstallGuide();
+          return true;
+        }
+        return false;
+      };
+
       window.addEventListener('flutter-first-frame', hideLoader, { once: true });
       window.addEventListener('load', function () {
         updateConnectionState();
+        refreshInstallCapability();
         window.setTimeout(hideLoader, 12000);
       }, { once: true });
       window.addEventListener('online', updateConnectionState);
@@ -250,11 +484,167 @@
       });
       if (installState) {
         installState.addEventListener('click', function () {
-          if (!deferredInstallPrompt) return;
-          deferredInstallPrompt.prompt();
+          window.__dineinTriggerInstallPrompt();
         });
       }
+
+      if (updateReload) {
+        updateReload.addEventListener('click', function () {
+          if (waitingWorker) {
+            pendingReload = true;
+            waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+            return;
+          }
+          window.location.reload();
+        });
+      }
+
+      if (updateDismiss) {
+        updateDismiss.addEventListener('click', hideUpdateBanner);
+      }
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (pendingReload) {
+            window.location.reload();
+          }
+        });
+      }
+
+      window.addEventListener('dinein-pwa-update-ready', function (event) {
+        showUpdateBanner(event.detail && event.detail.worker ? event.detail.worker : null);
+      });
+
+      function resolveRoleConfig() {
+        const host = window.location.hostname.toLowerCase();
+        const path = window.location.pathname.toLowerCase();
+        const currentPath = window.location.pathname || '/discover';
+        const canonicalPath = currentPath === '/' ? '/discover' : currentPath;
+        const shareImage = new URL('/icons/Icon-512.png', window.location.origin).toString();
+        if (
+          host.includes('dineinmta') ||
+          host.includes('dineinrwa') ||
+          path.startsWith('/admin')
+        ) {
+          return {
+            title: 'DineIn Admin',
+            kicker: 'ADMIN CONSOLE',
+            copy: 'Preparing reporting, venue controls, and your secure session.',
+            description: 'Secure DineIn admin console for reporting, catalog governance, and venue operations.',
+            robots: 'noindex, nofollow',
+            canonicalUrl: new URL(currentPath, window.location.origin).toString(),
+            shareImage: shareImage,
+            applicationCategory: 'BusinessApplication',
+          };
+        }
+        if (
+          host.includes('dineinmtv') ||
+          host.includes('dineinrwv') ||
+          path.startsWith('/venue')
+        ) {
+          return {
+            title: 'DineIn Venue',
+            kicker: 'VENUE OPERATIONS',
+            copy: 'Preparing orders, notifications, and venue access.',
+            description: 'Venue operations workspace for DineIn orders, waves, and service recovery.',
+            robots: 'noindex, nofollow',
+            canonicalUrl: new URL(currentPath, window.location.origin).toString(),
+            shareImage: shareImage,
+            applicationCategory: 'BusinessApplication',
+          };
+        }
+        return {
+          title: 'DineIn Guest',
+          kicker: 'GUEST EXPERIENCE',
+          copy: 'Preparing venues, menus, and your saved session.',
+          description: 'Discover nearby venues, browse live menus, and order from your table with DineIn.',
+          robots: 'index, follow, max-image-preview:large',
+          canonicalUrl: new URL(canonicalPath, window.location.origin).toString(),
+          shareImage: shareImage,
+          applicationCategory: 'FoodAndDrinkApplication',
+        };
+      }
+
+      function setMetaContent(selector, value) {
+        const element = document.querySelector(selector);
+        if (element && value) {
+          element.setAttribute('content', value);
+        }
+      }
+
+      function applyDocumentMeta(roleConfig) {
+        document.title = roleConfig.title;
+        setMetaContent('meta[name="description"]', roleConfig.description);
+        setMetaContent('meta[name="robots"]', roleConfig.robots);
+        setMetaContent('meta[name="application-name"]', roleConfig.title);
+        setMetaContent('meta[name="apple-mobile-web-app-title"]', roleConfig.title);
+        setMetaContent('meta[property="og:title"]', roleConfig.title);
+        setMetaContent('meta[property="og:description"]', roleConfig.description);
+        setMetaContent('meta[property="og:image"]', roleConfig.shareImage);
+        setMetaContent('meta[property="og:url"]', roleConfig.canonicalUrl);
+        setMetaContent('meta[name="twitter:title"]', roleConfig.title);
+        setMetaContent('meta[name="twitter:description"]', roleConfig.description);
+        setMetaContent('meta[name="twitter:image"]', roleConfig.shareImage);
+
+        const canonicalLink = document.getElementById('canonical-link');
+        if (canonicalLink && roleConfig.canonicalUrl) {
+          canonicalLink.setAttribute('href', roleConfig.canonicalUrl);
+        }
+
+        const structuredData = document.getElementById('structured-data');
+        if (structuredData) {
+          structuredData.textContent = JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebApplication',
+            name: roleConfig.title,
+            description: roleConfig.description,
+            applicationCategory: roleConfig.applicationCategory,
+            operatingSystem: 'Any',
+            url: roleConfig.canonicalUrl,
+          });
+        }
+      }
     })();
+  </script>
+  <script>
+    // Register the DineIn shell worker plus the dedicated Firebase Messaging
+    // worker used for background web push delivery.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        var serviceWorkerUrl = '/custom_sw.js?v=fb709d1b5fcc046b9184';
+        navigator.serviceWorker.register(serviceWorkerUrl, { scope: '/' })
+          .then(function (reg) {
+            if (reg.waiting) {
+              window.dispatchEvent(
+                new CustomEvent('dinein-pwa-update-ready', { detail: { worker: reg.waiting } })
+              );
+            }
+
+            reg.addEventListener('updatefound', function () {
+              var newWorker = reg.installing;
+              if (!newWorker) return;
+              newWorker.addEventListener('statechange', function () {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  window.dispatchEvent(
+                    new CustomEvent('dinein-pwa-update-ready', { detail: { worker: newWorker } })
+                  );
+                }
+              });
+            });
+          })
+          .catch(function (err) {
+            console.warn('[dinein-sw] Registration failed:', err);
+          });
+
+        navigator.serviceWorker
+          .register('/firebase-messaging-sw.js', {
+            scope: '/firebase-cloud-messaging-push-scope',
+          })
+          .catch(function (err) {
+            console.warn('[dinein-fcm-sw] Registration failed:', err);
+          });
+      });
+    }
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

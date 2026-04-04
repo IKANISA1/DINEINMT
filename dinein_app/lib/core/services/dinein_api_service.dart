@@ -37,12 +37,15 @@ class DineinApiService {
   static DineinApiInvocation buildInvocation(
     String action, {
     Map<String, dynamic>? payload,
+    Map<String, String>? extraHeaders,
     bool useAdminSession = false,
     String? userAccessToken,
     String? venueAccessToken,
     String? adminAccessToken,
   }) {
-    final headers = <String, String>{};
+    final headers = <String, String>{
+      if (extraHeaders != null) ...extraHeaders,
+    };
     final bodyPayload = <String, dynamic>{
       'action': action,
       'country': CountryRuntime.config.country.code,
@@ -79,11 +82,13 @@ class DineinApiService {
   static Future<dynamic> invoke(
     String action, {
     Map<String, dynamic>? payload,
+    Map<String, String>? extraHeaders,
     bool useAdminSession = false,
   }) async {
     final request = buildInvocation(
       action,
       payload: payload,
+      extraHeaders: extraHeaders,
       useAdminSession: useAdminSession,
       userAccessToken: AuthRepository.instance.currentSession?.accessToken,
       venueAccessToken:

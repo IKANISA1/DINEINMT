@@ -36,6 +36,7 @@ These flags **must be disabled in production** to prevent test-mode bypasses:
 | `FIREBASE_PROJECT_ID` | Real project ID |
 | `FIREBASE_CLIENT_EMAIL` | Service account email |
 | `FIREBASE_PRIVATE_KEY` | Service account private key (with `\n` escaping) |
+| `FCM_WEB_VAPID_KEY` | Firebase Web Push certificate public key for PWA browser notifications |
 
 If any of these are missing, push notifications are silently disabled (logged once).
 
