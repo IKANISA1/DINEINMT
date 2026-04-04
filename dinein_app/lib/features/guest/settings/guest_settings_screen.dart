@@ -196,6 +196,24 @@ class GuestSettingsScreen extends ConsumerWidget {
               .animate()
               .fadeIn(delay: 240.ms, duration: 320.ms)
               .slideY(begin: 0.05),
+          const SizedBox(height: AppTheme.space3),
+          _SettingsTile(
+                icon: LucideIcons.trash2,
+                title: 'Delete My Data',
+                subtitle: 'REQUEST DATA REMOVAL',
+                onTap: () => _launchExternal(
+                  context,
+                  Uri.parse(
+                    'mailto:info@ikanisa.com'
+                    '?subject=DineIn%20Data%20Deletion%20Request'
+                    '&body=I%20would%20like%20to%20request%20deletion%20of%20all%20'
+                    'my%20personal%20data%20associated%20with%20the%20DineIn%20app.',
+                  ),
+                ),
+              )
+              .animate()
+              .fadeIn(delay: 270.ms, duration: 320.ms)
+              .slideY(begin: 0.05),
           const SizedBox(height: AppTheme.space8),
           const _GuestProfileFooter(),
         ],

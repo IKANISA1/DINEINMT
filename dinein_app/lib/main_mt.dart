@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core_pkg/config/country_config.dart';
@@ -19,6 +21,25 @@ Future<void> _boot(CountryConfig config) async {
   WidgetsFlutterBinding.ensureInitialized();
   configureWebUrlStrategy();
   CountryRuntime.configure(config);
+
+  // ── Production error boundary ──────────────────────────────────────────
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    // Firebase Crashlytics (if initialised) picks these up automatically.
+    debugPrint('FlutterError: ${details.exceptionAsString()}');
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Uncaught platform error: $error\n$stack');
+    return true; // handled — prevent crash in release
+  };
+
+  // In release mode, show a friendly error widget instead of the red screen.
+  if (kReleaseMode) {
+    ErrorWidget.builder = (details) => const ProductionErrorWidget();
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   unawaited(AppBootstrapService.instance.ensureStarted());
 
   runApp(
@@ -61,5 +82,44 @@ class _NoScrollbarBehavior extends ScrollBehavior {
     ScrollableDetails details,
   ) {
     return child;
+  }
+}
+
+/// Friendly fallback shown in release builds when a widget fails to render.
+class ProductionErrorWidget extends StatelessWidget {
+  const ProductionErrorWidget({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(32),
+      color: const Color(0xFF111111),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.refresh_rounded, size: 48, color: Color(0xFF888888)),
+          SizedBox(height: 16),
+          Text(
+            'Something went wrong',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFFEEEEEE),
+              decoration: TextDecoration.none,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Try going back or restarting the app.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF888888),
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

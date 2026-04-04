@@ -131,7 +131,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Admin Login'), findsOneWidget);
-      expect(find.text('return:/venue/settings'), findsOneWidget);
+      expect(find.text('return:/v/settings'), findsOneWidget);
     },
   );
 
