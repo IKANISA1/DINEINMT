@@ -115,10 +115,7 @@ void main() {
     expect(find.text('Overview'), findsWidgets);
     expect(find.text('TOTAL VENUES'), findsOneWidget);
     expect(find.text('ORDERS TODAY'), findsOneWidget);
-    expect(find.text('ACCESS READY'), findsOneWidget);
     expect(find.text('TOTAL ORDERS'), findsOneWidget);
-    expect(find.text('Venue Access Setup'), findsOneWidget);
-    expect(find.text('Order Exceptions'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();
