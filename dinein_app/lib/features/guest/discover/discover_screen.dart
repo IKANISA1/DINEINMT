@@ -8,6 +8,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:js_interop' as js;
 
+import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/guest_venue_feed.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
@@ -1195,7 +1196,7 @@ class _SmartReorderSection extends ConsumerWidget {
     
     // Only show last completed/delivered orders
     final pastOrders = orders
-        .where((o) => o.status == OrderStatus.completed || o.status == OrderStatus.delivered)
+        .where((o) => o.status == OrderStatus.served)
         .toList();
 
     if (pastOrders.isEmpty && !ordersAsync.isLoading) return const SizedBox.shrink();
@@ -1247,7 +1248,7 @@ class _SmartReorderSection extends ConsumerWidget {
                       AppTelemetryService.trackGuestEvent('smart_reorder_tapped', venueId: order.venueId);
                       context.pushNamed(
                         AppRouteNames.venueDetail,
-                        pathParameters: {AppRouteParams.slug: order.venueSlug ?? order.venueId},
+                        pathParameters: {AppRouteParams.slug: order.venueId},
                       );
                     },
                     child: Container(
