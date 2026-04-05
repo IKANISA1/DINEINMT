@@ -1,3 +1,7 @@
+-- Analytics events table — works on both MT (dinein_* = tables) and RW (dinein_* = views over base tables).
+-- FK constraints are omitted intentionally because the target tables differ between MT and RW schemas.
+-- Data integrity is enforced at the application layer.
+
 create table if not exists public.dinein_guest_analytics_events (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -5,9 +9,9 @@ create table if not exists public.dinein_guest_analytics_events (
   event_name text not null,
   session_id text not null,
   route text,
-  venue_id uuid references public.dinein_venues(id) on delete set null,
-  menu_item_id uuid references public.dinein_menu_items(id) on delete set null,
-  order_id uuid references public.dinein_orders(id) on delete set null,
+  venue_id uuid,
+  menu_item_id uuid,
+  order_id uuid,
   user_id uuid references auth.users(id) on delete set null,
   user_agent text,
   referrer text,
