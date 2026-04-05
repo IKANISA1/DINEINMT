@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -9,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:core_pkg/config/country_config_provider.dart';
 import 'package:core_pkg/constants/app_download_links.dart';
 import 'package:core_pkg/constants/enums.dart';
-import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/shared/widgets/branded_qr_tools.dart';
@@ -160,7 +158,8 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                           semanticLabel: 'Clear search',
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6,
+                              horizontal: 12,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color: cs.primary.withValues(alpha: 0.10),
@@ -174,7 +173,11 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(LucideIcons.search, size: 12, color: cs.primary),
+                                Icon(
+                                  LucideIcons.search,
+                                  size: 12,
+                                  color: cs.primary,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   '"$_query"',
@@ -184,7 +187,11 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                Icon(LucideIcons.x, size: 12, color: cs.primary),
+                                Icon(
+                                  LucideIcons.x,
+                                  size: 12,
+                                  color: cs.primary,
+                                ),
                               ],
                             ),
                           ),
@@ -246,46 +253,184 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                   ),
                 )
               else
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppTheme.space6,
-                  ),
-                  sliver: SliverList.separated(
-                    itemCount: displayVenues.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppTheme.space4),
-                    itemBuilder: (context, index) {
-                      final venue = displayVenues[index];
-                      final guestUri = buildVenueDeepLinkUri(
-                        slug: venue.slug,
-                        config: config,
-                      );
-                      final appUri = buildVenueDownloadRedirectUri(
-                        slug: venue.slug,
-                        config: config,
-                        venueName: venue.name,
-                      );
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.space6,
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusXl,
+                          ),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.05),
+                          ),
+                        ),
+                        child: DataTable(
+                          headingTextStyle: tt.labelMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: cs.onSurfaceVariant,
+                            letterSpacing: 1.5,
+                          ),
+                          dataRowMinHeight: 72,
+                          dataRowMaxHeight: 72,
+                          columns: const [
+                            DataColumn(label: Text('VENUE')),
+                            DataColumn(label: Text('SLUG')),
+                            DataColumn(label: Text('STATUS')),
+                            DataColumn(label: Text('MODE')),
+                            DataColumn(label: Text('ACTIONS')),
+                          ],
+                          rows: displayVenues.map((venue) {
+                            final guestUri = buildVenueDeepLinkUri(
+                              slug: venue.slug,
+                              config: config,
+                            );
 
-                      return _VenueCard(
-                            venue: venue,
-                            guestUri: guestUri,
-                            appUri: appUri,
-                            onOpenDetail: () => context.pushNamed(
-                              AppRouteNames.adminVenueDetail,
-                              pathParameters: {AppRouteParams.id: venue.id},
-                            ),
-                            onShowQr: () => _showQrSheet(
-                              context,
-                              title: '${venue.name} guest QR',
-                              subtitle:
-                                  'Guests scan this QR to open the venue menu directly.',
-                              uri: guestUri,
-                            ),
-                          )
-                          .animate(delay: (50 * index).ms)
-                          .fadeIn(duration: 300.ms)
-                          .slideY(begin: 0.05, end: 0);
-                    },
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                  Row(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: SizedBox(
+                                          width: 48,
+                                          height: 48,
+                                          child: DineInImage(
+                                            imageUrl: venue.imageUrl,
+                                            fit: BoxFit.cover,
+                                            fallbackIcon: LucideIcons.store,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            venue.name,
+                                            style: tt.titleMedium?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          Text(
+                                            venue.category,
+                                            style: tt.bodySmall?.copyWith(
+                                              color: cs.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    venue.slug,
+                                    style: tt.bodyMedium?.copyWith(
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  StatusBadge(
+                                    label: venue.status.label,
+                                    color: venue.status == VenueStatus.active
+                                        ? cs.secondary.withValues(alpha: 0.12)
+                                        : cs.error.withValues(alpha: 0.12),
+                                    textColor:
+                                        venue.status == VenueStatus.active
+                                        ? cs.secondary
+                                        : cs.error,
+                                  ),
+                                ),
+                                DataCell(
+                                  StatusBadge(
+                                    label: venue.orderingEnabled
+                                        ? 'Ordering'
+                                        : 'Browse Only',
+                                    color: venue.orderingEnabled
+                                        ? cs.primary.withValues(alpha: 0.12)
+                                        : cs.surfaceContainerHighest,
+                                    textColor: venue.orderingEnabled
+                                        ? cs.primary
+                                        : cs.onSurface,
+                                  ),
+                                ),
+                                DataCell(
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          LucideIcons.externalLink,
+                                          size: 20,
+                                        ),
+                                        color: cs.onSurfaceVariant,
+                                        tooltip: 'Open Guest Link',
+                                        onPressed: () => _openLink(
+                                          context,
+                                          guestUri.toString(),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          LucideIcons.copy,
+                                          size: 20,
+                                        ),
+                                        color: cs.onSurfaceVariant,
+                                        tooltip: 'Copy Guest Link',
+                                        onPressed: () => _copyLink(
+                                          context,
+                                          guestUri.toString(),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          LucideIcons.qrCode,
+                                          size: 20,
+                                        ),
+                                        color: cs.onSurfaceVariant,
+                                        tooltip: 'Guest QR Code',
+                                        onPressed: () => _showQrSheet(
+                                          context,
+                                          title: '${venue.name} guest QR',
+                                          subtitle:
+                                              'Guests scan this QR to open the venue menu directly.',
+                                          uri: guestUri,
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          LucideIcons.edit2,
+                                          size: 20,
+                                        ),
+                                        color: cs.primary,
+                                        tooltip: 'Edit Venue',
+                                        onPressed: () => context.pushNamed(
+                                          AppRouteNames.adminVenueDetail,
+                                          pathParameters: {
+                                            AppRouteParams.id: venue.id,
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               const SliverToBoxAdapter(
@@ -296,6 +441,31 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _copyLink(BuildContext context, String value) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Link copied.')));
+  }
+
+  Future<void> _openLink(BuildContext context, String value) async {
+    final uri = Uri.tryParse(value);
+    if (uri == null) return;
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (launched || !context.mounted) return;
+    } catch (_) {
+      if (!context.mounted) return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Unable to open link.')));
   }
 
   Future<void> _showQrSheet(
@@ -322,19 +492,24 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusXl),
+        ),
       ),
       builder: (sheetContext) {
         return Padding(
           padding: EdgeInsets.fromLTRB(
-            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
             MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 margin: const EdgeInsets.only(bottom: AppTheme.space5),
                 decoration: BoxDecoration(
                   color: cs.onSurface.withValues(alpha: 0.12),
@@ -346,11 +521,17 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
                 ),
                 child: Row(
                   children: [
-                    Icon(LucideIcons.search, size: 20, color: cs.onSurface.withValues(alpha: 0.10)),
+                    Icon(
+                      LucideIcons.search,
+                      size: 20,
+                      color: cs.onSurface.withValues(alpha: 0.10),
+                    ),
                     Expanded(
                       child: TextField(
                         controller: _searchController,
@@ -358,12 +539,18 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                         onChanged: (v) => setState(() => _query = v.trim()),
                         textInputAction: TextInputAction.search,
                         onSubmitted: (_) => Navigator.pop(sheetContext),
-                        style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                        style: tt.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
                         decoration: InputDecoration(
-                          hintText: 'Search venues by name, slug, or address...',
+                          hintText:
+                              'Search venues by name, slug, or address...',
                           border: InputBorder.none,
                           filled: false,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
                           hintStyle: tt.titleSmall?.copyWith(
                             color: cs.onSurface.withValues(alpha: 0.12),
                             fontWeight: FontWeight.w900,
@@ -381,8 +568,6 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
     );
   }
 }
-
-
 
 class _TabButton extends StatelessWidget {
   final String label;
@@ -448,309 +633,7 @@ class _TabButton extends StatelessWidget {
   }
 }
 
-class _VenueCard extends StatelessWidget {
-  final Venue venue;
-  final Uri guestUri;
-  final Uri appUri;
-  final VoidCallback onOpenDetail;
-  final VoidCallback onShowQr;
-
-  const _VenueCard({
-    required this.venue,
-    required this.guestUri,
-    required this.appUri,
-    required this.onOpenDetail,
-    required this.onShowQr,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return ClayCard(
-      onTap: onOpenDetail,
-      padding: const EdgeInsets.all(AppTheme.space5),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                child: SizedBox(
-                  width: 84,
-                  height: 84,
-                  child: DineInImage(
-                    imageUrl: venue.imageUrl,
-                    fit: BoxFit.cover,
-                    fallbackIcon: LucideIcons.store,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppTheme.space4),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            venue.name,
-                            style: tt.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.space2),
-                        StatusBadge(
-                          label: venue.status.label,
-                          color: venue.status == VenueStatus.active
-                              ? cs.secondary.withValues(alpha: 0.12)
-                              : cs.error.withValues(alpha: 0.12),
-                          textColor: venue.status == VenueStatus.active
-                              ? cs.secondary
-                              : cs.error,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      venue.category,
-                      style: tt.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      venue.address.isEmpty ? venue.slug : venue.address,
-                      style: tt.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.75),
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppTheme.space3),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        StatusBadge(
-                          label: venue.orderingEnabled
-                              ? 'Ordering On'
-                              : 'Browse Only',
-                          color: venue.orderingEnabled
-                              ? cs.primary.withValues(alpha: 0.12)
-                              : cs.surfaceContainerHighest,
-                          textColor: venue.orderingEnabled
-                              ? cs.primary
-                              : cs.onSurface,
-                        ),
-                        if (venue.hasAssignedAccessPhone)
-                          StatusBadge(
-                            label: venue.isAccessReady
-                                ? 'OTP Ready'
-                                : 'OTP Pending',
-                            color: venue.isAccessReady
-                                ? cs.secondary.withValues(alpha: 0.12)
-                                : cs.tertiary.withValues(alpha: 0.12),
-                            textColor: venue.isAccessReady
-                                ? cs.secondary
-                                : cs.tertiary,
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTheme.space4),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final stackPreview = constraints.maxWidth < 760;
-              final previewCard = PressableScale(
-                onTap: onShowQr,
-                child: Container(
-                  width: stackPreview ? double.infinity : 160,
-                  padding: const EdgeInsets.all(AppTheme.space3),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.05),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      IgnorePointer(
-                        child: BrandedQrPoster(uri: guestUri, compact: true),
-                      ),
-                      const SizedBox(height: AppTheme.space3),
-                      Text(
-                        'GENERATE GUEST QR',
-                        style: tt.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.8,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-
-              final links = Column(
-                children: [
-                  _LinkRow(label: 'Guest URL', value: guestUri.toString()),
-                  const SizedBox(height: AppTheme.space3),
-                  _LinkRow(label: 'Venue App URL', value: appUri.toString()),
-                ],
-              );
-
-              if (stackPreview) {
-                return Column(
-                  children: [
-                    links,
-                    const SizedBox(height: AppTheme.space4),
-                    previewCard,
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: links),
-                  const SizedBox(width: AppTheme.space4),
-                  previewCard,
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 String venueQrFileSlug(String raw) {
   final normalized = raw.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
   return normalized.replaceAll(RegExp(r'^_+|_+$'), '');
-}
-
-class _LinkRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _LinkRow({required this.label, required this.value});
-
-  Future<void> _copyLink(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: value));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$label copied.')));
-  }
-
-  Future<void> _openLink(BuildContext context) async {
-    final uri = Uri.tryParse(value);
-    if (uri == null) return;
-
-    try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (launched || !context.mounted) return;
-    } catch (_) {
-      if (!context.mounted) return;
-    }
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Unable to open $label.')));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.space3),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label.toUpperCase(),
-                  style: tt.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.8,
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: tt.bodySmall?.copyWith(
-                    color: cs.onSurface,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppTheme.space2),
-          Column(
-            children: [
-              PressableScale(
-                onTap: () => _copyLink(context),
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(LucideIcons.copy, size: 16, color: cs.onSurface),
-                ),
-              ),
-              const SizedBox(height: 6),
-              PressableScale(
-                onTap: () => _openLink(context),
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    LucideIcons.externalLink,
-                    size: 16,
-                    color: cs.onSurface,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }
