@@ -771,7 +771,6 @@ class _ImagePanel extends StatelessWidget {
           ),
           const SizedBox(height: AppTheme.space2),
           Text(
-          Text(
             'Provide a real image URL, or use AI generation.',
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
