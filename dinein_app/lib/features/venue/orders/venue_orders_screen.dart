@@ -78,8 +78,8 @@ class _VenueOrdersScreenState extends ConsumerState<VenueOrdersScreen> {
         if (venue == null) {
           return const EmptyState(
             icon: LucideIcons.store,
-            title: 'No venue access',
-            subtitle: 'Claim and verify a venue first.',
+            title: 'No Venue Access',
+            subtitle: 'No venue linked to this account.',
           );
         }
         return _OrdersBody(
@@ -283,33 +283,64 @@ class _OrdersBody extends ConsumerWidget {
                                   letterSpacing: -0.5,
                                 ),
                               ),
-                              PressableScale(
-                                onTap: onToggleFilter,
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: showFilterPanel
-                                        ? cs.primary.withValues(alpha: 0.15)
-                                        : cs.surfaceContainerLow,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: showFilterPanel
-                                          ? cs.primary.withValues(alpha: 0.3)
-                                          : Colors.white.withValues(
-                                              alpha: 0.05,
-                                            ),
+                              Row(
+                                children: [
+                                  // Search icon
+                                  PressableScale(
+                                    onTap: () => _showSearchSheet(context, cs, tt),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: searchQuery.isNotEmpty
+                                            ? cs.primary.withValues(alpha: 0.15)
+                                            : cs.surfaceContainerLow,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: searchQuery.isNotEmpty
+                                              ? cs.primary.withValues(alpha: 0.3)
+                                              : Colors.white.withValues(alpha: 0.05),
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        LucideIcons.search,
+                                        size: 18,
+                                        color: searchQuery.isNotEmpty
+                                            ? cs.primary
+                                            : cs.onSurfaceVariant,
+                                      ),
                                     ),
                                   ),
-                                  child: Icon(
-                                    LucideIcons.slidersHorizontal,
-                                    size: 18,
-                                    color: showFilterPanel
-                                        ? cs.primary
-                                        : cs.onSurfaceVariant,
+                                  const SizedBox(width: 8),
+                                  // Filter toggle
+                                  PressableScale(
+                                    onTap: onToggleFilter,
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: showFilterPanel
+                                            ? cs.primary.withValues(alpha: 0.15)
+                                            : cs.surfaceContainerLow,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: showFilterPanel
+                                              ? cs.primary.withValues(alpha: 0.3)
+                                              : Colors.white.withValues(alpha: 0.05),
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        LucideIcons.slidersHorizontal,
+                                        size: 18,
+                                        color: showFilterPanel
+                                            ? cs.primary
+                                            : cs.onSurfaceVariant,
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ],
                           ),
@@ -375,48 +406,47 @@ class _OrdersBody extends ConsumerWidget {
                           ),
                           const SizedBox(height: AppTheme.space4),
 
-                          // ═══ SEARCH BAR ═══
-                          Container(
-                            decoration: BoxDecoration(
-                              color: cs.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.05),
+                          // Active search query chip
+                          if (searchQuery.isNotEmpty) ...[
+                            const SizedBox(height: AppTheme.space3),
+                            PressableScale(
+                              onTap: () {
+                                searchController.clear();
+                                onSearch('');
+                              },
+                              semanticLabel: 'Clear search',
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cs.primary.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusFull,
+                                  ),
+                                  border: Border.all(
+                                    color: cs.primary.withValues(alpha: 0.25),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(LucideIcons.search, size: 12, color: cs.primary),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '"$searchQuery"',
+                                      style: tt.labelSmall?.copyWith(
+                                        color: cs.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Icon(LucideIcons.x, size: 12, color: cs.primary),
+                                  ],
+                                ),
                               ),
                             ),
-                            child: TextField(
-                              controller: searchController,
-                              onChanged: onSearch,
-                              style: tt.bodyMedium,
-                              decoration: InputDecoration(
-                                hintText:
-                                    'Search Order Number, Guest or Item...',
-                                hintStyle: tt.bodyMedium?.copyWith(
-                                  color: cs.onSurfaceVariant.withValues(
-                                    alpha: 0.40,
-                                  ),
-                                ),
-                                prefixIcon: Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: 16,
-                                    right: 10,
-                                  ),
-                                  child: Icon(
-                                    LucideIcons.search,
-                                    size: 18,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                                prefixIconConstraints: const BoxConstraints(
-                                  minWidth: 0,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                              ),
-                            ),
-                          ),
+                          ],
 
                           // ═══ FILTER PANEL (collapsible) ═══
                           AnimatedSize(
@@ -513,7 +543,13 @@ class _OrdersBody extends ConsumerWidget {
     try {
       await OrderRepository.instance.updateOrderStatus(order.id, nextStatus);
       ref.invalidate(venueOrdersProvider(venueId));
-    } catch (_) {}
+      final msg = nextStatus == OrderStatus.received
+          ? 'Order marked as received'
+          : 'Order marked as served';
+      DineInToast.instance.success(msg);
+    } catch (e) {
+      DineInToast.instance.error('Failed to update: $e');
+    }
   }
 
   Future<void> _exportPdf(BuildContext context, List<Order> orders) async {
@@ -650,5 +686,67 @@ class _OrdersBody extends ConsumerWidget {
         ),
       );
     }
+  }
+
+  void _showSearchSheet(BuildContext context, ColorScheme cs, TextTheme tt) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusXl),
+        ),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: AppTheme.space5),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                ),
+                child: TextField(
+                  controller: searchController,
+                  autofocus: true,
+                  onChanged: onSearch,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => Navigator.pop(sheetContext),
+                  style: tt.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: 'Search Order Number, Guest or Item...',
+                    hintStyle: tt.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.40),
+                    ),
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 10),
+                      child: Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
+                    ),
+                    prefixIconConstraints: const BoxConstraints(minWidth: 0),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

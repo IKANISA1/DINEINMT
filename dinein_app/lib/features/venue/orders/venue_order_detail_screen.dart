@@ -463,19 +463,14 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                               OrderStatus.cancelled,
                             );
                             ref.invalidate(orderByIdProvider(orderId));
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Order cancelled'),
-                                ),
-                              );
-                            }
+                            DineInToast.instance.show(
+                              message: 'Order cancelled',
+                              type: ToastType.warning,
+                            );
                           } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Failed to cancel: $e')),
-                              );
-                            }
+                            DineInToast.instance.error(
+                              'Failed to cancel: $e',
+                            );
                           }
                         },
                         child: Container(
@@ -516,7 +511,15 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                               nextStatus,
                             );
                             ref.invalidate(orderByIdProvider(orderId));
-                          } catch (_) {}
+                            final msg = nextStatus == OrderStatus.received
+                                ? 'Order marked as received'
+                                : 'Order marked as served';
+                            DineInToast.instance.success(msg);
+                          } catch (e) {
+                            DineInToast.instance.error(
+                              'Failed to update: $e',
+                            );
+                          }
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 18),

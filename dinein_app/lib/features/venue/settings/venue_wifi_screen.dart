@@ -134,7 +134,7 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
             return const EmptyState(
               icon: LucideIcons.store,
               title: 'No venue',
-              subtitle: 'Claim a venue first.',
+              subtitle: 'No venue linked to this account.',
             );
           }
           _seed(venue);

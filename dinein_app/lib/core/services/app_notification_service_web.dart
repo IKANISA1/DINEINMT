@@ -11,6 +11,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:web/web.dart' as web;
 
 import 'supabase_config.dart';
+import 'notification_inbox_service.dart';
+import 'package:ui/widgets/dinein_toast.dart';
 
 const _venueOrdersRoute = AppRoutePaths.venueOrders;
 const _venueWavesRoute = AppRoutePaths.venueWaves;
@@ -148,14 +150,6 @@ class AppNotificationService {
   }
 
   static Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    if (web.document.hidden != true) {
-      return;
-    }
-
-    if (web.Notification.permission != 'granted') {
-      return;
-    }
-
     final notification = message.notification;
     final title = notification?.title ?? _stringData(message.data, 'title');
     if (title == null || title.trim().isEmpty) {
@@ -166,6 +160,51 @@ class AppNotificationService {
         notification?.body ??
         _stringData(message.data, 'body') ??
         'Open DineIn to review the latest venue activity.';
+
+    // Resolve the navigation route from notification data
+    final eventType = _stringData(message.data, 'event_type');
+    final route = switch (eventType) {
+      'new_order' => _venueOrdersRoute,
+      'bell_request' => _venueWavesRoute,
+      _ => _stringData(message.data, 'route'),
+    };
+
+    // Always add to notification inbox for persistence
+    final notifType = switch (eventType) {
+      'new_order' => 'order',
+      'bell_request' => 'bell',
+      _ => 'info',
+    };
+
+    await NotificationInboxService.instance.init();
+    await NotificationInboxService.instance.add(
+      id: message.messageId ?? '${DateTime.now().millisecondsSinceEpoch}',
+      title: title,
+      body: body,
+      url: route,
+      type: notifType,
+    );
+
+    // Tab is visible → show in-app toast with contextual type
+    if (web.document.hidden != true) {
+      final toastType = switch (eventType) {
+        'new_order' => ToastType.success,
+        'bell_request' => ToastType.warning,
+        _ => ToastType.info,
+      };
+      DineInToast.instance.show(
+        message: '$title — $body',
+        type: toastType,
+        actionLabel: route != null ? 'VIEW' : null,
+        onAction: route != null ? () => _navigateFromNotificationData(message.data) : null,
+      );
+      return;
+    }
+
+    // Tab is hidden → show OS notification
+    if (web.Notification.permission != 'granted') {
+      return;
+    }
 
     try {
       web.Notification(

@@ -418,7 +418,7 @@ void main() {
       expect(locked.needsGeneratedImage, isFalse);
     });
 
-    test('guest display tags prioritize popular and dietary badges', () {
+    test('guest display tags show Top Pick for highlighted items', () {
       final item = MenuItem.fromJson({
         'id': 'item_4',
         'venue_id': 'venue_1',
@@ -428,10 +428,97 @@ void main() {
         'tags': ['vegan', 'halal', 'Chef Pick'],
       });
 
+      // highlightRank alone no longer makes isPopular true
+      expect(item.isPopular, isFalse);
+      // Instead, highlighted items show "Top Pick"
+      expect(item.isGuestHighlight, isTrue);
+      expect(item.guestHighlightLabel, 'Top Pick');
+      expect(item.dietaryBadges, ['Vegan', 'Halal']);
+      expect(
+        item.guestDisplayTags,
+        ['Top Pick', 'Vegan', 'Halal', 'Chef Pick'],
+      );
+    });
+
+    test('isPopular requires totalOrdered >= 10 threshold', () {
+      const base = MenuItem(
+        id: 'pop_1',
+        venueId: 'v1',
+        name: 'Fries',
+        description: '',
+        price: 5,
+        category: 'Sides',
+      );
+
+      // Default totalOrdered = 0 → not popular
+      expect(base.isPopular, isFalse);
+      expect(base.guestHighlightLabel, isNull);
+
+      // Below threshold (9 orders)
+      final below = base.copyWith(totalOrdered: 9);
+      expect(below.isPopular, isFalse);
+
+      // At threshold (10 orders)
+      final atThreshold = base.copyWith(totalOrdered: 10);
+      expect(atThreshold.isPopular, isTrue);
+      expect(atThreshold.guestHighlightLabel, 'Popular');
+
+      // Above threshold
+      final above = base.copyWith(totalOrdered: 25);
+      expect(above.isPopular, isTrue);
+    });
+
+    test('isPopular is true with popular-like tag regardless of orders', () {
+      final item = MenuItem.fromJson({
+        'id': 'pop_2',
+        'venue_id': 'v1',
+        'name': 'Bestselling Pasta',
+        'price': 14,
+        'tags': ['bestseller'],
+      });
+
+      // Tag-based popularity, no orders needed
       expect(item.isPopular, isTrue);
       expect(item.guestHighlightLabel, 'Popular');
-      expect(item.dietaryBadges, ['Vegan', 'Halal']);
-      expect(item.guestDisplayTags, ['Popular', 'Vegan', 'Halal', 'Chef Pick']);
+    });
+
+    test('guestHighlightLabel priority: Top Pick > Popular > Signature', () {
+      // Case 1: both highlighted AND popular → "Top Pick" wins
+      const both = MenuItem(
+        id: 'prio_1',
+        venueId: 'v1',
+        name: 'X',
+        description: '',
+        price: 10,
+        category: 'C',
+        highlightRank: 1,
+        totalOrdered: 10,
+      );
+      expect(both.guestHighlightLabel, 'Top Pick');
+
+      // Case 2: popular only → "Popular"
+      const popularOnly = MenuItem(
+        id: 'prio_2',
+        venueId: 'v1',
+        name: 'Y',
+        description: '',
+        price: 10,
+        category: 'C',
+        totalOrdered: 15,
+      );
+      expect(popularOnly.guestHighlightLabel, 'Popular');
+
+      // Case 3: signature only → "Signature"
+      const signatureOnly = MenuItem(
+        id: 'prio_3',
+        venueId: 'v1',
+        name: 'Z',
+        description: '',
+        price: 10,
+        category: 'C',
+        tags: ['signature'],
+      );
+      expect(signatureOnly.guestHighlightLabel, 'Signature');
     });
   });
 

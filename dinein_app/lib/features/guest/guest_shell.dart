@@ -12,6 +12,7 @@ import 'package:ui/theme/app_layout.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 import 'package:dinein_app/shared/widgets/shell_scroll_chrome.dart';
+import 'package:dinein_app/shared/widgets/notification_bell_button.dart';
 
 class GuestShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -153,27 +154,6 @@ class _WideGuestShell extends StatelessWidget {
                             shadowBlur: 18,
                             shadowOpacity: 0.28,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'DINEIN',
-                                  style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -0.8,
-                                      ),
-                                ),
-                                Text(
-                                  'Guest portal',
-                                  style: Theme.of(context).textTheme.labelSmall
-                                      ?.copyWith(color: cs.onSurfaceVariant),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -246,7 +226,6 @@ class _TopAppBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(countryConfigProvider);
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
 
     return AdaptiveGlassSurface(
       decoration: BoxDecoration(
@@ -265,23 +244,11 @@ class _TopAppBar extends ConsumerWidget {
               PressableScale(
                 onTap: () => context.goNamed(AppRouteNames.discover),
                 semanticLabel: 'Open guest portal',
-                child: Row(
-                  children: [
-                    const BrandMark(
-                      size: 40,
-                      borderRadius: AppTheme.radiusFull,
-                      shadowBlur: 18,
-                      shadowOpacity: 0.28,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'DINEIN',
-                      style: tt.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.8,
-                      ),
-                    ),
-                  ],
+                child: const BrandMark(
+                  size: 40,
+                  borderRadius: AppTheme.radiusFull,
+                  shadowBlur: 18,
+                  shadowOpacity: 0.28,
                 ),
               ),
               const Spacer(),
@@ -290,6 +257,8 @@ class _TopAppBar extends ConsumerWidget {
                 onTap: () => _shareApp(config),
               ),
               const SizedBox(width: 8),
+              const NotificationBellButton(),
+              const SizedBox(width: 4),
               _AppBarIcon(
                 icon: LucideIcons.search,
                 onTap: () => context.goNamed(AppRouteNames.venuesBrowse),

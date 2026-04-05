@@ -376,8 +376,17 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
               ],
             ),
             actions: [
+              // Search icon — opens search sheet
+              IconButton(
+                icon: Icon(
+                  LucideIcons.search,
+                  color: _query.isNotEmpty ? cs.primary : cs.onSurfaceVariant,
+                ),
+                onPressed: () => _showSearchSheet(context, cs, tt),
+                tooltip: 'Search menu',
+              ),
               Padding(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.only(right: 8),
                 child: IconButton(
                   icon: Icon(LucideIcons.hand, color: cs.primary),
                   onPressed: venue?.id == null
@@ -387,70 +396,56 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
               ),
             ],
             bottom: PreferredSize(
-              preferredSize: Size.fromHeight(categories.isEmpty ? 76 : 132),
+              preferredSize: Size.fromHeight(
+                (categories.isEmpty ? 0 : 56) + (_query.isNotEmpty ? 40 : 0),
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppTheme.space4,
-                      0,
-                      AppTheme.space4,
-                      AppTheme.space3,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                        border: Border.all(
-                          color: cs.outlineVariant.withValues(alpha: 0.18),
+                  // Active query chip
+                  if (_query.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppTheme.space4, 0, AppTheme.space4, AppTheme.space2,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: PressableScale(
+                          onTap: _clearSearch,
+                          semanticLabel: 'Clear search',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusFull,
+                              ),
+                              border: Border.all(
+                                color: cs.primary.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(LucideIcons.search, size: 12, color: cs.primary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '"$_query"',
+                                  style: tt.labelSmall?.copyWith(
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(LucideIcons.x, size: 12, color: cs.primary),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            LucideIcons.search,
-                            size: 18,
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.85),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              onChanged: _onSearchChanged,
-                              textInputAction: TextInputAction.search,
-                              style: tt.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                filled: false,
-                                hintText: 'Search menu items...',
-                                hintStyle: tt.bodyLarge?.copyWith(
-                                  color: cs.onSurfaceVariant.withValues(
-                                    alpha: 0.40,
-                                  ),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (_query.isNotEmpty)
-                            PressableScale(
-                              onTap: _clearSearch,
-                              semanticLabel: 'Clear search',
-                              minTouchTargetSize: const Size(44, 44),
-                              child: Icon(
-                                LucideIcons.x,
-                                size: 18,
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
                     ),
-                  ),
                   if (categories.isNotEmpty && _tabController != null)
                     TabBar(
                       controller: _tabController,
@@ -690,6 +685,89 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                 .fadeIn(duration: 300.ms)
                 .slideY(begin: 1, end: 0, duration: 300.ms)
           : null,
+    );
+  }
+
+  void _showSearchSheet(BuildContext context, ColorScheme cs, TextTheme tt) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusXl),
+        ),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
+            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: AppTheme.space5),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                  border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.search, size: 18,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.85)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        autofocus: true,
+                        onChanged: _onSearchChanged,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => Navigator.pop(sheetContext),
+                        style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          filled: false,
+                          hintText: 'Search menu items...',
+                          hintStyle: tt.bodyLarge?.copyWith(
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.40),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_query.isNotEmpty)
+                      PressableScale(
+                        onTap: () {
+                          _clearSearch();
+                          Navigator.pop(sheetContext);
+                        },
+                        semanticLabel: 'Clear search',
+                        minTouchTargetSize: const Size(44, 44),
+                        child: Icon(LucideIcons.x, size: 18,
+                          color: cs.onSurfaceVariant),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

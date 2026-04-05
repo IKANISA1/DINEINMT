@@ -50,8 +50,8 @@ class VenueDashboardScreen extends ConsumerWidget {
           return const Scaffold(
             body: EmptyState(
               icon: LucideIcons.store,
-              title: 'No venue access',
-              subtitle: 'Claim and verify a venue to unlock the portal.',
+              title: 'No Venue Access',
+              subtitle: 'No venue linked to this account.',
             ),
           );
         }

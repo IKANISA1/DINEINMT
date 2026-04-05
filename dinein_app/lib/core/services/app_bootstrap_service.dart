@@ -10,6 +10,8 @@ import '../infrastructure/app_telemetry_service.dart'
     if (dart.library.html) 'app_telemetry_service_web.dart';
 import 'auth_repository.dart';
 import 'supabase_config.dart';
+import 'notification_inbox_service.dart';
+import 'offline_sync_listener.dart';
 
 enum AppBootstrapPhase { idle, running, ready, failed }
 
@@ -77,7 +79,11 @@ class AppBootstrapService extends ChangeNotifier {
     await Future.wait<void>([
       AppNotificationService.initialize(),
       AppTelemetryService.initialize(),
+      NotificationInboxService.instance.init(),
     ]);
+
+    // Start listening for offline sync SW messages (web only)
+    OfflineSyncListener.instance.init();
 
     final venueSession = AuthRepository.instance.currentVenueSession;
     if (venueSession != null) {

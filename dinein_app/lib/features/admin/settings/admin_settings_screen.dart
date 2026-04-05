@@ -315,10 +315,6 @@ class AdminSettingsScreen extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: AppTheme.space8),
-
-          // ─── Role Switch Footer ───
-          const RoleSwitchFooter(currentRole: ActiveRole.admin),
 
           const SizedBox(height: AppTheme.space12),
         ],

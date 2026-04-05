@@ -278,7 +278,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         await _showVenueSupportDialog(
           title: 'Venue Access Not Found',
           message:
-              'This WhatsApp number is not linked to a validated venue account. Contact support to activate or recover venue access.',
+              'This WhatsApp number is not linked to any venue. Ask the admin to register your venue and link your number first.',
         );
         return;
       }
@@ -330,7 +330,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         await _showVenueSupportDialog(
           title: 'Venue Access Not Found',
           message:
-              'This WhatsApp number is not linked to a validated venue account. Contact support to activate or recover venue access.',
+              'This WhatsApp number is not linked to any venue. Ask the admin to register your venue and link your number first.',
         );
         return;
       }
@@ -354,7 +354,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         await _showVenueSupportDialog(
           title: 'Venue Access Not Found',
           message:
-              'This WhatsApp number is no longer linked to a validated venue account. Contact support to restore venue access.',
+              'This WhatsApp number is no longer linked to a venue. Contact admin to restore access.',
         );
         return;
       }
@@ -447,7 +447,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
         const SizedBox(height: 8),
         Center(
           child: Text(
-            'Portal',
+            'Login',
             style: tt.headlineMedium?.copyWith(
               fontWeight: FontWeight.w900,
               fontSize: 28,
@@ -460,7 +460,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Access your venue workspace with WhatsApp OTP.',
+              'Enter the WhatsApp number linked to your venue to receive an OTP.',
               textAlign: TextAlign.center,
               style: tt.bodyMedium?.copyWith(
                 color: cs.onSurfaceVariant,

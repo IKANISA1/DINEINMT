@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/dinein_toast.dart';
 
 Future<void> bootApp(CountryConfig config) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,9 +39,11 @@ Future<void> bootApp(CountryConfig config) async {
   unawaited(AppBootstrapService.instance.ensureStarted());
 
   runApp(
-    ProviderScope(
-      overrides: [countryConfigProvider.overrideWithValue(config)],
-      child: DineInApp(config: config),
+    DineInToastOverlay(
+      child: ProviderScope(
+        overrides: [countryConfigProvider.overrideWithValue(config)],
+        child: DineInApp(config: config),
+      ),
     ),
   );
 }

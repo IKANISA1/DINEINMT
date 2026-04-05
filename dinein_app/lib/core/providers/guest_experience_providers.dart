@@ -70,7 +70,7 @@ final guestMenuBundleProvider =
     ) async {
       if (request.venueId != null) {
         final venueId = request.venueId!;
-        final items = await ref.watch(menuItemsProvider(venueId).future);
+        final items = await ref.watch(enrichedMenuItemsProvider(venueId).future);
         Venue? venue;
         try {
           venue = await ref.watch(venueByIdProvider(venueId).future);
@@ -95,6 +95,6 @@ final guestMenuBundleProvider =
       if (venue == null) {
         return const GuestMenuBundle(venue: null, items: <MenuItem>[]);
       }
-      final items = await ref.watch(menuItemsProvider(venue.id).future);
+      final items = await ref.watch(enrichedMenuItemsProvider(venue.id).future);
       return GuestMenuBundle(venue: venue, items: items);
     });

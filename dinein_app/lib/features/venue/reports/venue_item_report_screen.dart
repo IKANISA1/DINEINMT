@@ -77,8 +77,8 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
         if (venue == null) {
           return const EmptyState(
             icon: LucideIcons.store,
-            title: 'No venue access',
-            subtitle: 'Claim and verify a venue first.',
+            title: 'No Venue Access',
+            subtitle: 'No venue linked to this account.',
           );
         }
 
@@ -276,55 +276,37 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                           ),
                           const SizedBox(height: AppTheme.space4),
 
-                          // ═══ SEARCH + SORT ═══
+                          // ═══ SEARCH ICON + SORT ═══
                           Row(
                             children: [
-                              Expanded(
+                              // Search icon
+                              PressableScale(
+                                onTap: () => _showSearchSheet(context, cs, tt),
                                 child: Container(
+                                  width: 48,
+                                  height: 48,
                                   decoration: BoxDecoration(
-                                    color: cs.surfaceContainerLow,
+                                    color: _searchQuery.isNotEmpty
+                                        ? cs.primary.withValues(alpha: 0.15)
+                                        : cs.surfaceContainerLow,
                                     borderRadius: BorderRadius.circular(16),
                                     border: Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.05,
-                                      ),
+                                      color: _searchQuery.isNotEmpty
+                                          ? cs.primary.withValues(alpha: 0.3)
+                                          : Colors.white.withValues(alpha: 0.05),
                                     ),
                                   ),
-                                  child: TextField(
-                                    controller: _searchCtrl,
-                                    onChanged: (q) =>
-                                        setState(() => _searchQuery = q),
-                                    style: tt.bodyMedium,
-                                    decoration: InputDecoration(
-                                      hintText: 'Search items…',
-                                      hintStyle: tt.bodyMedium?.copyWith(
-                                        color: cs.onSurfaceVariant.withValues(
-                                          alpha: 0.40,
-                                        ),
-                                      ),
-                                      prefixIcon: Padding(
-                                        padding: const EdgeInsets.only(
-                                          left: 16,
-                                          right: 10,
-                                        ),
-                                        child: Icon(
-                                          LucideIcons.search,
-                                          size: 18,
-                                          color: cs.onSurfaceVariant,
-                                        ),
-                                      ),
-                                      prefixIconConstraints:
-                                          const BoxConstraints(minWidth: 0),
-                                      border: InputBorder.none,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                          ),
-                                    ),
+                                  child: Icon(
+                                    LucideIcons.search,
+                                    size: 18,
+                                    color: _searchQuery.isNotEmpty
+                                        ? cs.primary
+                                        : cs.onSurfaceVariant,
                                   ),
                                 ),
                               ),
                               const SizedBox(width: AppTheme.space3),
+                              // Sort toggle
                               PressableScale(
                                 onTap: () => setState(
                                   () => _sortDir = _sortDir == _SortDir.desc
@@ -352,6 +334,47 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                               ),
                             ],
                           ),
+                          // Active search query chip
+                          if (_searchQuery.isNotEmpty) ...[
+                            const SizedBox(height: AppTheme.space3),
+                            PressableScale(
+                              onTap: () {
+                                _searchCtrl.clear();
+                                setState(() => _searchQuery = '');
+                              },
+                              semanticLabel: 'Clear search',
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: cs.primary.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusFull,
+                                  ),
+                                  border: Border.all(
+                                    color: cs.primary.withValues(alpha: 0.25),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(LucideIcons.search, size: 12, color: cs.primary),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '"$_searchQuery"',
+                                      style: tt.labelSmall?.copyWith(
+                                        color: cs.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Icon(LucideIcons.x, size: 12, color: cs.primary),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: AppTheme.space4),
 
                           // ═══ EXPORT BUTTONS ═══
@@ -688,6 +711,66 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
         ),
       );
     }
+  }
+
+  void _showSearchSheet(BuildContext context, ColorScheme cs, TextTheme tt) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: AppTheme.space5),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                ),
+                child: TextField(
+                  controller: _searchCtrl,
+                  autofocus: true,
+                  onChanged: (q) => setState(() => _searchQuery = q),
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => Navigator.pop(sheetContext),
+                  style: tt.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: 'Search items…',
+                    hintStyle: tt.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.40),
+                    ),
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 10),
+                      child: Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
+                    ),
+                    prefixIconConstraints: const BoxConstraints(minWidth: 0),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 

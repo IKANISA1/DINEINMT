@@ -6,3 +6,4 @@ export 'order_providers.dart';
 export 'permission_providers.dart';
 export 'venue_providers.dart';
 export 'wifi_providers.dart';
+export 'notification_inbox_provider.dart';

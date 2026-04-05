@@ -13,6 +13,7 @@ import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'firebase_runtime_service.dart';
 import 'package:dinein_app/core/services/supabase_config.dart';
+import 'package:dinein_app/core/services/notification_inbox_service.dart';
 
 const _venueOrdersRoute = AppRoutePaths.venueOrders;
 const _venueWavesRoute = AppRoutePaths.venueWaves;
@@ -203,6 +204,30 @@ class AppNotificationService {
         message.data['body'] ??
         'Open DineIn to review the latest venue activity.';
 
+    // Resolve event type for inbox categorization
+    final eventType = (message.data['event_type'] as String?)?.trim();
+    final route = switch (eventType) {
+      'new_order' => _venueOrdersRoute,
+      'bell_request' => _venueWavesRoute,
+      _ => (message.data['route'] as String?)?.trim(),
+    };
+    final notifType = switch (eventType) {
+      'new_order' => 'order',
+      'bell_request' => 'bell',
+      _ => 'info',
+    };
+
+    // Persist to notification inbox
+    await NotificationInboxService.instance.init();
+    await NotificationInboxService.instance.add(
+      id: message.messageId ?? '${DateTime.now().millisecondsSinceEpoch}',
+      title: title,
+      body: body,
+      url: route,
+      type: notifType,
+    );
+
+    // Show local notification (native OS)
     final payload = jsonEncode(message.data);
     final details = NotificationDetails(
       android: AndroidNotificationDetails(

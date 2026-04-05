@@ -70,11 +70,18 @@ class _MenuItemBadgeTone {
 
 _MenuItemBadgeTone _toneForBadge(String label) {
   final normalized = label.trim().toLowerCase();
-  if (normalized == 'popular' || normalized == 'signature') {
+  if (normalized == 'popular') {
     return _MenuItemBadgeTone(
       background: AppColors.primary.withValues(alpha: 0.14),
       border: AppColors.primary.withValues(alpha: 0.30),
       foreground: AppColors.primary,
+    );
+  }
+  if (normalized == 'top pick' || normalized == 'signature') {
+    return _MenuItemBadgeTone(
+      background: AppColors.warning.withValues(alpha: 0.16),
+      border: AppColors.warning.withValues(alpha: 0.32),
+      foreground: AppColors.warning,
     );
   }
   if (normalized == 'vegetarian' || normalized == 'vegan') {

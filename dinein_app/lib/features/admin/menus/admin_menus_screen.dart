@@ -172,7 +172,35 @@ class _AdminMenusScreenState extends ConsumerState<AdminMenusScreen> {
                         ],
                       ),
                     ),
-                    if (_activeTab == _MenuAdminTab.queue)
+                    // Search icon
+                    PressableScale(
+                      onTap: () => _showSearchSheet(context, cs, tt),
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: _query.isNotEmpty
+                              ? cs.primary.withValues(alpha: 0.15)
+                              : cs.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _query.isNotEmpty
+                                ? cs.primary.withValues(alpha: 0.3)
+                                : Colors.white.withValues(alpha: 0.05),
+                          ),
+                          boxShadow: AppTheme.clayShadow,
+                        ),
+                        child: Icon(
+                          LucideIcons.search,
+                          size: 24,
+                          color: _query.isNotEmpty
+                              ? cs.primary
+                              : cs.onSurfaceVariant.withValues(alpha: 0.40),
+                        ),
+                      ),
+                    ),
+                    if (_activeTab == _MenuAdminTab.queue) ...[
+                      const SizedBox(width: 8),
                       PressableScale(
                         onTap: () => _showFilterSheet(context),
                         child: Container(
@@ -193,6 +221,7 @@ class _AdminMenusScreenState extends ConsumerState<AdminMenusScreen> {
                           ),
                         ),
                       ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: AppTheme.space4),
@@ -215,23 +244,56 @@ class _AdminMenusScreenState extends ConsumerState<AdminMenusScreen> {
             ),
           ),
         ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.space8,
-              AppTheme.space10,
-              AppTheme.space8,
-              0,
-            ),
-            child: _SearchBar(
-              controller: _searchController,
-              hintText: _activeTab == _MenuAdminTab.catalog
-                  ? 'Search menu catalog...'
-                  : 'Search menu submissions...',
-              onChanged: (value) => setState(() => _query = value.trim()),
+        // Active search query chip
+        if (_query.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppTheme.space8,
+                AppTheme.space4,
+                AppTheme.space8,
+                0,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: PressableScale(
+                  onTap: () {
+                    _searchController.clear();
+                    setState(() => _query = '');
+                  },
+                  semanticLabel: 'Clear search',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                      border: Border.all(
+                        color: cs.primary.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(LucideIcons.search, size: 12, color: cs.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          '"$_query"',
+                          style: tt.labelSmall?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(LucideIcons.x, size: 12, color: cs.primary),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -542,71 +604,81 @@ class _AdminMenusScreenState extends ConsumerState<AdminMenusScreen> {
       },
     );
   }
-}
 
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final String hintText;
-  final ValueChanged<String> onChanged;
-
-  const _SearchBar({
-    required this.controller,
-    required this.hintText,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
+  void _showSearchSheet(BuildContext context, ColorScheme cs, TextTheme tt) {
+    final hint = _activeTab == _MenuAdminTab.catalog
+        ? 'Search menu catalog...'
+        : 'Search menu submissions...';
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
       ),
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 24),
-            child: Icon(
-              LucideIcons.search,
-              size: 24,
-              color: cs.onSurfaceVariant.withValues(alpha: 0.20),
-            ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
           ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              decoration: InputDecoration(
-                hintText: hintText,
-                border: InputBorder.none,
-                filled: false,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                hintStyle: tt.titleLarge?.copyWith(
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.10),
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: AppTheme.space5),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              style: tt.titleLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(40),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                ),
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 24),
+                      child: Icon(LucideIcons.search, size: 24, color: cs.onSurfaceVariant.withValues(alpha: 0.20)),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        autofocus: true,
+                        onChanged: (v) => setState(() => _query = v.trim()),
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => Navigator.pop(sheetContext),
+                        style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                        decoration: InputDecoration(
+                          hintText: hint,
+                          border: InputBorder.none,
+                          filled: false,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                          hintStyle: tt.titleLarge?.copyWith(
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.10),
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
+
+
 
 class _TabButton extends StatelessWidget {
   final String label;

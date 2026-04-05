@@ -38,11 +38,46 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+
+  // Forward push messages from FCM SW to any visible Flutter clients
+  if (event.data && event.data.type === 'PUSH_RECEIVED') {
+    self.clients.matchAll({ type: 'window' }).then((clients) => {
+      for (const client of clients) {
+        client.postMessage(event.data);
+      }
+    });
+  }
 });
 
 self.addEventListener('sync', (event) => {
   if (event.tag === OFFLINE_QUEUE_SYNC_TAG) {
-    event.waitUntil(replayQueuedRequests());
+    event.waitUntil((async () => {
+      const result = await replayQueuedRequests();
+      // Notify Flutter app that offline orders have been synced
+      try {
+        const clientList = await self.clients.matchAll({ type: 'window' });
+        for (const client of clientList) {
+          client.postMessage({
+            type: 'OFFLINE_SYNC_COMPLETE',
+            syncedCount: result || 0,
+          });
+        }
+      } catch (_) {}
+
+      // Show OS notification if no visible tab (user left the app)
+      try {
+        const visibleClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        const hasVisible = visibleClients.some(c => c.visibilityState === 'visible');
+        if (!hasVisible && self.registration.showNotification) {
+          self.registration.showNotification('Order confirmed', {
+            body: 'Your offline order has been submitted successfully.',
+            icon: '/icons/Icon-192.png',
+            badge: '/icons/Icon-maskable-192.png',
+            tag: 'dinein-offline-sync',
+          });
+        }
+      } catch (_) {}
+    })());
   }
 });
 

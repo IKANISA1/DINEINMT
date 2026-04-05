@@ -12,11 +12,13 @@ import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:core_pkg/config/country_config_provider.dart';
+import 'package:core_pkg/config/country_runtime.dart';
 import 'package:core_pkg/constants/enums.dart';
 import 'package:dinein_app/core/providers/cart_provider.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/services/app_telemetry.dart';
 import 'package:dinein_app/core/services/order_repository.dart';
+import 'package:dinein_app/core/services/notification_inbox_service.dart';
 import 'package:dinein_app/core/services/pwa_install_service.dart';
 import 'package:dinein_app/shared/widgets/safari_install_guide.dart';
 import 'package:dinein_app/core/services/venue_repository.dart';
@@ -207,6 +209,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       }
 
       cartNotifier.clear();
+
+      // Show success toast + inbox entry
+      DineInToast.instance.success('Order placed! Track your order status.');
+      NotificationInboxService.instance.add(
+        id: 'order-placed-${placed.id}',
+        title: 'Order placed',
+        body: 'Order #${placed.displayNumber} has been placed successfully.',
+        type: 'order',
+      );
 
       // G-21: Trigger PWA install prompt after successful order
       PwaInstallService.triggerIfEligible(reason: 'order_placed');
@@ -403,63 +414,47 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
               const SizedBox(height: AppTheme.space8),
 
-              // ─── Table Number Card ───
-              Container(
-                    key: _tableCardKey,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 4,
+              // ─── Compact Action Bar ───
+              Row(
+                children: [
+                  // Table number icon
+                  Expanded(
+                    child: _CompactActionChip(
+                      key: _tableCardKey,
+                      icon: LucideIcons.hash,
+                      label: _tableController.text.trim().isEmpty
+                          ? 'Table #'
+                          : 'Table ${_tableController.text.trim()}',
+                      isError: _tableError,
+                      onTap: () => _showTableNumberSheet(context),
                     ),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: _tableError
-                            ? cs.error
-                            : Colors.white.withValues(alpha: 0.05),
-                      ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Special requests icon
+                  Expanded(
+                    child: _CompactActionChip(
+                      icon: LucideIcons.messageSquare,
+                      label: _requestsController.text.trim().isEmpty
+                          ? 'Notes'
+                          : 'Notes ✓',
+                      iconColor: AppColors.secondary,
+                      onTap: () => _showSpecialRequestsSheet(context),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          LucideIcons.hash,
-                          size: 24,
-                          color: _tableError ? cs.error : cs.primary,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TextField(
-                            controller: _tableController,
-                            focusNode: _tableFocusNode,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            textInputAction: TextInputAction.done,
-                            onChanged: (v) {
-                              if (v.trim().isNotEmpty && _tableError) {
-                                setState(() => _tableError = false);
-                              }
-                            },
-                            onSubmitted: (_) {
-                              _syncTableNumber();
-                              FocusScope.of(context).unfocus();
-                            },
-                            style: tt.headlineSmall, // text-xl font-black
-                            decoration: InputDecoration(
-                              hintText: 'Table Number (Required)',
-                              hintStyle: tt.bodyLarge?.copyWith(
-                                color: cs.onSurfaceVariant.withValues(
-                                  alpha: 0.30,
-                                ),
-                              ),
-                              border: InputBorder.none,
-                            ),
-                          ),
-                        ),
-                      ],
+                  ),
+                  const SizedBox(width: 10),
+                  // Add more items
+                  Expanded(
+                    child: _CompactActionChip(
+                      icon: LucideIcons.plus,
+                      label: 'Add more',
+                      onTap: () {
+                        _syncDraftFields(clearError: false);
+                        Navigator.of(context).pop();
+                      },
                     ),
-                  )
+                  ),
+                ],
+              )
                   .animate(target: _tableError ? 1 : 0)
                   .shimmer(
                     duration: 400.ms,
@@ -471,120 +466,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     offset: const Offset(6, 0),
                     duration: 400.ms,
                   ),
-
-              const SizedBox(height: AppTheme.space8),
-
-              // ─── Special Requests Card ───
-              Container(
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                ),
-                child: Theme(
-                  data: Theme.of(
-                    context,
-                  ).copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    initiallyExpanded: false,
-                    tilePadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 4,
-                    ),
-                    leading: Icon(
-                      LucideIcons.messageSquare,
-                      size: 24,
-                      color: AppColors.secondary,
-                    ),
-                    title: Text(
-                      'Special Requests',
-                      style: tt.headlineSmall?.copyWith(fontSize: 18),
-                    ),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: TextField(
-                          controller: _requestsController,
-                          focusNode: _requestsFocusNode,
-                          maxLines: 3,
-                          style: tt.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                          decoration: InputDecoration(
-                            hintText:
-                                'Any allergies or preferences?\n(e.g. No onions, extra spicy)',
-                            hintStyle: tt.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant.withValues(
-                                alpha: 0.30,
-                              ),
-                            ),
-                            filled: true,
-                            fillColor: cs.surfaceContainerHigh,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.05),
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.05),
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.all(16),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: AppTheme.space8),
-
-              // ─── Add More Items CTA ───
-              PressableScale(
-                semanticLabel: 'Add more items',
-                onTap: () {
-                  _syncDraftFields(clearError: false);
-                  Navigator.of(context).pop();
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(AppTheme.space8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(40),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      width: 2,
-                      strokeAlign: BorderSide.strokeAlignCenter,
-                    ),
-                    color: Colors.white.withValues(alpha: 0.02),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        LucideIcons.plus,
-                        size: 24,
-                        color: cs.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Add more items',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
               const SizedBox(height: AppTheme.space10),
 
@@ -671,65 +552,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     ),
                     const SizedBox(height: AppTheme.space8),
 
-                    // Revolut button (primary)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed:
-                            _isPlacing ||
-                                orderingUnavailable ||
-                                !supportsRevolut
-                            ? null
-                            : () => _placeOrder(PaymentMethod.revolutLink),
-                        icon: Icon(LucideIcons.creditCard, size: 24),
-                        label: Text(
-                          'Pay with Revolut',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: cs.primary,
-                          foregroundColor: cs.onPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppTheme.space4),
-
-                    // Cash button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed:
-                            _isPlacing || orderingUnavailable || !supportsCash
-                            ? null
-                            : () => _placeOrder(PaymentMethod.cash),
-                        icon: Icon(LucideIcons.banknote, size: 24),
-                        label: Text(
-                          'Pay Cash',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: cs.onSurface,
-                          side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.10),
-                          ),
-                          backgroundColor: Colors.white.withValues(alpha: 0.05),
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                        ),
-                      ),
+                    // ─── Payment Buttons (country-aware) ───
+                    ..._buildPaymentButtons(
+                      cs: cs,
+                      orderingUnavailable: orderingUnavailable,
+                      supportsCash: supportsCash,
+                      supportsRevolut: supportsRevolut,
                     ),
                   ],
                 ),
@@ -741,6 +569,255 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         ),
       ),
     );
+  }
+
+  void _showTableNumberSheet(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          24, 24, 24,
+          MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Table Number', style: tt.titleLarge),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _tableController,
+              focusNode: _tableFocusNode,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              textInputAction: TextInputAction.done,
+              style: tt.headlineSmall,
+              onChanged: (v) {
+                if (v.trim().isNotEmpty && _tableError) {
+                  setState(() => _tableError = false);
+                }
+              },
+              onSubmitted: (_) {
+                _syncTableNumber();
+                Navigator.of(ctx).pop();
+              },
+              decoration: InputDecoration(
+                hintText: 'Enter your table number',
+                hintStyle: tt.bodyLarge?.copyWith(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.30),
+                ),
+                prefixIcon: Icon(LucideIcons.hash, color: cs.primary),
+                filled: true,
+                fillColor: cs.surfaceContainerHigh,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.all(16),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  _syncTableNumber();
+                  Navigator.of(ctx).pop();
+                  setState(() {});
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: cs.primary,
+                  foregroundColor: cs.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'Done',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).then((_) => setState(() {}));
+  }
+
+  void _showSpecialRequestsSheet(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          24, 24, 24,
+          MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Special Requests', style: tt.titleLarge),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _requestsController,
+              focusNode: _requestsFocusNode,
+              autofocus: true,
+              maxLines: 3,
+              style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                hintText:
+                    'Any allergies or preferences?\n(e.g. No onions, extra spicy)',
+                hintStyle: tt.bodyMedium?.copyWith(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.30),
+                ),
+                filled: true,
+                fillColor: cs.surfaceContainerHigh,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.all(16),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  _syncSpecialRequests();
+                  Navigator.of(ctx).pop();
+                  setState(() {});
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: cs.primary,
+                  foregroundColor: cs.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'Done',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).then((_) => setState(() {}));
+  }
+
+  /// Build country-aware payment buttons.
+  /// MT: Revolut (primary) + Cash
+  /// RW: MoMo (primary) + Cash
+  List<Widget> _buildPaymentButtons({
+    required ColorScheme cs,
+    required bool orderingUnavailable,
+    required bool supportsCash,
+    required bool supportsRevolut,
+  }) {
+    final country = CountryRuntime.config.country;
+    final methods = country.paymentMethods;
+    final widgets = <Widget>[];
+
+    for (var i = 0; i < methods.length; i++) {
+      final method = methods[i];
+      final isPrimary = i == 0 && method != PaymentMethod.cash;
+
+      bool isEnabled;
+      switch (method) {
+        case PaymentMethod.revolutLink:
+          isEnabled = supportsRevolut;
+          break;
+        case PaymentMethod.momoUssd:
+          isEnabled = true; // MoMo USSD always available (handoff only)
+          break;
+        case PaymentMethod.cash:
+          isEnabled = supportsCash;
+          break;
+      }
+
+      if (i > 0) widgets.add(const SizedBox(height: AppTheme.space4));
+
+      final icon = switch (method) {
+        PaymentMethod.revolutLink => LucideIcons.creditCard,
+        PaymentMethod.momoUssd => LucideIcons.smartphone,
+        PaymentMethod.cash => LucideIcons.banknote,
+      };
+
+      widgets.add(
+        SizedBox(
+          width: double.infinity,
+          child: isPrimary
+              ? ElevatedButton.icon(
+                  onPressed:
+                      _isPlacing || orderingUnavailable || !isEnabled
+                      ? null
+                      : () => _placeOrder(method),
+                  icon: Icon(icon, size: 24),
+                  label: Text(
+                    method.label,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: cs.primary,
+                    foregroundColor: cs.onPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    elevation: 0,
+                  ),
+                )
+              : OutlinedButton.icon(
+                  onPressed:
+                      _isPlacing || orderingUnavailable || !isEnabled
+                      ? null
+                      : () => _placeOrder(method),
+                  icon: Icon(icon, size: 24),
+                  label: Text(
+                    method.label,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: cs.onSurface,
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.10),
+                    ),
+                    backgroundColor: Colors.white.withValues(alpha: 0.05),
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                ),
+        ),
+      );
+    }
+    return widgets;
   }
 }
 
@@ -917,6 +994,71 @@ class _CartItemCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Compact chip-style action button for the cart checkout bar.
+class _CompactActionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isError;
+  final Color? iconColor;
+
+  const _CompactActionChip({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isError = false,
+    this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return PressableScale(
+      onTap: onTap,
+      semanticLabel: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isError
+                ? cs.error
+                : Colors.white.withValues(alpha: 0.05),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isError
+                  ? cs.error
+                  : (iconColor ?? cs.primary),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isError ? cs.error : cs.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

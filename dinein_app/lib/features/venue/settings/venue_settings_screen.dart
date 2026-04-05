@@ -57,8 +57,8 @@ class _VenueSettingsScreenState extends ConsumerState<VenueSettingsScreen> {
         if (venue == null) {
           return const EmptyState(
             icon: LucideIcons.store,
-            title: 'No venue access',
-            subtitle: 'Claim and verify a venue first.',
+            title: 'No Venue Access',
+            subtitle: 'No venue linked to this account.',
           );
         }
 
@@ -252,10 +252,7 @@ class _VenueSettingsScreenState extends ConsumerState<VenueSettingsScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: AppTheme.space8),
 
-            // ═══ ROLE SWITCH FOOTER ═══
-            const RoleSwitchFooter(currentRole: ActiveRole.venue),
           ],
         );
       },

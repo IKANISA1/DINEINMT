@@ -9,6 +9,7 @@ export 'permission_access_dialog.dart';
 export 'otp_widgets.dart';
 export 'role_switch_footer.dart';
 export 'access_support_dialog.dart';
+export 'dinein_toast.dart';
 
 /// Claymorphic card — the signature DineIn interactive surface.
 ///

@@ -112,6 +112,32 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                               ],
                             ),
                           ),
+                          PressableScale(
+                            onTap: () => _showSearchSheet(context, cs, tt),
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: _query.isNotEmpty
+                                    ? cs.primary.withValues(alpha: 0.15)
+                                    : cs.surfaceContainerLow,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: _query.isNotEmpty
+                                      ? cs.primary.withValues(alpha: 0.3)
+                                      : Colors.white.withValues(alpha: 0.05),
+                                ),
+                              ),
+                              child: Icon(
+                                LucideIcons.search,
+                                size: 18,
+                                color: _query.isNotEmpty
+                                    ? cs.primary
+                                    : cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           PremiumButton(
                             label: 'NEW VENUE',
                             icon: LucideIcons.plus,
@@ -124,12 +150,47 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                         ],
                       ),
                       const SizedBox(height: AppTheme.space6),
-                      _SearchBar(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _query = value.trim()),
-                      ),
-                      const SizedBox(height: AppTheme.space4),
+                      // Active search query chip
+                      if (_query.isNotEmpty) ...[
+                        PressableScale(
+                          onTap: () {
+                            _searchController.clear();
+                            setState(() => _query = '');
+                          },
+                          semanticLabel: 'Clear search',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.primary.withValues(alpha: 0.10),
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusFull,
+                              ),
+                              border: Border.all(
+                                color: cs.primary.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(LucideIcons.search, size: 12, color: cs.primary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '"$_query"',
+                                  style: tt.labelSmall?.copyWith(
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(LucideIcons.x, size: 12, color: cs.primary),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppTheme.space4),
+                      ],
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
@@ -254,59 +315,74 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
       openLabel: 'venue link',
     );
   }
-}
 
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-
-  const _SearchBar({required this.controller, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
+  void _showSearchSheet(BuildContext context, ColorScheme cs, TextTheme tt) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
       ),
-      child: Row(
-        children: [
-          Icon(
-            LucideIcons.search,
-            size: 20,
-            color: cs.onSurface.withValues(alpha: 0.10),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
           ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-              decoration: InputDecoration(
-                hintText: 'Search venues by name, slug, or address...',
-                border: InputBorder.none,
-                filled: false,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
-                hintStyle: tt.titleSmall?.copyWith(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: AppTheme.space5),
+                decoration: BoxDecoration(
                   color: cs.onSurface.withValues(alpha: 0.12),
-                  fontWeight: FontWeight.w900,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.search, size: 20, color: cs.onSurface.withValues(alpha: 0.10)),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        autofocus: true,
+                        onChanged: (v) => setState(() => _query = v.trim()),
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => Navigator.pop(sheetContext),
+                        style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+                        decoration: InputDecoration(
+                          hintText: 'Search venues by name, slug, or address...',
+                          border: InputBorder.none,
+                          filled: false,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          hintStyle: tt.titleSmall?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.12),
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
+
+
 
 class _TabButton extends StatelessWidget {
   final String label;

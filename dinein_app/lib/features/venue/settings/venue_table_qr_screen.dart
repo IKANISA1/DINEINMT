@@ -89,7 +89,7 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
           return const EmptyState(
             icon: LucideIcons.qrCode,
             title: 'No venue',
-            subtitle: 'Claim a venue first.',
+            subtitle: 'No venue linked to this account.',
           );
         }
 

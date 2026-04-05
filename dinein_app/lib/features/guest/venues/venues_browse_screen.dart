@@ -406,47 +406,39 @@ class _VenuesBody extends StatelessWidget {
                 const SizedBox(height: AppTheme.space8),
                 Row(
                   children: [
-                    Expanded(
+                    // Search icon — opens search sheet
+                    PressableScale(
+                      onTap: () => _showSearchSheet(context, cs, tt),
+                      semanticLabel: 'Search venues',
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        width: 56,
+                        height: 56,
                         decoration: BoxDecoration(
-                          color: cs.surfaceContainer,
+                          color: query.isNotEmpty
+                              ? cs.primary.withValues(alpha: 0.14)
+                              : cs.surfaceContainer,
                           borderRadius: BorderRadius.circular(
                             AppTheme.radiusXl,
                           ),
-                          border: Border.all(color: AppColors.white5),
+                          border: Border.all(
+                            color: query.isNotEmpty
+                                ? cs.primary.withValues(alpha: 0.28)
+                                : AppColors.white5,
+                          ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              LucideIcons.search,
-                              size: 20,
-                              color: AppColors.white10,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: searchController,
-                                onChanged: onSearchChanged,
-                                style: tt.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  filled: false,
-                                  hintText: 'Search...',
-                                  hintStyle: tt.bodyLarge?.copyWith(
-                                    color: AppColors.white10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: Center(
+                          child: Icon(
+                            LucideIcons.search,
+                            size: 22,
+                            color: query.isNotEmpty
+                                ? cs.primary
+                                : AppColors.white40,
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: AppTheme.space4),
+                    // Location button
                     PressableScale(
                       onTap: requestingLocation ? null : onUseMyLocation,
                       semanticLabel: 'Use my location',
@@ -490,6 +482,44 @@ class _VenuesBody extends StatelessWidget {
                     ),
                   ],
                 ),
+                // Active query chip
+                if (query.isNotEmpty) ...[
+                  const SizedBox(height: AppTheme.space3),
+                  PressableScale(
+                    onTap: onResetFilters,
+                    semanticLabel: 'Clear search',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(
+                          AppTheme.radiusFull,
+                        ),
+                        border: Border.all(
+                          color: cs.primary.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.search, size: 12, color: cs.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            '"$query"',
+                            style: tt.labelSmall?.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(LucideIcons.x, size: 12, color: cs.primary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppTheme.space4),
                 Text(
                   discoveryLocation != null
@@ -691,6 +721,73 @@ class _VenuesBody extends StatelessWidget {
           ),
         const SliverToBoxAdapter(child: SizedBox(height: AppTheme.space24)),
       ],
+    );
+  }
+
+  void _showSearchSheet(BuildContext context, ColorScheme cs, TextTheme tt) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusXl),
+        ),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: AppTheme.space5),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainer,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                  border: Border.all(color: AppColors.white5),
+                ),
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.search, size: 20, color: AppColors.white10),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: searchController,
+                        autofocus: true,
+                        onChanged: onSearchChanged,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => Navigator.pop(sheetContext),
+                        style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w800),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          filled: false,
+                          hintText: 'Search venues...',
+                          hintStyle: tt.bodyLarge?.copyWith(
+                            color: AppColors.white10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

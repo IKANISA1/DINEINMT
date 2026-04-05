@@ -311,6 +311,10 @@ class MenuItem extends Equatable {
   final bool isAvailable;
   final List<String> tags;
 
+  /// Runtime-computed: total quantity ordered (served orders, last 90 days).
+  /// Not a DB column — enriched client-side from order history.
+  final int totalOrdered;
+
   const MenuItem({
     required this.id,
     required this.venueId,
@@ -334,6 +338,7 @@ class MenuItem extends Equatable {
     this.imageAttempts = 0,
     this.isAvailable = true,
     this.tags = const [],
+    this.totalOrdered = 0,
   });
 
   factory MenuItem.fromJson(Map<String, dynamic> json) {
@@ -423,6 +428,7 @@ class MenuItem extends Equatable {
     int? imageAttempts,
     bool? isAvailable,
     List<String>? tags,
+    int? totalOrdered,
   }) {
     return MenuItem(
       id: id ?? this.id,
@@ -449,6 +455,7 @@ class MenuItem extends Equatable {
       imageAttempts: imageAttempts ?? this.imageAttempts,
       isAvailable: isAvailable ?? this.isAvailable,
       tags: tags ?? this.tags,
+      totalOrdered: totalOrdered ?? this.totalOrdered,
     );
   }
 
@@ -460,12 +467,23 @@ class MenuItem extends Equatable {
 
   bool get isGuestHighlight => highlightRank != null;
 
+  /// Minimum total-ordered quantity for an item to qualify as "Popular".
+  static const int _popularThreshold = 10;
+
+  /// Data-driven: item is popular if it has enough orders or a popular tag.
+  /// No longer conflated with highlightRank (owner curation).
   bool get isPopular =>
-      isGuestHighlight || tags.any((tag) => _isPopularMenuTag(tag));
+      totalOrdered >= _popularThreshold ||
+      tags.any((tag) => _isPopularMenuTag(tag));
 
   bool get isSignature => tags.any((tag) => _isSignatureMenuTag(tag));
 
+  /// Returns the primary guest-facing badge label.
+  /// - "Top Pick" for owner-curated highlights (highlightRank).
+  /// - "Popular" for data-driven popularity (order volume).
+  /// - "Signature" for signature-tagged items.
   String? get guestHighlightLabel {
+    if (isGuestHighlight) return 'Top Pick';
     if (isPopular) return 'Popular';
     if (isSignature) return 'Signature';
     return null;
@@ -490,8 +508,10 @@ class MenuItem extends Equatable {
     for (final tag in tags) {
       final trimmed = tag.trim();
       if (trimmed.isEmpty) continue;
+      final lc = trimmed.toLowerCase();
       if (_isPopularMenuTag(trimmed) ||
           _isSignatureMenuTag(trimmed) ||
+          lc == 'top pick' ||
           _normalizeDietaryMenuTag(trimmed) != null) {
         continue;
       }
@@ -540,5 +560,6 @@ class MenuItem extends Equatable {
     imageAttempts,
     isAvailable,
     tags,
+    totalOrdered,
   ];
 }

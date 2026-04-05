@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/dinein_toast.dart';
 
 import 'package:dinein_app/core/providers/connectivity_provider.dart';
 
@@ -11,6 +12,8 @@ import 'package:dinein_app/core/providers/connectivity_provider.dart';
 ///
 /// Design: slim, non-intrusive bar with amber/gold accent matching
 /// the DineIn brand. Animates in/out smoothly.
+///
+/// Also fires a "You're back online" toast on offline→online transitions.
 class OfflineBanner extends ConsumerWidget {
   final Widget child;
 
@@ -19,6 +22,13 @@ class OfflineBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isOnline = ref.watch(connectivityProvider);
+
+    // Listen for connectivity transitions → fire toast on reconnect
+    ref.listen<bool>(connectivityProvider, (previous, next) {
+      if (previous == false && next == true) {
+        DineInToast.instance.success("You're back online");
+      }
+    });
 
     return Column(
       children: [

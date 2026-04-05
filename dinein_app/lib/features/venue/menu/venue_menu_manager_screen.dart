@@ -53,8 +53,8 @@ class _VenueMenuManagerScreenState
         if (venue == null) {
           return const EmptyState(
             icon: LucideIcons.store,
-            title: 'No venue access',
-            subtitle: 'Claim and verify a venue to manage its menu.',
+            title: 'No Venue Access',
+            subtitle: 'No venue linked to this account.',
           );
         }
         return _MenuBody(
@@ -246,70 +246,106 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                             letterSpacing: -0.5,
                           ),
                         ),
-                        PressableScale(
-                          onTap: widget.onAddItem,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: cs.primary,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: cs.primary.withValues(alpha: 0.25),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
+                        Row(
+                          children: [
+                            // Search icon
+                            PressableScale(
+                              onTap: () => _showSearchSheet(context, cs, tt),
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: widget.searchQuery.isNotEmpty
+                                      ? cs.primary.withValues(alpha: 0.15)
+                                      : cs.surfaceContainerLow,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: widget.searchQuery.isNotEmpty
+                                        ? cs.primary.withValues(alpha: 0.3)
+                                        : Colors.white.withValues(alpha: 0.05),
+                                  ),
                                 ),
-                              ],
+                                child: Icon(
+                                  LucideIcons.search,
+                                  size: 18,
+                                  color: widget.searchQuery.isNotEmpty
+                                      ? cs.primary
+                                      : cs.onSurfaceVariant,
+                                ),
+                              ),
                             ),
-                            child: const Icon(
-                              LucideIcons.plus,
-                              size: 22,
-                              color: Colors.white,
+                            const SizedBox(width: 8),
+                            // Add item button
+                            PressableScale(
+                              onTap: widget.onAddItem,
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: cs.primary,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: cs.primary.withValues(alpha: 0.25),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  LucideIcons.plus,
+                                  size: 22,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
                     const SizedBox(height: AppTheme.space5),
 
-                    // ═══ SEARCH BAR ═══
-                    Container(
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.05),
-                        ),
-                      ),
-                      child: TextField(
-                        controller: widget.searchCtrl,
-                        onChanged: widget.onSearch,
-                        style: tt.bodyMedium,
-                        decoration: InputDecoration(
-                          hintText: 'Search items...',
-                          hintStyle: tt.bodyMedium?.copyWith(
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.40),
+                    // Active search query chip
+                    if (widget.searchQuery.isNotEmpty) ...[
+                      PressableScale(
+                        onTap: () {
+                          widget.searchCtrl.clear();
+                          widget.onSearch('');
+                        },
+                        semanticLabel: 'Clear search',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6,
                           ),
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.only(left: 16, right: 10),
-                            child: Icon(
-                              LucideIcons.search,
-                              size: 18,
-                              color: cs.onSurfaceVariant,
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(
+                              AppTheme.radiusFull,
+                            ),
+                            border: Border.all(
+                              color: cs.primary.withValues(alpha: 0.25),
                             ),
                           ),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 0,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 16,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.search, size: 12, color: cs.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                '"${widget.searchQuery}"',
+                                style: tt.labelSmall?.copyWith(
+                                  color: cs.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(LucideIcons.x, size: 12, color: cs.primary),
+                            ],
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: AppTheme.space4),
+                      const SizedBox(height: AppTheme.space4),
+                    ],
 
                     // ═══ FILTER BY TAGS ═══
                     PressableScale(
@@ -580,6 +616,66 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
 
             const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
           ],
+        );
+      },
+    );
+  }
+
+  void _showSearchSheet(BuildContext context, ColorScheme cs, TextTheme tt) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36, height: 4,
+                margin: const EdgeInsets.only(bottom: AppTheme.space5),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                ),
+                child: TextField(
+                  controller: widget.searchCtrl,
+                  autofocus: true,
+                  onChanged: widget.onSearch,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => Navigator.pop(sheetContext),
+                  style: tt.bodyMedium,
+                  decoration: InputDecoration(
+                    hintText: 'Search items...',
+                    hintStyle: tt.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.40),
+                    ),
+                    prefixIcon: Padding(
+                      padding: const EdgeInsets.only(left: 16, right: 10),
+                      child: Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
+                    ),
+                    prefixIconConstraints: const BoxConstraints(minWidth: 0),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

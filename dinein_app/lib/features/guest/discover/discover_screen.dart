@@ -5,7 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:share_plus/share_plus.dart';
+
 import 'dart:js_interop' as js;
 
 import 'package:core_pkg/constants/enums.dart';
@@ -538,45 +538,6 @@ class _DiscoverHero extends StatelessWidget {
                 fontWeight: FontWeight.w900,
                 letterSpacing: -1.0,
                 color: cs.primary,
-              ),
-            ),
-            const Spacer(),
-            // Search icon — opens search sheet
-            PressableScale(
-              onTap: () => _showSearchSheet(context),
-              semanticLabel: 'Search venues',
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: query.isNotEmpty
-                      ? cs.primary.withValues(alpha: 0.14)
-                      : cs.surfaceContainerHigh,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: query.isNotEmpty
-                        ? cs.primary.withValues(alpha: 0.28)
-                        : AppColors.white5,
-                  ),
-                ),
-                child: Icon(LucideIcons.search, size: 16, color: cs.primary),
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Web Share API trigger
-            PressableScale(
-              onTap: () {
-                AppTelemetryService.trackGuestEvent('discover_web_share_tapped');
-                Share.shareUri(Uri.base);
-              },
-              semanticLabel: 'Share App',
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHigh,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.white5),
-                ),
-                child: Icon(LucideIcons.share, size: 16, color: cs.primary),
               ),
             ),
           ],

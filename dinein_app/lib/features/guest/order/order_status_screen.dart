@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/notification_inbox_service.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:core_pkg/constants/enums.dart';
@@ -24,11 +25,26 @@ class OrderStatusScreen extends ConsumerStatefulWidget {
 }
 
 class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
+  OrderStatus? _lastKnownStatus;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final orderAsync = ref.watch(orderByIdProvider(widget.orderId));
+
+    // Listen for status transitions → fire toast + inbox entry
+    ref.listen<AsyncValue<OrderStatus>>(
+      orderStreamProvider(widget.orderId),
+      (previous, next) {
+        final newStatus = next.value;
+        if (newStatus == null) return;
+        if (_lastKnownStatus != null && newStatus != _lastKnownStatus) {
+          _onStatusChanged(newStatus);
+        }
+        _lastKnownStatus = newStatus;
+      },
+    );
 
     return orderAsync.when(
       loading: () => Scaffold(
@@ -59,6 +75,7 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
         // Also listen to real-time stream for status updates
         final streamAsync = ref.watch(orderStreamProvider(widget.orderId));
         final currentStatus = streamAsync.value ?? order.status;
+        _lastKnownStatus ??= currentStatus;
         final displayOrder = order;
 
         return Scaffold(
@@ -236,6 +253,40 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
       OrderStatus.served => AppColors.primary,
       OrderStatus.cancelled => cs.error,
     };
+  }
+
+  void _onStatusChanged(OrderStatus newStatus) {
+    final (title, body, type) = switch (newStatus) {
+      OrderStatus.received => (
+        'Order confirmed',
+        'Your order is being prepared!',
+        ToastType.success,
+      ),
+      OrderStatus.served => (
+        'Order served',
+        'Your order has been served! Enjoy your meal!',
+        ToastType.success,
+      ),
+      OrderStatus.cancelled => (
+        'Order cancelled',
+        'Your order has been cancelled.',
+        ToastType.error,
+      ),
+      OrderStatus.placed => (
+        'Order placed',
+        'Your order has been placed.',
+        ToastType.info,
+      ),
+    };
+
+    DineInToast.instance.show(message: body, type: type);
+
+    NotificationInboxService.instance.add(
+      id: 'order-status-${widget.orderId}-${newStatus.dbValue}',
+      title: title,
+      body: body,
+      type: 'order',
+    );
   }
 
   IconData _statusIcon(OrderStatus status) {

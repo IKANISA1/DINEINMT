@@ -19,7 +19,7 @@ class VenueMenuHighlights extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final menuAsync = ref.watch(menuItemsProvider(venue.id));
+    final menuAsync = ref.watch(enrichedMenuItemsProvider(venue.id));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

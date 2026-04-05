@@ -8,6 +8,7 @@ import 'api_invoker.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 import 'menu_image_generation_service.dart';
+import 'supabase_config.dart';
 
 /// Repository for menu item data access via Supabase.
 class MenuRepository {
@@ -298,6 +299,35 @@ class MenuRepository {
       itemId,
       (item) => item.copyWith(imageLocked: imageLocked),
     );
+  }
+
+  /// Fetches per-item order popularity for a venue (served orders, last 7d).
+  ///
+  /// Returns a map of `{menuItemId: totalQuantityOrdered}`.
+  /// Uses a Postgres RPC function for efficient aggregation without
+  /// transferring full order payloads to the client.
+  Future<Map<String, int>> getVenueItemPopularity(String venueId) async {
+    try {
+      final response = await SupabaseConfig.client.rpc(
+        'get_venue_item_popularity',
+        params: {'p_venue_id': venueId},
+      ) as List<dynamic>;
+
+      final popularity = <String, int>{};
+      for (final row in response) {
+        final map = row as Map<String, dynamic>;
+        final itemId = map['menu_item_id'] as String?;
+        final count = (map['total_ordered'] as num?)?.toInt() ?? 0;
+        if (itemId != null && count > 0) {
+          popularity[itemId] = count;
+        }
+      }
+      return popularity;
+    } catch (_) {
+      // Gracefully degrade if the RPC function is not yet deployed.
+      // Items will simply not show "Popular" badges until the migration runs.
+      return const {};
+    }
   }
 
   Future<void> _queueMenuItemImageGenerationSilently(String itemId) async {
