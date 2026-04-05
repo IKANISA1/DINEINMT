@@ -52,4 +52,50 @@ void main() {
     expect(find.text('Hidden Tasting Menu'), findsOneWidget);
     expect(find.text('89.00 • Unavailable'), findsOneWidget);
   });
+
+  testWidgets('admin menu review opens detail sheet before generating image', (
+    tester,
+  ) async {
+    const venue = Venue(
+      id: 'venue-1',
+      name: 'Harbor Table',
+      slug: 'harbor-table',
+      category: 'Restaurants',
+      description: '',
+      address: 'Valletta Waterfront',
+    );
+
+    const item = MenuItem(
+      id: 'item-1',
+      venueId: 'venue-1',
+      name: 'Passion Spritz',
+      description: 'Sparkling aperitif with citrus and passion fruit.',
+      price: 14,
+      category: 'Signature Drinks',
+      itemClass: MenuItemClass.drinks,
+      imageStatus: MenuItemImageStatus.ready,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          venueByIdProvider(venue.id).overrideWith((ref) async => venue),
+          menuItemsProvider(venue.id).overrideWith((ref) async => const []),
+          adminMenuItemsProvider(venue.id).overrideWith((ref) async => [item]),
+        ],
+        child: MaterialApp(home: AdminMenuReviewScreen(venueId: venue.id)),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    await tester.tap(find.text('GENERATE IMAGE'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Generate Item Image'), findsOneWidget);
+    expect(find.text('CLASS'), findsOneWidget);
+    expect(find.text('CATEGORY'), findsOneWidget);
+    expect(find.text('DESCRIPTION'), findsOneWidget);
+  });
 }

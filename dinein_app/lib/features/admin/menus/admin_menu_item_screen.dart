@@ -12,6 +12,7 @@ import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/services/menu_repository.dart';
+import 'package:dinein_app/shared/widgets/menu_item_image_generation_sheet.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
@@ -300,8 +301,38 @@ class _AdminMenuItemScreenState extends ConsumerState<AdminMenuItemScreen> {
   }
 
   Future<void> _generateImage(AdminMenuCatalogEntry entry) async {
-    setState(() => _isGenerating = true);
+    final draft = await showMenuItemImageGenerationSheet(
+      context: context,
+      title: 'Generate Item Image',
+      name: _nameController.text.trim().isEmpty
+          ? entry.name
+          : _nameController.text.trim(),
+      description: _descriptionController.text.trim().isEmpty
+          ? entry.description
+          : _descriptionController.text.trim(),
+      category: _categoryController.text.trim().isEmpty
+          ? entry.category
+          : _categoryController.text.trim(),
+      itemClass: _selectedClass ?? entry.itemClass,
+      helperText:
+          'Review the core menu details first so image generation uses the right item information.',
+    );
+    if (draft == null) return;
+
+    setState(() {
+      _nameController.text = draft.name;
+      _descriptionController.text = draft.description;
+      _categoryController.text = draft.category;
+      _selectedClass = draft.itemClass;
+      _isGenerating = true;
+    });
+
     try {
+      await MenuRepository.instance.updateMenuItem(
+        entry.representativeItemId,
+        draft.toUpdatePayload(),
+        useAdminSession: true,
+      );
       await MenuRepository.instance.generateMenuItemImage(
         entry.representativeItemId,
         venueId: entry.representativeVenueId,
@@ -761,37 +792,55 @@ class _AdminMenuItemScreenState extends ConsumerState<AdminMenuItemScreen> {
                     title: 'Image Automation',
                     children: [
                       Text(
-                        'Admin can trigger menu image generation across all assigned venues from the representative menu item.',
+                        'Admin can review the item details first, then trigger image generation across all assigned venues from the representative menu item.',
                         style: tt.bodyMedium?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: AppTheme.space4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: PremiumButton(
-                              label: 'GENERATE IMAGE',
-                              icon: LucideIcons.sparkles,
-                              isOutlined: true,
-                              onPressed: _isGenerating
-                                  ? null
-                                  : () => _generateImage(entry),
-                              isLoading: _isGenerating,
-                            ),
-                          ),
-                          const SizedBox(width: AppTheme.space3),
-                          Expanded(
-                            child: PremiumButton(
-                              label: 'DELETE ITEM',
-                              icon: LucideIcons.trash2,
-                              isOutlined: true,
-                              onPressed: _isSaving
-                                  ? null
-                                  : () => _delete(entry),
-                            ),
-                          ),
-                        ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final stackActions = constraints.maxWidth < 560;
+                          final generateButton = PremiumButton(
+                            label: 'GENERATE IMAGE',
+                            icon: LucideIcons.sparkles,
+                            isOutlined: true,
+                            onPressed: _isGenerating
+                                ? null
+                                : () => _generateImage(entry),
+                            isLoading: _isGenerating,
+                          );
+                          final deleteButton = PremiumButton(
+                            label: 'DELETE ITEM',
+                            icon: LucideIcons.trash2,
+                            isOutlined: true,
+                            onPressed: _isSaving ? null : () => _delete(entry),
+                          );
+
+                          if (stackActions) {
+                            return Column(
+                              children: [
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: generateButton,
+                                ),
+                                const SizedBox(height: AppTheme.space3),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: deleteButton,
+                                ),
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            children: [
+                              Expanded(child: generateButton),
+                              const SizedBox(width: AppTheme.space3),
+                              Expanded(child: deleteButton),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -802,32 +851,52 @@ class _AdminMenuItemScreenState extends ConsumerState<AdminMenuItemScreen> {
               left: AppTheme.space6,
               right: AppTheme.space6,
               bottom: 100,
-              child: Row(
-                children: [
-                  if (widget.isEditing && entry != null) ...[
-                    Expanded(
-                      child: PremiumButton(
-                        label: 'ASSIGN VENUES',
-                        icon: LucideIcons.store,
-                        isOutlined: true,
-                        onPressed: _isSaving ? null : () => _assignMore(entry),
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.space3),
-                  ],
-                  Expanded(
-                    child: PremiumButton(
-                      label: widget.isEditing ? 'SAVE CHANGES' : 'CREATE ITEM',
-                      icon: LucideIcons.save,
-                      isLoading: _isSaving,
-                      onPressed: _isSaving
-                          ? null
-                          : () => widget.isEditing && entry != null
-                                ? _saveExisting(entry)
-                                : _saveNew(),
-                    ),
-                  ),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final stackActions = constraints.maxWidth < 640;
+                  final saveButton = PremiumButton(
+                    label: widget.isEditing ? 'SAVE CHANGES' : 'CREATE ITEM',
+                    icon: LucideIcons.save,
+                    isLoading: _isSaving,
+                    onPressed: _isSaving
+                        ? null
+                        : () => widget.isEditing && entry != null
+                              ? _saveExisting(entry)
+                              : _saveNew(),
+                  );
+                  final assignButton = widget.isEditing && entry != null
+                      ? PremiumButton(
+                          label: 'ASSIGN VENUES',
+                          icon: LucideIcons.store,
+                          isOutlined: true,
+                          onPressed: _isSaving
+                              ? null
+                              : () => _assignMore(entry),
+                        )
+                      : null;
+
+                  if (stackActions) {
+                    return Column(
+                      children: [
+                        if (assignButton != null) ...[
+                          SizedBox(width: double.infinity, child: assignButton),
+                          const SizedBox(height: AppTheme.space3),
+                        ],
+                        SizedBox(width: double.infinity, child: saveButton),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      if (assignButton != null) ...[
+                        Expanded(child: assignButton),
+                        const SizedBox(width: AppTheme.space3),
+                      ],
+                      Expanded(child: saveButton),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -836,4 +905,3 @@ class _AdminMenuItemScreenState extends ConsumerState<AdminMenuItemScreen> {
     );
   }
 }
-

@@ -8,7 +8,7 @@ import {
 Deno.test("configuredAdminWhatsAppNumberForCountry returns the current country number", () => {
   assertEquals(
     configuredAdminWhatsAppNumberForCountry("356"),
-    "+356771861993",
+    "+35677186193",
   );
   assertEquals(
     configuredAdminWhatsAppNumberForCountry("250"),
@@ -25,7 +25,7 @@ Deno.test("selectAdminProfileForPhone falls back to the configured country admin
       role: "admin",
       whatsapp_number: "+35699742524",
     }],
-    "+356771861993",
+    "+35677186193",
     "356",
   );
 

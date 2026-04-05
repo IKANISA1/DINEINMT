@@ -9,6 +9,7 @@ import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/services/menu_repository.dart';
+import 'package:dinein_app/shared/widgets/menu_item_image_generation_sheet.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
@@ -35,6 +36,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
   final _tagsController = TextEditingController();
   final _imageUrlController = TextEditingController();
 
+  MenuItemClass? _selectedClass;
   bool _isAvailable = true;
   bool _isSaving = false;
   bool _isGeneratingImage = false;
@@ -69,24 +71,21 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
     if (_lastPolledStatus == MenuItemImageStatus.generating &&
         status == MenuItemImageStatus.ready &&
         mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Image ready for ${item.name}.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Image ready for ${item.name}.')));
     }
     _lastPolledStatus = status;
 
     if (status == MenuItemImageStatus.generating) {
       if (_imageStatusPoller?.isActive == true) return;
-      _imageStatusPoller = Timer.periodic(
-        const Duration(seconds: 3),
-        (_) {
-          if (!mounted) {
-            _imageStatusPoller?.cancel();
-            return;
-          }
-          ref.invalidate(menuItemsProvider(venue.id));
-        },
-      );
+      _imageStatusPoller = Timer.periodic(const Duration(seconds: 3), (_) {
+        if (!mounted) {
+          _imageStatusPoller?.cancel();
+          return;
+        }
+        ref.invalidate(menuItemsProvider(venue.id));
+      });
     } else {
       _imageStatusPoller?.cancel();
       _imageStatusPoller = null;
@@ -106,6 +105,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
         item.effectiveImageSource == MenuItemImageSource.manual
         ? item.imageUrl ?? ''
         : '';
+    _selectedClass = item.itemClass;
     _isAvailable = item.isAvailable;
   }
 
@@ -182,6 +182,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
             description: description,
             price: price,
             category: category,
+            itemClass: _selectedClass,
             imageUrl: manualImageUrl,
             imageSource: manualImageUrl != null
                 ? MenuItemImageSource.manual
@@ -200,6 +201,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
           'description': description,
           'price': price,
           'category': category,
+          'class': _selectedClass?.dbValue,
           'is_available': _isAvailable,
           'tags': _parseTags(),
         };
@@ -233,6 +235,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
           description: description,
           price: price,
           category: category,
+          itemClass: _selectedClass,
           imageUrl: manualImageUrl,
           imageSource: manualImageUrl != null
               ? MenuItemImageSource.manual
@@ -269,12 +272,38 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
   }
 
   Future<void> _generateImage(Venue venue, MenuItem existing) async {
+    final draft = await showMenuItemImageGenerationSheet(
+      context: context,
+      title: 'Generate Item Image',
+      name: _nameController.text.trim().isEmpty
+          ? existing.name
+          : _nameController.text.trim(),
+      description: _descriptionController.text.trim().isEmpty
+          ? existing.description
+          : _descriptionController.text.trim(),
+      category: _categoryController.text.trim().isEmpty
+          ? existing.category
+          : _categoryController.text.trim(),
+      itemClass: _selectedClass ?? existing.itemClass,
+      helperText:
+          'Review the guest-facing details first so automatic image generation picks up the right menu information.',
+    );
+    if (draft == null) return;
+
     setState(() {
+      _nameController.text = draft.name;
+      _descriptionController.text = draft.description;
+      _categoryController.text = draft.category;
+      _selectedClass = draft.itemClass;
       _isGeneratingImage = true;
       _error = null;
     });
 
     try {
+      await MenuRepository.instance.updateMenuItem(
+        existing.id,
+        draft.toUpdatePayload(),
+      );
       final result = await MenuRepository.instance.generateMenuItemImage(
         existing.id,
         forceRegenerate: existing.hasImage,
@@ -287,7 +316,8 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
               ? 'Image updated for ${existing.name}.'
               : 'Image generated for ${existing.name}.',
         'skipped' => switch (result.reason) {
-          'image_locked' => '${existing.name} is protected from automatic changes.',
+          'image_locked' =>
+            '${existing.name} is protected from automatic changes.',
           'manual_image_exists' =>
             '${existing.name} already uses a manual image.',
           'already_generating' =>
@@ -510,31 +540,66 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
                   ),
                 ),
                 const SizedBox(height: AppTheme.space4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _priceController,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Price',
-                          hintText: '48.00',
-                        ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stackFields = constraints.maxWidth < 640;
+                    final priceField = TextField(
+                      controller: _priceController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
-                    ),
-                    const SizedBox(width: AppTheme.space4),
-                    Expanded(
-                      child: TextField(
-                        controller: _categoryController,
-                        decoration: const InputDecoration(
-                          labelText: 'Category',
-                          hintText: 'Signature Mains',
-                        ),
+                      decoration: const InputDecoration(
+                        labelText: 'Price',
+                        hintText: '48.00',
                       ),
-                    ),
-                  ],
+                    );
+                    final categoryField = TextField(
+                      controller: _categoryController,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        hintText: 'Signature Mains',
+                      ),
+                    );
+                    final classField = DropdownButtonFormField<MenuItemClass>(
+                      initialValue: _selectedClass,
+                      decoration: const InputDecoration(labelText: 'Class'),
+                      items: MenuItemClass.values
+                          .map((itemClass) {
+                            return DropdownMenuItem<MenuItemClass>(
+                              value: itemClass,
+                              child: Text(itemClass.label),
+                            );
+                          })
+                          .toList(growable: false),
+                      onChanged: _isSaving
+                          ? null
+                          : (value) {
+                              setState(() => _selectedClass = value);
+                            },
+                    );
+
+                    if (stackFields) {
+                      return Column(
+                        children: [
+                          priceField,
+                          const SizedBox(height: AppTheme.space4),
+                          categoryField,
+                          const SizedBox(height: AppTheme.space4),
+                          classField,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        Expanded(child: priceField),
+                        const SizedBox(width: AppTheme.space4),
+                        Expanded(child: categoryField),
+                        const SizedBox(width: AppTheme.space4),
+                        Expanded(child: classField),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: AppTheme.space4),
                 TextField(
@@ -569,28 +634,47 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
             ),
           ),
           const SizedBox(height: AppTheme.space6),
-          Row(
-            children: [
-              if (existing != null)
-                Expanded(
-                  child: PremiumButton(
-                    label: 'DELETE',
-                    isOutlined: true,
-                    isLoading: _isSaving,
-                    onPressed: () => _delete(venue, existing),
-                    icon: LucideIcons.trash2,
-                  ),
-                ),
-              if (existing != null) const SizedBox(width: AppTheme.space4),
-              Expanded(
-                child: PremiumButton(
-                  label: widget.isEditing ? 'SAVE CHANGES' : 'CREATE ITEM',
-                  isLoading: _isSaving,
-                  onPressed: () => _save(venue, existing),
-                  icon: LucideIcons.chevronRight,
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stackActions = constraints.maxWidth < 560;
+              final deleteButton = existing != null
+                  ? PremiumButton(
+                      label: 'DELETE',
+                      isOutlined: true,
+                      isLoading: _isSaving,
+                      onPressed: () => _delete(venue, existing),
+                      icon: LucideIcons.trash2,
+                    )
+                  : null;
+              final saveButton = PremiumButton(
+                label: widget.isEditing ? 'SAVE CHANGES' : 'CREATE ITEM',
+                isLoading: _isSaving,
+                onPressed: () => _save(venue, existing),
+                icon: LucideIcons.chevronRight,
+              );
+
+              if (stackActions) {
+                return Column(
+                  children: [
+                    if (deleteButton != null) ...[
+                      SizedBox(width: double.infinity, child: deleteButton),
+                      const SizedBox(height: AppTheme.space4),
+                    ],
+                    SizedBox(width: double.infinity, child: saveButton),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  if (deleteButton != null) ...[
+                    Expanded(child: deleteButton),
+                    const SizedBox(width: AppTheme.space4),
+                  ],
+                  Expanded(child: saveButton),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -723,9 +807,10 @@ class _ImagePanel extends StatelessWidget {
             ),
           ],
           const SizedBox(height: AppTheme.space5),
-          Row(
-            children: [
-              Expanded(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return SizedBox(
+                width: double.infinity,
                 child: PremiumButton(
                   label: usesManualImage
                       ? 'MANUAL IMAGE ACTIVE'
@@ -742,8 +827,8 @@ class _ImagePanel extends StatelessWidget {
                       ? onGenerate
                       : null,
                 ),
-              ),
-            ],
+              );
+            },
           ),
           if (hasExistingItem && !usesManualImage) ...[
             const SizedBox(height: AppTheme.space4),

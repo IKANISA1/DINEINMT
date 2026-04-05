@@ -4,7 +4,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:core_pkg/config/country_config_provider.dart';
@@ -13,6 +12,7 @@ import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/shared/widgets/branded_qr_tools.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
@@ -215,9 +215,10 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                             ),
                             onShowQr: () => _showQrSheet(
                               context,
-                              title: '${venue.name} guest access',
-                              subtitle: 'Scan to open the venue on DineIn',
-                              uri: appUri,
+                              title: '${venue.name} guest QR',
+                              subtitle:
+                                  'Guests scan this QR to open the venue menu directly.',
+                              uri: guestUri,
                             ),
                           )
                           .animate(delay: (50 * index).ms)
@@ -242,73 +243,15 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
     required String subtitle,
     required Uri uri,
   }) async {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    await showModalBottomSheet<void>(
+    showBrandedQrSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => SafeArea(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.20),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Text(
-                title,
-                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: QrImageView(
-                  data: uri.toString(),
-                  version: QrVersions.auto,
-                  size: 220,
-                  backgroundColor: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 20),
-              PremiumButton(
-                label: 'COPY URL',
-                icon: LucideIcons.copy,
-                isOutlined: true,
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: uri.toString()));
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Venue link copied.')),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+      title: title,
+      helperText: subtitle,
+      uri: uri,
+      shareFileName: '${venueQrFileSlug(title)}_qr.png',
+      shareSubject: '$title QR',
+      copyFeedbackMessage: 'Venue link copied.',
+      openLabel: 'venue link',
     );
   }
 }
@@ -551,57 +494,77 @@ class _VenueCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppTheme.space4),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  children: [
-                    _LinkRow(label: 'Guest URL', value: guestUri.toString()),
-                    const SizedBox(height: AppTheme.space3),
-                    _LinkRow(label: 'Venue App URL', value: appUri.toString()),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppTheme.space4),
-              PressableScale(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stackPreview = constraints.maxWidth < 760;
+              final previewCard = PressableScale(
                 onTap: onShowQr,
                 child: Container(
-                  width: 96,
-                  padding: const EdgeInsets.all(10),
+                  width: stackPreview ? double.infinity : 160,
+                  padding: const EdgeInsets.all(AppTheme.space3),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cs.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(AppTheme.radiusXl),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: Colors.white.withValues(alpha: 0.05),
                     ),
                   ),
                   child: Column(
                     children: [
-                      QrImageView(
-                        data: appUri.toString(),
-                        version: QrVersions.auto,
-                        size: 60,
-                        backgroundColor: Colors.white,
+                      IgnorePointer(
+                        child: BrandedQrPoster(uri: guestUri, compact: true),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppTheme.space3),
                       Text(
-                        'Guest QR',
+                        'GENERATE GUEST QR',
                         style: tt.labelSmall?.copyWith(
                           fontWeight: FontWeight.w900,
-                          color: const Color(0xFF121416),
+                          letterSpacing: 1.8,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
+              );
+
+              final links = Column(
+                children: [
+                  _LinkRow(label: 'Guest URL', value: guestUri.toString()),
+                  const SizedBox(height: AppTheme.space3),
+                  _LinkRow(label: 'Venue App URL', value: appUri.toString()),
+                ],
+              );
+
+              if (stackPreview) {
+                return Column(
+                  children: [
+                    links,
+                    const SizedBox(height: AppTheme.space4),
+                    previewCard,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: links),
+                  const SizedBox(width: AppTheme.space4),
+                  previewCard,
+                ],
+              );
+            },
           ),
         ],
       ),
     );
   }
+}
+
+String venueQrFileSlug(String raw) {
+  final normalized = raw.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+  return normalized.replaceAll(RegExp(r'^_+|_+$'), '');
 }
 
 class _LinkRow extends StatelessWidget {

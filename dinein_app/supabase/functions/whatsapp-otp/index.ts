@@ -30,7 +30,7 @@ const defaultCountryCode =
     .replace(/\D/g, "");
 const fallbackAdminWhatsAppByCountry = new Map<string, string>([
   ["250", "+250788767816"],
-  ["356", "+356771861993"],
+  ["356", "+35677186193"],
 ]);
 const allowMock = boolEnv("WHATSAPP_OTP_ALLOW_MOCK", false);
 const allowTextFallback = boolEnv("WHATSAPP_OTP_ALLOW_TEXT_FALLBACK", false);

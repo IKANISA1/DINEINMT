@@ -60,9 +60,16 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('Table QR Code'), findsOneWidget);
-    expect(find.text('TABLE 4'), findsOneWidget);
-    expect(find.text('SCAN TO GET DINEIN APP'), findsOneWidget);
+    expect(find.text('Venue QR Codes'), findsOneWidget);
+    expect(find.text('Guest Menu QR'), findsOneWidget);
+    expect(find.text('Venue App QR'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('table-qr-number-field')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('SCAN TO ORDER TABLE 4'), findsOneWidget);
     expect(find.text('TABLE NUMBER'), findsOneWidget);
     expect(
       find.descendant(
@@ -72,9 +79,9 @@ void main() {
       findsNothing,
     );
 
-    await tester.enterText(find.byType(TextField), '7');
+    await tester.enterText(find.byKey(const Key('table-qr-number-field')), '7');
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('TABLE 7'), findsOneWidget);
+    expect(find.text('SCAN TO ORDER TABLE 7'), findsOneWidget);
   });
 }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
+import 'package:dinein_app/shared/widgets/branded_qr_tools.dart';
 
 /// Reusable section card with an uppercased title label.
 class AdminVenueSectionCard extends StatelessWidget {
@@ -207,6 +207,7 @@ class AdminVenueQrPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
     return PressableScale(
@@ -214,24 +215,21 @@ class AdminVenueQrPreviewCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(AppTheme.space4),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cs.surfaceContainerLow,
           borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
         ),
         child: Column(
           children: [
-            QrImageView(
-              data: uri.toString(),
-              version: QrVersions.auto,
-              size: 96,
-              backgroundColor: Colors.white,
-            ),
+            IgnorePointer(child: BrandedQrPoster(uri: uri, compact: true)),
             const SizedBox(height: AppTheme.space3),
             Text(
               label,
               textAlign: TextAlign.center,
               style: tt.labelSmall?.copyWith(
                 fontWeight: FontWeight.w900,
-                color: const Color(0xFF121416),
+                letterSpacing: 1.8,
+                color: cs.onSurface,
               ),
             ),
           ],

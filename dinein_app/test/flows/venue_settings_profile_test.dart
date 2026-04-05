@@ -44,7 +44,7 @@ void main() {
         GoRoute(
           path: AppRoutePaths.venueTableQr,
           name: AppRouteNames.venueTableQr,
-          builder: (_, _) => const Scaffold(body: Text('Table QR Screen')),
+          builder: (_, _) => const Scaffold(body: Text('Venue QR Screen')),
         ),
         GoRoute(
           path: AppRoutePaths.venueNotifications,
@@ -102,7 +102,7 @@ void main() {
       // Key tiles in the first section
       expect(find.text('Venue Profile'), findsOneWidget);
       expect(find.text('Opening Hours'), findsOneWidget);
-      expect(find.text('Table QR Code'), findsOneWidget);
+      expect(find.text('Venue QR Codes'), findsOneWidget);
 
       // Owner card shows venue name
       expect(find.text('Harbor Table'), findsAtLeast(1));
@@ -119,9 +119,7 @@ void main() {
     },
   );
 
-  testWidgets('venue settings table QR tile navigates to QR screen', (
-    tester,
-  ) async {
+  testWidgets('venue settings QR tile navigates to QR screen', (tester) async {
     const venue = Venue(
       id: 'venue_1',
       name: 'Harbor Table',
@@ -137,10 +135,10 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    await tester.tap(find.text('Table QR Code'));
+    await tester.tap(find.text('Venue QR Codes'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Table QR Screen'), findsOneWidget);
+    expect(find.text('Venue QR Screen'), findsOneWidget);
   });
 
   testWidgets('venue settings WiFi tile navigates to WiFi screen', (

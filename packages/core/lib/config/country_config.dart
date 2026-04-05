@@ -68,7 +68,7 @@ class CountryConfig {
     appTitle: 'DINEIN MALTA',
     siteHost: 'dineinmt.ikanisa.com',
     playStoreId: 'com.dineinmalta.app',
-    supportWhatsApp: '356771861993',
+    supportWhatsApp: '35677186193',
     supportEmail: 'info@ikanisa.com',
     venueAccessWhatsApp: '35699711145',
     venueAccessEmail: 'info@ikanisa.com',

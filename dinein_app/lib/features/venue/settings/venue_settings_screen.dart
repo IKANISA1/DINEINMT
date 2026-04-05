@@ -174,8 +174,8 @@ class _VenueSettingsScreenState extends ConsumerState<VenueSettingsScreen> {
             _SettingTile(
               icon: LucideIcons.qrCode,
               iconColor: cs.primary,
-              title: 'Table QR Code',
-              subtitle: 'GENERATE AND MANAGE QR CODES',
+              title: 'Venue QR Codes',
+              subtitle: 'GUEST, APP, AND TABLE QR TOOLS',
               onTap: () => context.pushNamed(AppRouteNames.venueTableQr),
             ),
             _SettingTile(

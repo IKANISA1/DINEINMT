@@ -25,12 +25,12 @@ void main() {
     );
   }
 
-  testWidgets('Malta admin login accepts the current 9-digit admin number', (
+  testWidgets('Malta admin login accepts the current 8-digit admin number', (
     tester,
   ) async {
     await pumpAdminLogin(tester, CountryConfig.mt);
 
-    await tester.enterText(find.byType(TextField).first, '771861993');
+    await tester.enterText(find.byType(TextField).first, '77186193');
     await tester.pump();
 
     expect(otpButton(tester).onTap, isNotNull);

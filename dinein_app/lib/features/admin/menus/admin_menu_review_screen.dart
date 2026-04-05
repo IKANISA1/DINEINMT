@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/services/menu_repository.dart';
+import 'package:dinein_app/shared/widgets/menu_item_image_generation_sheet.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
@@ -76,8 +77,25 @@ class _AdminMenuReviewScreenState extends ConsumerState<AdminMenuReviewScreen> {
   }
 
   Future<void> _generateImage(MenuItem item) async {
+    final draft = await showMenuItemImageGenerationSheet(
+      context: context,
+      title: 'Generate Item Image',
+      name: item.name,
+      description: item.description,
+      category: item.category,
+      itemClass: item.itemClass,
+      helperText:
+          'Confirm the guest-facing content first so the generated image matches the item correctly.',
+    );
+    if (draft == null) return;
+
     setState(() => _busyItemId = item.id);
     try {
+      await MenuRepository.instance.updateMenuItem(
+        item.id,
+        draft.toUpdatePayload(),
+        useAdminSession: true,
+      );
       await MenuRepository.instance.generateMenuItemImage(
         item.id,
         venueId: item.venueId,
@@ -85,6 +103,7 @@ class _AdminMenuReviewScreenState extends ConsumerState<AdminMenuReviewScreen> {
         useAdminSession: true,
       );
       ref.invalidate(adminMenuItemsProvider(widget.venueId));
+      ref.invalidate(adminMenuQueueProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Image generation requested.')),
@@ -262,32 +281,52 @@ class _AdminMenuReviewScreenState extends ConsumerState<AdminMenuReviewScreen> {
                               ),
                             ),
                             const SizedBox(height: AppTheme.space4),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: PremiumButton(
-                                    label: 'EDIT DESCRIPTION',
-                                    icon: LucideIcons.pencil,
-                                    isOutlined: true,
-                                    isSmall: true,
-                                    onPressed: isBusy
-                                        ? null
-                                        : () => _editDescription(item),
-                                  ),
-                                ),
-                                const SizedBox(width: AppTheme.space3),
-                                Expanded(
-                                  child: PremiumButton(
-                                    label: 'GENERATE IMAGE',
-                                    icon: LucideIcons.sparkles,
-                                    isSmall: true,
-                                    isLoading: isBusy,
-                                    onPressed: isBusy
-                                        ? null
-                                        : () => _generateImage(item),
-                                  ),
-                                ),
-                              ],
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final stackActions = constraints.maxWidth < 520;
+                                final editButton = PremiumButton(
+                                  label: 'EDIT DESCRIPTION',
+                                  icon: LucideIcons.pencil,
+                                  isOutlined: true,
+                                  isSmall: true,
+                                  onPressed: isBusy
+                                      ? null
+                                      : () => _editDescription(item),
+                                );
+                                final generateButton = PremiumButton(
+                                  label: 'GENERATE IMAGE',
+                                  icon: LucideIcons.sparkles,
+                                  isSmall: true,
+                                  isLoading: isBusy,
+                                  onPressed: isBusy
+                                      ? null
+                                      : () => _generateImage(item),
+                                );
+
+                                if (stackActions) {
+                                  return Column(
+                                    children: [
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: editButton,
+                                      ),
+                                      const SizedBox(height: AppTheme.space3),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: generateButton,
+                                      ),
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  children: [
+                                    Expanded(child: editButton),
+                                    const SizedBox(width: AppTheme.space3),
+                                    Expanded(child: generateButton),
+                                  ],
+                                );
+                              },
                             ),
                           ],
                         ),

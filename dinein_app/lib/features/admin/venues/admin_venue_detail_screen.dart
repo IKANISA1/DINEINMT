@@ -13,6 +13,7 @@ import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/services/venue_repository.dart';
+import 'package:dinein_app/shared/widgets/branded_qr_tools.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
@@ -434,11 +435,7 @@ class _AdminVenueDetailScreenState
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColors.white5),
             ),
-            child: Icon(
-              LucideIcons.chevronLeft,
-              size: 22,
-              color: cs.onSurface,
-            ),
+            child: Icon(LucideIcons.chevronLeft, size: 22, color: cs.onSurface),
           ),
         ),
         const SizedBox(width: AppTheme.space4),
@@ -454,9 +451,7 @@ class _AdminVenueDetailScreenState
                 ),
               ),
               Text(
-                widget.isCreate
-                    ? 'CREATE ADMIN VENUE'
-                    : 'ADMIN · VENUE',
+                widget.isCreate ? 'CREATE ADMIN VENUE' : 'ADMIN · VENUE',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
@@ -516,16 +511,12 @@ class _AdminVenueDetailScreenState
                   _nameCtrl.text.trim().isEmpty
                       ? 'Venue preview'
                       : _nameCtrl.text.trim(),
-                  style: tt.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   slug.isEmpty ? 'slug-pending' : slug,
-                  style: tt.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+                  style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
                 const SizedBox(height: AppTheme.space3),
                 Wrap(
@@ -548,9 +539,7 @@ class _AdminVenueDetailScreenState
                       color: _orderingEnabled
                           ? cs.primary.withValues(alpha: 0.12)
                           : cs.surfaceContainerHighest,
-                      textColor: _orderingEnabled
-                          ? cs.primary
-                          : cs.onSurface,
+                      textColor: _orderingEnabled ? cs.primary : cs.onSurface,
                     ),
                   ],
                 ),
@@ -618,19 +607,13 @@ class _AdminVenueDetailScreenState
                   textColor: cs.onSurfaceVariant,
                 ),
               StatusBadge(
-                label:
-                    venue.latitude != null &&
-                        venue.longitude != null
+                label: venue.latitude != null && venue.longitude != null
                     ? 'Geo Ready'
                     : 'Geo Missing',
-                color:
-                    venue.latitude != null &&
-                        venue.longitude != null
+                color: venue.latitude != null && venue.longitude != null
                     ? cs.primary.withValues(alpha: 0.12)
                     : cs.error.withValues(alpha: 0.12),
-                textColor:
-                    venue.latitude != null &&
-                        venue.longitude != null
+                textColor: venue.latitude != null && venue.longitude != null
                     ? cs.primary
                     : cs.error,
               ),
@@ -651,9 +634,7 @@ class _AdminVenueDetailScreenState
             children: [
               Expanded(
                 child: PremiumButton(
-                  label: _syncingProfile
-                      ? 'SYNCING...'
-                      : 'SYNC PROFILE DATA',
+                  label: _syncingProfile ? 'SYNCING...' : 'SYNC PROFILE DATA',
                   icon: LucideIcons.sparkles,
                   onPressed: _syncingProfile
                       ? null
@@ -663,18 +644,14 @@ class _AdminVenueDetailScreenState
               if (venue.googleMapsUri != null) ...[
                 const SizedBox(width: AppTheme.space3),
                 PressableScale(
-                  onTap: () => _openLink(
-                    'Map',
-                    Uri.parse(venue.googleMapsUri!),
-                  ),
+                  onTap: () =>
+                      _openLink('Map', Uri.parse(venue.googleMapsUri!)),
                   child: Container(
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(
-                        AppTheme.radiusLg,
-                      ),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                       border: Border.all(color: AppColors.white5),
                     ),
                     child: Icon(
@@ -831,8 +808,7 @@ class _AdminVenueDetailScreenState
         const SizedBox(height: AppTheme.space4),
         SwitchListTile(
           value: _orderingEnabled,
-          onChanged: (value) =>
-              setState(() => _orderingEnabled = value),
+          onChanged: (value) => setState(() => _orderingEnabled = value),
           title: const Text('Guest ordering enabled'),
           subtitle: const Text(
             'When off, guests can browse the menu but cannot order.',
@@ -845,9 +821,7 @@ class _AdminVenueDetailScreenState
             padding: const EdgeInsets.all(AppTheme.space4),
             decoration: BoxDecoration(
               color: cs.surfaceContainer,
-              borderRadius: BorderRadius.circular(
-                AppTheme.radiusLg,
-              ),
+              borderRadius: BorderRadius.circular(AppTheme.radiusLg),
             ),
             child: Row(
               children: [
@@ -886,8 +860,7 @@ class _AdminVenueDetailScreenState
                     venue: venue,
                     config: ref.read(countryConfigProvider),
                     phoneCtrl: _phoneCtrl,
-                    onCachesInvalidated: () =>
-                        _invalidateVenueCaches(venue.id),
+                    onCachesInvalidated: () => _invalidateVenueCaches(venue.id),
                     onUpdateVenueOverride: widget.onUpdateVenueOverride,
                   ),
                 ),
@@ -897,9 +870,7 @@ class _AdminVenueDetailScreenState
         else
           Text(
             'Save the venue first to manage WhatsApp access and QR sharing.',
-            style: tt.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
+            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
       ],
     );
@@ -933,38 +904,73 @@ class _AdminVenueDetailScreenState
             onOpen: () => _openLink('Venue app URL', appUri),
           ),
           const SizedBox(height: AppTheme.space4),
-          Row(
-            children: [
-              Expanded(
-                child: AdminVenueQrPreviewCard(
-                  label: 'Guest View QR',
-                  uri: guestUri,
-                  onTap: () => AdminVenueSheets.showQr(
-                    context: context,
-                    title: '${_nameCtrl.text.trim()} guest view',
-                    subtitle:
-                        'Guests open the direct venue experience.',
+          Text(
+            'Generate a clean QR poster for either the direct guest menu link or the smart venue app link.',
+            style: tt.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppTheme.space4),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stackCards = constraints.maxWidth < 760;
+              final cards = [
+                Expanded(
+                  child: AdminVenueQrPreviewCard(
+                    label: 'GENERATE GUEST QR',
                     uri: guestUri,
-                    onCopyLink: _copyLink,
+                    onTap: () => showBrandedQrSheet(
+                      context: context,
+                      title: '${_nameCtrl.text.trim()} guest QR',
+                      helperText:
+                          'Guests scan this QR to open the venue menu directly.',
+                      uri: guestUri,
+                      shareFileName:
+                          '${_slugCtrl.text.trim().isEmpty ? 'venue' : _slugCtrl.text.trim()}_guest_qr.png',
+                      shareSubject: '${_nameCtrl.text.trim()} guest QR',
+                      copyFeedbackMessage: 'Guest URL copied.',
+                      openLabel: 'guest URL',
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: AppTheme.space4),
-              Expanded(
-                child: AdminVenueQrPreviewCard(
-                  label: 'Venue App QR',
-                  uri: appUri,
-                  onTap: () => AdminVenueSheets.showQr(
-                    context: context,
-                    title: '${_nameCtrl.text.trim()} venue app',
-                    subtitle:
-                        'Guests use the smart redirect into the venue experience.',
+                Expanded(
+                  child: AdminVenueQrPreviewCard(
+                    label: 'GENERATE VENUE QR',
                     uri: appUri,
-                    onCopyLink: _copyLink,
+                    onTap: () => showBrandedQrSheet(
+                      context: context,
+                      title: '${_nameCtrl.text.trim()} venue QR',
+                      helperText:
+                          'Guests scan this QR to open the smart venue app link.',
+                      uri: appUri,
+                      shareFileName:
+                          '${_slugCtrl.text.trim().isEmpty ? 'venue' : _slugCtrl.text.trim()}_venue_qr.png',
+                      shareSubject: '${_nameCtrl.text.trim()} venue QR',
+                      copyFeedbackMessage: 'Venue app URL copied.',
+                      openLabel: 'venue app URL',
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ];
+
+              if (stackCards) {
+                return Column(
+                  children: [
+                    cards[0],
+                    const SizedBox(height: AppTheme.space4),
+                    cards[1],
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  cards[0],
+                  const SizedBox(width: AppTheme.space4),
+                  cards[1],
+                ],
+              );
+            },
           ),
         ],
       ],
@@ -990,9 +996,7 @@ class _AdminVenueDetailScreenState
             Expanded(
               child: DropdownButtonFormField<String>(
                 initialValue: _wifiSecurity,
-                decoration: const InputDecoration(
-                  labelText: 'WIFI SECURITY',
-                ),
+                decoration: const InputDecoration(labelText: 'WIFI SECURITY'),
                 items: const ['WPA', 'WEP', 'Open']
                     .map((value) {
                       return DropdownMenuItem<String>(
@@ -1056,15 +1060,10 @@ class _AdminVenueDetailScreenState
           return Padding(
             padding: const EdgeInsets.only(bottom: AppTheme.space2),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 color: cs.surfaceContainer,
-                borderRadius: BorderRadius.circular(
-                  AppTheme.radiusLg,
-                ),
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
               ),
               child: Row(
                 children: [
@@ -1078,9 +1077,7 @@ class _AdminVenueDetailScreenState
                   ),
                   PressableScale(
                     onTap: () => setState(() {
-                      _schedule[day] = hours.copyWith(
-                        isOpen: !hours.isOpen,
-                      );
+                      _schedule[day] = hours.copyWith(isOpen: !hours.isOpen);
                     }),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
@@ -1096,9 +1093,7 @@ class _AdminVenueDetailScreenState
                       child: Text(
                         hours.isOpen ? 'Open' : 'Closed',
                         style: tt.labelSmall?.copyWith(
-                          color: hours.isOpen
-                              ? cs.secondary
-                              : cs.error,
+                          color: hours.isOpen ? cs.secondary : cs.error,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
