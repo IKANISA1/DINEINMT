@@ -70,6 +70,7 @@ import {
 } from "./handlers/notification.ts";
 import {
   handleGetAllOrders,
+  handleGetAdminDashboardKpis,
   handleGetOrderById,
   handleGetOrdersForUser,
   handleGetOrdersForVenue,
@@ -206,6 +207,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
           return await handleGetOrdersForUser(supabase, req, body);
         case "get_all_orders":
           return await handleGetAllOrders(supabase, req);
+        case "get_admin_dashboard_kpis":
+          return await handleGetAdminDashboardKpis(supabase, req, body);
         case "get_order_by_id":
           return await handleGetOrderById(supabase, req, body);
         case "update_order_status":

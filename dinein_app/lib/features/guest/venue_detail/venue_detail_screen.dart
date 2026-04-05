@@ -446,6 +446,33 @@ class _VenueDetailBody extends StatelessWidget {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 const SizedBox(height: AppTheme.space6),
+                if (venue.isPromoActive && venue.promoMessage?.isNotEmpty == true)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppTheme.space4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: cs.secondary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                        border: Border.all(color: cs.secondary.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(LucideIcons.tag, color: cs.secondary, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              venue.promoMessage!,
+                              style: tt.bodyMedium?.copyWith(
+                                color: cs.secondary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ).animate().fadeIn(duration: 300.ms).slideX(begin: -0.08),
                 if (tableNumber != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppTheme.space4),

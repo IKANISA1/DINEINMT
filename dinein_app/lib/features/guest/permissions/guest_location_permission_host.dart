@@ -20,7 +20,6 @@ class _GuestLocationPermissionHostState
     extends ConsumerState<GuestLocationPermissionHost>
     with WidgetsBindingObserver {
   static const _guestVenueManagerSegments = {
-    'claim',
     'verify',
     'onboarding',
     'order',

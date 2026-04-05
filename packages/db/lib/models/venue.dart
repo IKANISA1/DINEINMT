@@ -46,6 +46,8 @@ class Venue extends Equatable {
   final String? wifiPassword;
   final String? wifiSecurity;
   final Map<String, String>? socialLinks;
+  final String? promoMessage;
+  final bool isPromoActive;
 
   const Venue({
     required this.id,
@@ -92,6 +94,8 @@ class Venue extends Equatable {
     this.wifiPassword,
     this.wifiSecurity,
     this.socialLinks,
+    this.promoMessage,
+    this.isPromoActive = false,
   });
 
   /// Deserialize from Supabase JSON row.
@@ -189,6 +193,8 @@ class Venue extends Equatable {
       wifiPassword: json['wifi_password'] as String?,
       wifiSecurity: json['wifi_security'] as String?,
       socialLinks: _parseStringMap(json['social_links'] ?? json['socialLinks']),
+      promoMessage: json['promo_message'] as String? ?? json['promoMessage'] as String?,
+      isPromoActive: json['is_promo_active'] as bool? ?? json['isPromoActive'] as bool? ?? false,
     );
   }
 
@@ -241,6 +247,8 @@ class Venue extends Equatable {
     'wifi_password': wifiPassword,
     'wifi_security': wifiSecurity,
     'social_links': socialLinks,
+    'promo_message': promoMessage,
+    'is_promo_active': isPromoActive,
   };
 
   /// Whether this venue is currently accepting orders.
@@ -486,6 +494,8 @@ class Venue extends Equatable {
     wifiPassword,
     wifiSecurity,
     socialLinks,
+    promoMessage,
+    isPromoActive,
   ];
 }
 

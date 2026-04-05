@@ -12,10 +12,6 @@ void main() {
         AppRoutePaths.adminVenueCreate,
         AppRoutePaths.adminVenueDetail,
         AppRoutePaths.adminSettings,
-        AppRoutePaths.adminMenus,
-        AppRoutePaths.adminMenuNew,
-        AppRoutePaths.adminMenuItem,
-        AppRoutePaths.adminMenuReview,
         AppRoutePaths.adminOrders,
         AppRoutePaths.adminRoot,
       ];

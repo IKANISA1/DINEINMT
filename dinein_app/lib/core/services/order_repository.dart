@@ -115,6 +115,22 @@ class OrderRepository {
     return data != null ? Order.fromJson(data) : null;
   }
 
+  /// Get aggregated KPIs for the Admin Dashboard.
+  Future<Map<String, dynamic>> getAdminDashboardKpis({
+    required DateTime startOfDay,
+    required String timeZone,
+  }) async {
+    final data = await _invoke(
+      'get_admin_dashboard_kpis',
+      useAdminSession: true,
+      payload: {
+        'startOfDay': startOfDay.toUtc().toIso8601String(),
+        'timeZone': timeZone,
+      },
+    );
+    return data != null ? Map<String, dynamic>.from(data) : {};
+  }
+
   /// Update order status (venue owner action).
   Future<void> updateOrderStatus(String orderId, OrderStatus status) async {
     await _invoke(

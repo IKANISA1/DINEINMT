@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:file_picker/file_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:core_pkg/config/country_config.dart';
 import 'package:core_pkg/config/country_config_provider.dart';
 import 'package:core_pkg/constants/app_download_links.dart';
@@ -48,16 +49,19 @@ class _AdminVenueDetailScreenState
   final _descriptionCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final _ownerWhatsAppCtrl = TextEditingController();
+  final _ownerContactPhoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _imageCtrl = TextEditingController();
   final _websiteCtrl = TextEditingController();
   final _reservationCtrl = TextEditingController();
-  final _revolutCtrl = TextEditingController();
+
   final _wifiSsidCtrl = TextEditingController();
   final _wifiPasswordCtrl = TextEditingController();
   final _instagramCtrl = TextEditingController();
   final _facebookCtrl = TextEditingController();
   final _tiktokCtrl = TextEditingController();
+  final _promoMessageCtrl = TextEditingController();
 
   static const _days = <String>[
     'Monday',
@@ -72,6 +76,7 @@ class _AdminVenueDetailScreenState
   final Map<String, DayHours> _schedule = <String, DayHours>{};
   VenueStatus _status = VenueStatus.inactive;
   bool _orderingEnabled = false;
+  bool _isPromoActive = false;
   String _wifiSecurity = 'WPA';
   bool _saving = false;
   bool _syncingProfile = false;
@@ -86,16 +91,19 @@ class _AdminVenueDetailScreenState
     _descriptionCtrl.dispose();
     _addressCtrl.dispose();
     _phoneCtrl.dispose();
+    _ownerWhatsAppCtrl.dispose();
+    _ownerContactPhoneCtrl.dispose();
     _emailCtrl.dispose();
     _imageCtrl.dispose();
     _websiteCtrl.dispose();
     _reservationCtrl.dispose();
-    _revolutCtrl.dispose();
+
     _wifiSsidCtrl.dispose();
     _wifiPasswordCtrl.dispose();
     _instagramCtrl.dispose();
     _facebookCtrl.dispose();
     _tiktokCtrl.dispose();
+    _promoMessageCtrl.dispose();
     super.dispose();
   }
 
@@ -117,11 +125,13 @@ class _AdminVenueDetailScreenState
     _descriptionCtrl.text = venue?.description ?? '';
     _addressCtrl.text = venue?.address ?? '';
     _phoneCtrl.text = venue?.phone ?? '';
+    _ownerWhatsAppCtrl.text = venue?.ownerWhatsAppNumber ?? '';
+    _ownerContactPhoneCtrl.text = venue?.ownerContactPhone ?? '';
     _emailCtrl.text = venue?.email ?? '';
     _imageCtrl.text = venue?.imageUrl ?? '';
     _websiteCtrl.text = venue?.websiteUrl ?? '';
     _reservationCtrl.text = venue?.reservationUrl ?? '';
-    _revolutCtrl.text = venue?.revolutUrl ?? '';
+
     _wifiSsidCtrl.text = venue?.wifiSsid ?? '';
     _wifiPasswordCtrl.text = venue?.wifiPassword ?? '';
     _instagramCtrl.text = venue?.socialLinks?['instagram'] ?? '';
@@ -130,6 +140,8 @@ class _AdminVenueDetailScreenState
     _wifiSecurity = venue?.wifiSecurity ?? 'WPA';
     _status = venue?.status ?? VenueStatus.inactive;
     _orderingEnabled = venue?.orderingEnabled ?? false;
+    _isPromoActive = venue?.isPromoActive ?? false;
+    _promoMessageCtrl.text = venue?.promoMessage ?? '';
     _slugDirty = venue != null;
 
     _schedule.clear();
@@ -208,6 +220,8 @@ class _AdminVenueDetailScreenState
       'description': _descriptionCtrl.text.trim(),
       'address': _addressCtrl.text.trim(),
       'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+      'owner_whatsapp_number': _ownerWhatsAppCtrl.text.trim().isEmpty ? null : _ownerWhatsAppCtrl.text.trim(),
+      'owner_contact_phone': _ownerContactPhoneCtrl.text.trim().isEmpty ? null : _ownerContactPhoneCtrl.text.trim(),
       'email': _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
       'image_url': _imageCtrl.text.trim().isEmpty
           ? null
@@ -218,9 +232,7 @@ class _AdminVenueDetailScreenState
       'reservation_url': _reservationCtrl.text.trim().isEmpty
           ? null
           : _reservationCtrl.text.trim(),
-      'revolut_url': _revolutCtrl.text.trim().isEmpty
-          ? null
-          : _revolutCtrl.text.trim(),
+
       'wifi_ssid': wifiSsid.isEmpty ? null : wifiSsid,
       'wifi_password': wifiSsid.isEmpty
           ? null
@@ -230,6 +242,8 @@ class _AdminVenueDetailScreenState
       'opening_hours': _buildOpeningHoursPayload(),
       'status': _status.dbValue,
       'ordering_enabled': _orderingEnabled,
+      'is_promo_active': _isPromoActive,
+      'promo_message': _promoMessageCtrl.text.trim().isEmpty ? null : _promoMessageCtrl.text.trim(),
       'country': config.country.code,
     };
 
@@ -261,6 +275,73 @@ class _AdminVenueDetailScreenState
     }
   }
 
+  Future<void> _uploadProfileImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.image);
+      if (result == null || result.files.isEmpty) return;
+      
+      final file = result.files.first;
+      if (file.bytes == null) {
+        _showSnack('Cannot read image data');
+        return;
+      }
+
+      setState(() => _saving = true);
+      final ext = file.extension ?? 'png';
+      final fileName = 'venue_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      
+      // We assume a 'venues' bucket exists. If it doesn't, this will throw.
+      final supabase = Supabase.instance.client;
+      await supabase.storage.from('venues').uploadBinary(
+            'images/$fileName',
+            file.bytes!,
+          );
+          
+      final url = supabase.storage.from('venues').getPublicUrl('images/$fileName');
+      setState(() {
+        _imageCtrl.text = url;
+      });
+      _showSnack('Image uploaded successfully.');
+    } catch (e) {
+      _showSnack('Upload failed: Ensure Supabase storage bucket "venues" exists. Error: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _uploadMenuDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      
+      final file = result.files.first;
+      if (file.bytes == null) {
+        _showSnack('Cannot read file data');
+        return;
+      }
+
+      setState(() => _saving = true);
+      final ext = file.extension ?? 'pdf';
+      final fileName = 'menu_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      
+      final supabase = Supabase.instance.client;
+      await supabase.storage.from('venues').uploadBinary(
+            'menus/$fileName',
+            file.bytes!,
+          );
+          
+      // Typically the backend triggers the OCR pipeline automatically via a webhook when a menu is uploaded.
+      _showSnack('Menu document uploaded. OCR pipeline will process this shortly.');
+    } catch (e) {
+      _showSnack('Upload failed. Error: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _copyLink(String label, Uri uri) async {
     await Clipboard.setData(ClipboardData(text: uri.toString()));
     _showSnack('$label copied.');
@@ -277,6 +358,83 @@ class _AdminVenueDetailScreenState
       if (!mounted) return;
     }
     _showSnack('Unable to open $label.');
+  }
+
+  Future<void> _deleteVenue(Venue venue) async {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radius3xl),
+        ),
+        title: Text(
+          'Delete Venue?',
+          style: tt.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: cs.error,
+          ),
+        ),
+        content: Text(
+          'This venue will be removed from the platform. '
+          'This action cannot be easily undone.',
+          style: tt.bodyLarge?.copyWith(
+            color: cs.onSurfaceVariant,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'CANCEL',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              backgroundColor: cs.error.withValues(alpha: 0.10),
+            ),
+            child: Text(
+              'DELETE',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                color: cs.error,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    if (!mounted) return;
+    setState(() => _saving = true);
+
+    try {
+      await VenueRepository.instance.deleteVenue(venue.id);
+      _invalidateVenueCaches(venue.id);
+
+      if (mounted) {
+        _showSnack('Venue completely deleted.');
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        _showSnack('Failed to delete venue: $e');
+      }
+    }
   }
 
   Future<void> _syncProfileData(Venue venue) async {
@@ -388,6 +546,12 @@ class _AdminVenueDetailScreenState
                 const SizedBox(height: AppTheme.space4),
                 _buildProfileDataSection(config),
                 const SizedBox(height: AppTheme.space4),
+                _buildDocumentSubmissionSection(),
+                const SizedBox(height: AppTheme.space4),
+                _buildPromoSection(),
+                const SizedBox(height: AppTheme.space4),
+                _buildAccessAndOnboardingSection(config),
+                const SizedBox(height: AppTheme.space4),
                 _buildOperationalSection(cs, tt, venue),
                 const SizedBox(height: AppTheme.space4),
                 _buildGuestAccessSection(tt, guestUri, appUri),
@@ -395,6 +559,8 @@ class _AdminVenueDetailScreenState
                 _buildWifiSocialSection(),
                 const SizedBox(height: AppTheme.space4),
                 _buildOpeningHoursSection(cs, tt),
+                const SizedBox(height: AppTheme.space6),
+                _buildDangerZone(cs, tt, venue),
               ],
             ),
             Positioned(
@@ -745,12 +911,32 @@ class _AdminVenueDetailScreenState
             ),
           ],
         ),
-        AdminVenueLabeledField(
-          label: 'IMAGE URL',
-          controller: _imageCtrl,
-          hint: 'https://images.example.com/venue.jpg',
-          keyboardType: TextInputType.url,
-          onChanged: (_) => setState(() {}),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'IMAGE URL',
+                controller: _imageCtrl,
+                hint: 'https://images.example.com/venue.jpg',
+                keyboardType: TextInputType.url,
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(width: AppTheme.space2),
+            InkWell(
+              onTap: _uploadProfileImage,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                ),
+                child: const Icon(LucideIcons.uploadCloud, size: 20),
+              ),
+            ),
+          ],
         ),
         Row(
           children: [
@@ -773,11 +959,142 @@ class _AdminVenueDetailScreenState
             ),
           ],
         ),
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.space2, bottom: AppTheme.space2),
+            child: Text(
+              'Payment destinations (MoMo / Revolut codes) are strictly managed by system integrations or venue owners directly and cannot be modified by site administrators.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                    fontStyle: FontStyle.italic,
+                  ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ── Document Submissions ──────────────────────────────────────────────
+
+  Widget _buildDocumentSubmissionSection() {
+    return AdminVenueSectionCard(
+      title: 'Menu / Document Submissions',
+      children: [
+        Text(
+          'Upload menu documents (PDF, JPG) so the backend OCR pipeline can process their items automatically.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: AppTheme.space4),
+        FilledButton.tonalIcon(
+          onPressed: _uploadMenuDocument,
+          icon: const Icon(LucideIcons.fileText),
+          label: const Text('Upload Menu Document'),
+        ),
+      ],
+    );
+  }
+
+  // ── Home Display Promos ─────────────────────────────────────────────
+
+  Widget _buildPromoSection() {
+    final cs = Theme.of(context).colorScheme;
+    return AdminVenueSectionCard(
+      title: 'Home Display Promo',
+      children: [
+        Text(
+          'Highlight a special promo or announcement on the guest app home screen.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: AppTheme.space4),
         AdminVenueLabeledField(
-          label: 'REVOLUT URL',
-          controller: _revolutCtrl,
-          hint: 'https://revolut.me/venue',
-          keyboardType: TextInputType.url,
+          label: 'PROMO MESSAGE',
+          controller: _promoMessageCtrl,
+          hint: 'e.g. "Free delivery on all orders this weekend!"',
+          maxLines: 2,
+        ),
+        const SizedBox(height: AppTheme.space4),
+        Container(
+          padding: const EdgeInsets.all(AppTheme.space4),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.05),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Promo Visibility',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _isPromoActive
+                          ? 'Guests can see this promo message.'
+                          : 'Promo message is hidden.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppTheme.space4),
+              Switch(
+                value: _isPromoActive,
+                onChanged: (val) => setState(() => _isPromoActive = val),
+                activeThumbColor: AppColors.secondary,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Access & Onboarding ─────────────────────────────────────────────
+
+  Widget _buildAccessAndOnboardingSection(CountryConfig config) {
+    return AdminVenueSectionCard(
+      title: 'Auth & Access',
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'OWNER WHATSAPP NUMBER',
+                controller: _ownerWhatsAppCtrl,
+                hint: '${config.countryDialCode}...',
+                keyboardType: TextInputType.phone,
+              ),
+            ),
+            const SizedBox(width: AppTheme.space4),
+            Expanded(
+              child: AdminVenueLabeledField(
+                label: 'OWNER CONTACT PHONE',
+                controller: _ownerContactPhoneCtrl,
+                hint: '${config.countryDialCode}...',
+                keyboardType: TextInputType.phone,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.space2),
+        Text(
+          'The Owner WhatsApp Number is required for venue operators to log in via WhatsApp OTP.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
         ),
       ],
     );
@@ -789,33 +1106,93 @@ class _AdminVenueDetailScreenState
     return AdminVenueSectionCard(
       title: 'Operational Controls',
       children: [
-        DropdownButtonFormField<VenueStatus>(
-          initialValue: _status,
-          decoration: const InputDecoration(labelText: 'STATUS'),
-          items: VenueStatus.values
-              .map((status) {
-                return DropdownMenuItem<VenueStatus>(
-                  value: status,
-                  child: Text(status.label),
-                );
-              })
-              .toList(growable: false),
-          onChanged: (value) {
-            if (value == null) return;
-            setState(() => _status = value);
-          },
+        Row(
+          children: [
+            AdminStatusDot(status: _status.dbValue),
+            const SizedBox(width: AppTheme.space3),
+            Text(
+              'CURRENT STATUS',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 3,
+                color: cs.onSurfaceVariant.withValues(alpha: 0.30),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: AppTheme.space4),
-        SwitchListTile(
-          value: _orderingEnabled,
-          onChanged: (value) => setState(() => _orderingEnabled = value),
-          title: const Text('Guest ordering enabled'),
-          subtitle: const Text(
-            'When off, guests can browse the menu but cannot order.',
-          ),
-          contentPadding: EdgeInsets.zero,
+        AdminStatusButton(
+          label: 'Activate Venue',
+          subtitle: 'Visible to guests • Ordering depends on validation',
+          icon: LucideIcons.play,
+          isSelected: _status == VenueStatus.active,
+          selectedColor: AppColors.secondary,
+          onTap: () => setState(() => _status = VenueStatus.active),
         ),
-        const SizedBox(height: AppTheme.space2),
+        const SizedBox(height: AppTheme.space4),
+        AdminStatusButton(
+          label: 'Maintenance Mode',
+          subtitle: 'Visible as unavailable • Ordering disabled',
+          icon: LucideIcons.clock,
+          isSelected: _status == VenueStatus.maintenance,
+          selectedColor: AppColors.warning,
+          onTap: () => setState(() => _status = VenueStatus.maintenance),
+        ),
+        const SizedBox(height: AppTheme.space4),
+        AdminStatusButton(
+          label: 'Suspend Venue',
+          subtitle: 'Hidden from all guests',
+          icon: LucideIcons.pause,
+          isSelected: _status == VenueStatus.suspended,
+          selectedColor: cs.error,
+          onTap: () => setState(() => _status = VenueStatus.suspended),
+        ),
+        const SizedBox(height: AppTheme.space6),
+        Container(
+          padding: const EdgeInsets.all(AppTheme.space5),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.05),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Guest Ordering Validation',
+                      style: tt.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _orderingEnabled
+                          ? 'Validated venues can accept guest orders.'
+                          : 'Guests can browse this venue, but ordering stays unavailable.',
+                      style: tt.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppTheme.space4),
+              Switch(
+                value: _orderingEnabled,
+                onChanged: (val) => setState(() => _orderingEnabled = val),
+                activeThumbColor: AppColors.secondary,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppTheme.space4),
         if (venue != null)
           Container(
             padding: const EdgeInsets.all(AppTheme.space4),
@@ -850,8 +1227,8 @@ class _AdminVenueDetailScreenState
                 const SizedBox(width: AppTheme.space4),
                 PremiumButton(
                   label: venue.hasAssignedAccessPhone
-                      ? 'Edit WhatsApp Number'
-                      : 'Add WhatsApp Number',
+                      ? 'Edit WhatsApp'
+                      : 'Add WhatsApp',
                   icon: LucideIcons.messageCircle,
                   isOutlined: true,
                   isSmall: true,
@@ -859,7 +1236,7 @@ class _AdminVenueDetailScreenState
                     context: context,
                     venue: venue,
                     config: ref.read(countryConfigProvider),
-                    phoneCtrl: _phoneCtrl,
+                    phoneCtrl: _ownerWhatsAppCtrl,
                     onCachesInvalidated: () => _invalidateVenueCaches(venue.id),
                     onUpdateVenueOverride: widget.onUpdateVenueOverride,
                   ),
@@ -872,6 +1249,91 @@ class _AdminVenueDetailScreenState
             'Save the venue first to manage WhatsApp access and QR sharing.',
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
+      ],
+    );
+  }
+
+  Widget _buildDangerZone(ColorScheme cs, TextTheme tt, Venue? venue) {
+    if (venue == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppTheme.space3),
+          child: Text(
+            'Danger Zone',
+            style: tt.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              color: cs.error,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppTheme.space5),
+        PressableScale(
+          onTap: () => _deleteVenue(venue),
+          child: Container(
+            padding: const EdgeInsets.all(AppTheme.space6),
+            decoration: BoxDecoration(
+              color: cs.error.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(AppTheme.radius3xl),
+              border: Border.all(color: cs.error.withValues(alpha: 0.10)),
+              boxShadow: AppTheme.clayShadow,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: cs.error.withValues(alpha: 0.20),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                  ),
+                  child: Icon(LucideIcons.trash2, size: 28, color: cs.error),
+                ),
+                const SizedBox(width: AppTheme.space5),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Delete Venue',
+                        style: tt.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.5,
+                          color: cs.error,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'IRREVERSIBLE ACTION',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 3,
+                          color: cs.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: cs.error.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    LucideIcons.chevronRight,
+                    size: 24,
+                    color: cs.error,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }

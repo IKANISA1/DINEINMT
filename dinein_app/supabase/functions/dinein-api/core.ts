@@ -5731,6 +5731,52 @@ export async function handleGetAllOrders(
   return ok(await attachPresentationDataToOrders(supabase, data ?? []));
 }
 
+export async function handleGetAdminDashboardKpis(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  await requireAdmin(supabase, req);
+
+  const tz = stringValue(body.timeZone) ?? "UTC";
+  // The client passes the start of today as an ISO string to handle timezone safely
+  const startOfDay = stringValue(body.startOfDay) ?? new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+
+  const [ordersResp] = await Promise.all([
+    supabase.from("dinein_orders").select("total, created_at, status")
+  ]);
+
+  const ordersData = ordersResp.data ?? [];
+  let revenue_today = 0;
+  let orders_today = 0;
+  let total_revenue = 0;
+  let cancelled_orders = 0;
+
+  for (const o of ordersData) {
+    const total = numberValue(o.total) ?? 0;
+    const createdAt = stringValue(o.created_at);
+    const status = stringValue(o.status);
+    
+    total_revenue += total;
+    if (status === 'cancelled') {
+        cancelled_orders++;
+    }
+
+    if (createdAt && createdAt >= startOfDay) {
+      orders_today++;
+      revenue_today += total;
+    }
+  }
+
+  return ok({
+    orders_today,
+    revenue_today: roundCurrency(revenue_today),
+    total_orders: ordersData.length,
+    total_revenue: roundCurrency(total_revenue),
+    cancelled_orders,
+  });
+}
+
 export async function handleGetOrderById(
   supabase: ReturnType<typeof adminClient>,
   req: Request,

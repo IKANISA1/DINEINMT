@@ -923,6 +923,33 @@ class _VenueCard extends StatelessWidget {
                             height: 0.96,
                           ),
                         ),
+                        if (venue.isPromoActive && venue.promoMessage?.isNotEmpty == true)
+                          Container(
+                            margin: const EdgeInsets.only(top: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: cs.secondary.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(LucideIcons.tag, size: 12, color: cs.onSecondary),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    venue.promoMessage!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: tt.labelSmall?.copyWith(
+                                      color: cs.onSecondary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         const SizedBox(height: 10),
                         Wrap(
                           spacing: 8,

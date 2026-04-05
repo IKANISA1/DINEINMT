@@ -10,10 +10,9 @@ import 'package:ui/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
-bool _hasVenueAccessReady(Venue venue) => venue.isAccessReady;
 
 /// Admin overview dashboard — system-wide live KPIs.
-/// Uses [allVenuesProvider] and [allOrdersProvider].
+/// Uses [allVenuesProvider] and [adminDashboardKpisProvider].
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
 
@@ -23,7 +22,7 @@ class AdminDashboardScreen extends ConsumerWidget {
     final tt = Theme.of(context).textTheme;
 
     final venuesAsync = ref.watch(allVenuesProvider);
-    final ordersAsync = ref.watch(allOrdersProvider);
+    final kpisAsync = ref.watch(adminDashboardKpisProvider);
     final kpiCards = <Widget>[
       _AdminKpi(
         label: 'TOTAL VENUES',
@@ -45,73 +44,36 @@ class AdminDashboardScreen extends ConsumerWidget {
       ),
       _AdminKpi(
         label: 'ORDERS TODAY',
-        value: ordersAsync.when(
+        value: kpisAsync.when(
           loading: () => '—',
           error: (_, _) => '—',
-          data: (orders) {
-            final today = DateTime.now();
-            final todayOrders = orders.where(
-              (o) =>
-                  o.createdAt.day == today.day &&
-                  o.createdAt.month == today.month &&
-                  o.createdAt.year == today.year,
-            );
-            return '${todayOrders.length}';
-          },
+          data: (kpis) => '${kpis['orders_today'] ?? 0}',
         ),
-        delta: ordersAsync.when(
+        delta: kpisAsync.when(
           loading: () => 'Loading...',
           error: (_, _) => 'Error',
-          data: (orders) {
-            final today = DateTime.now();
-            final todayRevenue = orders
-                .where(
-                  (o) =>
-                      o.createdAt.day == today.day &&
-                      o.createdAt.month == today.month &&
-                      o.createdAt.year == today.year,
-                )
-                .fold<double>(0, (sum, o) => sum + o.total);
-            final cs = CountryRuntime.config.country.currencySymbol;
-            return '$cs${todayRevenue.toStringAsFixed(0)} total';
+          data: (kpis) {
+            final num todayRevenue = kpis['revenue_today'] ?? 0;
+            final sym = CountryRuntime.config.country.currencySymbol;
+            return '$sym${todayRevenue.toStringAsFixed(0)} total';
           },
         ),
         icon: LucideIcons.shoppingBag,
         color: cs.tertiary,
       ),
-      _AdminKpi(
-        label: 'ACCESS READY',
-        value: venuesAsync.when(
-          loading: () => '—',
-          error: (_, _) => '—',
-          data: (venues) => '${venues.where(_hasVenueAccessReady).length}',
-        ),
-        delta: venuesAsync.when(
-          loading: () => 'Loading...',
-          error: (_, _) => 'Error',
-          data: (venues) {
-            final ready = venues.where(_hasVenueAccessReady).length;
-            final remaining = venues.length - ready;
-            return remaining == 0
-                ? 'All venue access configured'
-                : '$remaining still need setup';
-          },
-        ),
-        icon: LucideIcons.messageCircle,
-        color: AppColors.warning,
-      ),
+
       _AdminKpi(
         label: 'TOTAL ORDERS',
-        value: ordersAsync.when(
+        value: kpisAsync.when(
           loading: () => '—',
           error: (_, _) => '—',
-          data: (o) => '${o.length}',
+          data: (kpis) => '${kpis['total_orders'] ?? 0}',
         ),
-        delta: ordersAsync.when(
+        delta: kpisAsync.when(
           loading: () => 'Loading...',
           error: (_, _) => 'Error',
-          data: (o) {
-            final total = o.fold<double>(0, (sum, o) => sum + o.total);
+          data: (kpis) {
+            final num total = kpis['total_revenue'] ?? 0;
             final cs = CountryRuntime.config.country.currencySymbol;
             return '$cs${total.toStringAsFixed(0)} lifetime';
           },
@@ -177,147 +139,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             ),
           ),
 
-          // ─── Venue Access Setup ───
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(AppTheme.space6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text('Venue Access Setup', style: tt.headlineSmall),
-                      const SizedBox(width: AppTheme.space3),
-                      venuesAsync.when(
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, _) => const SizedBox.shrink(),
-                        data: (venues) {
-                          final count = venues
-                              .where((v) => !_hasVenueAccessReady(v))
-                              .length;
-                          if (count == 0) return const SizedBox.shrink();
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.warning.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '$count',
-                              style: TextStyle(
-                                color: AppColors.warning,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppTheme.space4),
-                  venuesAsync.when(
-                    loading: () => const SkeletonLoader(
-                      width: double.infinity,
-                      height: 100,
-                    ),
-                    error: (_, _) => const Text('Could not load venues'),
-                    data: (venues) {
-                      final pendingAccess = venues
-                          .where((venue) => !_hasVenueAccessReady(venue))
-                          .toList();
-                      if (pendingAccess.isEmpty) {
-                        return const EmptyState(
-                          icon: LucideIcons.shieldCheck,
-                          title: 'All venue access is configured',
-                          subtitle:
-                              'Every active venue has a WhatsApp login number.',
-                        );
-                      }
 
-                      return Column(
-                        children: pendingAccess.asMap().entries.map((entry) {
-                          final venue = entry.value;
-                          final requiresPhone = !venue.hasAssignedAccessPhone;
-                          final accessLabel = requiresPhone
-                              ? 'Add WhatsApp number'
-                              : !venue.isOpen
-                              ? 'Activate venue'
-                              : !venue.isAccessVerified
-                              ? 'Finish validation'
-                              : 'Review access';
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              bottom: AppTheme.space3,
-                            ),
-                            child:
-                                ClayCard(
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 44,
-                                            height: 44,
-                                            decoration: BoxDecoration(
-                                              color: AppColors.warning
-                                                  .withValues(alpha: 0.12),
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    AppTheme.radiusMd,
-                                                  ),
-                                            ),
-                                            child: Icon(
-                                              LucideIcons.messageCircle,
-                                              size: 20,
-                                              color: AppColors.warning,
-                                            ),
-                                          ),
-                                          const SizedBox(
-                                            width: AppTheme.space3,
-                                          ),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  venue.name,
-                                                  style: tt.titleSmall,
-                                                ),
-                                                Text(
-                                                  requiresPhone
-                                                      ? 'WhatsApp number missing'
-                                                      : 'Venue is not active yet',
-                                                  style: tt.bodySmall?.copyWith(
-                                                    color: cs.onSurfaceVariant,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          StatusBadge(
-                                            label: accessLabel,
-                                            color: AppColors.warning.withValues(
-                                              alpha: 0.12,
-                                            ),
-                                            textColor: AppColors.warning,
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                    .animate(delay: (300 + 100 * entry.key).ms)
-                                    .fadeIn(duration: 300.ms),
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
 
           // ─── System Health ───
           SliverToBoxAdapter(
@@ -330,17 +152,15 @@ class AdminDashboardScreen extends ConsumerWidget {
                     title: 'Order Exceptions',
                     icon: LucideIcons.alertCircle,
                     iconColor: cs.error,
-                    child: ordersAsync.when(
+                    child: kpisAsync.when(
                       loading: () => const SkeletonLoader(
                         width: double.infinity,
                         height: 60,
                       ),
                       error: (_, _) => const Text('Could not load orders'),
-                      data: (orders) {
-                        final cancelled = orders
-                            .where((o) => o.status == OrderStatus.cancelled)
-                            .toList();
-                        if (cancelled.isEmpty) {
+                      data: (kpis) {
+                        final cancelled = kpis['cancelled_orders'] ?? 0;
+                        if (cancelled == 0) {
                           return Text(
                             'No exceptions — all orders running smoothly.',
                             style: tt.bodySmall?.copyWith(
@@ -349,21 +169,19 @@ class AdminDashboardScreen extends ConsumerWidget {
                           );
                         }
                         return Column(
-                          children: cancelled.asMap().entries.map((entry) {
-                            final o = entry.value;
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                bottom: entry.key < cancelled.length - 1
-                                    ? AppTheme.space3
-                                    : 0,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: AppTheme.space2),
+                              child: Text(
+                                '$cancelled cancelled ${cancelled == 1 ? 'order' : 'orders'} need review.',
+                                style: tt.bodyMedium?.copyWith(
+                                  color: cs.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              child: _ExceptionRow(
-                                label: '${o.venueName} — #${o.displayNumber}',
-                                severity: 'Cancelled',
-                                severityColor: cs.error,
-                              ),
-                            );
-                          }).toList(),
+                            ),
+                          ],
                         );
                       },
                     ),

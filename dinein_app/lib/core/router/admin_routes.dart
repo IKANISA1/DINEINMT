@@ -1,12 +1,8 @@
 import 'package:go_router/go_router.dart';
 
-import '../../features/admin/activation/admin_activation_screen.dart' deferred as adminactivationscreen;
 import '../../features/admin/admin_shell.dart';
 import '../../features/admin/auth/admin_login_screen.dart';
 import '../../features/admin/dashboard/admin_dashboard_screen.dart' deferred as admindashboardscreen;
-import '../../features/admin/menus/admin_menu_item_screen.dart' deferred as adminmenuitemscreen;
-import '../../features/admin/menus/admin_menu_review_screen.dart' deferred as adminmenureviewscreen;
-import '../../features/admin/menus/admin_menus_screen.dart' deferred as adminmenusscreen;
 import '../../features/admin/orders/admin_orders_screen.dart' deferred as adminordersscreen;
 import '../../features/admin/settings/admin_settings_screen.dart' deferred as adminsettingsscreen;
 import '../../features/admin/venues/admin_venue_detail_screen.dart' deferred as adminvenuedetailscreen;
@@ -40,15 +36,6 @@ final List<RouteBase> adminRoutes = [
   GoRoute(
     path: AppRoutePaths.adminRoot,
     redirect: (context, state) => AppRoutePaths.adminOverview,
-  ),
-  GoRoute(
-    path: AppRoutePaths.adminActivation,
-    name: AppRouteNames.adminActivation,
-    redirect: adminRoleGuard,
-    pageBuilder: (context, state) {
-      final id = state.pathParameters[AppRouteParams.id]!;
-      return buildFadeSlidePage(state, DeferredWidget(libraryLoader: adminactivationscreen.loadLibrary, createWidget: (_) => adminactivationscreen.AdminActivationScreen(venueId: id)));
-    },
   ),
   ShellRoute(
     builder: (context, state, child) => AdminShell(child: child),
@@ -89,38 +76,6 @@ final List<RouteBase> adminRoutes = [
         redirect: adminRoleGuard,
         pageBuilder: (context, state) =>
             buildFadeSlidePage(state, DeferredWidget(libraryLoader: adminsettingsscreen.loadLibrary, createWidget: (_) => adminsettingsscreen.AdminSettingsScreen())),
-      ),
-      GoRoute(
-        path: AppRoutePaths.adminMenus,
-        name: AppRouteNames.adminMenus,
-        redirect: adminRoleGuard,
-        pageBuilder: (context, state) =>
-            buildFadeSlidePage(state, DeferredWidget(libraryLoader: adminmenusscreen.loadLibrary, createWidget: (_) => adminmenusscreen.AdminMenusScreen())),
-      ),
-      GoRoute(
-        path: AppRoutePaths.adminMenuNew,
-        name: AppRouteNames.adminMenuNew,
-        redirect: adminRoleGuard,
-        pageBuilder: (context, state) =>
-            buildFadeSlidePage(state, DeferredWidget(libraryLoader: adminmenuitemscreen.loadLibrary, createWidget: (_) => adminmenuitemscreen.AdminMenuItemScreen())),
-      ),
-      GoRoute(
-        path: AppRoutePaths.adminMenuItem,
-        name: AppRouteNames.adminMenuItem,
-        redirect: adminRoleGuard,
-        pageBuilder: (context, state) {
-          final id = state.pathParameters[AppRouteParams.id]!;
-          return buildFadeSlidePage(state, DeferredWidget(libraryLoader: adminmenuitemscreen.loadLibrary, createWidget: (_) => adminmenuitemscreen.AdminMenuItemScreen(groupId: id)));
-        },
-      ),
-      GoRoute(
-        path: AppRoutePaths.adminMenuReview,
-        name: AppRouteNames.adminMenuReview,
-        redirect: adminRoleGuard,
-        pageBuilder: (context, state) {
-          final id = state.pathParameters[AppRouteParams.id]!;
-          return buildFadeSlidePage(state, DeferredWidget(libraryLoader: adminmenureviewscreen.loadLibrary, createWidget: (_) => adminmenureviewscreen.AdminMenuReviewScreen(venueId: id)));
-        },
       ),
       GoRoute(
         path: AppRoutePaths.adminOrders,

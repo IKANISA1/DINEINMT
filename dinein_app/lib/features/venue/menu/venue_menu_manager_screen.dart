@@ -446,108 +446,57 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                             )
                           : const SizedBox.shrink(),
                     ),
-                    const SizedBox(height: AppTheme.space5),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppTheme.space5),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.05),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                LucideIcons.star,
-                                size: 16,
+                    // ═══ GUEST HIGHLIGHTS ═══
+                    if (selectedHighlights.isNotEmpty || _isSavingHighlights)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppTheme.space4),
+                        child: Row(
+                          children: [
+                            Icon(LucideIcons.star, size: 14, color: cs.primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'GUEST HIGHLIGHTS',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2,
                                 color: cs.primary,
                               ),
-                              const SizedBox(width: 10),
+                            ),
+                            const SizedBox(width: 12),
+                            if (_isSavingHighlights)
+                              SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                                ),
+                              )
+                            else
                               Expanded(
-                                child: Text(
-                                  'Guest Highlights',
-                                  style: tt.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w900,
+                                child: SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: selectedHighlights.map((item) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(right: 8),
+                                        child: Text(
+                                          '#${item.highlightRank} ${item.name}',
+                                          style: tt.bodySmall?.copyWith(
+                                            color: cs.onSurfaceVariant,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
                                   ),
                                 ),
                               ),
-                              Text(
-                                '${selectedHighlights.length}/3',
-                                style: tt.labelLarge?.copyWith(
-                                  color: cs.primary,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppTheme.space3),
-                          Text(
-                            selectedHighlights.isEmpty
-                                ? 'Choose up to 3 menu items to feature on the guest venue page. Any unused slots still fall back to the current automatic selection.'
-                                : 'Selected items appear first on the guest venue page in this order. Remove and re-add an item to change its position.',
-                            style: tt.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              height: 1.45,
-                            ),
-                          ),
-                          if (selectedHighlights.isNotEmpty) ...[
-                            const SizedBox(height: AppTheme.space3),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: selectedHighlights.map((item) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: cs.primary.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    '#${item.highlightRank} ${item.name}',
-                                    style: tt.labelMedium?.copyWith(
-                                      color: cs.primary,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
                           ],
-                          if (_isSavingHighlights) ...[
-                            const SizedBox(height: AppTheme.space3),
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      cs.primary,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Saving guest highlights...',
-                                  style: tt.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
+                        ),
                       ),
-                    ),
+                    const SizedBox(height: AppTheme.space4),
                     const SizedBox(height: AppTheme.space5),
                   ],
                 ),
@@ -851,73 +800,54 @@ class _MenuItemCard extends StatelessWidget {
                     : 'Add to guest highlights',
                 child: PressableScale(
                   onTap: isSavingHighlights ? null : onToggleHighlight,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: item.highlightRank != null
-                          ? cs.primary.withValues(alpha: 0.14)
-                          : cs.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
                     child: item.highlightRank != null
-                        ? Center(
-                            child: Text(
-                              '${item.highlightRank}',
-                              style: TextStyle(
-                                color: cs.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                              ),
+                        ? Text(
+                            '#${item.highlightRank}',
+                            style: TextStyle(
+                              color: cs.primary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
                             ),
                           )
                         : Icon(
                             LucideIcons.star,
-                            size: 16,
+                            size: 18,
                             color: isSavingHighlights
-                                ? cs.onSurfaceVariant.withValues(alpha: 0.35)
-                                : cs.onSurfaceVariant,
+                                ? cs.onSurfaceVariant.withValues(alpha: 0.20)
+                                : cs.onSurfaceVariant.withValues(alpha: 0.50),
                           ),
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-
-              // Edit button
-              PressableScale(
-                onTap: onEdit,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    LucideIcons.pencil,
-                    size: 16,
-                    color: cs.onSurfaceVariant,
+              Tooltip(
+                message: 'Edit item',
+                child: PressableScale(
+                  onTap: onEdit,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Icon(
+                      LucideIcons.pencil,
+                      size: 18,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.50),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-
-              // Visibility toggle
-              PressableScale(
-                onTap: onToggleVisibility,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: item.isAvailable
-                        ? cs.surfaceContainerHigh
-                        : cs.error.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    item.isAvailable ? LucideIcons.eye : LucideIcons.eyeOff,
-                    size: 16,
-                    color: item.isAvailable ? cs.onSurfaceVariant : cs.error,
+              Tooltip(
+                message: item.isAvailable ? 'Hide from menu' : 'Show on menu',
+                child: PressableScale(
+                  onTap: onToggleVisibility,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Icon(
+                      item.isAvailable ? LucideIcons.eye : LucideIcons.eyeOff,
+                      size: 18,
+                      color: item.isAvailable
+                          ? cs.onSurfaceVariant.withValues(alpha: 0.50)
+                          : cs.error,
+                    ),
                   ),
                 ),
               ),

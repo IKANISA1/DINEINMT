@@ -601,28 +601,24 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
                     );
                   },
                 ),
-                const SizedBox(height: AppTheme.space4),
+                // Tags
                 TextField(
                   controller: _tagsController,
                   decoration: const InputDecoration(
-                    labelText: 'Tags',
-                    hintText: 'Vegetarian, Premium, Best Seller',
+                    labelText: 'Tags (comma separated)',
+                    hintText: 'Vegetarian, Spicy',
                   ),
                 ),
-                const SizedBox(height: AppTheme.space5),
+                const SizedBox(height: AppTheme.space4),
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   value: _isAvailable,
                   onChanged: _isSaving
                       ? null
-                      : (value) {
-                          setState(() {
-                            _isAvailable = value;
-                          });
-                        },
+                      : (value) => setState(() => _isAvailable = value),
                   title: Text('Available for ordering', style: tt.titleSmall),
                   subtitle: Text(
-                    'Disable this if the item should stay hidden from guests.',
+                    'Hide this item if it is out of stock.',
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ),
@@ -775,27 +771,19 @@ class _ImagePanel extends StatelessWidget {
           ),
           const SizedBox(height: AppTheme.space2),
           Text(
-            hasExistingItem
-                ? usesManualImage
-                      ? 'Manual images stay authoritative. Update the URL below and save to replace it.'
-                      : 'Generate automatic menu art, or paste a real dish photo URL to override it.'
-                : 'Save the item first. The app will queue image generation automatically if the item still has no image.',
-            style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+          Text(
+            'Provide a real image URL, or use AI generation.',
+            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
-          const SizedBox(height: AppTheme.space5),
+          const SizedBox(height: AppTheme.space4),
           TextField(
             controller: imageUrlController,
             keyboardType: TextInputType.url,
             textInputAction: TextInputAction.done,
             onChanged: onImageUrlChanged,
-            decoration: InputDecoration(
-              labelText: 'Manual image URL',
-              hintText: 'https://images.example.com/dishes/ribeye.jpg',
-              helperText: hasExistingItem
-                  ? usesManualImage
-                        ? 'Saving with a new URL replaces the current manual image. Clearing this field keeps the saved image.'
-                        : 'Saving with a real image URL marks it as Manual and prevents automatic replacement.'
-                  : 'Optional. Add a real dish photo now to skip automatic generation.',
+            decoration: const InputDecoration(
+              labelText: 'Manual Image URL (Optional)',
+              hintText: 'https://...',
             ),
           ),
           if (item?.imageError != null &&

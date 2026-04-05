@@ -32,16 +32,12 @@ abstract final class AppRouteNames {
   static const venueWaves = 'venueWaves';
 
   static const adminLogin = 'adminLogin';
-  static const adminActivation = 'adminActivation';
   static const adminOverview = 'adminOverview';
   static const adminVenues = 'adminVenues';
   static const adminVenueCreate = 'adminVenueCreate';
   static const adminVenueDetail = 'adminVenueDetail';
   static const adminSettings = 'adminSettings';
-  static const adminMenus = 'adminMenus';
-  static const adminMenuNew = 'adminMenuNew';
-  static const adminMenuItem = 'adminMenuItem';
-  static const adminMenuReview = 'adminMenuReview';
+
   static const adminOrders = 'adminOrders';
 
   static const biopayHome = 'biopayHome';
@@ -97,17 +93,12 @@ abstract final class AppRoutePaths {
   static const venueWaves = '/venue/waves';
 
   static const adminLogin = '/admin/login';
-  static const adminActivation =
-      '/admin/venues/:${AppRouteParams.id}/activation';
   static const adminOverview = '/admin/overview';
   static const adminVenues = '/admin/venues';
   static const adminVenueCreate = '/admin/venues/new';
   static const adminVenueDetail = '/admin/venues/:${AppRouteParams.id}';
   static const adminSettings = '/admin/settings';
-  static const adminMenus = '/admin/menus';
-  static const adminMenuNew = '/admin/menus/manage/new';
-  static const adminMenuItem = '/admin/menus/manage/:${AppRouteParams.id}';
-  static const adminMenuReview = '/admin/menus/:${AppRouteParams.id}';
+
   static const adminOrders = '/admin/orders';
   static const adminRoot = '/admin';
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import 'package:ui/theme/app_theme.dart';
+import 'package:ui/theme/app_colors.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 import 'package:dinein_app/shared/widgets/branded_qr_tools.dart';
 
@@ -264,4 +265,133 @@ class DayHours {
     'open': open,
     'close': close,
   };
+}
+
+/// Animated status indicator dot.
+class AdminStatusDot extends StatelessWidget {
+  final String status;
+
+  const AdminStatusDot({super.key, required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (status) {
+      'active' => AppColors.secondary,
+      'suspended' => Theme.of(context).colorScheme.error,
+      'maintenance' => AppColors.warning,
+      _ => Theme.of(context).colorScheme.onSurface,
+    };
+
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.50), blurRadius: 16),
+        ],
+      ),
+    );
+  }
+}
+
+/// Individual status toggle button for venue operations.
+class AdminStatusButton extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final IconData icon;
+  final bool isSelected;
+  final Color selectedColor;
+  final VoidCallback onTap;
+
+  const AdminStatusButton({
+    super.key,
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.isSelected,
+    required this.selectedColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    final textColor = isSelected
+        ? selectedColor
+        : cs.onSurface.withValues(alpha: 0.40);
+
+    return PressableScale(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(AppTheme.space5),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? selectedColor.withValues(alpha: 0.10)
+              : cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+          border: Border.all(
+            color: isSelected
+                ? selectedColor
+                : cs.outlineVariant.withValues(alpha: 0.10),
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: selectedColor.withValues(alpha: 0.10),
+                    blurRadius: 32,
+                  ),
+                ]
+              : AppTheme.clayShadow,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? selectedColor.withValues(alpha: 0.20)
+                    : cs.onSurface.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+              ),
+              child: Icon(icon, size: 24, color: textColor),
+            ),
+            const SizedBox(width: AppTheme.space4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: tt.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                      color: textColor.withValues(alpha: 0.60),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(LucideIcons.checkCircle2, size: 24, color: selectedColor),
+          ],
+        ),
+      ),
+    );
+  }
 }

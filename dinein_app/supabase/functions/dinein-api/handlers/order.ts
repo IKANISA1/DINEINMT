@@ -6,6 +6,7 @@ export {
   handleGetOrdersForVenue,
   handleGetOrdersForUser,
   handleGetAllOrders,
+  handleGetAdminDashboardKpis,
   handleGetOrderById,
   handleUpdateOrderStatus,
 } from "../core.ts";

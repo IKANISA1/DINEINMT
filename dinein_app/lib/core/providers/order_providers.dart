@@ -46,6 +46,17 @@ final allOrdersProvider = FutureProvider<List<Order>>((ref) async {
   return await OrderRepository.instance.getAllOrders();
 });
 
+/// System-wide order KPIs for the Admin Dashboard.
+final adminDashboardKpisProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final now = DateTime.now();
+  final startOfDay = DateTime(now.year, now.month, now.day);
+  final timeZone = DateTime.now().timeZoneName;
+  return await OrderRepository.instance.getAdminDashboardKpis(
+    startOfDay: startOfDay,
+    timeZone: timeZone,
+  );
+});
+
 /// Realtime order status stream for customer order tracking.
 final orderStreamProvider = StreamProvider.family<OrderStatus, String>((
   ref,

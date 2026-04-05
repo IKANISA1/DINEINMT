@@ -44,9 +44,8 @@ class _AdminShellState extends State<AdminShell> {
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
     if (location.startsWith(AppRoutePaths.adminVenues)) return 1;
-    if (location.startsWith(AppRoutePaths.adminMenus)) return 2;
-    if (location.startsWith(AppRoutePaths.adminOrders)) return 3;
-    if (location.startsWith(AppRoutePaths.adminSettings)) return 4;
+    if (location.startsWith(AppRoutePaths.adminOrders)) return 2;
+    if (location.startsWith(AppRoutePaths.adminSettings)) return 3;
     return 0; // /admin/overview
   }
 
@@ -468,11 +467,7 @@ const _adminNavItems = [
     label: 'Venues',
     routeName: AppRouteNames.adminVenues,
   ),
-  _NavData(
-    icon: LucideIcons.menu,
-    label: 'Menus',
-    routeName: AppRouteNames.adminMenus,
-  ),
+
   _NavData(
     icon: LucideIcons.shoppingBag,
     label: 'Orders',
