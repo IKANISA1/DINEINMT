@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:core_pkg/constants/enums.dart';
-import 'package:db_pkg/models/models.dart';
 import 'package:core_pkg/config/country_runtime.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
@@ -532,61 +530,7 @@ class _SystemHealthCard extends StatelessWidget {
   }
 }
 
-/// Exception row for the Order Exceptions card.
-class _ExceptionRow extends StatelessWidget {
-  final String label;
-  final String severity;
-  final Color severityColor;
 
-  const _ExceptionRow({
-    required this.label,
-    required this.severity,
-    required this.severityColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.space4),
-      decoration: BoxDecoration(
-        color: severityColor.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: severityColor.withValues(alpha: 0.10)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: tt.titleSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.3,
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: severityColor,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              severity.toUpperCase(),
-              style: TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-                color: cs.onPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 /// Compact status chip showing a count with a colored accent.
 class _ImageStatChip extends StatelessWidget {
