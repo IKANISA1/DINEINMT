@@ -272,64 +272,67 @@ class OtpPillFields extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(6, (index) {
-        final hasValue = controllers[index].text.isNotEmpty;
-        final isFocused = focusNodes[index].hasFocus;
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(6, (index) {
+          final hasValue = controllers[index].text.isNotEmpty;
+          final isFocused = focusNodes[index].hasFocus;
 
-        return Padding(
-          padding: EdgeInsets.only(left: index == 0 ? 0 : 10),
-          child: Focus(
-            onKeyEvent: (_, event) {
-              _onKeyEvent(index, event);
-              return KeyEventResult.ignored;
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: hasValue
-                    ? AppColors.surfaceContainerHigh
-                    : AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(27),
-                border: Border.all(
-                  color: isFocused
-                      ? cs.primary.withValues(alpha: 0.75)
-                      : hasValue
-                      ? cs.onSurfaceVariant.withValues(alpha: 0.18)
-                      : cs.onSurfaceVariant.withValues(alpha: 0.10),
-                  width: isFocused ? 1.6 : 1,
-                ),
-              ),
-              child: Center(
-                child: TextField(
-                  controller: controllers[index],
-                  focusNode: focusNodes[index],
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  maxLength: 1,
-                  onChanged: (v) => _onDigitChanged(index, v),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: tt.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 22,
+          return Padding(
+            padding: EdgeInsets.only(left: index == 0 ? 0 : 10),
+            child: Focus(
+              onKeyEvent: (_, event) {
+                _onKeyEvent(index, event);
+                return KeyEventResult.ignored;
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: hasValue
+                      ? AppColors.surfaceContainerHigh
+                      : AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(27),
+                  border: Border.all(
+                    color: isFocused
+                        ? cs.primary.withValues(alpha: 0.75)
+                        : hasValue
+                        ? cs.onSurfaceVariant.withValues(alpha: 0.18)
+                        : cs.onSurfaceVariant.withValues(alpha: 0.10),
+                    width: isFocused ? 1.6 : 1,
                   ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    counterText: '',
-                    contentPadding: EdgeInsets.zero,
-                    filled: false,
+                ),
+                child: Center(
+                  child: TextField(
+                    controller: controllers[index],
+                    focusNode: focusNodes[index],
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    maxLength: 1,
+                    onChanged: (v) => _onDigitChanged(index, v),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: tt.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 22,
+                    ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      counterText: '',
+                      contentPadding: EdgeInsets.zero,
+                      filled: false,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     );
   }
 }

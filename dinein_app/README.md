@@ -29,11 +29,14 @@ flutter run -d ios
 flutter run -d chrome
 ```
 
-For browser release builds:
+For browser release builds (Cloudflare PWAs):
 
 ```bash
-flutter build web --release
-flutter build web --release -t lib/main_rw.dart
+# Malta (dinein-mt-pwa)
+./scripts/build_web_release.sh --flavor mt
+
+# Rwanda (dinein-rw-pwa)
+./scripts/build_web_release.sh --flavor rw
 ```
 
 BioPay, face enrollment, Wi-Fi auto-connect, and other device-native flows stay

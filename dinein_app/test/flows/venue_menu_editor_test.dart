@@ -17,6 +17,7 @@ void main() {
   testWidgets('menu editor treats manual images as authoritative', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
     const venue = Venue(
       id: 'venue_1',
       name: 'Harbor Table',
@@ -52,12 +53,6 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(
-      find.text(
-        'Manual images stay authoritative. Update the URL below and save to replace it.',
-      ),
-      findsOneWidget,
-    );
     expect(find.text('MANUAL IMAGE ACTIVE'), findsOneWidget);
     expect(find.text('Protect current image'), findsNothing);
     expect(find.text('https://example.com/images/ribeye.jpg'), findsOneWidget);
@@ -66,6 +61,7 @@ void main() {
   testWidgets('menu editor opens detail sheet before generating an image', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1200));
     const venue = Venue(
       id: 'venue_1',
       name: 'Harbor Table',

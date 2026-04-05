@@ -12,7 +12,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 // ─── Types ───
 
-type SupabaseClient = ReturnType<typeof createClient>;
+type SupabaseClient = any;
 
 interface RateLimitConfig {
   /** Rate limit action name, e.g. "wave" or "google_maps_search" */

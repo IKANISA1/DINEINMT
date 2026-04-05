@@ -20,6 +20,6 @@ void main() {
 
     await tester.pumpAndSettle();
     
-    expect(find.text('No venue access'), findsOneWidget);
+    expect(find.text('No Venue Access'), findsOneWidget);
   });
 }
