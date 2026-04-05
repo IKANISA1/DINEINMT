@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -130,91 +129,70 @@ class GuestSettingsScreen extends ConsumerWidget {
         children: [
           _ProfileHeaderCard(
             welcomeMessage: config.welcomeMessage,
-          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05),
-          const SizedBox(height: AppTheme.space8),
+          ),
+          const SizedBox(height: AppTheme.space5),
           const _SectionLabel(label: 'QUICK ACTIONS'),
           const SizedBox(height: AppTheme.space4),
           _SettingsTile(
-                icon: LucideIcons.history,
-                title: 'Order History',
-                subtitle: 'VIEW YOUR PAST ORDERS',
-                onTap: () => context.goNamed(AppRouteNames.orderHistory),
-              )
-              .animate()
-              .fadeIn(delay: 100.ms, duration: 320.ms)
-              .slideY(begin: 0.05),
+            icon: LucideIcons.history,
+            title: 'Order History',
+            subtitle: 'VIEW YOUR PAST ORDERS',
+            onTap: () => context.goNamed(AppRouteNames.orderHistory),
+          ),
           if (config.hasBioPay && !kIsWeb) ...[
             const SizedBox(height: AppTheme.space3),
             _SettingsTile(
-                  icon: LucideIcons.scanFace,
-                  title: 'BioPay',
-                  subtitle: 'FACE-SCAN PAYMENTS',
-                  onTap: () => context.goNamed(AppRouteNames.biopayHome),
-                )
-                .animate()
-                .fadeIn(delay: 130.ms, duration: 320.ms)
-                .slideY(begin: 0.05),
+              icon: LucideIcons.scanFace,
+              title: 'BioPay',
+              subtitle: 'FACE-SCAN PAYMENTS',
+              onTap: () => context.goNamed(AppRouteNames.biopayHome),
+            ),
           ],
-          const SizedBox(height: AppTheme.space8),
+          const SizedBox(height: AppTheme.space5),
           const _SectionLabel(label: 'ACCOUNT'),
           const SizedBox(height: AppTheme.space4),
           _SettingsTile(
-                icon: LucideIcons.store,
-                title: 'Venue Portal',
-                onTap: () => context.pushNamed(AppRouteNames.venueLogin),
-              )
-              .animate()
-              .fadeIn(delay: 150.ms, duration: 320.ms)
-              .slideY(begin: 0.05),
+            icon: LucideIcons.store,
+            title: 'Venue Portal',
+            onTap: () => context.pushNamed(AppRouteNames.venueLogin),
+          ),
           const SizedBox(height: AppTheme.space3),
           _SettingsTile(
-                icon: LucideIcons.messageSquare,
-                title: 'Get in Touch',
-                onTap: () => SupportContactService.contactSupport(context),
-              )
-              .animate()
-              .fadeIn(delay: 180.ms, duration: 320.ms)
-              .slideY(begin: 0.05),
+            icon: LucideIcons.messageSquare,
+            title: 'Get in Touch',
+            onTap: () => SupportContactService.contactSupport(context),
+          ),
           const SizedBox(height: AppTheme.space3),
           _SettingsTile(
-                icon: LucideIcons.info,
-                title: 'About DINEIN',
-                onTap: () => _showAboutSheet(context, config),
-              )
-              .animate()
-              .fadeIn(delay: 210.ms, duration: 320.ms)
-              .slideY(begin: 0.05),
+            icon: LucideIcons.info,
+            title: 'About DINEIN',
+            onTap: () => _showAboutSheet(context, config),
+          ),
           const SizedBox(height: AppTheme.space3),
           _SettingsTile(
-                icon: LucideIcons.shield,
-                title: 'Privacy Policy',
-                onTap: () => _launchExternal(
-                  context,
-                  Uri.parse(config.privacyPolicyUrl),
-                ),
-              )
-              .animate()
-              .fadeIn(delay: 240.ms, duration: 320.ms)
-              .slideY(begin: 0.05),
+            icon: LucideIcons.shield,
+            title: 'Privacy Policy',
+            onTap: () => _launchExternal(
+              context,
+              Uri.parse(config.privacyPolicyUrl),
+            ),
+          ),
           const SizedBox(height: AppTheme.space3),
           _SettingsTile(
-                icon: LucideIcons.trash2,
-                title: 'Delete My Data',
-                subtitle: 'REQUEST DATA REMOVAL',
-                onTap: () => _launchExternal(
-                  context,
-                  Uri.parse(
-                    'mailto:info@ikanisa.com'
-                    '?subject=DineIn%20Data%20Deletion%20Request'
-                    '&body=I%20would%20like%20to%20request%20deletion%20of%20all%20'
-                    'my%20personal%20data%20associated%20with%20the%20DineIn%20app.',
-                  ),
-                ),
-              )
-              .animate()
-              .fadeIn(delay: 270.ms, duration: 320.ms)
-              .slideY(begin: 0.05),
-          const SizedBox(height: AppTheme.space8),
+            icon: LucideIcons.trash2,
+            title: 'Delete My Data',
+            subtitle: 'REQUEST DATA REMOVAL',
+            onTap: () => _launchExternal(
+              context,
+              Uri.parse(
+                'mailto:info@ikanisa.com'
+                '?subject=DineIn%20Data%20Deletion%20Request'
+                '&body=I%20would%20like%20to%20request%20deletion%20of%20all%20'
+                'my%20personal%20data%20associated%20with%20the%20DineIn%20app.',
+              ),
+            ),
+          ),
+          const SizedBox(height: AppTheme.space5),
           const _GuestProfileFooter(),
         ],
       ),
@@ -234,57 +212,54 @@ class _ProfileHeaderCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.space6,
-        vertical: AppTheme.space8,
+        horizontal: AppTheme.space5,
+        vertical: AppTheme.space5,
       ),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppTheme.radius3xl),
+        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
         border: Border.all(color: AppColors.white5),
-        boxShadow: AppTheme.ambientShadow,
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [cs.surfaceContainerLow, cs.surfaceContainerLowest],
-        ),
       ),
-      child: Column(
+      child: Row(
         children: [
           Container(
-            width: 108,
-            height: 108,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: cs.primary.withValues(alpha: 0.16),
-              border: Border.all(color: cs.primary.withValues(alpha: 0.28)),
-              boxShadow: [
-                BoxShadow(
-                  color: cs.primary.withValues(alpha: 0.16),
-                  blurRadius: 24,
-                  spreadRadius: 2,
+              border: Border.all(
+                color: cs.primary.withValues(alpha: 0.28),
+              ),
+            ),
+            child: Icon(LucideIcons.user, size: 22, color: cs.primary),
+          ),
+          const SizedBox(width: AppTheme.space4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Guest',
+                  style: tt.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  welcomeMessage,
+                  style: TextStyle(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.60),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-            child: Icon(LucideIcons.user, size: 44, color: cs.primary),
-          ),
-          const SizedBox(height: AppTheme.space6),
-          Text(
-            'Guest',
-            style: tt.displaySmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.8,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            welcomeMessage,
-            style: TextStyle(
-              color: cs.onSurfaceVariant.withValues(alpha: 0.68),
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2.6,
-            ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),

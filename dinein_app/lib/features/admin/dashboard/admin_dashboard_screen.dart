@@ -158,8 +158,8 @@ class AdminDashboardScreen extends ConsumerWidget {
                           ? availableWidth
                           : (availableWidth - AppTheme.space4) / 2;
                   return Wrap(
-                    spacing: AppTheme.space4,
-                    runSpacing: AppTheme.space4,
+                    spacing: AppTheme.space3,
+                    runSpacing: AppTheme.space3,
                     children:
                         kpiCards.asMap().entries.map((entry) {
                           final index = entry.key;
@@ -184,7 +184,40 @@ class AdminDashboardScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Venue Access Setup', style: tt.headlineSmall),
+                  Row(
+                    children: [
+                      Text('Venue Access Setup', style: tt.headlineSmall),
+                      const SizedBox(width: AppTheme.space3),
+                      venuesAsync.when(
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, _) => const SizedBox.shrink(),
+                        data: (venues) {
+                          final count = venues
+                              .where((v) => !_hasVenueAccessReady(v))
+                              .length;
+                          if (count == 0) return const SizedBox.shrink();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              '$count',
+                              style: TextStyle(
+                                color: AppColors.warning,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: AppTheme.space4),
                   venuesAsync.when(
                     loading: () => const SkeletonLoader(
@@ -195,7 +228,6 @@ class AdminDashboardScreen extends ConsumerWidget {
                     data: (venues) {
                       final pendingAccess = venues
                           .where((venue) => !_hasVenueAccessReady(venue))
-                          .take(3)
                           .toList();
                       if (pendingAccess.isEmpty) {
                         return const EmptyState(
@@ -307,7 +339,6 @@ class AdminDashboardScreen extends ConsumerWidget {
                       data: (orders) {
                         final cancelled = orders
                             .where((o) => o.status == OrderStatus.cancelled)
-                            .take(3)
                             .toList();
                         if (cancelled.isEmpty) {
                           return Text(

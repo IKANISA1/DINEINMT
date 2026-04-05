@@ -5,6 +5,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:js_interop' as js;
 
 import 'package:db_pkg/models/guest_venue_feed.dart';
 import 'package:db_pkg/models/models.dart';
@@ -17,8 +19,16 @@ import 'package:ui/theme/app_theme.dart';
 import 'package:ui/theme/motion_preferences.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
-const _discoverHeroImageUrl =
-    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80';
+/// Known cuisine/category filter labels derived from venue data.
+const _cuisineFilters = [
+  'All',
+  'Restaurants',
+  'Bar',
+  'Bar & Restaurants',
+  'Hotels',
+  'Café',
+  'Bistro',
+];
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -34,6 +44,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   final _searchController = TextEditingController();
   Timer? _queryDebounce;
   String _query = '';
+  String _cuisineFilter = 'All';
   int _resultLimit = _pageSize;
   bool _requestingLocation = false;
   bool _trackedDiscoverView = false;
@@ -174,6 +185,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
     return _DiscoverBody(
       query: _query,
+      cuisineFilter: _cuisineFilter,
       controller: _searchController,
       feed: feed,
       isLoading: feedAsync.isLoading,
@@ -191,6 +203,13 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             }
           : null,
       onQueryChanged: _onSearchChanged,
+      onCuisineChanged: (filter) {
+        if (_cuisineFilter == filter) return;
+        setState(() {
+          _cuisineFilter = filter;
+          _resultLimit = _pageSize;
+        });
+      },
       onUseMyLocation: _requestLocation,
       onOpenFeaturedVenue: (venue) =>
           _openVenue(venue, source: 'discover_featured'),
@@ -216,6 +235,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
 class _DiscoverBody extends StatelessWidget {
   final String query;
+  final String cuisineFilter;
   final TextEditingController controller;
   final GuestVenueFeed? feed;
   final bool isLoading;
@@ -225,6 +245,7 @@ class _DiscoverBody extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback? onLoadMore;
   final ValueChanged<String> onQueryChanged;
+  final ValueChanged<String> onCuisineChanged;
   final VoidCallback onUseMyLocation;
   final ValueChanged<Venue> onOpenFeaturedVenue;
   final ValueChanged<Venue> onOpenResultVenue;
@@ -233,6 +254,7 @@ class _DiscoverBody extends StatelessWidget {
 
   const _DiscoverBody({
     required this.query,
+    required this.cuisineFilter,
     required this.controller,
     required this.feed,
     required this.isLoading,
@@ -242,6 +264,7 @@ class _DiscoverBody extends StatelessWidget {
     required this.onRetry,
     required this.onLoadMore,
     required this.onQueryChanged,
+    required this.onCuisineChanged,
     required this.onUseMyLocation,
     required this.onOpenFeaturedVenue,
     required this.onOpenResultVenue,
@@ -251,7 +274,15 @@ class _DiscoverBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final venues = feed?.items ?? const <Venue>[];
+    final allVenues = feed?.items ?? const <Venue>[];
+    // Apply cuisine filter client-side for instant feedback.
+    final venues = cuisineFilter == 'All'
+        ? allVenues
+        : allVenues
+            .where((v) => v.category.toLowerCase().contains(
+                  cuisineFilter.toLowerCase(),
+                ))
+            .toList();
     final featuredVenues = venues.take(6).toList(growable: false);
     final results = venues;
     final shouldAnimateResults = query.isEmpty && !reduceMotionOf(context);
@@ -275,6 +306,17 @@ class _DiscoverBody extends StatelessWidget {
               onUseMyLocation: onUseMyLocation,
               onClear: onClearQuery,
             ),
+          ),
+        ),
+        // ─── Smart Reorder (Jump Back In) ───
+        const SliverToBoxAdapter(
+          child: _SmartReorderSection(),
+        ),
+        // ─── Cuisine Filter Chips ───
+        SliverToBoxAdapter(
+          child: _CuisineFilterChips(
+            selected: cuisineFilter,
+            onChanged: onCuisineChanged,
           ),
         ),
         if (isLoading)
@@ -322,7 +364,7 @@ class _DiscoverBody extends StatelessWidget {
         if (query.isEmpty && featuredVenues.isNotEmpty)
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 382,
+              height: 280,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(
@@ -476,181 +518,228 @@ class _DiscoverHero extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Container(
-      constraints: const BoxConstraints(minHeight: 340),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppTheme.radius3xl),
-        border: Border.all(color: AppColors.white5),
-        boxShadow: AppTheme.elevatedShadow,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: DineInImage(
-              imageUrl: _discoverHeroImageUrl,
-              fit: BoxFit.cover,
-              semanticLabel: 'Discover dining hero banner',
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.18),
-                    Colors.black.withValues(alpha: 0.54),
-                    Theme.of(context).colorScheme.surfaceContainerHigh,
-                  ],
-                  stops: const [0.0, 0.38, 1.0],
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ─── Compact branded greeting ───
+        Row(
+          children: [
+            Text(
+              'FIND YOUR ',
+              style: tt.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.0,
               ),
             ),
+            Text(
+              'FLAVOR',
+              style: tt.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.0,
+                color: cs.primary,
+              ),
+            ),
+            const Spacer(),
+            // Web Share API trigger
+            PressableScale(
+              onTap: () {
+                AppTelemetryService.trackGuestEvent('discover_web_share_tapped');
+                Share.shareUri(Uri.base);
+              },
+              semanticLabel: 'Share App',
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHigh,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.white5),
+                ),
+                child: Icon(LucideIcons.share, size: 16, color: cs.primary),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.space4),
+
+        // ─── Search bar (primary interaction) ───
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+            border: Border.all(color: AppColors.white10),
           ),
-          Padding(
-            padding: const EdgeInsets.all(AppTheme.space8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    style: tt.displayMedium?.copyWith(
-                      height: 0.84,
-                      letterSpacing: -2.2,
-                    ),
-                    children: [
-                      const TextSpan(text: 'FIND YOUR\n'),
-                      TextSpan(
-                        text: 'FLAVOR',
-                        style: TextStyle(color: cs.primary),
+          child: Row(
+            children: [
+              Icon(
+                LucideIcons.search,
+                size: 20,
+                color: cs.onSurfaceVariant.withValues(alpha: 0.85),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  onChanged: onChanged,
+                  textInputAction: TextInputAction.search,
+                  style: tt.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    filled: false,
+                    hintText: 'Search venues, cuisines...',
+                    hintStyle: tt.bodyLarge?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(
+                        alpha: 0.30,
                       ),
-                    ],
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      decoration: BoxDecoration(
-                        color: cs.surface.withValues(alpha: 0.96),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                        border: Border.all(color: AppColors.white10),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            LucideIcons.search,
-                            size: 20,
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.68),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: controller,
-                              onChanged: onChanged,
-                              textInputAction: TextInputAction.search,
-                              style: tt.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                filled: false,
-                                hintText: 'Search venues...',
-                                hintStyle: tt.bodyLarge?.copyWith(
-                                  color: cs.onSurfaceVariant.withValues(
-                                    alpha: 0.30,
-                                  ),
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (query.isNotEmpty)
-                            PressableScale(
-                              onTap: onClear,
-                              semanticLabel: 'Clear search',
-                              minTouchTargetSize: const Size(44, 44),
-                              child: Icon(
-                                LucideIcons.x,
-                                size: 18,
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
+              ),
+              if (query.isNotEmpty)
+                PressableScale(
+                  onTap: onClear,
+                  semanticLabel: 'Clear search',
+                  minTouchTargetSize: const Size(44, 44),
+                  child: Icon(
+                    LucideIcons.x,
+                    size: 18,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppTheme.space3),
+
+        // ─── Location pill ───
+        PressableScale(
+          onTap: requestingLocation ? null : onUseMyLocation,
+          semanticLabel: 'Use my location',
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 10,
+            ),
+            decoration: BoxDecoration(
+              color: discoveryLocation != null
+                  ? cs.primary.withValues(alpha: 0.14)
+                  : cs.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(
+                AppTheme.radiusFull,
+              ),
+              border: Border.all(
+                color: discoveryLocation != null
+                    ? cs.primary.withValues(alpha: 0.28)
+                    : AppColors.white5,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (requestingLocation)
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cs.primary,
                     ),
-                    const SizedBox(height: AppTheme.space4),
-                    PressableScale(
-                      onTap: requestingLocation ? null : onUseMyLocation,
-                      semanticLabel: 'Use my location',
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: discoveryLocation != null
-                              ? cs.primary.withValues(alpha: 0.14)
-                              : Colors.black.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusFull,
-                          ),
-                          border: Border.all(
-                            color: discoveryLocation != null
-                                ? cs.primary.withValues(alpha: 0.28)
-                                : AppColors.white10,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (requestingLocation)
-                              SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: cs.primary,
-                                ),
-                              )
-                            else
-                              Icon(
-                                discoveryLocation != null
-                                    ? LucideIcons.navigation
-                                    : LucideIcons.mapPin,
-                                size: 16,
-                                color: discoveryLocation != null
-                                    ? cs.primary
-                                    : Colors.white,
-                              ),
-                            const SizedBox(width: 10),
-                            Text(
-                              discoveryLocation != null
-                                  ? 'NEAR YOU ACTIVE'
-                                  : 'USE MY LOCATION',
-                              style: TextStyle(
-                                color: discoveryLocation != null
-                                    ? cs.primary
-                                    : Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  )
+                else
+                  Icon(
+                    discoveryLocation != null
+                        ? LucideIcons.navigation
+                        : LucideIcons.mapPin,
+                    size: 14,
+                    color: discoveryLocation != null
+                        ? cs.primary
+                        : cs.onSurfaceVariant,
+                  ),
+                const SizedBox(width: 8),
+                Text(
+                  discoveryLocation != null
+                      ? 'NEAR YOU'
+                      : 'USE LOCATION',
+                  style: TextStyle(
+                    color: discoveryLocation != null
+                        ? cs.primary
+                        : cs.onSurfaceVariant,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.0,
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Horizontal cuisine filter chip strip.
+class _CuisineFilterChips extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  const _CuisineFilterChips({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+        itemCount: _cuisineFilters.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final filter = _cuisineFilters[index];
+          final isActive = filter == selected;
+
+          return PressableScale(
+            onTap: () => onChanged(filter),
+            semanticLabel: 'Filter by $filter',
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? cs.primary
+                    : cs.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                border: Border.all(
+                  color: isActive
+                      ? cs.primary
+                      : AppColors.white5,
+                ),
+              ),
+              child: Text(
+                filter.toUpperCase(),
+                style: TextStyle(
+                  color: isActive
+                      ? cs.onPrimary
+                      : cs.onSurfaceVariant,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.8,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -715,12 +804,13 @@ class _FeaturedVenueCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final reviewSnippet = venue.primaryReviewSnippet;
 
     return PressableScale(
       onTap: onTap,
       semanticLabel: 'View ${venue.name}',
       child: SizedBox(
-        width: 288,
+        width: 260,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
@@ -741,56 +831,103 @@ class _FeaturedVenueCard extends StatelessWidget {
                       colors: [
                         Colors.transparent,
                         Colors.black.withValues(alpha: 0.14),
-                        Colors.black.withValues(alpha: 0.94),
+                        Colors.black.withValues(alpha: 0.96),
                       ],
-                      stops: const [0.0, 0.38, 1.0],
+                      stops: const [0.0, 0.30, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              // Category chip (top-right)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.60),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                  ),
+                  child: Text(
+                    venue.category.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
                     ),
                   ),
                 ),
               ),
               Positioned(
-                left: 28,
-                right: 28,
-                bottom: 28,
+                left: 20,
+                right: 20,
+                bottom: 18,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       venue.name,
-                      maxLines: 3,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: tt.headlineMedium?.copyWith(
+                      style: tt.titleLarge?.copyWith(
                         color: Colors.white,
-                        letterSpacing: -1.1,
-                        height: 1,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                        height: 1.1,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
-                        Icon(LucideIcons.star, size: 15, color: cs.primary),
-                        const SizedBox(width: 6),
+                        Icon(LucideIcons.star, size: 13, color: cs.primary),
+                        const SizedBox(width: 5),
                         Text(
                           _ratingLabel(venue),
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
+                        if (venue.priceLevelLabel != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            venue.priceLevelLabel!,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                         if (distanceLabel != null) ...[
-                          const SizedBox(width: 10),
+                          const SizedBox(width: 8),
                           Text(
                             distanceLabel!,
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.74),
+                              color: Colors.white.withValues(alpha: 0.60),
                               fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ],
                     ),
+                    if (reviewSnippet != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        '"${reviewSnippet.length > 60 ? '${reviewSnippet.substring(0, 60)}...' : reviewSnippet}"',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.56),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -817,25 +954,26 @@ class _NearbyVenueCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final hoursHint = venue.closingTimeHint;
+    final locality = venue.addressLocality;
 
     return PressableScale(
       onTap: onTap,
       semanticLabel: 'View ${venue.name}',
       child: Container(
-        padding: const EdgeInsets.all(AppTheme.space6),
+        padding: const EdgeInsets.all(AppTheme.space4),
         decoration: BoxDecoration(
           color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+          borderRadius: BorderRadius.circular(AppTheme.radiusXl),
           border: Border.all(color: AppColors.white5),
-          boxShadow: AppTheme.ambientShadow,
         ),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
               child: SizedBox(
-                width: 96,
-                height: 96,
+                width: 80,
+                height: 80,
                 child: DineInImage(
                   imageUrl: venue.imageUrl,
                   fit: BoxFit.cover,
@@ -844,44 +982,47 @@ class _NearbyVenueCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: AppTheme.space6),
+            const SizedBox(width: AppTheme.space4),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     venue.name,
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: tt.headlineSmall?.copyWith(letterSpacing: -0.8),
+                    style: tt.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                    ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(LucideIcons.star, size: 15, color: cs.primary),
-                      const SizedBox(width: 6),
-                      Text(
-                        _ratingLabel(venue),
-                        style: TextStyle(
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.72),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.2,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 2),
+                  // Category + locality
+                  Text(
+                    [
+                      venue.category,
+                      ?locality,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.60),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
+                  // Meta pills row
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: 6,
+                    runSpacing: 6,
                     children: [
                       _MetaPill(
-                        label: venue.isOpenNow ? 'OPEN NOW' : 'CLOSED',
+                        label: venue.isOpenNow ? 'OPEN' : 'CLOSED',
                         isPrimary: venue.isOpenNow,
                       ),
-                      if (venue.canAcceptGuestOrders)
-                        const _MetaPill(label: 'ORDERING'),
+                      if (hoursHint != null)
+                        _MetaPill(label: hoursHint),
                       if (venue.priceLevelLabel != null)
                         _MetaPill(label: venue.priceLevelLabel!),
                       if (distanceLabel != null)
@@ -891,19 +1032,24 @@ class _NearbyVenueCard extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              ),
-              child: Icon(
-                LucideIcons.chevronRight,
-                size: 18,
-                color: cs.onSurfaceVariant,
-              ),
+            // Rating badge (right)
+            Column(
+              children: [
+                Icon(LucideIcons.star, size: 14, color: cs.primary),
+                const SizedBox(height: 2),
+                Text(
+                  venue.rating.toStringAsFixed(
+                    venue.rating.truncateToDouble() == venue.rating ? 0 : 1,
+                  ),
+                  style: TextStyle(
+                    color: cs.onSurface,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(width: 4),
           ],
         ),
       ),
@@ -1037,3 +1183,129 @@ String? _distanceLabelForVenue(Venue venue, DiscoveryCoordinates? location) {
   if (location == null) return null;
   return venue.distanceLabelFrom(location.latitude, location.longitude);
 }
+
+/// Smart Reorder Section pulling from [userOrdersProvider].
+class _SmartReorderSection extends ConsumerWidget {
+  const _SmartReorderSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ordersAsync = ref.watch(userOrdersProvider);
+    final orders = ordersAsync.asData?.value ?? [];
+    
+    // Only show last completed/delivered orders
+    final pastOrders = orders
+        .where((o) => o.status == OrderStatus.completed || o.status == OrderStatus.delivered)
+        .toList();
+
+    if (pastOrders.isEmpty && !ordersAsync.isLoading) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppTheme.space6, bottom: AppTheme.space2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+            child: Row(
+              children: [
+                Icon(LucideIcons.history, size: 16, color: cs.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'JUMP BACK IN',
+                  style: tt.labelSmall?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2.0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppTheme.space4),
+          if (ordersAsync.isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppTheme.space6),
+              child: SkeletonLoader(width: double.infinity, height: 72, borderRadius: 16),
+            )
+          else
+            SizedBox(
+              height: 72,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+                itemCount: pastOrders.length.clamp(0, 5),
+                separatorBuilder: (_, __) => const SizedBox(width: AppTheme.space4),
+                itemBuilder: (context, index) {
+                  final order = pastOrders[index];
+                  final itemsStr = order.items.map((i) => i.name).take(2).join(', ');
+                  return PressableScale(
+                    onTap: () {
+                      AppTelemetryService.trackGuestEvent('smart_reorder_tapped', venueId: order.venueId);
+                      context.pushNamed(
+                        AppRouteNames.venueDetail,
+                        pathParameters: {AppRouteParams.slug: order.venueSlug ?? order.venueId},
+                      );
+                    },
+                    child: Container(
+                      width: 240,
+                      padding: const EdgeInsets.all(AppTheme.space3),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                        border: Border.all(color: AppColors.white5),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                            ),
+                            child: Icon(LucideIcons.store, color: cs.onSurfaceVariant, size: 20),
+                          ),
+                          const SizedBox(width: AppTheme.space3),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  order.venueName.toUpperCase(),
+                                  style: tt.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                    color: cs.onSurface,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  itemsStr,
+                                  style: tt.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+

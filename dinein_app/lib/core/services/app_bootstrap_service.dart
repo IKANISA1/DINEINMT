@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
 import '../infrastructure/app_notification_service.dart'
@@ -59,7 +60,9 @@ class AppBootstrapService extends ChangeNotifier {
       _phase = AppBootstrapPhase.ready;
       notifyListeners();
 
-      unawaited(_finishBackgroundBoot());
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        unawaited(_finishBackgroundBoot());
+      });
     } catch (error, stackTrace) {
       _phase = AppBootstrapPhase.failed;
       _error = error;

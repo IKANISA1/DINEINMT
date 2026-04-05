@@ -74,8 +74,8 @@ abstract final class AppColors {
   /// Ghost border: outlineVariant at 15% opacity
   static Color get ghostBorder => outlineVariant.withValues(alpha: 0.15);
 
-  /// Glass overlay: surface at 60% opacity (matching React premium-blur)
-  static Color get glassOverlay => surface.withValues(alpha: 0.60);
+  /// Glass overlay: surface at 80% opacity for better text contrast
+  static Color get glassOverlay => surface.withValues(alpha: 0.80);
 
   /// White at various opacities — matching React white/5, white/10 patterns
   static Color get white5 => Colors.white.withValues(alpha: 0.05);

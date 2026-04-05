@@ -196,6 +196,7 @@ class CartNotifier extends Notifier<CartState> {
     if (state.items.length >= 2) {
       PwaInstallService.triggerIfEligible(reason: 'cart_2_items');
     }
+    PwaInstallService.updateCartBadgeCount(state.itemCount);
   }
 
   /// Remove one unit of an item (if qty reaches 0, remove entirely).
@@ -211,6 +212,7 @@ class CartNotifier extends Notifier<CartState> {
       updated[existing] = current.copyWith(quantity: current.quantity - 1);
     }
     state = state.copyWith(items: updated);
+    PwaInstallService.updateCartBadgeCount(state.itemCount);
   }
 
   /// Set the quantity of an item directly (used by item detail sheet).
@@ -227,6 +229,7 @@ class CartNotifier extends Notifier<CartState> {
           .where((i) => i.menuItemId != menuItemId)
           .toList();
       state = state.copyWith(items: updated);
+      PwaInstallService.updateCartBadgeCount(state.itemCount);
       return;
     }
 
@@ -250,6 +253,7 @@ class CartNotifier extends Notifier<CartState> {
         ],
       );
     }
+    PwaInstallService.updateCartBadgeCount(state.itemCount);
   }
 
   /// Get quantity for a specific item.
@@ -282,6 +286,7 @@ class CartNotifier extends Notifier<CartState> {
   /// Clear the cart after order placement.
   void clear() {
     state = const CartState();
+    PwaInstallService.updateCartBadgeCount(0);
   }
 }
 

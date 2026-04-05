@@ -1,5 +1,5 @@
 export const corsAllowHeaders =
-  "authorization, x-client-info, apikey, content-type";
+  "authorization, x-client-info, apikey, content-type, x-dinein-offline-queue, x-dinein-offline-replay";
 export const corsAllowMethods = "GET, POST, OPTIONS";
 const defaultAllowedAppOrigins = [
   "https://dineinmt.ikanisa.com",

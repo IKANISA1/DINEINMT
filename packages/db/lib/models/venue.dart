@@ -336,6 +336,46 @@ class Venue extends Equatable {
       priceLevelLabel != null ||
       primaryReviewSnippet != null;
 
+  /// Compact address for card display — first comma-segment, trimmed.
+  String? get addressLocality {
+    final raw = address.trim();
+    if (raw.isEmpty) return null;
+    final parts = raw.split(',');
+    // Skip very short segments (e.g. street numbers) if a second part exists.
+    final first = parts.first.trim();
+    if (parts.length > 1 && first.length < 6) {
+      return parts[1].trim();
+    }
+    return first;
+  }
+
+  /// Compact hours hint for card display (e.g. "Closes 22:00" or "Opens 09:00").
+  String? get closingTimeHint {
+    final hours = openingHours;
+    if (hours == null || hours.isEmpty) return null;
+
+    final now = DateTime.now();
+    final dayName = switch (now.weekday) {
+      DateTime.monday => 'Monday',
+      DateTime.tuesday => 'Tuesday',
+      DateTime.wednesday => 'Wednesday',
+      DateTime.thursday => 'Thursday',
+      DateTime.friday => 'Friday',
+      DateTime.saturday => 'Saturday',
+      DateTime.sunday => 'Sunday',
+      _ => 'Monday',
+    };
+
+    final today = hours[dayName];
+    if (today == null || !today.isOpen) return 'Closed today';
+
+    if (isOpenNow) {
+      return today.close.isNotEmpty ? 'Closes ${today.close}' : null;
+    }
+
+    return today.open.isNotEmpty ? 'Opens ${today.open}' : null;
+  }
+
   bool get isOpenNow {
     final hours = openingHours;
     if (hours == null || hours.isEmpty) return isOpen;

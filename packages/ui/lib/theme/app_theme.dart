@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_colors.dart';
+import 'app_colors_light.dart';
 import 'app_typography.dart';
 
 /// DineIn Material 3 theme configuration — dark-first.
@@ -221,7 +222,7 @@ abstract final class AppTheme {
           color: AppColors.onSurfaceVariant,
         ),
         hintStyle: textTheme.bodyMedium?.copyWith(
-          color: AppColors.onSurfaceVariant.withValues(alpha: 0.30),
+          color: AppColors.onSurfaceVariant.withValues(alpha: 0.60),
         ),
       ),
 
@@ -281,6 +282,193 @@ abstract final class AppTheme {
         backgroundColor: AppColors.inverseSurface,
         contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: AppColors.inverseOnSurface,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusLg),
+        ),
+        behavior: SnackBarBehavior.floating,
+        insetPadding: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  // ─── Light Theme ───
+  static ThemeData get light {
+    final textTheme = AppTypography.textTheme(
+      onSurface: AppColorsLight.onSurface,
+      onSurfaceVariant: AppColorsLight.onSurfaceVariant,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      textTheme: textTheme,
+      colorScheme: const ColorScheme.light(
+        primary: AppColorsLight.primary,
+        onPrimary: AppColorsLight.onPrimary,
+        primaryContainer: AppColorsLight.primaryContainer,
+        onPrimaryContainer: AppColorsLight.onPrimaryContainer,
+        secondary: AppColorsLight.secondary,
+        onSecondary: AppColorsLight.onSecondary,
+        secondaryContainer: AppColorsLight.secondaryContainer,
+        onSecondaryContainer: AppColorsLight.onSecondaryContainer,
+        tertiary: AppColorsLight.tertiary,
+        onTertiary: AppColorsLight.onTertiary,
+        tertiaryContainer: AppColorsLight.tertiaryContainer,
+        onTertiaryContainer: AppColorsLight.onTertiaryContainer,
+        error: AppColorsLight.error,
+        onError: AppColorsLight.onError,
+        errorContainer: AppColorsLight.errorContainer,
+        onErrorContainer: AppColorsLight.onErrorContainer,
+        surface: AppColorsLight.surface,
+        onSurface: AppColorsLight.onSurface,
+        onSurfaceVariant: AppColorsLight.onSurfaceVariant,
+        outline: AppColorsLight.outline,
+        outlineVariant: AppColorsLight.outlineVariant,
+        inverseSurface: AppColorsLight.inverseSurface,
+        onInverseSurface: AppColorsLight.inverseOnSurface,
+        inversePrimary: AppColorsLight.inversePrimary,
+        surfaceContainerLowest: AppColorsLight.surfaceContainerLowest,
+        surfaceContainerLow: AppColorsLight.surfaceContainerLow,
+        surfaceContainer: AppColorsLight.surfaceContainer,
+        surfaceContainerHigh: AppColorsLight.surfaceContainerHigh,
+        surfaceContainerHighest: AppColorsLight.surfaceContainerHighest,
+      ),
+
+      appBarTheme: AppBarTheme(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: AppColorsLight.onSurface,
+        titleTextStyle: textTheme.titleLarge,
+      ),
+
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusXxl),
+        ),
+        color: AppColorsLight.surfaceContainerLow,
+        margin: EdgeInsets.zero,
+      ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColorsLight.primary,
+          foregroundColor: AppColorsLight.onPrimary,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusLg),
+          ),
+          textStyle: textTheme.labelLarge?.copyWith(
+            letterSpacing: 2,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColorsLight.onSurface,
+          side: BorderSide(color: AppColorsLight.white5),
+          backgroundColor: AppColorsLight.white5,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radiusLg),
+          ),
+          textStyle: textTheme.labelLarge?.copyWith(
+            letterSpacing: 2,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColorsLight.primary,
+          textStyle: textTheme.labelLarge,
+        ),
+      ),
+
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColorsLight.surfaceContainerLow,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusLg),
+          borderSide: BorderSide(color: AppColorsLight.white5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusLg),
+          borderSide: BorderSide(color: AppColorsLight.white5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusLg),
+          borderSide: BorderSide(
+            color: AppColorsLight.primary.withValues(alpha: 0.50),
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ),
+        labelStyle: textTheme.labelMedium?.copyWith(
+          color: AppColorsLight.onSurfaceVariant,
+        ),
+        hintStyle: textTheme.bodyMedium?.copyWith(
+          color: AppColorsLight.onSurfaceVariant.withValues(alpha: 0.40),
+        ),
+      ),
+
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColorsLight.surfaceContainerLow,
+        labelStyle: textTheme.labelMedium?.copyWith(
+          color: AppColorsLight.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusFull),
+          side: BorderSide(color: AppColorsLight.white5),
+        ),
+        side: BorderSide(color: AppColorsLight.white5),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: AppColorsLight.surface,
+        selectedItemColor: AppColorsLight.primary,
+        unselectedItemColor: AppColorsLight.onSurfaceVariant,
+        elevation: 0,
+        type: BottomNavigationBarType.fixed,
+      ),
+
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColorsLight.surfaceContainer,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(radiusXxl)),
+        ),
+        showDragHandle: true,
+      ),
+
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radiusXxl),
+        ),
+        backgroundColor: AppColorsLight.surfaceContainer,
+      ),
+
+      scaffoldBackgroundColor: AppColorsLight.surface,
+
+      dividerTheme: DividerThemeData(
+        color: AppColorsLight.white5,
+        thickness: 1,
+        space: 0,
+      ),
+
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColorsLight.inverseSurface,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: AppColorsLight.inverseOnSurface,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusLg),

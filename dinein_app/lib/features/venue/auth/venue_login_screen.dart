@@ -401,11 +401,16 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeController,
-          child: _step == 'phone'
-              ? _buildPhoneStep(context)
-              : _buildOtpStep(context),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: FadeTransition(
+              opacity: _fadeController,
+              child: _step == 'phone'
+                  ? _buildPhoneStep(context)
+                  : _buildOtpStep(context),
+            ),
+          ),
         ),
       ),
     );

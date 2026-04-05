@@ -395,7 +395,7 @@ class _WifiField extends StatelessWidget {
           style: tt.labelSmall?.copyWith(
             fontWeight: FontWeight.w900,
             letterSpacing: 2,
-            color: cs.onSurfaceVariant.withValues(alpha: 0.68),
+            color: cs.onSurfaceVariant.withValues(alpha: 0.85),
           ),
         ),
         const SizedBox(height: AppTheme.space3),
@@ -468,7 +468,7 @@ class _WifiDropdownField extends StatelessWidget {
           style: tt.labelSmall?.copyWith(
             fontWeight: FontWeight.w900,
             letterSpacing: 2,
-            color: cs.onSurfaceVariant.withValues(alpha: 0.68),
+            color: cs.onSurfaceVariant.withValues(alpha: 0.85),
           ),
         ),
         const SizedBox(height: AppTheme.space3),

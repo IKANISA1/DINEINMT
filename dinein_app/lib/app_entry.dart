@@ -55,9 +55,9 @@ class DineInApp extends StatelessWidget {
     return MaterialApp.router(
       title: config.appTitle,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
+      theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.system,
       routerConfig: appRouter,
       builder: (context, child) => OfflineBanner(
         child: GuestLocationPermissionHost(

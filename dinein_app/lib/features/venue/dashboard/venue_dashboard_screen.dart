@@ -298,7 +298,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               ),
             ),
           ).animate().fadeIn(duration: 300.ms),
-          const SizedBox(height: AppTheme.space5),
+          const SizedBox(height: AppTheme.space4),
 
           // ═══ STAT CARDS (from orders) ═══
           ordersAsync.when(
@@ -323,56 +323,44 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                 0,
                 (sum, o) => sum + o.total,
               );
-              final todayRevenue = todayOrders.fold<double>(
-                0,
-                (sum, o) => sum + o.total,
-              );
               final activeOrders = orders
                   .where((o) => o.status.isActive)
                   .length;
               final totalGuests = orders.length;
-
-              // Simple trend: today vs yesterday
-              final pctRevenue = totalRevenue > 0
-                  ? (todayRevenue / totalRevenue * 100)
-                  : 0.0;
-
-              return Column(
+              return Row(
                 children: [
-                  _StatCard(
-                    icon: LucideIcons.trendingUp,
-                    iconBg: cs.primary.withValues(alpha: 0.15),
-                    label: 'Total Revenue',
-                    value:
-                        '$_currencySymbol${totalRevenue.toStringAsFixed(totalRevenue > 999 ? 0 : 2)}',
-                    trend: '+${pctRevenue.toStringAsFixed(1)}%',
-                    isUp: true,
-                  ).animate().fadeIn(duration: 400.ms),
-                  const SizedBox(height: AppTheme.space3),
-                  _StatCard(
-                    icon: LucideIcons.shoppingBag,
-                    iconBg: AppColors.warning.withValues(alpha: 0.15),
-                    label: 'Active Orders',
-                    value: '$activeOrders',
-                    trend: '+${todayOrders.length}',
-                    isUp: true,
-                  ).animate(delay: 100.ms).fadeIn(duration: 400.ms),
-                  const SizedBox(height: AppTheme.space3),
-                  _StatCard(
-                    icon: LucideIcons.users,
-                    iconBg: cs.tertiary.withValues(alpha: 0.15),
-                    label: 'Total Guests',
-                    value: '$totalGuests',
-                    trend: totalGuests > 0
-                        ? '${todayOrders.length} today'
-                        : '0 today',
-                    isUp: todayOrders.isNotEmpty,
-                  ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
+                  Expanded(
+                    child: _CompactKpi(
+                      label: 'REVENUE',
+                      value:
+                          '$_currencySymbol${totalRevenue.toStringAsFixed(totalRevenue > 999 ? 0 : 2)}',
+                      sub: '${todayOrders.length} today',
+                      color: cs.primary,
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.space3),
+                  Expanded(
+                    child: _CompactKpi(
+                      label: 'ACTIVE',
+                      value: '$activeOrders',
+                      sub: '${orders.length} total',
+                      color: AppColors.warning,
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.space3),
+                  Expanded(
+                    child: _CompactKpi(
+                      label: 'GUESTS',
+                      value: '$totalGuests',
+                      sub: '${todayOrders.length} today',
+                      color: cs.tertiary,
+                    ),
+                  ),
                 ],
-              );
+              ).animate().fadeIn(duration: 400.ms);
             },
           ),
-          const SizedBox(height: AppTheme.space8),
+          const SizedBox(height: AppTheme.space5),
 
           // ═══ RECENT ORDERS ═══
           Row(
@@ -416,7 +404,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               subtitle: 'Pull down to refresh.',
             ),
             data: (orders) {
-              final recent = orders.take(3).toList();
+              final recent = orders.take(6).toList();
               if (recent.isEmpty) {
                 return const EmptyState(
                   icon: LucideIcons.inbox,
@@ -447,7 +435,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               );
             },
           ),
-          const SizedBox(height: AppTheme.space8),
+          const SizedBox(height: AppTheme.space5),
 
           // ═══ QUICK ACTIONS ═══
           Text(
@@ -483,11 +471,11 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               ),
             ],
           ).animate(delay: 400.ms).fadeIn(),
-          const SizedBox(height: AppTheme.space8),
+          const SizedBox(height: AppTheme.space5),
 
           // ═══ ACTIVE WAVES ═══
           _ActiveWavesSummary(venueId: widget.venue.id),
-          const SizedBox(height: AppTheme.space8),
+          const SizedBox(height: AppTheme.space5),
 
           // ═══ TOP ITEMS (aggregated from real orders) ═══
           Row(

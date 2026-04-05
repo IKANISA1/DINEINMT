@@ -85,4 +85,16 @@ class PwaInstallService {
       _isInstallable = false;
     }
   }
+
+  /// Update PWA app icon badge with cart item count.
+  static void updateCartBadgeCount(int count) {
+    if (!kIsWeb) return;
+    try {
+      if (count > 0) {
+        platform.setAppBadge(count);
+      } else {
+        platform.clearAppBadge();
+      }
+    } catch (_) {}
+  }
 }

@@ -369,7 +369,7 @@ class _BottomNav extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppTheme.space6,
-              vertical: AppTheme.space3,
+              vertical: AppTheme.space2,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -387,49 +387,50 @@ class _BottomNav extends StatelessWidget {
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
                           curve: Curves.easeOutCubic,
-                          width: 52,
-                          height: 52,
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
                             color: isActive ? cs.primary : Colors.transparent,
                             borderRadius: BorderRadius.circular(
-                              AppTheme.radiusLg,
+                              AppTheme.radiusMd,
                             ),
                             boxShadow: isActive
                                 ? [
                                     BoxShadow(
                                       color: cs.primary.withValues(alpha: 0.28),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 6),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
                                     ),
                                   ]
                                 : null,
                           ),
-                          child: Transform.translate(
-                            offset: Offset(0, isActive ? -1 : 0),
-                            child: Icon(
-                              item.icon,
-                              size: 24,
-                              color: isActive
-                                  ? cs.onPrimary
-                                  : cs.onSurfaceVariant,
-                            ),
+                          child: Icon(
+                            item.icon,
+                            size: 20,
+                            color: isActive
+                                ? cs.onPrimary
+                                : cs.onSurfaceVariant,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        AnimatedOpacity(
-                          duration: const Duration(milliseconds: 250),
-                          opacity: isActive ? 1 : 0.55,
-                          child: Text(
-                            item.label.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.8,
-                              color: isActive
-                                  ? cs.onSurface
-                                  : cs.onSurfaceVariant,
+                        // Label visible only on selected tab
+                        AnimatedCrossFade(
+                          duration: const Duration(milliseconds: 200),
+                          crossFadeState: isActive
+                              ? CrossFadeState.showFirst
+                              : CrossFadeState.showSecond,
+                          firstChild: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              item.label.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.6,
+                                color: cs.onSurface,
+                              ),
                             ),
                           ),
+                          secondChild: const SizedBox(height: 4),
                         ),
                       ],
                     ),

@@ -24,6 +24,7 @@ class DineInImage extends StatelessWidget {
   final IconData fallbackIcon;
   final Alignment gradientBegin;
   final Alignment gradientEnd;
+  final bool isEager;
 
   /// Accessibility label for screen readers (alt text).
   final String? semanticLabel;
@@ -39,6 +40,7 @@ class DineInImage extends StatelessWidget {
     this.fallbackIcon = LucideIcons.utensils,
     this.gradientBegin = Alignment.bottomCenter,
     this.gradientEnd = Alignment.topCenter,
+    this.isEager = false,
     this.semanticLabel,
   });
 
@@ -75,8 +77,8 @@ class DineInImage extends StatelessWidget {
           memCacheHeight: memCacheHeight,
           maxWidthDiskCache: memCacheWidth ?? 800,
           maxHeightDiskCache: memCacheHeight ?? 800,
-          fadeInDuration: const Duration(milliseconds: 200),
-          fadeOutDuration: const Duration(milliseconds: 100),
+          fadeInDuration: isEager ? Duration.zero : const Duration(milliseconds: 200),
+          fadeOutDuration: isEager ? Duration.zero : const Duration(milliseconds: 100),
           placeholder: (context, url) => _Shimmer(
             width: width,
             height: height,

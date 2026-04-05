@@ -36,3 +36,27 @@ void triggerInstallPrompt() {
     // Silently fail — prompt may have been spent or dismissed
   }
 }
+
+void setAppBadge(int count) {
+  try {
+    final nav = _window.getProperty('navigator'.toJS);
+    if (nav != null && nav.isA<JSObject>()) {
+      final navObj = nav as JSObject;
+      if (navObj.hasProperty('setAppBadge'.toJS).toDart) {
+        navObj.callMethod('setAppBadge'.toJS, count.toJS);
+      }
+    }
+  } catch (_) {}
+}
+
+void clearAppBadge() {
+  try {
+    final nav = _window.getProperty('navigator'.toJS);
+    if (nav != null && nav.isA<JSObject>()) {
+      final navObj = nav as JSObject;
+      if (navObj.hasProperty('clearAppBadge'.toJS).toDart) {
+        navObj.callMethod('clearAppBadge'.toJS);
+      }
+    }
+  } catch (_) {}
+}

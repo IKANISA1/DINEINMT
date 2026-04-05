@@ -412,7 +412,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                           Icon(
                             LucideIcons.search,
                             size: 18,
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.68),
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.85),
                           ),
                           const SizedBox(width: 12),
                           Expanded(

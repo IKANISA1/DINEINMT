@@ -4,3 +4,7 @@
 bool hasDeferredPrompt() => false;
 
 void triggerInstallPrompt() {}
+
+void setAppBadge(int count) {}
+
+void clearAppBadge() {}
