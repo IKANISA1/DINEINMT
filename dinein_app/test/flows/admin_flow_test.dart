@@ -48,7 +48,7 @@ void main() {
       tester,
     ) async {
       await pumpApp(tester);
-      appRouter.go('/admin/venues/test-venue-id/activation');
+      appRouter.go(AppRoutePaths.adminOverview);
       await tester.pump();
       await pumpUntilVisible(tester, find.text('Secure Access'));
       expect(appRouter.state.uri.path, AppRoutePaths.adminLogin);

@@ -148,8 +148,14 @@ void main() {
 
     expect(find.text('Espresso'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'tiramisu');
+    await tester.tap(find.byTooltip('Search menu'));
     await tester.pump();
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+
+    await tester.enterText(find.byType(TextField), 'tiramisu');
+    await tester.pumpAndSettle(const Duration(milliseconds: 300));
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
 
     expect(find.text('Espresso'), findsNothing);
     expect(find.text('Tiramisu'), findsOneWidget);

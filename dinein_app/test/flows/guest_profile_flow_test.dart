@@ -75,7 +75,6 @@ void main() {
     expect(find.text('WELCOME TO DINEIN MALTA'), findsOneWidget);
     expect(find.text('Order History'), findsOneWidget);
     expect(find.text('VIEW YOUR PAST ORDERS'), findsOneWidget);
-    expect(find.text('Venue Portal'), findsOneWidget);
     expect(find.text('Get in Touch'), findsOneWidget);
     expect(find.text('About DINEIN'), findsOneWidget);
     expect(find.text('Privacy Policy'), findsOneWidget);
@@ -83,16 +82,7 @@ void main() {
     expect(find.text('Terms & Conditions'), findsNothing);
     expect(find.text('SIGN OUT'), findsNothing);
 
-    await tester.scrollUntilVisible(
-      find.text('DINEIN MALTA V1.0.0'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pump(const Duration(milliseconds: 300));
-
-    expect(find.text('DINEIN MALTA V1.0.0'), findsOneWidget);
-    expect(find.byTooltip('Venue Portal'), findsOneWidget);
-    expect(find.byTooltip('Admin Console'), findsOneWidget);
+    expect(find.byTooltip('Guest'), findsNothing);
     expect(find.byTooltip('Guest'), findsNothing);
   });
 
@@ -112,23 +102,5 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Orders Screen'), findsOneWidget);
-  });
-
-  testWidgets('guest profile venue portal tile routes into venue login', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(430, 1200));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-
-    await tester.pumpWidget(buildScreen());
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    await tester.ensureVisible(find.text('Venue Portal'));
-    await tester.tap(find.text('Venue Portal'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-
-    expect(find.text('Venue Portal Screen'), findsOneWidget);
   });
 }

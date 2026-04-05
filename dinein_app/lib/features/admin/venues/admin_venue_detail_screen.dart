@@ -895,7 +895,7 @@ class _AdminVenueDetailScreenState
           children: [
             Expanded(
               child: AdminVenueLabeledField(
-                label: 'PHONE',
+                label: 'PUBLIC PHONE',
                 controller: _phoneCtrl,
                 hint: '${config.countryDialCode}...',
               ),

@@ -31,11 +31,6 @@ const _discoverTestVenues = [
 ];
 
 final _discoverTestFeed = GuestVenueFeed.fromVenues(_discoverTestVenues);
-final _discoverSearchFeed = GuestVenueFeed.fromVenues(
-  _discoverTestVenues
-      .where((venue) => venue.description.toLowerCase().contains('waterfront'))
-      .toList(growable: false),
-);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +39,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('discover screen exposes the search hero and featured venues', (
+  testWidgets('discover screen exposes the hero and featured venues', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(800, 1200));
@@ -64,44 +59,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    // Search bar is present in the hero section.
-    expect(find.byType(TextField), findsOneWidget);
-    // Search hint text is present.
-    expect(find.text('Search venues...'), findsOneWidget);
-    expect(find.text('GO'), findsNothing);
+    expect(find.text('FIND YOUR '), findsOneWidget);
+    expect(find.text('FLAVOR'), findsOneWidget);
     expect(find.text('Featured'), findsOneWidget);
     expect(find.text('All Venues'), findsOneWidget);
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump(const Duration(seconds: 1));
-  });
-
-  testWidgets('discover search switches the screen into results mode', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          guestVenueFeedProvider(
-            const GuestVenueQuery(limit: 12),
-          ).overrideWith((ref) async => _discoverTestFeed),
-          guestVenueFeedProvider(
-            const GuestVenueQuery(limit: 12, query: 'waterfront'),
-          ).overrideWith((ref) async => _discoverSearchFeed),
-        ],
-        child: const MaterialApp(home: Scaffold(body: DiscoverScreen())),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    await tester.enterText(find.byType(TextField).first, 'waterfront');
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
-
-    expect(find.text('waterfront'), findsOneWidget);
-    expect(find.text('Results'), findsOneWidget);
-    expect(find.text('Featured'), findsNothing);
+    await tester.pumpAndSettle();
   });
 }

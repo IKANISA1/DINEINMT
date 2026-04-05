@@ -58,6 +58,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
+    await tester.tap(find.text('Table #'));
+    await tester.pumpAndSettle();
+
     final tableField = find.byType(TextField).first;
     await tester.tap(tableField);
     await tester.enterText(tableField, '12');
@@ -87,10 +90,10 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
 
-      await tester.tap(find.text('Special Requests'));
+      await tester.tap(find.text('Notes'));
       await tester.pump(const Duration(milliseconds: 300));
 
-      final requestsField = find.byType(TextField).at(1);
+      final requestsField = find.byType(TextField).first;
       await tester.enterText(requestsField, 'No onions');
       await tester.pump();
 

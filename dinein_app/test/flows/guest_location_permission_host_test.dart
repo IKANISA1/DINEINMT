@@ -47,6 +47,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(openedSettings, 1);
+    await tester.pumpAndSettle();
   });
 
   testWidgets('venue login route does not show the guest location popup', (

@@ -2102,6 +2102,16 @@ function sanitizeVenueUpdates(
     sanitized.phone = phone ? normalizePhone(phone) : null;
   }
 
+  if ("owner_whatsapp_number" in updates) {
+    const raw = stringValue(updates.owner_whatsapp_number);
+    sanitized.owner_whatsapp_number = raw ? normalizePhone(raw) : null;
+  }
+
+  if ("owner_contact_phone" in updates) {
+    const raw = stringValue(updates.owner_contact_phone);
+    sanitized.owner_contact_phone = raw ? normalizePhone(raw) : null;
+  }
+
   if ("wifi_security" in updates || "wifiSecurity" in updates) {
     const raw = stringValue(updates.wifi_security ?? updates.wifiSecurity);
     if (raw) {
@@ -3146,9 +3156,9 @@ export async function handleCreateVenue(
     opening_hours: updates.opening_hours ?? null,
     social_links: updates.social_links ?? {},
     phone: stringValue(updates.phone) ?? null,
-    owner_contact_phone: stringValue(updates.phone) ?? null,
-    owner_whatsapp_number: stringValue(updates.phone) ?? null,
-    normalized_access_phone: stringValue(updates.phone) ?? null,
+    owner_contact_phone: stringValue(updates.owner_contact_phone) ?? null,
+    owner_whatsapp_number: stringValue(updates.owner_whatsapp_number) ?? null,
+    normalized_access_phone: stringValue(updates.owner_whatsapp_number) ?? null,
     status: stringValue(updates.status) ?? "inactive",
     ordering_enabled: booleanValue(updates.ordering_enabled) ?? false,
     country: normalizeCountryCode(
@@ -3320,8 +3330,8 @@ export async function handleUpdateVenue(
   if (mode == "admin") {
     const persistedVenue = currentVenue ??
       await venueSnapshot(supabase, venueId);
-    if ("phone" in updates) {
-      const nextAccessPhone = stringValue(updates.phone);
+    if ("owner_whatsapp_number" in updates) {
+      const nextAccessPhone = stringValue(updates.owner_whatsapp_number);
       const previousAccessPhone = normalizedVenueAccessPhone(persistedVenue);
       const accessPhoneChanged = nextAccessPhone != previousAccessPhone;
 
@@ -3333,7 +3343,6 @@ export async function handleUpdateVenue(
         );
       }
 
-      updates.owner_contact_phone = nextAccessPhone;
       updates.owner_whatsapp_number = nextAccessPhone;
       updates.normalized_access_phone = nextAccessPhone;
       updates.access_number_updated_at = new Date().toISOString();
@@ -3346,6 +3355,10 @@ export async function handleUpdateVenue(
         updates.access_verification_note = null;
         updates.last_access_token_issued_at = null;
       }
+    }
+    
+    if ("owner_contact_phone" in updates) {
+      updates.owner_contact_phone = stringValue(updates.owner_contact_phone);
     }
 
     const nextVenue = { ...persistedVenue, ...updates };
