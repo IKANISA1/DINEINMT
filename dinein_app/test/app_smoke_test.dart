@@ -89,10 +89,10 @@ void main() {
 
     appRouter.goNamed(AppRouteNames.venueLogin);
     await tester.pump();
-    await pumpUntilVisible(tester, find.text('Portal'));
+    await pumpUntilVisible(tester, find.text('Login'));
 
     expect(
-      find.text('Access your venue workspace with WhatsApp OTP.'),
+      find.text('Enter the WhatsApp number linked to your venue to receive an OTP.'),
       findsOneWidget,
     );
     expect(find.text('WHATSAPP NUMBER'), findsOneWidget);
