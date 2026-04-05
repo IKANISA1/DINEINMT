@@ -541,6 +541,27 @@ class _DiscoverHero extends StatelessWidget {
               ),
             ),
             const Spacer(),
+            // Search icon — opens search sheet
+            PressableScale(
+              onTap: () => _showSearchSheet(context),
+              semanticLabel: 'Search venues',
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: query.isNotEmpty
+                      ? cs.primary.withValues(alpha: 0.14)
+                      : cs.surfaceContainerHigh,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: query.isNotEmpty
+                        ? cs.primary.withValues(alpha: 0.28)
+                        : AppColors.white5,
+                  ),
+                ),
+                child: Icon(LucideIcons.search, size: 16, color: cs.primary),
+              ),
+            ),
+            const SizedBox(width: 8),
             // Web Share API trigger
             PressableScale(
               onTap: () {
@@ -560,59 +581,38 @@ class _DiscoverHero extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: AppTheme.space4),
-
-        // ─── Search bar (primary interaction) ───
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-            border: Border.all(color: AppColors.white10),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                LucideIcons.search,
-                size: 20,
-                color: cs.onSurfaceVariant.withValues(alpha: 0.85),
+        // Active query indicator chip
+        if (query.isNotEmpty) ...[
+          const SizedBox(height: AppTheme.space3),
+          PressableScale(
+            onTap: onClear,
+            semanticLabel: 'Clear search',
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                border: Border.all(color: cs.primary.withValues(alpha: 0.25)),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  onChanged: onChanged,
-                  textInputAction: TextInputAction.search,
-                  style: tt.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    filled: false,
-                    hintText: 'Search venues, cuisines...',
-                    hintStyle: tt.bodyLarge?.copyWith(
-                      color: cs.onSurfaceVariant.withValues(
-                        alpha: 0.30,
-                      ),
-                      fontWeight: FontWeight.w800,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.search, size: 12, color: cs.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    '"$query"',
+                    style: tt.labelSmall?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
+                  const SizedBox(width: 6),
+                  Icon(LucideIcons.x, size: 12, color: cs.primary),
+                ],
               ),
-              if (query.isNotEmpty)
-                PressableScale(
-                  onTap: onClear,
-                  semanticLabel: 'Clear search',
-                  minTouchTargetSize: const Size(44, 44),
-                  child: Icon(
-                    LucideIcons.x,
-                    size: 18,
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-            ],
+            ),
           ),
-        ),
+        ],
         const SizedBox(height: AppTheme.space3),
 
         // ─── Location pill ───
@@ -678,6 +678,101 @@ class _DiscoverHero extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  void _showSearchSheet(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusXl),
+        ),
+      ),
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
+            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: AppTheme.space5),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Search field
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                  border: Border.all(color: AppColors.white10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.search,
+                      size: 20,
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.85),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        autofocus: true,
+                        onChanged: onChanged,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => Navigator.pop(sheetContext),
+                        style: tt.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          filled: false,
+                          hintText: 'Search venues, cuisines...',
+                          hintStyle: tt.bodyLarge?.copyWith(
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.30),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (query.isNotEmpty)
+                      PressableScale(
+                        onTap: () {
+                          onClear();
+                          Navigator.pop(sheetContext);
+                        },
+                        semanticLabel: 'Clear search',
+                        minTouchTargetSize: const Size(44, 44),
+                        child: Icon(
+                          LucideIcons.x,
+                          size: 18,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
