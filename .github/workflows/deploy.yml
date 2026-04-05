@@ -1,0 +1,122 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# deploy.yml — Deploy DineIn PWAs to Cloudflare Pages
+#
+# Triggered on push to main (after CI passes).
+# Deploys to 2 existing Cloudflare Pages projects:
+#   - dinein-mt-pwa → dineinmtg/dineinmtv/dineinmta/dineinmt.ikanisa.com
+#   - dinein-rw-pwa → dineinrwg/dineinrwv/dineinrwa/dineinrw.ikanisa.com
+#
+# Required GitHub Secrets:
+#   CLOUDFLARE_API_TOKEN
+#   CLOUDFLARE_ACCOUNT_ID
+#   SUPABASE_URL_MT
+#   SUPABASE_ANON_KEY_MT
+#   SUPABASE_URL_RW
+#   SUPABASE_ANON_KEY_RW
+#   FCM_WEB_VAPID_KEY  (optional — venue push notifications)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: "What to deploy (all, mt, rw)"
+        required: false
+        default: "all"
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false   # never cancel in-flight deploys
+
+env:
+  FLUTTER_VERSION: stable
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Deploy Malta PWA → dinein-mt-pwa
+  # ═══════════════════════════════════════════════════════════════════════════
+  deploy-mt:
+    if: >-
+      github.event_name == 'push' ||
+      contains(fromJSON('["all","mt"]'), github.event.inputs.deploy_target)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dinein_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Build web (mt flavor)
+        env:
+          SUPABASE_URL_MT: ${{ secrets.SUPABASE_URL_MT }}
+          SUPABASE_ANON_KEY_MT: ${{ secrets.SUPABASE_ANON_KEY_MT }}
+          FCM_WEB_VAPID_KEY: ${{ secrets.FCM_WEB_VAPID_KEY }}
+        run: |
+          ./scripts/build_web_release.sh \
+            --flavor mt \
+            --skip-checks
+
+      - name: Deploy to Cloudflare Pages (dinein-mt-pwa)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy build/web --project-name=dinein-mt-pwa --commit-dirty=true
+          workingDirectory: dinein_app
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Deploy Rwanda PWA → dinein-rw-pwa
+  # ═══════════════════════════════════════════════════════════════════════════
+  deploy-rw:
+    if: >-
+      github.event_name == 'push' ||
+      contains(fromJSON('["all","rw"]'), github.event.inputs.deploy_target)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dinein_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Build web (rw flavor)
+        env:
+          SUPABASE_URL_RW: ${{ secrets.SUPABASE_URL_RW }}
+          SUPABASE_ANON_KEY_RW: ${{ secrets.SUPABASE_ANON_KEY_RW }}
+          FCM_WEB_VAPID_KEY: ${{ secrets.FCM_WEB_VAPID_KEY }}
+        run: |
+          ./scripts/build_web_release.sh \
+            --flavor rw \
+            --skip-checks
+
+      - name: Deploy to Cloudflare Pages (dinein-rw-pwa)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy build/web --project-name=dinein-rw-pwa --commit-dirty=true
+          workingDirectory: dinein_app
