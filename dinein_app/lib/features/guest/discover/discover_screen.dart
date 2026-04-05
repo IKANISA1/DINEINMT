@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import 'dart:js_interop' as js;
+
 
 import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/guest_venue_feed.dart';
@@ -642,100 +642,6 @@ class _DiscoverHero extends StatelessWidget {
     );
   }
 
-  void _showSearchSheet(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppTheme.radiusXl),
-        ),
-      ),
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppTheme.space6,
-            AppTheme.space6,
-            AppTheme.space6,
-            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Drag handle
-              Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: AppTheme.space5),
-                decoration: BoxDecoration(
-                  color: cs.onSurface.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // Search field
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                  border: Border.all(color: AppColors.white10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.search,
-                      size: 20,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.85),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        autofocus: true,
-                        onChanged: onChanged,
-                        textInputAction: TextInputAction.search,
-                        onSubmitted: (_) => Navigator.pop(sheetContext),
-                        style: tt.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          filled: false,
-                          hintText: 'Search venues, cuisines...',
-                          hintStyle: tt.bodyLarge?.copyWith(
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.30),
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (query.isNotEmpty)
-                      PressableScale(
-                        onTap: () {
-                          onClear();
-                          Navigator.pop(sheetContext);
-                        },
-                        semanticLabel: 'Clear search',
-                        minTouchTargetSize: const Size(44, 44),
-                        child: Icon(
-                          LucideIcons.x,
-                          size: 18,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 }
 
 /// Horizontal cuisine filter chip strip.
@@ -1295,7 +1201,7 @@ class _SmartReorderSection extends ConsumerWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
                 itemCount: pastOrders.length.clamp(0, 5),
-                separatorBuilder: (_, __) => const SizedBox(width: AppTheme.space4),
+                separatorBuilder: (_, _) => const SizedBox(width: AppTheme.space4),
                 itemBuilder: (context, index) {
                   final order = pastOrders[index];
                   final itemsStr = order.items.map((i) => i.name).take(2).join(', ');

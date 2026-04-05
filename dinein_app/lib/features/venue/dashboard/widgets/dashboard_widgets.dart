@@ -4,6 +4,7 @@ part of '../venue_dashboard_screen.dart';
 // ═══════════════════════════════════════════════════
 
 /// Stat card with green circle icon, value, and trend badge.
+// ignore: unused_element
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconBg;

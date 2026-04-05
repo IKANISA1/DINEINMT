@@ -1,6 +1,7 @@
-import 'dart:js_interop';
-
 import 'package:flutter/foundation.dart';
+
+import 'web_badge_service_stub.dart'
+    if (dart.library.js_interop) 'web_badge_service_web.dart' as impl;
 
 /// Web Badging API integration.
 ///
@@ -19,30 +20,12 @@ class WebBadgeService {
       clearBadge();
       return;
     }
-
-    try {
-      _setAppBadge(count);
-    } catch (e) {
-      debugPrint('[badge] setAppBadge not supported: $e');
-    }
+    impl.setAppBadge(count);
   }
 
   /// Clear the app badge.
   void clearBadge() {
     if (!kIsWeb) return;
-
-    try {
-      _clearAppBadge();
-    } catch (e) {
-      debugPrint('[badge] clearAppBadge not supported: $e');
-    }
+    impl.clearAppBadge();
   }
 }
-
-// ─── JS Interop ─────────────────────────────────────
-
-@JS('navigator.setAppBadge')
-external void _setAppBadge(int count);
-
-@JS('navigator.clearAppBadge')
-external void _clearAppBadge();
