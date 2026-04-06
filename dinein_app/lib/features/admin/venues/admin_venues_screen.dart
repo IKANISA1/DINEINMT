@@ -533,29 +533,46 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                       color: cs.onSurface.withValues(alpha: 0.10),
                     ),
                     Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        autofocus: true,
-                        onChanged: (v) => setState(() => _query = v.trim()),
-                        textInputAction: TextInputAction.search,
-                        onSubmitted: (_) => Navigator.pop(sheetContext),
-                        style: tt.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                        decoration: InputDecoration(
-                          hintText:
-                              'Search venues by name, slug, or address...',
-                          border: InputBorder.none,
-                          filled: false,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                          hintStyle: tt.titleSmall?.copyWith(
-                            color: cs.onSurface.withValues(alpha: 0.12),
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
+                      child: StatefulBuilder(
+                        builder: (sheetContext, setSheetState) {
+                          return TextField(
+                            controller: _searchController,
+                            autofocus: true,
+                            onChanged: (v) {
+                              setState(() => _query = v.trim());
+                              setSheetState(() {});
+                            },
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (_) => Navigator.pop(sheetContext),
+                            style: tt.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Search venues by name, slug, or address...',
+                              border: InputBorder.none,
+                              filled: false,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                              hintStyle: tt.titleSmall?.copyWith(
+                                color: cs.onSurface.withValues(alpha: 0.12),
+                                fontWeight: FontWeight.w900,
+                              ),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(LucideIcons.x, color: cs.onSurface.withValues(alpha: 0.50)),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _query = '');
+                                        setSheetState(() {});
+                                      },
+                                    )
+                                  : null,
+                            ),
+                          );
+                        }
                       ),
                     ),
                   ],

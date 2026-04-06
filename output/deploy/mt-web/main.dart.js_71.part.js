@@ -1,7 +1,6 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B,C
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
 A=c[0]
-B=c[2]
-C=c[83]
-var z=a.updateTypes([]);(function constants(){C.ra=new A.eL(B.bz,"No venue access","Claim and verify a venue first.",null)})()};
-(a=>{a["VOhR4t3XRwtZpw+aUSwJU4UhRbA="]=a.current})($__dart_deferred_initializers__);
+B=c[85]
+var z=a.updateTypes([]);(function constants(){B.o7=new A.b_(61934,"Lucide","lucide_icons",!1)})()};
+(a=>{a["glGSgHzg1suOh+tt44212k80TFU="]=a.current})($__dart_deferred_initializers__);

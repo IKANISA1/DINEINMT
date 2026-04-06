@@ -83,8 +83,9 @@ class _WavesBody extends ConsumerWidget {
             ),
           ),
         ),
-        error: (err, _) => Center(
-          child: Text('Error loading waves: $err'),
+        error: (_, _) => ErrorState(
+          message: 'Could not load waves.',
+          onRetry: () => ref.invalidate(allWavesProvider(venueId)),
         ),
         data: (allWaves) {
           final active = allWaves

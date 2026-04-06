@@ -18,15 +18,27 @@ import 'pwa_install_stub.dart'
 /// - Never show repeatedly (max once per session).
 /// - Only runs on web platform.
 ///
-/// The JS side (index.html) captures the `beforeinstallprompt` event and
-/// stores it at `window.__dineinDeferredInstallPrompt`. This service calls
-/// `.prompt()` on that object via JS interop at the right moment.
+/// **Browser requirement:** `prompt()` MUST be called from a user gesture
+/// (click/tap). Timer-based and programmatic triggers will throw
+/// `NotAllowedError`. This service marks *eligibility* via [_showBanner],
+/// then the UI shows a banner/button the user taps.
 class PwaInstallService {
   PwaInstallService._();
 
   static bool _promptShown = false;
   static bool _isInstallable = false;
+  static bool _showBanner = false;
   static Timer? _engagementTimer;
+
+  /// Stream controller that fires when the install banner should appear.
+  static final _bannerController = StreamController<bool>.broadcast();
+
+  /// Listen for install banner visibility changes.
+  static Stream<bool> get bannerStream => _bannerController.stream;
+
+  /// Whether the install banner should currently be shown.
+  static bool get shouldShowBanner =>
+      kIsWeb && _showBanner && _isInstallable && !_promptShown;
 
   /// Initialize the engagement timer. Call once from app startup.
   static void init() {
@@ -34,15 +46,18 @@ class PwaInstallService {
 
     _checkInstallable();
 
-    // Start a 45-second engagement timer
+    // Start a 45-second engagement timer.
+    // When it fires, we DON'T call prompt() (browser forbids it without
+    // a gesture). Instead we flag eligibility so the UI can show a banner.
     _engagementTimer?.cancel();
     _engagementTimer = Timer(const Duration(seconds: 45), () {
       _checkInstallable();
-      triggerIfEligible(reason: 'engagement_timer');
+      _markEligible(reason: 'engagement_timer');
     });
   }
 
   /// Call when a significant engagement event happens.
+  /// This marks the user eligible and shows the install banner.
   /// [reason] is for logging: 'order_placed', 'cart_2_items', 'engagement_timer'
   static void triggerIfEligible({required String reason}) {
     if (!kIsWeb) return;
@@ -51,22 +66,59 @@ class PwaInstallService {
     _checkInstallable();
     if (!_isInstallable) return;
 
-    _promptShown = true;
+    _markEligible(reason: reason);
+  }
+
+  /// Internal: mark as eligible and notify listeners to show the banner.
+  static void _markEligible({required String reason}) {
+    if (_showBanner || _promptShown) return;
+    if (!_isInstallable) return;
+
+    _showBanner = true;
     _engagementTimer?.cancel();
 
-    debugPrint('[pwa-install] Triggering install prompt (reason: $reason)');
+    debugPrint('[pwa-install] Eligible for install prompt (reason: $reason)');
     unawaited(
       AppTelemetryService.trackGuestEvent(
-        'pwa_install_prompt_requested',
+        'pwa_install_prompt_eligible',
         details: {'reason': reason},
+      ),
+    );
+
+    _bannerController.add(true);
+  }
+
+  /// Call this from a user gesture (tap handler) to actually trigger the
+  /// browser install prompt. Returns true if the prompt was shown.
+  static bool promptFromUserGesture() {
+    if (!kIsWeb || _promptShown || !_isInstallable) return false;
+
+    _promptShown = true;
+    _showBanner = false;
+    _bannerController.add(false);
+
+    debugPrint('[pwa-install] Triggering install prompt from user gesture');
+    unawaited(
+      AppTelemetryService.trackGuestEvent(
+        'pwa_install_prompt_triggered',
+        details: {},
       ),
     );
 
     try {
       platform.triggerInstallPrompt();
+      return true;
     } catch (e) {
       debugPrint('[pwa-install] Error: $e');
+      return false;
     }
+  }
+
+  /// Dismiss the install banner without triggering the prompt.
+  static void dismissBanner() {
+    _showBanner = false;
+    _promptShown = true; // Don't show again this session
+    _bannerController.add(false);
   }
 
   /// Whether an install prompt is available and hasn't been shown yet.

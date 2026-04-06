@@ -25,8 +25,26 @@ class OrderDetailsScreen extends ConsumerWidget {
 
     return Scaffold(
       body: orderAsync.when(
-        loading: () => const Center(
-          child: SkeletonLoader(width: double.infinity, height: 200),
+        loading: () => SafeArea(
+          child: ListView(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            children: const [
+              SkeletonLoader(width: 160, height: 24, borderRadius: 8),
+              SizedBox(height: 8),
+              SkeletonLoader(width: 80, height: 12, borderRadius: 4),
+              SizedBox(height: 24),
+              SkeletonLoader(width: double.infinity, height: 140, borderRadius: 24),
+              SizedBox(height: 20),
+              SkeletonLoader(width: 60, height: 14, borderRadius: 6),
+              SizedBox(height: 16),
+              SkeletonLoader(width: double.infinity, height: 88, borderRadius: 20),
+              SizedBox(height: 12),
+              SkeletonLoader(width: double.infinity, height: 88, borderRadius: 20),
+              SizedBox(height: 24),
+              SkeletonLoader(width: double.infinity, height: 100, borderRadius: 24),
+            ],
+          ),
         ),
         error: (err, _) => ErrorState(
           message: 'Could not load order details.',
@@ -393,7 +411,7 @@ class OrderDetailsScreen extends ConsumerWidget {
                               ],
                               const SizedBox(height: 6),
                               Text(
-                                '${order.currencySymbol}${item.price.toStringAsFixed(2)}',
+                                order.formatPrice(item.price),
                                 style: tt.bodySmall?.copyWith(
                                   color: cs.onSurfaceVariant.withValues(
                                     alpha: 0.60,
@@ -408,7 +426,7 @@ class OrderDetailsScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              '${order.currencySymbol}${item.subtotal.toStringAsFixed(2)}',
+                              order.formatPrice(item.subtotal),
                               style: tt.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 18,
@@ -464,7 +482,7 @@ class OrderDetailsScreen extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        '${order.currencySymbol}${order.subtotal.toStringAsFixed(2)}',
+                        order.formatPrice(order.subtotal),
                         style: tt.titleMedium,
                       ),
                     ],
@@ -480,7 +498,7 @@ class OrderDetailsScreen extends ConsumerWidget {
                         ),
                       ),
                       Text(
-                        '${order.currencySymbol}${order.serviceFee.toStringAsFixed(2)}',
+                        order.formatPrice(order.serviceFee),
                         style: tt.titleMedium,
                       ),
                     ],
@@ -492,7 +510,7 @@ class OrderDetailsScreen extends ConsumerWidget {
                     children: [
                       Text('Total', style: tt.titleLarge),
                       Text(
-                        '${order.currencySymbol}${finalTotal.toStringAsFixed(2)}',
+                        order.formatPrice(finalTotal),
                         style: TextStyle(
                           fontSize: 36,
                           fontWeight: FontWeight.w900,

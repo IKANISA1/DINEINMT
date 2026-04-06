@@ -8,6 +8,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
+import 'package:dinein_app/core/services/image_upload_service.dart';
 import 'package:dinein_app/core/services/menu_repository.dart';
 import 'package:dinein_app/shared/widgets/menu_item_image_generation_sheet.dart';
 import 'package:ui/theme/app_theme.dart';
@@ -40,6 +41,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
   bool _isAvailable = true;
   bool _isSaving = false;
   bool _isGeneratingImage = false;
+  bool _isUploadingImage = false;
   bool _isUpdatingImageLock = false;
   String? _seededItemId;
   String? _error;
@@ -271,6 +273,38 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
     }
   }
 
+  Future<void> _uploadMenuItemImage(Venue venue, MenuItem existing) async {
+    if (_isUploadingImage) return;
+    setState(() => _isUploadingImage = true);
+    try {
+      final url = await ImageUploadService.instance
+          .pickAndUploadMenuItemImage(venue.id, existing.id);
+      if (url == null) {
+        // User cancelled the picker
+        return;
+      }
+      // Update local controller so preview refreshes immediately
+      setState(() => _imageUrlController.text = url);
+      ref.invalidate(menuItemsProvider(venue.id));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Menu item image uploaded.')),
+      );
+    } on ImageUploadException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not upload item image.')),
+      );
+    } finally {
+      if (mounted) setState(() => _isUploadingImage = false);
+    }
+  }
+
   Future<void> _generateImage(Venue venue, MenuItem existing) async {
     final draft = await showMenuItemImageGenerationSheet(
       context: context,
@@ -499,6 +533,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
             displayImageUrl: _previewImageUrl(existing),
             imageUrlController: _imageUrlController,
             isGeneratingImage: _isGeneratingImage,
+            isUploadingImage: _isUploadingImage,
             isUpdatingImageLock: _isUpdatingImageLock,
             onImageUrlChanged: (_) {
               if (_error == null) {
@@ -509,6 +544,9 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
                 _error = null;
               });
             },
+            onUpload: existing == null
+                ? null
+                : () => _uploadMenuItemImage(venue, existing),
             onGenerate: existing == null
                 ? null
                 : () => _generateImage(venue, existing),
@@ -683,8 +721,10 @@ class _ImagePanel extends StatelessWidget {
   final String? displayImageUrl;
   final TextEditingController imageUrlController;
   final bool isGeneratingImage;
+  final bool isUploadingImage;
   final bool isUpdatingImageLock;
   final ValueChanged<String>? onImageUrlChanged;
+  final VoidCallback? onUpload;
   final VoidCallback? onGenerate;
   final ValueChanged<bool>? onToggleLock;
 
@@ -693,8 +733,10 @@ class _ImagePanel extends StatelessWidget {
     required this.displayImageUrl,
     required this.imageUrlController,
     required this.isGeneratingImage,
+    required this.isUploadingImage,
     required this.isUpdatingImageLock,
     required this.onImageUrlChanged,
+    required this.onUpload,
     required this.onGenerate,
     required this.onToggleLock,
   });
@@ -714,6 +756,8 @@ class _ImagePanel extends StatelessWidget {
       MenuItemImageStatus.failed => cs.error,
       MenuItemImageStatus.pending => cs.primary,
     };
+    final isBusy =
+        isGeneratingImage || isUploadingImage || isUpdatingImageLock;
 
     return ClayCard(
       child: Column(
@@ -732,6 +776,31 @@ class _ImagePanel extends StatelessWidget {
                     fit: BoxFit.cover,
                     fallbackIcon: LucideIcons.sparkles,
                   ),
+                  // Upload progress overlay
+                  if (isUploadingImage)
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: Colors.white,
+                            ),
+                            SizedBox(height: 12),
+                            Text(
+                              'Uploading...',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   Positioned(
                     left: AppTheme.space4,
                     right: AppTheme.space4,
@@ -771,19 +840,8 @@ class _ImagePanel extends StatelessWidget {
           ),
           const SizedBox(height: AppTheme.space2),
           Text(
-            'Provide a real image URL, or use AI generation.',
+            'Upload a photo from your device or generate with AI.',
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: AppTheme.space4),
-          TextField(
-            controller: imageUrlController,
-            keyboardType: TextInputType.url,
-            textInputAction: TextInputAction.done,
-            onChanged: onImageUrlChanged,
-            decoration: const InputDecoration(
-              labelText: 'Manual Image URL (Optional)',
-              hintText: 'https://...',
-            ),
           ),
           if (item?.imageError != null &&
               item!.imageError!.trim().isNotEmpty) ...[
@@ -794,37 +852,40 @@ class _ImagePanel extends StatelessWidget {
             ),
           ],
           const SizedBox(height: AppTheme.space5),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return SizedBox(
-                width: double.infinity,
-                child: PremiumButton(
-                  label: usesManualImage
-                      ? 'MANUAL IMAGE ACTIVE'
-                      : item?.hasImage == true
-                      ? 'REGENERATE IMAGE'
-                      : 'GENERATE IMAGE',
-                  icon: LucideIcons.sparkles,
-                  isLoading: isGeneratingImage,
-                  onPressed:
-                      hasExistingItem &&
-                          !usesManualImage &&
-                          !isUpdatingImageLock &&
-                          !isGeneratingImage
-                      ? onGenerate
-                      : null,
-                ),
-              );
-            },
+          // Upload button
+          SizedBox(
+            width: double.infinity,
+            child: PremiumButton(
+              label: isUploadingImage ? 'UPLOADING...' : 'UPLOAD IMAGE',
+              icon: LucideIcons.upload,
+              isLoading: isUploadingImage,
+              onPressed: hasExistingItem && !isBusy ? onUpload : null,
+            ),
+          ),
+          const SizedBox(height: AppTheme.space3),
+          // AI Generate button
+          SizedBox(
+            width: double.infinity,
+            child: PremiumButton(
+              label: usesManualImage
+                  ? 'MANUAL IMAGE ACTIVE'
+                  : item?.hasImage == true
+                  ? 'REGENERATE IMAGE'
+                  : 'GENERATE IMAGE',
+              icon: LucideIcons.sparkles,
+              isLoading: isGeneratingImage,
+              onPressed:
+                  hasExistingItem && !usesManualImage && !isBusy
+                  ? onGenerate
+                  : null,
+            ),
           ),
           if (hasExistingItem && !usesManualImage) ...[
             const SizedBox(height: AppTheme.space4),
             SwitchListTile.adaptive(
               contentPadding: EdgeInsets.zero,
               value: item!.imageLocked,
-              onChanged: isUpdatingImageLock || isGeneratingImage
-                  ? null
-                  : onToggleLock,
+              onChanged: isBusy ? null : onToggleLock,
               title: Text('Protect current image', style: tt.titleSmall),
               subtitle: Text(
                 'When enabled, automatic backfills will skip this item.',

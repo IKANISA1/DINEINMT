@@ -11,4 +11,6 @@ export {
   handleGenerateVenueProfileImage,
   handleBackfillVenueProfileImages,
   handleImageHealth,
+  handleUploadVenueImage,
+  handleUploadMenuItemImage,
 } from "../core.ts";

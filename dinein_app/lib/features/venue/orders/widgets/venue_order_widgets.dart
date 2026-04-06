@@ -415,12 +415,10 @@ class _ExportButton extends StatelessWidget {
 /// Rich order card matching screenshots — guest name, item chips, time, total.
 class _OrderCard extends StatelessWidget {
   final Order order;
-  final String currencySymbol;
   final VoidCallback onAdvance;
 
   const _OrderCard({
     required this.order,
-    required this.currencySymbol,
     required this.onAdvance,
   });
 
@@ -637,7 +635,7 @@ class _OrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$currencySymbol${order.total.toStringAsFixed(2)}',
+                      order.formatPrice(order.total),
                       style: tt.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),

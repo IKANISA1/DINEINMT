@@ -115,8 +115,66 @@ enum Country {
   String get currencySymbol {
     return switch (this) {
       Country.mt => '€',
-      Country.rw => 'FRw',
+      Country.rw => 'RWF',
     };
+  }
+
+  /// Format an amount with the correct currency symbol and locale rules.
+  ///
+  /// - **Malta (MT)**: `€12.34` — 2 decimal places, comma thousands for ≥1000.
+  /// - **Rwanda (RW)**: `RWF 12,345` — 0 decimal places, comma thousands.
+  String formatPrice(double amount) {
+    switch (this) {
+      case Country.rw:
+        final rounded = amount.round();
+        // Insert comma thousands separators.
+        final digits = rounded.abs().toString();
+        final buffer = StringBuffer();
+        for (var i = 0; i < digits.length; i++) {
+          if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
+          buffer.write(digits[i]);
+        }
+        final formatted = rounded < 0 ? '-${buffer.toString()}' : buffer.toString();
+        return 'RWF $formatted';
+
+      case Country.mt:
+        final fixed = amount.toStringAsFixed(2);
+        // Split into integer and decimal parts.
+        final parts = fixed.split('.');
+        final intPart = parts[0];
+        final decPart = parts.length > 1 ? parts[1] : '00';
+        // Insert comma thousands separators for the integer part.
+        final absInt = intPart.startsWith('-') ? intPart.substring(1) : intPart;
+        final buffer = StringBuffer();
+        for (var i = 0; i < absInt.length; i++) {
+          if (i > 0 && (absInt.length - i) % 3 == 0) buffer.write(',');
+          buffer.write(absInt[i]);
+        }
+        final formattedInt = intPart.startsWith('-') ? '-${buffer.toString()}' : buffer.toString();
+        return '€$formattedInt.$decPart';
+    }
+  }
+  /// Format an amount with 2 decimal places for tabular/report alignment.
+  ///
+  /// Unlike [formatPrice], this always uses 2 decimal places regardless of
+  /// currency, ensuring flush column alignment in data-dense screens.
+  ///
+  /// - **Malta (MT)**: `€12,345.00` (same as formatPrice)
+  /// - **Rwanda (RW)**: `RWF 12,345.00` (adds `.00` for alignment)
+  String formatPriceTabular(double amount) {
+    final fixed = amount.toStringAsFixed(2);
+    final parts = fixed.split('.');
+    final intPart = parts[0];
+    final decPart = parts.length > 1 ? parts[1] : '00';
+    final absInt = intPart.startsWith('-') ? intPart.substring(1) : intPart;
+    final buffer = StringBuffer();
+    for (var i = 0; i < absInt.length; i++) {
+      if (i > 0 && (absInt.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(absInt[i]);
+    }
+    final formattedInt =
+        intPart.startsWith('-') ? '-${buffer.toString()}' : buffer.toString();
+    return '${currencySymbol == '€' ? '€' : '$currencySymbol '}$formattedInt.$decPart';
   }
 
   /// Available payment methods per country.

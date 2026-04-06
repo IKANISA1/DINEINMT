@@ -223,9 +223,35 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
     final venueAsync = ref.watch(venueBySlugProvider(widget.slug));
 
     return venueAsync.when(
-      loading: () => const Scaffold(
-        body: Center(
-          child: SkeletonLoader(width: double.infinity, height: 320),
+      loading: () => Scaffold(
+        body: SafeArea(
+          child: ListView(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            children: const [
+              SkeletonLoader(width: double.infinity, height: 280, borderRadius: 0),
+              SizedBox(height: 24),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: SkeletonLoader(width: 200, height: 28, borderRadius: 8),
+              ),
+              SizedBox(height: 12),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: SkeletonLoader(width: 140, height: 16, borderRadius: 6),
+              ),
+              SizedBox(height: 24),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: SkeletonLoader(width: double.infinity, height: 120, borderRadius: 20),
+              ),
+              SizedBox(height: 16),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: SkeletonLoader(width: double.infinity, height: 80, borderRadius: 20),
+              ),
+            ],
+          ),
         ),
       ),
       error: (error, stackTrace) => Scaffold(
@@ -508,10 +534,10 @@ class _VenueDetailBody extends StatelessWidget {
       ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(
-          AppTheme.space6,
           AppTheme.space4,
-          AppTheme.space6,
-          AppTheme.space8,
+          AppTheme.space2,
+          AppTheme.space4,
+          AppTheme.space4,
         ),
         decoration: BoxDecoration(
           color: cs.surface,
@@ -526,7 +552,7 @@ class _VenueDetailBody extends StatelessWidget {
             child: ElevatedButton(
               onPressed: onOpenMenu,
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 20),
+                padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppTheme.radiusFull),
                 ),

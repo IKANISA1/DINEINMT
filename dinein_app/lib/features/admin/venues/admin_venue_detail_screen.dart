@@ -267,7 +267,7 @@ class _AdminVenueDetailScreenState
         _showSnack('Venue updated.');
       }
     } catch (error) {
-      _showSnack('Could not save venue: $error');
+      _showSnack('Could not save venue. Please try again.');
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -303,7 +303,7 @@ class _AdminVenueDetailScreenState
       });
       _showSnack('Image uploaded successfully.');
     } catch (e) {
-      _showSnack('Upload failed: Ensure Supabase storage bucket "venues" exists. Error: $e');
+      _showSnack('Image upload failed. Please try again later.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -336,7 +336,7 @@ class _AdminVenueDetailScreenState
       // Typically the backend triggers the OCR pipeline automatically via a webhook when a menu is uploaded.
       _showSnack('Menu document uploaded. OCR pipeline will process this shortly.');
     } catch (e) {
-      _showSnack('Upload failed. Error: $e');
+      _showSnack('Menu document upload failed. Please try again later.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -432,7 +432,7 @@ class _AdminVenueDetailScreenState
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        _showSnack('Failed to delete venue: $e');
+        _showSnack('Failed to delete venue. Please try again.');
       }
     }
   }
@@ -449,7 +449,7 @@ class _AdminVenueDetailScreenState
       if (!mounted) return;
       _showSnack('Venue discovery data refreshed.');
     } catch (error) {
-      _showSnack('Could not refresh venue discovery data: $error');
+      _showSnack('Could not refresh venue discovery data. Please try again.');
     } finally {
       if (mounted) {
         setState(() => _syncingProfile = false);

@@ -134,8 +134,21 @@ class DineinApiService {
         cause: e,
       );
     } on FunctionException catch (e) {
+      // Extract the real error message from the edge function response body
+      // instead of hiding it behind a generic message.
+      String message =
+          'Service temporarily unavailable. Please try again shortly.';
+      final details = e.details;
+      if (details is Map) {
+        final errorMsg = details['error'];
+        if (errorMsg is String && errorMsg.isNotEmpty) {
+          message = errorMsg;
+        }
+      } else if (details is String && details.isNotEmpty) {
+        message = details;
+      }
       throw DineinApiException(
-        'Service temporarily unavailable. Please try again shortly.',
+        message,
         action: action,
         cause: e,
       );

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../fixtures/mock_api_invoker.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late MockApiInvoker mock;
   late AuthRepository repo;
 

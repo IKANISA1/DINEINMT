@@ -402,9 +402,8 @@ class _DashboardWaveCardState extends ConsumerState<_DashboardWaveCard> {
 /// Recent order card — #ID badge + Table + items•price + status pill.
 class _OrderPreview extends StatelessWidget {
   final Order order;
-  final String currencySymbol;
 
-  const _OrderPreview({required this.order, required this.currencySymbol});
+  const _OrderPreview({required this.order});
 
   @override
   Widget build(BuildContext context) {
@@ -474,7 +473,7 @@ class _OrderPreview extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${order.itemCount} ITEMS • $currencySymbol${order.total.toStringAsFixed(2)}',
+                    '${order.itemCount} ITEMS • ${order.formatPrice(order.total)}',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,

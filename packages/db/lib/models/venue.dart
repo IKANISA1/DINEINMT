@@ -14,6 +14,7 @@ class Venue extends Equatable {
   final String? email;
   final String? imageUrl;
   final String? revolutUrl;
+  final String? momoCode;
   final VenueStatus status;
   final bool orderingEnabled;
   final DateTime? approvedAt;
@@ -62,6 +63,7 @@ class Venue extends Equatable {
     this.email,
     this.imageUrl,
     this.revolutUrl,
+    this.momoCode,
     this.status = VenueStatus.active,
     this.orderingEnabled = false,
     this.approvedAt,
@@ -113,6 +115,7 @@ class Venue extends Equatable {
       email: json['email'] as String?,
       imageUrl: json['image_url'] as String?,
       revolutUrl: json['revolut_url'] as String?,
+      momoCode: json['momo_code'] as String? ?? json['momoCode'] as String?,
       status: VenueStatus.fromString(json['status'] as String? ?? 'active'),
       orderingEnabled:
           json['ordering_enabled'] as bool? ??
@@ -212,6 +215,7 @@ class Venue extends Equatable {
     'email': email,
     'image_url': imageUrl,
     'revolut_url': revolutUrl,
+    'momo_code': momoCode,
     'status': status.dbValue,
     'ordering_enabled': orderingEnabled,
     'approved_at': approvedAt?.toIso8601String(),
@@ -386,7 +390,8 @@ class Venue extends Equatable {
 
   bool get isOpenNow {
     final hours = openingHours;
-    if (hours == null || hours.isEmpty) return isOpen;
+    // No hours configured → we don't know if they're open, default to closed.
+    if (hours == null || hours.isEmpty) return false;
 
     final now = DateTime.now();
     final dayName = switch (now.weekday) {
@@ -405,7 +410,7 @@ class Venue extends Equatable {
 
     final openMinutes = _minutesSinceMidnight(today.open);
     final closeMinutes = _minutesSinceMidnight(today.close);
-    if (openMinutes == null || closeMinutes == null) return isOpen;
+    if (openMinutes == null || closeMinutes == null) return false;
 
     final nowMinutes = now.hour * 60 + now.minute;
     if (closeMinutes < openMinutes) {
@@ -466,6 +471,7 @@ class Venue extends Equatable {
     websiteUrl,
     reservationUrl,
     revolutUrl,
+    momoCode,
     status,
     orderingEnabled,
     approvedAt,

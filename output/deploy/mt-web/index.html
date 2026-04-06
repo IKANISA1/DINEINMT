@@ -14,7 +14,7 @@
     This is a placeholder for base href that will be replaced by the value of
     the `--base-href` argument provided to `flutter build`.
   -->
-  <base href="$FLUTTER_BASE_HREF">
+  <base href="/">
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -39,6 +39,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="dns-prefetch" href="https://firebaseinstallations.googleapis.com">
+  <link rel="preload" as="image" href="assets/assets/branding/dinein-brand-icon-512.png">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -133,16 +134,7 @@
       object-fit: cover;
     }
 
-    .loader-brand {
-      margin: 0;
-      font-size: 32px;
-      font-weight: 900;
-      letter-spacing: -0.04em;
-    }
 
-    .loader-brand span:first-child {
-      color: var(--dinein-gold);
-    }
 
     .loader-kicker {
       margin: 10px 0 0;
@@ -319,7 +311,7 @@
       <div class="loader-mark" aria-hidden="true">
         <img src="assets/assets/branding/dinein-brand-icon-512.png" alt="" />
       </div>
-      <p class="loader-brand"><span>DINE</span><span>IN</span></p>
+
       <p class="loader-kicker" id="loader-role">GUEST EXPERIENCE</p>
       <p class="loader-copy" id="loader-copy">
         Preparing venues, menus, and your saved session.
@@ -611,7 +603,7 @@
     // worker used for background web push delivery.
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
-        var serviceWorkerUrl = '/custom_sw.js?v=096294128b18535c8533';
+        var serviceWorkerUrl = '/custom_sw.js?v=8b881e779e5dc57d7538';
         navigator.serviceWorker.register(serviceWorkerUrl, { scope: '/' })
           .then(function (reg) {
             if (reg.waiting) {

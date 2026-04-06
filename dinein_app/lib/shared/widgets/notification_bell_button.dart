@@ -34,7 +34,7 @@ class NotificationBellButton extends ConsumerWidget {
             clipBehavior: Clip.none,
             children: [
               Icon(
-                LucideIcons.inbox,
+                LucideIcons.bell,
                 size: 22,
                 color: count > 0 ? cs.onSurface : cs.onSurfaceVariant,
               ),

@@ -14,6 +14,7 @@ import '../../../core/providers/bell_providers.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/services/bell_repository.dart';
 import 'package:dinein_app/core/services/venue_repository.dart';
+import 'package:dinein_app/core/services/dinein_api_service.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
 part 'widgets/dashboard_widgets.dart';
@@ -88,7 +89,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     return DateFormat('MMMM d, yyyy').format(DateTime.now()).toUpperCase();
   }
 
-  String get _currencySymbol => widget.venue.country.currencySymbol;
+  String _formatPrice(double amount) => widget.venue.country.formatPriceTabular(amount);
 
   Future<void> _toggleActivation() async {
     if (_isTogglingActivation) return;
@@ -333,7 +334,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                     child: _CompactKpi(
                       label: 'REVENUE',
                       value:
-                          '$_currencySymbol${totalRevenue.toStringAsFixed(totalRevenue > 999 ? 0 : 2)}',
+                          _formatPrice(totalRevenue),
                       sub: '${todayOrders.length} today',
                       color: cs.primary,
                     ),
@@ -398,10 +399,12 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                 ),
               ),
             ),
-            error: (_, _) => const EmptyState(
+            error: (err, _) => EmptyState(
               icon: LucideIcons.inbox,
               title: 'Could not load orders',
-              subtitle: 'Pull down to refresh.',
+              subtitle: err is DineinApiException
+                  ? err.message
+                  : 'Pull down to refresh.',
             ),
             data: (orders) {
               final recent = orders.take(6).toList();
@@ -425,7 +428,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                       child:
                         _OrderPreview(
                               order: order,
-                              currencySymbol: _currencySymbol,
+                              // _OrderPreview uses order.formatPrice
                             )
                             .animate(delay: (400 + 80 * idx).ms)
                             .fadeIn(duration: 300.ms),
@@ -608,7 +611,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text(
-                                  '$_currencySymbol${item.totalRevenue.toStringAsFixed(item.totalRevenue > 999 ? 0 : 2)}',
+                                  _formatPrice(item.totalRevenue),
                                   style: tt.titleSmall?.copyWith(
                                     fontWeight: FontWeight.w700,
                                   ),

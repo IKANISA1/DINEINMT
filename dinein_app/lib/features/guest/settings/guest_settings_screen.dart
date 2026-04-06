@@ -523,9 +523,14 @@ class _DeleteDataSheetState extends State<_DeleteDataSheet> {
             runSpacing: 8,
             children: List.generate(_reasons.length, (index) {
               final isSelected = _selectedIndex == index;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedIndex = index),
-                child: AnimatedContainer(
+              return Semantics(
+                label: _reasons[index],
+                selected: isSelected,
+                button: true,
+                child: InkWell(
+                  onTap: () => setState(() => _selectedIndex = index),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                  child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -551,6 +556,7 @@ class _DeleteDataSheetState extends State<_DeleteDataSheet> {
                           ? Colors.red.shade200
                           : cs.onSurfaceVariant,
                     ),
+                  ),
                   ),
                 ),
               );

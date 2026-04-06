@@ -11,7 +11,7 @@ import 'package:dinein_app/shared/widgets/shell_scroll_chrome.dart';
 /// Admin portal shell — matches React AdminLayout.tsx exactly.
 ///
 /// Top bar: ShieldCheck logo (primary) + "DineIn HQ" + "Admin Console" label + bell + avatar
-/// Bottom nav: 5 tabs with primary-bg pill + indicator dot
+/// Bottom nav: 4 tabs with primary-bg pill + indicator dot
 /// Both bars use BackdropFilter glass blur.
 class AdminShell extends StatefulWidget {
   final Widget child;
@@ -331,7 +331,7 @@ class _AdminTopBar extends StatelessWidget {
 }
 
 /// Bottom nav matching React AdminLayout:
-/// 5 tabs: Overview, Venues, Menus, Orders, Settings
+/// 4 tabs: Overview, Venues, Orders, Settings
 /// Active tab: w-14 h-9 primary-bg pill + indicator dot below
 /// Glass backdrop blur.
 class _AdminBottomNav extends StatelessWidget {

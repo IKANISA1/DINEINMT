@@ -1,7 +1,7 @@
 import 'package:go_router/go_router.dart';
 
 import '../services/auth_repository.dart';
-import '../../features/venue/auth/venue_login_screen.dart';
+import '../../features/venue/auth/venue_login_screen.dart' deferred as venueloginscreen;
 
 import '../../features/venue/dashboard/venue_dashboard_screen.dart' deferred as venuedashboardscreen;
 import '../../features/venue/menu/venue_edit_item_screen.dart' deferred as venueedititemscreen;
@@ -19,7 +19,7 @@ import '../../features/venue/settings/venue_table_qr_screen.dart' deferred as ve
 import '../../features/venue/settings/venue_wifi_screen.dart' deferred as venuewifiscreen;
 import '../../features/venue/settings/venue_settings_screen.dart' deferred as venuesettingsscreen;
 import '../../features/venue/waves/venue_waves_screen.dart' deferred as venuewavesscreen;
-import '../../features/venue/venue_shell.dart';
+import '../../features/venue/venue_shell.dart' deferred as venueshell;
 import 'app_routes.dart';
 import 'route_guards.dart';
 import 'route_helpers.dart';
@@ -32,7 +32,7 @@ final List<RouteBase> venueRoutes = [
     redirect: (context, state) => AuthRepository.instance.hasVenueAccess
         ? (resolveVenueReturnToUri(state) ?? AppRoutePaths.venueDashboard)
         : null,
-    builder: (context, state) => const VenueLoginScreen(),
+    builder: (context, state) => DeferredWidget(libraryLoader: venueloginscreen.loadLibrary, createWidget: (_) => venueloginscreen.VenueLoginScreen()),
   ),
 
   GoRoute(
@@ -102,7 +102,7 @@ final List<RouteBase> venueRoutes = [
     builder: (context, state) => DeferredWidget(libraryLoader: venuewavesscreen.loadLibrary, createWidget: (_) => venuewavesscreen.VenueWavesScreen()),
   ),
   ShellRoute(
-    builder: (context, state, child) => VenueShell(child: child),
+    builder: (context, state, child) => DeferredWidget(libraryLoader: venueshell.loadLibrary, createWidget: (_) => venueshell.VenueShell(child: child)),
     routes: [
       GoRoute(
         path: AppRoutePaths.venueDashboard,

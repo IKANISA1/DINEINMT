@@ -25,7 +25,7 @@ abstract final class AdminVenueSheets {
     required Future<void> Function(String venueId, Map<String, dynamic> updates)?
         onUpdateVenueOverride,
   }) async {
-    final expectedPhoneLength = config.country.code == 'RW' ? 10 : 8;
+    final expectedPhoneLength = config.localPhoneLength;
     final controller = TextEditingController(
       text: normalizePhoneLocalInput(
         venue.effectiveAccessPhone ?? '',

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:core_pkg/constants/enums.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -237,9 +239,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                 onRetry: () =>
                     ref.invalidate(guestMenuBundleProvider(bundleRequest)),
               )
-            : const Center(
-                child: SkeletonLoader(width: double.infinity, height: 200),
-              ),
+            : _buildMenuSkeletonLoading(),
       );
     }
 
@@ -357,23 +357,10 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
             pinned: true,
             floating: true,
             snap: true,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  venue?.name ?? cart.venueName ?? 'Menu',
-                  style: tt.titleLarge, // text-lg font-black
-                ),
-                Text(
-                  'DIGITAL MENU',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3.2,
-                    color: cs.primary,
-                  ),
-                ),
-              ],
+            toolbarHeight: 44,
+            title: Text(
+              venue?.name ?? cart.venueName ?? 'Menu',
+              style: tt.titleLarge,
             ),
             actions: [
               // Search icon — opens search sheet
@@ -397,7 +384,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
             ],
             bottom: PreferredSize(
               preferredSize: Size.fromHeight(
-                (categories.isEmpty ? 0 : 56) + (_query.isNotEmpty ? 40 : 0),
+                (categories.isEmpty ? 0 : 40) + (_query.isNotEmpty ? 36 : 0),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -470,20 +457,24 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                       isScrollable: true,
                       labelColor: cs.primary,
                       unselectedLabelColor: cs.onSurfaceVariant,
-                      labelStyle: tt.labelMedium?.copyWith(
+                      labelStyle: tt.labelSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
+                        letterSpacing: 1.2,
                       ),
-                      unselectedLabelStyle: tt.labelMedium?.copyWith(
+                      unselectedLabelStyle: tt.labelSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 10),
                       indicatorSize: TabBarIndicatorSize.label,
                       indicatorColor: cs.primary,
-                      indicatorWeight: 3,
+                      indicatorWeight: 2,
                       dividerColor: Colors.transparent,
                       tabAlignment: TabAlignment.start,
                       tabs: categories
-                          .map((c) => Tab(text: c.toUpperCase()))
+                          .map((c) => Tab(
+                                text: c.toUpperCase(),
+                                height: 34,
+                              ))
                           .toList(),
                     ),
                 ],
@@ -561,7 +552,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                       child: _MenuItemCard(
                         item: entry.item!,
                         quantity: cartNotifier.quantityOf(entry.item!.id),
-                        currencySymbol: cart.currencySymbol,
+                        country: cart.effectiveCountry,
                         onAdd: () {
                           _trackGuestEvent(
                             'menu_item_added',
@@ -597,10 +588,10 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
       bottomNavigationBar: cart.itemCount > 0
           ? Container(
                   padding: const EdgeInsets.fromLTRB(
-                    AppTheme.space6,
+                    AppTheme.space4,
+                    AppTheme.space2,
+                    AppTheme.space4,
                     AppTheme.space3,
-                    AppTheme.space6,
-                    AppTheme.space8,
                   ),
                   decoration: BoxDecoration(
                     color: cs.surface,
@@ -625,8 +616,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 18,
+                          horizontal: 16,
+                          vertical: 12,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(
@@ -661,7 +652,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                'VIEW CART  •  ${cart.currencySymbol}${cart.total.toStringAsFixed(2)}',
+                                'VIEW CART  •  ${cart.formatPrice(cart.total)}',
                                 style: TextStyle(
                                   color: cs.onPrimary,
                                   fontWeight: FontWeight.w900,
@@ -770,6 +761,28 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
       },
     );
   }
+
+  Widget _buildMenuSkeletonLoading() {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      children: const [
+        SkeletonLoader(width: 120, height: 14, borderRadius: 6),
+        SizedBox(height: 16),
+        SkeletonLoader(width: double.infinity, height: 88, borderRadius: 16),
+        SizedBox(height: 12),
+        SkeletonLoader(width: double.infinity, height: 88, borderRadius: 16),
+        SizedBox(height: 24),
+        SkeletonLoader(width: 100, height: 14, borderRadius: 6),
+        SizedBox(height: 16),
+        SkeletonLoader(width: double.infinity, height: 88, borderRadius: 16),
+        SizedBox(height: 12),
+        SkeletonLoader(width: double.infinity, height: 88, borderRadius: 16),
+        SizedBox(height: 12),
+        SkeletonLoader(width: double.infinity, height: 88, borderRadius: 16),
+      ],
+    );
+  }
 }
 
 enum _MenuListEntryType { header, item, spacer }
@@ -799,7 +812,7 @@ class _MenuListEntry {
 class _MenuItemCard extends StatelessWidget {
   final MenuItem item;
   final int quantity;
-  final String currencySymbol;
+  final Country country;
   final VoidCallback onAdd;
   final VoidCallback onRemove;
   final VoidCallback? onTap;
@@ -807,7 +820,7 @@ class _MenuItemCard extends StatelessWidget {
   const _MenuItemCard({
     required this.item,
     required this.quantity,
-    required this.currencySymbol,
+    required this.country,
     required this.onAdd,
     required this.onRemove,
     this.onTap,
@@ -906,7 +919,7 @@ class _MenuItemCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '$currencySymbol${item.price.toStringAsFixed(2)}',
+                        country.formatPrice(item.price),
                         style: tt.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                           color: cs.primary,

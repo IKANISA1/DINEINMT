@@ -40,6 +40,7 @@ import {
   handleDeleteMenuItem,
   handleGetMenuItemById,
   handleGetMenuItems,
+  handleIngestMenuDocument,
   handleSetMenuItemHighlights,
   handleToggleMenuItemAvailability,
   handleUpdateMenuItem,
@@ -61,6 +62,8 @@ import {
   handleGenerateMenuItemImage,
   handleGenerateVenueProfileImage,
   handleImageHealth,
+  handleUploadVenueImage,
+  handleUploadMenuItemImage,
 } from "./handlers/image.ts";
 import {
   handleGetVenueNotificationSettings,
@@ -167,6 +170,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
           return await handleDeleteMenuItem(supabase, req, body);
         case "set_menu_item_highlights":
           return await handleSetMenuItemHighlights(supabase, req, body);
+        case "ingest_menu_document":
+          return await handleIngestMenuDocument(supabase, req, body);
         case "generate_menu_item_image":
           return await handleGenerateMenuItemImage(supabase, req, body);
         case "backfill_menu_images":
@@ -217,6 +222,10 @@ export async function handleAppRequest(req: Request): Promise<Response> {
           return await handleSearchGoogleMaps(req, body);
         case "image_health":
           return await handleImageHealth(supabase, req);
+        case "upload_venue_image":
+          return await handleUploadVenueImage(supabase, req, body);
+        case "upload_menu_item_image":
+          return await handleUploadMenuItemImage(supabase, req, body);
         default:
           throw new HttpError(400, `Unsupported action: ${action}`);
       }

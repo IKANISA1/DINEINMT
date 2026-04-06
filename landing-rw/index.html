@@ -18,7 +18,6 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
-  <link rel="canonical" href="https://dineinrw.ikanisa.com/">
   
   <link rel="stylesheet" href="index.css">
 </head>
@@ -269,32 +268,6 @@
     }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
 
     document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
-
-    // ─── Cookie consent ───
-    (function () {
-      if (localStorage.getItem('dinein_cookie_ok')) return;
-      const bar = document.createElement('div');
-      bar.id = 'cookie-banner';
-      bar.setAttribute('role', 'dialog');
-      bar.setAttribute('aria-label', 'Cookie notice');
-      bar.innerHTML =
-        '<p>We use essential cookies only to keep the site working. No tracking or advertising cookies. ' +
-        '<a href="privacy.html" style="color:var(--primary);text-decoration:underline;">Privacy Policy</a></p>' +
-        '<button id="cookie-ok">Got it</button>';
-      bar.style.cssText =
-        'position:fixed;bottom:0;left:0;right:0;z-index:9999;padding:14px 24px;display:flex;align-items:center;' +
-        'justify-content:space-between;gap:16px;background:rgba(17,17,17,0.96);border-top:1px solid rgba(255,255,255,0.08);' +
-        'font-size:13px;color:rgba(255,255,255,0.72);backdrop-filter:blur(12px);';
-      const btn = bar.querySelector('#cookie-ok');
-      btn.style.cssText =
-        'padding:8px 20px;border:none;border-radius:12px;background:var(--primary);color:#0d120f;font-weight:800;' +
-        'font-size:12px;letter-spacing:0.1em;cursor:pointer;white-space:nowrap;';
-      document.body.appendChild(bar);
-      btn.addEventListener('click', function () {
-        localStorage.setItem('dinein_cookie_ok', '1');
-        bar.remove();
-      });
-    })();
   </script>
 </body>
 </html>

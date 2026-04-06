@@ -17,6 +17,7 @@ import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/services/order_repository.dart';
+import 'package:dinein_app/core/services/dinein_api_service.dart';
 import 'package:core_pkg/utils/time_ago.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
@@ -85,7 +86,7 @@ class _VenueOrdersScreenState extends ConsumerState<VenueOrdersScreen> {
         return _OrdersBody(
           venueId: venue.id,
           venueName: venue.name,
-          currencySymbol: venue.country.currencySymbol,
+          country: venue.country,
           statusFilter: _statusFilter,
           timePeriod: _timePeriod,
           sortBy: _sortBy,
@@ -109,7 +110,7 @@ class _VenueOrdersScreenState extends ConsumerState<VenueOrdersScreen> {
 class _OrdersBody extends ConsumerWidget {
   final String venueId;
   final String venueName;
-  final String currencySymbol;
+  final Country country;
   final _StatusFilter statusFilter;
   final _TimePeriod timePeriod;
   final _SortBy sortBy;
@@ -127,7 +128,7 @@ class _OrdersBody extends ConsumerWidget {
   const _OrdersBody({
     required this.venueId,
     required this.venueName,
-    required this.currencySymbol,
+    required this.country,
     required this.statusFilter,
     required this.timePeriod,
     required this.sortBy,
@@ -242,10 +243,15 @@ class _OrdersBody extends ConsumerWidget {
       loading: () => const Center(
         child: SkeletonLoader(width: double.infinity, height: 200),
       ),
-      error: (err, _) => ErrorState(
-        message: 'Could not load orders.',
-        onRetry: () => ref.invalidate(venueOrdersProvider(venueId)),
-      ),
+      error: (err, _) {
+        final message = err is DineinApiException
+            ? err.message
+            : 'Could not load orders.';
+        return ErrorState(
+          message: message,
+          onRetry: () => ref.invalidate(venueOrdersProvider(venueId)),
+        );
+      },
       data: (allOrders) {
         final filtered = _applyFilters(allOrders);
         final totalRevenue = filtered.fold<double>(
@@ -362,7 +368,7 @@ class _OrdersBody extends ConsumerWidget {
                                   icon: LucideIcons.dollarSign,
                                   label: 'REVENUE',
                                   value:
-                                      '$currencySymbol${totalRevenue.toStringAsFixed(totalRevenue > 999 ? 0 : 2)}',
+                                      country.formatPriceTabular(totalRevenue),
                                 ),
                               ),
                             ],
@@ -400,6 +406,13 @@ class _OrdersBody extends ConsumerWidget {
                                       statusFilter == _StatusFilter.served,
                                   onTap: () =>
                                       onStatusFilter(_StatusFilter.served),
+                                ),
+                                _TabChip(
+                                  label: 'CANCELLED',
+                                  isSelected:
+                                      statusFilter == _StatusFilter.cancelled,
+                                  onTap: () =>
+                                      onStatusFilter(_StatusFilter.cancelled),
                                 ),
                               ],
                             ),
@@ -511,7 +524,7 @@ class _OrdersBody extends ConsumerWidget {
                             child:
                                 _OrderCard(
                                       order: order,
-                                      currencySymbol: currencySymbol,
+
                                       onAdvance: () =>
                                           _advanceStatus(ref, order),
                                     )
@@ -548,7 +561,10 @@ class _OrdersBody extends ConsumerWidget {
           : 'Order marked as served';
       DineInToast.instance.success(msg);
     } catch (e) {
-      DineInToast.instance.error('Failed to update: $e');
+      final message = e is DineinApiException
+          ? e.message
+          : 'Could not update order status. Please try again.';
+      DineInToast.instance.error(message);
     }
   }
 
@@ -586,7 +602,7 @@ class _OrdersBody extends ConsumerWidget {
                     ),
                     pw.SizedBox(width: 24),
                     pw.Text(
-                      'Revenue: $currencySymbol${orders.fold<double>(0, (s, o) => s + o.total).toStringAsFixed(2)}',
+                      'Revenue: ${country.formatPriceTabular(orders.fold<double>(0, (s, o) => s + o.total))}',
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                     ),
                   ],
@@ -612,7 +628,7 @@ class _OrdersBody extends ConsumerWidget {
                     o.userName ?? '—',
                     o.tableNumber ?? '—',
                     '${o.itemCount}',
-                    '$currencySymbol${o.total.toStringAsFixed(2)}',
+                    o.formatPrice(o.total),
                     o.status.label,
                     DateFormat('dd/MM/yy HH:mm').format(o.createdAt),
                   ],
@@ -664,7 +680,7 @@ class _OrdersBody extends ConsumerWidget {
           o.tableNumber ?? '—',
           '${o.itemCount}',
           o.items.map((i) => '${i.quantity}x ${i.name}').join('; '),
-          '$currencySymbol${o.total.toStringAsFixed(2)}',
+          o.formatPrice(o.total),
           o.status.label,
           o.paymentMethod.label,
           DateFormat('dd/MM/yy HH:mm').format(o.createdAt),

@@ -49,8 +49,20 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
     return orderAsync.when(
       loading: () => Scaffold(
         appBar: AppBar(title: Text('Order', style: tt.headlineMedium)),
-        body: const Center(
-          child: SkeletonLoader(width: double.infinity, height: 200),
+        body: ListView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          children: const [
+            SkeletonLoader(width: double.infinity, height: 140, borderRadius: 24),
+            SizedBox(height: 24),
+            SkeletonLoader(width: 120, height: 12, borderRadius: 4),
+            SizedBox(height: 16),
+            SkeletonLoader(width: double.infinity, height: 180, borderRadius: 16),
+            SizedBox(height: 24),
+            SkeletonLoader(width: 120, height: 12, borderRadius: 4),
+            SizedBox(height: 16),
+            SkeletonLoader(width: double.infinity, height: 160, borderRadius: 20),
+          ],
         ),
       ),
       error: (err, _) => Scaffold(
@@ -216,7 +228,7 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
                     _OrderDetailRow(
                       label: 'Total',
                       value:
-                          '${displayOrder.currencySymbol}${displayOrder.total.toStringAsFixed(2)}',
+                          displayOrder.formatPrice(displayOrder.total),
                       isBold: true,
                     ),
                   ],

@@ -108,7 +108,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
         text:
             'Check out ${item.name} on ${config.appTitle}.\n'
             '${item.description}\n'
-            'Price: ${ref.read(cartProvider).currencySymbol}${item.price.toStringAsFixed(2)}',
+            'Price: ${ref.read(cartProvider).formatPrice(item.price)}',
       ),
     );
   }
@@ -140,11 +140,32 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
 
     return itemAsync.when(
       loading: () => Scaffold(
-        body: Center(
-          child: SkeletonLoader(
-            width: double.infinity,
-            height: screenHeight * 0.4,
-          ),
+        body: ListView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          children: [
+            SkeletonLoader(width: double.infinity, height: screenHeight * 0.4, borderRadius: 0),
+            const SizedBox(height: 24),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: SkeletonLoader(width: 220, height: 24, borderRadius: 8),
+            ),
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: SkeletonLoader(width: 120, height: 20, borderRadius: 6),
+            ),
+            const SizedBox(height: 20),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: SkeletonLoader(width: double.infinity, height: 60, borderRadius: 12),
+            ),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: SkeletonLoader(width: double.infinity, height: 100, borderRadius: 16),
+            ),
+          ],
         ),
       ),
       error: (error, stackTrace) => Scaffold(
@@ -195,7 +216,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
         final venueAsync = ref.watch(venueByIdProvider(item.venueId));
         final venue = venueAsync.asData?.value;
         _trackItemViewed(item, venue);
-        final currencySymbol = ref.watch(cartProvider).currencySymbol;
+        final cart = ref.watch(cartProvider);
         final total = item.price * _quantity;
 
         return Scaffold(
@@ -295,7 +316,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                                   ),
                                   const SizedBox(width: AppTheme.space4),
                                   Text(
-                                    '$currencySymbol${item.price.toStringAsFixed(2)}',
+                                    cart.formatPrice(item.price),
                                     style: tt.headlineSmall?.copyWith(
                                       color: cs.primary,
                                       fontWeight: FontWeight.w900,
@@ -667,7 +688,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '$currencySymbol${total.toStringAsFixed(2)}',
+                                  cart.formatPrice(total),
                                   style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w900,

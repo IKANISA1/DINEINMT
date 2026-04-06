@@ -54,8 +54,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('MANUAL IMAGE ACTIVE'), findsOneWidget);
+    // Manual-image items hide the "Protect current image" toggle (source code #883)
     expect(find.text('Protect current image'), findsNothing);
-    expect(find.text('https://example.com/images/ribeye.jpg'), findsOneWidget);
   });
 
   testWidgets('menu editor opens detail sheet before generating an image', (

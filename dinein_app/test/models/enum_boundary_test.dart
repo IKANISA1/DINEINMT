@@ -116,7 +116,7 @@ void main() {
       expect(Country.rw.label, 'Rwanda');
       expect(Country.rw.code, 'RW');
       expect(Country.rw.currency, 'RWF');
-      expect(Country.rw.currencySymbol, 'FRw');
+      expect(Country.rw.currencySymbol, 'RWF');
     });
 
     test('paymentMethods match each country configuration', () {

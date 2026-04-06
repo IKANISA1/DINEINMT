@@ -99,23 +99,42 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
   bool get _isCoolingDown => _cooldownSeconds > 0;
   String get _countryCode => CountryRuntime.config.defaultCountryCode;
   String get _dialCode => CountryRuntime.config.countryDialCode;
-  int get _expectedPhoneLength =>
-      CountryRuntime.config.country.code == 'RW' ? 10 : 8;
-  String get _localPhone => normalizePhoneLocalInput(
-    _phoneController.text,
-    countryCode: _countryCode,
-    maxDigits: _expectedPhoneLength,
-  );
+
+  int get _configuredPhoneLength =>
+      CountryRuntime.config.venueWhatsAppLocalDigits;
+
+  int get _inputPhoneLength =>
+      CountryRuntime.config.country.code == 'RW' && _configuredPhoneLength == 9
+      ? 10
+      : _configuredPhoneLength;
+
+  String _normalizeVenuePhoneInput(String value) {
+    final normalized = normalizePhoneLocalInput(
+      value,
+      countryCode: _countryCode,
+      maxDigits: _inputPhoneLength,
+    );
+    if (CountryRuntime.config.country.code == 'RW' &&
+        normalized.length == _configuredPhoneLength + 1 &&
+        normalized.startsWith('0')) {
+      return normalized.substring(1);
+    }
+    return normalized;
+  }
+
+  bool _isValidVenuePhoneInput(String value) {
+    final normalized = _normalizeVenuePhoneInput(value);
+    return normalized.length == _configuredPhoneLength &&
+        !normalized.startsWith(_countryCode);
+  }
+
+  String get _localPhone => _normalizeVenuePhoneInput(_phoneController.text);
   String get _fullPhone => _localPhone.isEmpty ? '' : '$_dialCode$_localPhone';
   String get _otpCode => _otpControllers.map((c) => c.text).join();
   bool get _canSendOtp =>
       !_isLoading &&
       !_isCoolingDown &&
-      isValidPhoneLocalInput(
-        _phoneController.text,
-        countryCode: _countryCode,
-        expectedLength: _expectedPhoneLength,
-      );
+      _isValidVenuePhoneInput(_phoneController.text);
 
   String _entryReturnPath(BuildContext context) {
     final candidate = GoRouterState.of(
@@ -227,14 +246,10 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
 
   Future<void> _sendOtp() async {
     if (_isCoolingDown) return;
-    if (!isValidPhoneLocalInput(
-      _phoneController.text,
-      countryCode: _countryCode,
-      expectedLength: _expectedPhoneLength,
-    )) {
+    if (!_isValidVenuePhoneInput(_phoneController.text)) {
       setState(
         () => _error =
-            'Enter your $_expectedPhoneLength-digit ${CountryRuntime.config.country.label} phone number.',
+            'Enter the WhatsApp number linked to your venue.',
       );
       return;
     }

@@ -479,12 +479,18 @@ class MenuItem extends Equatable {
   bool get isSignature => tags.any((tag) => _isSignatureMenuTag(tag));
 
   /// Returns the primary guest-facing badge label.
-  /// - "Top Pick" for owner-curated highlights (highlightRank).
-  /// - "Popular" for data-driven popularity (order volume).
-  /// - "Signature" for signature-tagged items.
+  ///
+  /// Badge hierarchy (highest priority wins):
+  /// - "Top Pick"  → owner-curated (highlightRank) AND data-popular.
+  /// - "Popular"   → data-driven popularity only (order volume ≥ threshold).
+  /// - "Featured"  → owner-curated only (manually highlighted, not yet popular).
+  /// - "Signature" → tagged as signature dish.
+  ///
+  /// "Top Pick" is earned, not hardcoded — it requires real order traction.
   String? get guestHighlightLabel {
-    if (isGuestHighlight) return 'Top Pick';
+    if (isGuestHighlight && isPopular) return 'Top Pick';
     if (isPopular) return 'Popular';
+    if (isGuestHighlight) return 'Featured';
     if (isSignature) return 'Signature';
     return null;
   }
@@ -512,6 +518,7 @@ class MenuItem extends Equatable {
       if (_isPopularMenuTag(trimmed) ||
           _isSignatureMenuTag(trimmed) ||
           lc == 'top pick' ||
+          lc == 'featured' ||
           _normalizeDietaryMenuTag(trimmed) != null) {
         continue;
       }

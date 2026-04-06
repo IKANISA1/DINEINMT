@@ -223,4 +223,116 @@ void main() {
       semantics.dispose();
     }
   });
+
+  // ═══ Cross-regional phone normalization (RW) ═══
+
+  group('Rwanda phone normalization', () {
+    setUp(() {
+      CountryRuntime.configure(CountryConfig.rw);
+    });
+
+    testWidgets('RW: 10-digit phone with leading 0 is accepted', (
+      tester,
+    ) async {
+      String? sentPhone;
+      await pumpVenueLogin(
+        tester,
+        screen: VenueLoginScreen(
+          sendOtpOverride: (phone, {appScope = 'venue'}) async {
+            sentPhone = phone;
+            return WhatsAppOtpChallenge(
+              verificationId: 'rw-challenge-1',
+              expiresAt: DateTime.parse('2026-04-02T12:00:00.000Z'),
+              usesMock: false,
+            );
+          },
+        ),
+      );
+
+      // Enter 10-digit number with leading 0 (common RW format)
+      await enterVenuePhone(tester, '0795588248');
+      await tester.tap(find.text('Get OTP'));
+      await tester.pumpAndSettle();
+
+      // Should advance to OTP step (normalization stripped the leading 0)
+      expect(find.text('Enter Code'), findsOneWidget);
+      // The full phone should have the stripped local number
+      expect(sentPhone, '+250795588248');
+    });
+
+    testWidgets('RW: 9-digit phone without leading 0 is accepted', (
+      tester,
+    ) async {
+      String? sentPhone;
+      await pumpVenueLogin(
+        tester,
+        screen: VenueLoginScreen(
+          sendOtpOverride: (phone, {appScope = 'venue'}) async {
+            sentPhone = phone;
+            return WhatsAppOtpChallenge(
+              verificationId: 'rw-challenge-2',
+              expiresAt: DateTime.parse('2026-04-02T12:00:00.000Z'),
+              usesMock: false,
+            );
+          },
+        ),
+      );
+
+      // Enter 9-digit number directly (no leading 0)
+      await enterVenuePhone(tester, '795588248');
+      await tester.tap(find.text('Get OTP'));
+      await tester.pumpAndSettle();
+
+      // Should advance to OTP step
+      expect(find.text('Enter Code'), findsOneWidget);
+      expect(sentPhone, '+250795588248');
+    });
+  });
+
+  // ═══ MT strict 8-digit enforcement ═══
+
+  group('Malta strict phone enforcement', () {
+    setUp(() {
+      CountryRuntime.configure(CountryConfig.mt);
+    });
+
+    testWidgets('MT: 8-digit phone is accepted', (tester) async {
+      await pumpVenueLogin(
+        tester,
+        screen: VenueLoginScreen(
+          sendOtpOverride: (phone, {appScope = 'venue'}) async {
+            return WhatsAppOtpChallenge(
+              verificationId: 'mt-challenge-1',
+              expiresAt: DateTime.parse('2026-04-02T12:00:00.000Z'),
+              usesMock: false,
+            );
+          },
+        ),
+      );
+
+      await enterVenuePhone(tester, '99123456');
+      await tester.tap(find.text('Get OTP'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Enter Code'), findsOneWidget);
+    });
+
+    testWidgets('MT: 7-digit phone is rejected', (tester) async {
+      await pumpVenueLogin(
+        tester,
+        screen: VenueLoginScreen(
+          sendOtpOverride: (phone, {appScope = 'venue'}) async {
+            throw Exception('Should not be called');
+          },
+        ),
+      );
+
+      await enterVenuePhone(tester, '9912345'); // 7 digits — too short
+      await tester.pump();
+
+      // The Get OTP button should be disabled (no tap sends)
+      final getOtpFinder = find.text('Get OTP');
+      expect(getOtpFinder, findsOneWidget);
+    });
+  });
 }

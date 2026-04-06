@@ -418,7 +418,7 @@ void main() {
       expect(locked.needsGeneratedImage, isFalse);
     });
 
-    test('guest display tags show Top Pick for highlighted items', () {
+    test('guest display tags show Featured for highlight-only items', () {
       final item = MenuItem.fromJson({
         'id': 'item_4',
         'venue_id': 'venue_1',
@@ -428,15 +428,14 @@ void main() {
         'tags': ['vegan', 'halal', 'Chef Pick'],
       });
 
-      // highlightRank alone no longer makes isPopular true
+      // highlightRank alone → "Featured" (not yet earned "Top Pick")
       expect(item.isPopular, isFalse);
-      // Instead, highlighted items show "Top Pick"
       expect(item.isGuestHighlight, isTrue);
-      expect(item.guestHighlightLabel, 'Top Pick');
+      expect(item.guestHighlightLabel, 'Featured');
       expect(item.dietaryBadges, ['Vegan', 'Halal']);
       expect(
         item.guestDisplayTags,
-        ['Top Pick', 'Vegan', 'Halal', 'Chef Pick'],
+        ['Featured', 'Vegan', 'Halal', 'Chef Pick'],
       );
     });
 
@@ -482,8 +481,8 @@ void main() {
       expect(item.guestHighlightLabel, 'Popular');
     });
 
-    test('guestHighlightLabel priority: Top Pick > Popular > Signature', () {
-      // Case 1: both highlighted AND popular → "Top Pick" wins
+    test('guestHighlightLabel priority: Top Pick > Popular > Featured > Signature', () {
+      // Case 1: highlighted AND popular → earned "Top Pick"
       const both = MenuItem(
         id: 'prio_1',
         venueId: 'v1',
@@ -508,7 +507,19 @@ void main() {
       );
       expect(popularOnly.guestHighlightLabel, 'Popular');
 
-      // Case 3: signature only → "Signature"
+      // Case 3: highlighted only (no orders) → "Featured"
+      const highlightOnly = MenuItem(
+        id: 'prio_2b',
+        venueId: 'v1',
+        name: 'W',
+        description: '',
+        price: 10,
+        category: 'C',
+        highlightRank: 2,
+      );
+      expect(highlightOnly.guestHighlightLabel, 'Featured');
+
+      // Case 4: signature only → "Signature"
       const signatureOnly = MenuItem(
         id: 'prio_3',
         venueId: 'v1',

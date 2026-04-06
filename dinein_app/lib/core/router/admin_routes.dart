@@ -1,7 +1,7 @@
 import 'package:go_router/go_router.dart';
 
-import '../../features/admin/admin_shell.dart';
-import '../../features/admin/auth/admin_login_screen.dart';
+import '../../features/admin/admin_shell.dart' deferred as adminshell;
+import '../../features/admin/auth/admin_login_screen.dart' deferred as adminloginscreen;
 import '../../features/admin/dashboard/admin_dashboard_screen.dart' deferred as admindashboardscreen;
 import '../../features/admin/orders/admin_orders_screen.dart' deferred as adminordersscreen;
 import '../../features/admin/settings/admin_settings_screen.dart' deferred as adminsettingsscreen;
@@ -30,7 +30,7 @@ final List<RouteBase> adminRoutes = [
       }
       return AppRoutePaths.adminOverview;
     },
-    builder: (context, state) => const AdminLoginScreen(),
+    builder: (context, state) => DeferredWidget(libraryLoader: adminloginscreen.loadLibrary, createWidget: (_) => adminloginscreen.AdminLoginScreen()),
   ),
   // Redirect /admin → /admin/overview
   GoRoute(
@@ -38,7 +38,7 @@ final List<RouteBase> adminRoutes = [
     redirect: (context, state) => AppRoutePaths.adminOverview,
   ),
   ShellRoute(
-    builder: (context, state, child) => AdminShell(child: child),
+    builder: (context, state, child) => DeferredWidget(libraryLoader: adminshell.loadLibrary, createWidget: (_) => adminshell.AdminShell(child: child)),
     routes: [
       GoRoute(
         path: AppRoutePaths.adminOverview,

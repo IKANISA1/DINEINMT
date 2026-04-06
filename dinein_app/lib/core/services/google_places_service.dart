@@ -26,6 +26,42 @@ class GooglePlaceCandidate {
   });
 }
 
+/// A single autocomplete suggestion from Google Places (New) API.
+class PlaceAutocompleteSuggestion {
+  final String placeId;
+  final String description;
+  final String mainText;
+  final String secondaryText;
+
+  const PlaceAutocompleteSuggestion({
+    required this.placeId,
+    required this.description,
+    required this.mainText,
+    required this.secondaryText,
+  });
+}
+
+/// Detailed place information retrieved after selecting an autocomplete suggestion.
+class PlaceDetails {
+  final String placeId;
+  final String formattedAddress;
+  final String? name;
+  final double? latitude;
+  final double? longitude;
+  final String? phoneNumber;
+  final String? websiteUrl;
+
+  const PlaceDetails({
+    required this.placeId,
+    required this.formattedAddress,
+    this.name,
+    this.latitude,
+    this.longitude,
+    this.phoneNumber,
+    this.websiteUrl,
+  });
+}
+
 /// Simple Google Places Text Search wrapper for the claim fallback flow.
 class GooglePlacesService {
   GooglePlacesService._();
@@ -159,5 +195,105 @@ class GooglePlacesService {
     }
     if (fallbackValue.contains('bar')) return 'Bar';
     return 'Restaurants';
+  }
+
+  /// Google Places Autocomplete (New) — returns address suggestions.
+  ///
+  /// Requires `GOOGLE_MAPS_API_KEY` with Places API (New) enabled.
+  /// Min 3 chars to avoid excessive billing.
+  Future<List<PlaceAutocompleteSuggestion>> autocomplete(String input) async {
+    final trimmed = input.trim();
+    if (!isConfigured || trimmed.length < 3) {
+      return const [];
+    }
+
+    final response = await http.post(
+      Uri.parse('https://places.googleapis.com/v1/places:autocomplete'),
+      headers: {
+        'content-type': 'application/json',
+        'X-Goog-Api-Key': _apiKey,
+      },
+      body: jsonEncode({
+        'input': trimmed,
+        'includedPrimaryTypes': [
+          'restaurant',
+          'cafe',
+          'bar',
+          'hotel',
+          'food',
+          'meal_delivery',
+          'meal_takeaway',
+          'night_club',
+          'lodging',
+          'establishment',
+        ],
+      }),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return const [];
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final suggestions =
+        json['suggestions'] as List<dynamic>? ?? const [];
+
+    return suggestions.map((s) {
+      final suggestion = s as Map<String, dynamic>;
+      final placeSuggestion =
+          suggestion['placePrediction'] as Map<String, dynamic>? ?? {};
+      final placeId = placeSuggestion['placeId'] as String? ?? '';
+      final structuredFormat =
+          placeSuggestion['structuredFormat'] as Map<String, dynamic>? ?? {};
+      final mainText =
+          (structuredFormat['mainText'] as Map<String, dynamic>?)?['text']
+              as String? ?? '';
+      final secondaryText =
+          (structuredFormat['secondaryText'] as Map<String, dynamic>?)?['text']
+              as String? ?? '';
+      final fullText =
+          (placeSuggestion['text'] as Map<String, dynamic>?)?['text']
+              as String? ?? '$mainText, $secondaryText';
+
+      return PlaceAutocompleteSuggestion(
+        placeId: placeId,
+        description: fullText,
+        mainText: mainText,
+        secondaryText: secondaryText,
+      );
+    }).where((s) => s.placeId.isNotEmpty).toList();
+  }
+
+  /// Fetch full place details (address, coordinates) for a selected suggestion.
+  Future<PlaceDetails?> getPlaceDetails(String placeId) async {
+    if (!isConfigured || placeId.trim().isEmpty) return null;
+
+    final response = await http.get(
+      Uri.parse('https://places.googleapis.com/v1/places/$placeId'),
+      headers: {
+        'content-type': 'application/json',
+        'X-Goog-Api-Key': _apiKey,
+        'X-Goog-FieldMask':
+            'id,formattedAddress,displayName,location,nationalPhoneNumber,websiteUri',
+      },
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return null;
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final location = json['location'] as Map<String, dynamic>?;
+
+    return PlaceDetails(
+      placeId: json['id'] as String? ?? placeId,
+      formattedAddress: json['formattedAddress'] as String? ?? '',
+      name:
+          (json['displayName'] as Map<String, dynamic>?)?['text'] as String?,
+      latitude: (location?['latitude'] as num?)?.toDouble(),
+      longitude: (location?['longitude'] as num?)?.toDouble(),
+      phoneNumber: json['nationalPhoneNumber'] as String?,
+      websiteUrl: json['websiteUri'] as String?,
+    );
   }
 }

@@ -6,8 +6,8 @@ import 'package:core_pkg/config/country_runtime.dart';
 import '../../features/biopay/biopay_route_surface_native.dart'
     if (dart.library.html) '../../features/biopay/biopay_route_surface_web.dart' deferred as biopaysurface;
 import '../../features/guest/cart/cart_screen.dart' deferred as cartscreen;
-import '../../features/guest/discover/discover_screen.dart';
-import '../../features/guest/guest_shell.dart';
+import '../../features/guest/discover/discover_screen.dart' deferred as discoverscreen;
+import '../../features/guest/guest_shell.dart' deferred as guestshell;
 import '../../features/guest/menu/item_detail_screen.dart' deferred as itemdetailscreen;
 import '../../features/guest/menu/menu_screen.dart' deferred as menuscreen;
 import '../../features/guest/order/order_details_screen.dart' deferred as orderdetailsscreen;
@@ -41,7 +41,7 @@ final List<RouteBase> guestRoutes = [
     builder: (context, state) => const SplashScreen(),
   ),
   ShellRoute(
-    builder: (context, state, child) => GuestShell(child: child),
+    builder: (context, state, child) => DeferredWidget(libraryLoader: guestshell.loadLibrary, createWidget: (_) => guestshell.GuestShell(child: child)),
     routes: [
       GoRoute(
         path: AppRoutePaths.venueDeepLink,
@@ -63,7 +63,7 @@ final List<RouteBase> guestRoutes = [
         path: AppRoutePaths.discover,
         name: AppRouteNames.discover,
         pageBuilder: (context, state) =>
-            buildFadeSlidePage(state, const DiscoverScreen()),
+            buildFadeSlidePage(state, DeferredWidget(libraryLoader: discoverscreen.loadLibrary, createWidget: (_) => discoverscreen.DiscoverScreen())),
       ),
       GoRoute(
         path: AppRoutePaths.venuesBrowse,

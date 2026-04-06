@@ -1,9 +1,15 @@
 ((a,b)=>{a[b]=a[b]||{}})(self,"$__dart_deferred_initializers__")
-$__dart_deferred_initializers__.current=function(a,b,c,$){var A,B
+$__dart_deferred_initializers__.current=function(a,b,c,$){var A,C,B,D={
+bxQ(d,e,f){var x,w=d.d,v=B.te("https",w,"/v/"+e,null),u=A.A(y.g,y.b)
+u.m(0,"slug",e)
+u.m(0,"target",v.gdW())
+x=C.m.S(f)
+if(x.length!==0)u.m(0,"venue",f)
+return B.te("https",w,"/download/",u)}}
 A=c[0]
+C=c[2]
 B=c[61]
-var z=a.updateTypes([]);(function constants(){B.yG=new A.a8(24,0,0,0)
-B.jT=new A.a8(32,40,32,0)
-B.yR=new A.a8(48,48,32,16)
-B.Ky=new A.aY(62176,"Lucide","lucide_icons",!1)})()};
-(a=>{a["GBhQHwdt+lnBAU9jvc5aOlghmaw="]=a.current})($__dart_deferred_initializers__);
+D=a.updateHolder(c[37],D)
+var z=a.updateTypes([])
+var y={g:A.B("f"),b:A.B("@")}};
+(a=>{a["ZOWzSCIWYVIAh20T2+ypjuBpcVA="]=a.current})($__dart_deferred_initializers__);

@@ -3,8 +3,14 @@ import '../fixtures/mock_data.dart';
 import 'package:dinein_app/core/providers/cart_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
   test('cart builds an order using the active venue context', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);

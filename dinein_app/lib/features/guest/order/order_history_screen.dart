@@ -372,7 +372,7 @@ class _OrderHistoryCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '${order.currencySymbol}${order.total.toStringAsFixed(2)}',
+                        order.formatPrice(order.total),
                         style: tt.titleMedium?.copyWith(
                           color: cs.primary,
                           fontWeight: FontWeight.w900,

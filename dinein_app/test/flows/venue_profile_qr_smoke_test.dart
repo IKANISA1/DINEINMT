@@ -37,10 +37,10 @@ void main() {
   ) async {
     await tester.pumpWidget(buildHarness(const VenueProfileScreen()));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
 
     expect(find.text('Venue Profile'), findsOneWidget);
-    expect(find.text('UPDATE COVER'), findsOneWidget);
+    expect(find.text('UPLOAD COVER'), findsOneWidget);
     expect(find.text('SAVE CHANGES'), findsOneWidget);
     expect(find.text('VENUE NAME'), findsOneWidget);
     expect(find.text('Ocean Pearl'), findsAtLeast(1));

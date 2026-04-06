@@ -47,7 +47,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   String _query = '';
   String _cuisineFilter = 'All';
   int _resultLimit = _pageSize;
-  bool _requestingLocation = false;
   bool _trackedDiscoverView = false;
   GuestVenueFeed? _lastFeed;
 
@@ -122,37 +121,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     );
   }
 
-  Future<void> _requestLocation() async {
-    if (_requestingLocation) return;
-    _trackGuestEvent(
-      'discover_location_requested',
-      details: {'has_query': _query.isNotEmpty},
-    );
-    setState(() => _requestingLocation = true);
-    try {
-      final result = await ref
-          .read(discoveryLocationServiceProvider)
-          .getCurrentLocation(requestIfNeeded: true);
-      ref.invalidate(discoveryLocationProvider);
-      _trackGuestEvent(
-        'discover_location_result',
-        details: {'granted': result != null, 'has_query': _query.isNotEmpty},
-      );
-      if (result == null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Location is still unavailable. Enable it in the browser to rank venues near you.',
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _requestingLocation = false);
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +160,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       isLoading: feedAsync.isLoading,
       loadError: feedAsync.asError?.error,
       discoveryLocation: discoveryLocation,
-      requestingLocation: _requestingLocation,
       onRetry: () => ref.invalidate(guestVenueFeedProvider(venuesQuery)),
       onLoadMore: feed?.hasMore == true
           ? () {
@@ -211,7 +178,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           _resultLimit = _pageSize;
         });
       },
-      onUseMyLocation: _requestLocation,
       onOpenFeaturedVenue: (venue) =>
           _openVenue(venue, source: 'discover_featured'),
       onOpenResultVenue: (venue) =>
@@ -242,12 +208,10 @@ class _DiscoverBody extends StatelessWidget {
   final bool isLoading;
   final Object? loadError;
   final DiscoveryCoordinates? discoveryLocation;
-  final bool requestingLocation;
   final VoidCallback onRetry;
   final VoidCallback? onLoadMore;
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<String> onCuisineChanged;
-  final VoidCallback onUseMyLocation;
   final ValueChanged<Venue> onOpenFeaturedVenue;
   final ValueChanged<Venue> onOpenResultVenue;
   final VoidCallback onOpenBrowse;
@@ -261,12 +225,10 @@ class _DiscoverBody extends StatelessWidget {
     required this.isLoading,
     required this.loadError,
     required this.discoveryLocation,
-    required this.requestingLocation,
     required this.onRetry,
     required this.onLoadMore,
     required this.onQueryChanged,
     required this.onCuisineChanged,
-    required this.onUseMyLocation,
     required this.onOpenFeaturedVenue,
     required this.onOpenResultVenue,
     required this.onOpenBrowse,
@@ -301,10 +263,7 @@ class _DiscoverBody extends StatelessWidget {
             child: _DiscoverHero(
               controller: controller,
               query: query,
-              discoveryLocation: discoveryLocation,
-              requestingLocation: requestingLocation,
               onChanged: onQueryChanged,
-              onUseMyLocation: onUseMyLocation,
               onClear: onClearQuery,
             ),
           ),
@@ -498,19 +457,13 @@ class _DiscoverLoadingState extends StatelessWidget {
 class _DiscoverHero extends StatelessWidget {
   final TextEditingController controller;
   final String query;
-  final DiscoveryCoordinates? discoveryLocation;
-  final bool requestingLocation;
   final ValueChanged<String> onChanged;
-  final VoidCallback onUseMyLocation;
   final VoidCallback onClear;
 
   const _DiscoverHero({
     required this.controller,
     required this.query,
-    required this.discoveryLocation,
-    required this.requestingLocation,
     required this.onChanged,
-    required this.onUseMyLocation,
     required this.onClear,
   });
 
@@ -533,7 +486,7 @@ class _DiscoverHero extends StatelessWidget {
               ),
             ),
             Text(
-              'FLAVOR',
+              'TABLE',
               style: tt.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w900,
                 letterSpacing: -1.0,
@@ -574,70 +527,6 @@ class _DiscoverHero extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: AppTheme.space3),
-
-        // ─── Location pill ───
-        PressableScale(
-          onTap: requestingLocation ? null : onUseMyLocation,
-          semanticLabel: 'Use my location',
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 10,
-            ),
-            decoration: BoxDecoration(
-              color: discoveryLocation != null
-                  ? cs.primary.withValues(alpha: 0.14)
-                  : cs.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(
-                AppTheme.radiusFull,
-              ),
-              border: Border.all(
-                color: discoveryLocation != null
-                    ? cs.primary.withValues(alpha: 0.28)
-                    : AppColors.white5,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (requestingLocation)
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: cs.primary,
-                    ),
-                  )
-                else
-                  Icon(
-                    discoveryLocation != null
-                        ? LucideIcons.navigation
-                        : LucideIcons.mapPin,
-                    size: 14,
-                    color: discoveryLocation != null
-                        ? cs.primary
-                        : cs.onSurfaceVariant,
-                  ),
-                const SizedBox(width: 8),
-                Text(
-                  discoveryLocation != null
-                      ? 'NEAR YOU'
-                      : 'USE LOCATION',
-                  style: TextStyle(
-                    color: discoveryLocation != null
-                        ? cs.primary
-                        : cs.onSurfaceVariant,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2.0,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -686,7 +575,7 @@ class _CuisineFilterChips extends StatelessWidget {
                 border: Border.all(
                   color: isActive
                       ? cs.primary
-                      : AppColors.white5,
+                      : Colors.white.withValues(alpha: 0.10),
                 ),
               ),
               child: Text(
@@ -694,7 +583,7 @@ class _CuisineFilterChips extends StatelessWidget {
                 style: TextStyle(
                   color: isActive
                       ? cs.onPrimary
-                      : cs.onSurfaceVariant,
+                      : cs.onSurface.withValues(alpha: 0.70),
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1.8,
@@ -773,7 +662,7 @@ class _FeaturedVenueCard extends StatelessWidget {
       onTap: onTap,
       semanticLabel: 'View ${venue.name}',
       child: SizedBox(
-        width: 260,
+        width: 280,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppTheme.radiusXxl),

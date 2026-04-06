@@ -234,7 +234,7 @@ class _ExportButton extends StatelessWidget {
 /// Item performance card — chart icon, name, category, orders, trend, revenue.
 class _ItemCard extends StatelessWidget {
   final _ItemStat stat;
-  final String currency;
+  final Country currency;
   final _ViewMode viewMode;
   final int rank;
 
@@ -316,7 +316,7 @@ class _ItemCard extends StatelessWidget {
                   Text(
                     viewMode == _ViewMode.orders
                         ? '${stat.totalOrders}'
-                        : '$currency${stat.totalRevenue.toStringAsFixed(stat.totalRevenue > 999 ? 0 : 2)}',
+                        : currency.formatPrice(stat.totalRevenue),
                     style: tt.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -373,7 +373,7 @@ class _ItemCard extends StatelessWidget {
               if (viewMode == _ViewMode.orders) ...[
                 const SizedBox(height: 2),
                 Text(
-                  '$currency${stat.totalRevenue.toStringAsFixed(stat.totalRevenue > 999 ? 0 : 2)}',
+                  currency.formatPrice(stat.totalRevenue),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,

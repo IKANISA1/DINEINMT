@@ -5,6 +5,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
+import 'package:core_pkg/config/country_runtime.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Order success confirmation screen.
 /// Shown after order placement — animated success icon + CTAs.
@@ -179,6 +181,49 @@ class OrderSuccessScreen extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: AppTheme.space6),
+                            if (CountryRuntime.config.momoUssdCode != null) ...[
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    final code = CountryRuntime.config.momoUssdCode;
+                                    if (code != null) {
+                                      final url = Uri.parse('tel:$code');
+                                      if (await canLaunchUrl(url)) {
+                                        await launchUrl(url);
+                                      }
+                                    }
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: cs.onSurface,
+                                    side: BorderSide(color: AppColors.white5),
+                                    backgroundColor: AppColors.white5,
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 22),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        AppTheme.radiusXxl,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(LucideIcons.smartphone, size: 20),
+                                      const SizedBox(width: 12),
+                                      const Text(
+                                        'Tap to Pay via MoMo',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppTheme.space6),
+                            ],
                             SizedBox(
                               width: double.infinity,
                               child: OutlinedButton(

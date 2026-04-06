@@ -262,7 +262,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                 ...order.items.map(
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: AppTheme.space3),
-                    child: _buildItemCard(cs, tt, item, order.currencySymbol),
+                    child: _buildItemCard(cs, tt, item, order),
                   ),
                 ),
                 const SizedBox(height: AppTheme.space5),
@@ -351,7 +351,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            '${order.currencySymbol}${order.subtotal.toStringAsFixed(2)}',
+                            order.formatPrice(order.subtotal),
                             style: tt.bodyLarge?.copyWith(
                               fontWeight: FontWeight.w800,
                             ),
@@ -369,7 +369,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            '${order.currencySymbol}${order.serviceFee.toStringAsFixed(2)}',
+                            order.formatPrice(order.serviceFee),
                             style: tt.bodyLarge?.copyWith(
                               fontWeight: FontWeight.w800,
                             ),
@@ -390,7 +390,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                             ),
                           ),
                           Text(
-                            '${order.currencySymbol}${order.total.toStringAsFixed(2)}',
+                            order.formatPrice(order.total),
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w900,
@@ -575,7 +575,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
     ColorScheme cs,
     TextTheme tt,
     OrderItem item,
-    String currencySymbol,
+    Order order,
   ) {
     return Container(
       padding: const EdgeInsets.all(AppTheme.space4),
@@ -657,7 +657,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                     ],
                     const SizedBox(height: 6),
                     Text(
-                      '$currencySymbol${item.price.toStringAsFixed(2)} each',
+                      '${order.formatPrice(item.price)} each',
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ],
@@ -665,7 +665,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
               ),
               const SizedBox(width: AppTheme.space3),
               Text(
-                '$currencySymbol${item.subtotal.toStringAsFixed(2)}',
+                order.formatPrice(item.subtotal),
                 style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),
               ),
             ],

@@ -52,8 +52,8 @@ class AdminDashboardScreen extends ConsumerWidget {
           error: (_, _) => 'Error',
           data: (kpis) {
             final num todayRevenue = kpis['revenue_today'] ?? 0;
-            final sym = CountryRuntime.config.country.currencySymbol;
-            return '$sym${todayRevenue.toStringAsFixed(0)} total';
+            final country = CountryRuntime.config.country;
+            return '${country.formatPrice(todayRevenue.toDouble())} total';
           },
         ),
         icon: LucideIcons.shoppingBag,
@@ -72,8 +72,8 @@ class AdminDashboardScreen extends ConsumerWidget {
           error: (_, _) => 'Error',
           data: (kpis) {
             final num total = kpis['total_revenue'] ?? 0;
-            final cs = CountryRuntime.config.country.currencySymbol;
-            return '$cs${total.toStringAsFixed(0)} lifetime';
+            final country = CountryRuntime.config.country;
+            return '${country.formatPrice(total.toDouble())} lifetime';
           },
         ),
         icon: LucideIcons.activity,
@@ -107,40 +107,56 @@ class AdminDashboardScreen extends ConsumerWidget {
           ),
 
           // ─── System KPIs ───
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final availableWidth = constraints.maxWidth;
-                  final cardWidth =
-                      availableWidth <= AppTheme.space4
-                          ? availableWidth
-                          : (availableWidth - AppTheme.space4) / 2;
-                  return Wrap(
-                    spacing: AppTheme.space3,
-                    runSpacing: AppTheme.space3,
-                    children:
-                        kpiCards.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final card = entry.value;
-                          return SizedBox(
-                            width: cardWidth,
-                            child: card
-                                .animate(delay: (80 + 80 * index).ms)
-                                .fadeIn(duration: 500.ms),
-                          );
-                        }).toList(),
-                  );
-                },
+          if (venuesAsync.hasError || kpisAsync.hasError)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.space6,
+                  vertical: AppTheme.space6,
+                ),
+                child: ErrorState(
+                  message: 'Could not load dashboard data.',
+                  onRetry: () {
+                    ref.invalidate(allVenuesProvider);
+                    ref.invalidate(adminDashboardKpisProvider);
+                  },
+                ),
+              ),
+            )
+          else
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final availableWidth = constraints.maxWidth;
+                    final cardWidth =
+                        availableWidth <= AppTheme.space4
+                            ? availableWidth
+                            : (availableWidth - AppTheme.space4) / 2;
+                    return Wrap(
+                      spacing: AppTheme.space3,
+                      runSpacing: AppTheme.space3,
+                      children:
+                          kpiCards.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final card = entry.value;
+                            return SizedBox(
+                              width: cardWidth,
+                              child: card
+                                  .animate(delay: (80 + 80 * index).ms)
+                                  .fadeIn(duration: 500.ms),
+                            );
+                          }).toList(),
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-
-
 
           // ─── System Health ───
-          SliverToBoxAdapter(
+          if (!venuesAsync.hasError && !kpisAsync.hasError)
+            SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
               child: Column(
@@ -426,10 +442,12 @@ class _AdminKpi extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.all(AppTheme.space5),
+      padding: const EdgeInsets.all(AppTheme.space10),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+        borderRadius: BorderRadius.circular(AppTheme.radius3xl),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        boxShadow: AppTheme.clayShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,27 +460,39 @@ class _AdminKpi extends StatelessWidget {
                 label,
                 style: tt.labelSmall?.copyWith(
                   color: cs.onSurfaceVariant,
-                  letterSpacing: 1.5,
+                  letterSpacing: 3,
                   fontSize: 8,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
               Container(
-                width: 28,
-                height: 28,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(7),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, size: 14, color: color),
+                child: Icon(icon, size: 22, color: color),
               ),
             ],
           ),
-          Text(value, style: tt.displaySmall?.copyWith(fontSize: 28)),
+          const SizedBox(height: AppTheme.space4),
+          Text(
+            value,
+            style: tt.displaySmall?.copyWith(
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1.5,
+            ),
+          ),
+          const SizedBox(height: AppTheme.space1),
           Text(
             delta,
             style: tt.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
               fontSize: 10,
+              letterSpacing: 1.5,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],

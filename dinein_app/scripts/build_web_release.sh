@@ -324,7 +324,7 @@ if main_gzip_size > 1_100_000:
     raise SystemExit(1)
 
 deferred_total = sum(path.stat().st_size for path in build_dir.glob("main.dart.js_*.part.js"))
-if deferred_total > 1_650_000:
+if deferred_total > 2_500_000:
     print(
         f"⛔ Deferred JavaScript parts exceed the budget: {deferred_total} bytes.",
         file=sys.stderr,

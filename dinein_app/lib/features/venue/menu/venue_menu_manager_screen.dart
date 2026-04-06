@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:core_pkg/constants/enums.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/menu_ingest_service.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:db_pkg/models/models.dart';
@@ -59,7 +60,7 @@ class _VenueMenuManagerScreenState
         }
         return _MenuBody(
           venueId: venue.id,
-          currencySymbol: venue.country.currencySymbol,
+          country: venue.country,
           searchQuery: _searchQuery,
           searchCtrl: _searchCtrl,
           selectedTag: _selectedTag,
@@ -72,15 +73,91 @@ class _VenueMenuManagerScreenState
           onAddItem: () => context
               .pushNamed(AppRouteNames.venueNewItem)
               .then((_) => ref.invalidate(menuItemsProvider(venue.id))),
+          onImportMenu: () => _importMenuDocument(venue),
         );
       },
     );
+  }
+
+  Future<void> _importMenuDocument(Venue venue) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final cs = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => const _ImportProgressSheet(),
+    );
+
+    try {
+      final result = await MenuIngestService.instance
+          .pickAndIngestMenuDocument(
+        venue.id,
+        country: venue.country.name.toUpperCase(),
+      );
+
+      // Close progress sheet
+      if (navigator.canPop()) navigator.pop();
+
+      if (result == null) {
+        // User cancelled file picker
+        return;
+      }
+
+      // Refresh menu list
+      ref.invalidate(menuItemsProvider(venue.id));
+
+      // Show result
+      if (result.createdCount > 0) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              '\u2705 ${result.createdCount} items imported'
+              '${result.skippedCount > 0 ? ' (${result.skippedCount} duplicates skipped)' : ''}',
+            ),
+            backgroundColor: cs.secondary,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      } else {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(result.message.isNotEmpty
+                ? result.message
+                : 'No new items found in the document.'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } on MenuIngestException catch (e) {
+      if (navigator.canPop()) navigator.pop();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: cs.error,
+        ),
+      );
+    } catch (e) {
+      if (navigator.canPop()) navigator.pop();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Import failed: $e'),
+          backgroundColor: cs.error,
+        ),
+      );
+    }
   }
 }
 
 class _MenuBody extends ConsumerStatefulWidget {
   final String venueId;
-  final String currencySymbol;
+  final Country country;
   final String searchQuery;
   final TextEditingController searchCtrl;
   final String? selectedTag;
@@ -89,10 +166,11 @@ class _MenuBody extends ConsumerStatefulWidget {
   final ValueChanged<String> onSelectTag;
   final VoidCallback onToggleTagFilter;
   final VoidCallback onAddItem;
+  final VoidCallback onImportMenu;
 
   const _MenuBody({
     required this.venueId,
-    required this.currencySymbol,
+    required this.country,
     required this.searchQuery,
     required this.searchCtrl,
     required this.selectedTag,
@@ -101,6 +179,7 @@ class _MenuBody extends ConsumerStatefulWidget {
     required this.onSelectTag,
     required this.onToggleTagFilter,
     required this.onAddItem,
+    required this.onImportMenu,
   });
 
   @override
@@ -271,6 +350,27 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                                   color: widget.searchQuery.isNotEmpty
                                       ? cs.primary
                                       : cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Import menu button
+                            PressableScale(
+                              onTap: widget.onImportMenu,
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerLow,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppColors.primary.withValues(alpha: 0.30),
+                                  ),
+                                ),
+                                child: Icon(
+                                  LucideIcons.fileUp,
+                                  size: 18,
+                                  color: AppColors.primary,
                                 ),
                               ),
                             ),
@@ -527,7 +627,7 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                       child:
                           _MenuItemCard(
                                 item: item,
-                                currencySymbol: widget.currencySymbol,
+                                currencySymbol: widget.country,
                                 isSavingHighlights: _isSavingHighlights,
                                 onEdit: () {
                                   context
@@ -638,7 +738,7 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
 /// Menu item card matching screenshot — thumbnail, name, price, tags, stock, edit/visibility.
 class _MenuItemCard extends StatelessWidget {
   final MenuItem item;
-  final String currencySymbol;
+  final Country currencySymbol;
   final bool isSavingHighlights;
   final VoidCallback onEdit;
   final VoidCallback onToggleVisibility;
@@ -740,7 +840,7 @@ class _MenuItemCard extends StatelessWidget {
 
                 // Price
                 Text(
-                  '$currencySymbol${item.price.toStringAsFixed(2)}',
+                  currencySymbol.formatPrice(item.price),
                   style: tt.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: item.isAvailable
@@ -942,6 +1042,78 @@ class _PulsingDotState extends State<_PulsingDot>
           ),
         );
       },
+    );
+  }
+}
+
+/// Progress bottom sheet shown during menu document AI ingestion.
+class _ImportProgressSheet extends StatelessWidget {
+  const _ImportProgressSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Extracting Menu Items',
+            style: tt.titleLarge?.copyWith(
+              fontWeight: FontWeight.w900,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Gemini AI is reading your document and\nextracting menu items. This may take a moment.',
+            textAlign: TextAlign.center,
+            style: tt.bodyMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(LucideIcons.sparkles, size: 14, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                'Powered by Gemini AI',
+                style: tt.bodySmall?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 }

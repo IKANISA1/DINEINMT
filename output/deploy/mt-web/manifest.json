@@ -55,7 +55,7 @@
             "name": "Venue login",
             "short_name": "Venue",
             "description": "Open the venue dashboard login",
-            "url": "/venue/login",
+            "url": "/venue-login",
             "icons": [
                 {
                     "src": "icons/Icon-192.png",

@@ -20,7 +20,10 @@ let replayInFlight = null;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(precacheShellAssets());
-  self.skipWaiting();
+  // Do NOT call self.skipWaiting() here — the new worker must remain
+  // in the "waiting" state so the update banner can offer a controlled
+  // reload.  The SKIP_WAITING message listener (below) handles activation
+  // when the user taps "Reload".
 });
 
 self.addEventListener('activate', (event) => {

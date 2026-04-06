@@ -3,12 +3,16 @@ import '../fixtures/mock_data.dart';
 import 'package:dinein_app/core/providers/cart_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late ProviderContainer container;
   late CartNotifier notifier;
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     container = ProviderContainer();
     notifier = container.read(cartProvider.notifier);
 

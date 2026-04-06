@@ -84,6 +84,13 @@ _MenuItemBadgeTone _toneForBadge(String label) {
       foreground: AppColors.warning,
     );
   }
+  if (normalized == 'featured') {
+    return _MenuItemBadgeTone(
+      background: AppColors.tertiary.withValues(alpha: 0.14),
+      border: AppColors.tertiary.withValues(alpha: 0.28),
+      foreground: AppColors.tertiary,
+    );
+  }
   if (normalized == 'vegetarian' || normalized == 'vegan') {
     return _MenuItemBadgeTone(
       background: AppColors.secondary.withValues(alpha: 0.14),

@@ -206,6 +206,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         if (await canLaunchUrl(url)) {
           await launchUrl(url, mode: LaunchMode.externalApplication);
         }
+      } else if (method == PaymentMethod.momoUssd) {
+        final config = ref.read(countryConfigProvider);
+        final ussdCode = config.momoUssdCode;
+        if (ussdCode != null) {
+          final url = Uri.parse('tel:$ussdCode');
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url);
+          }
+        }
       }
 
       cartNotifier.clear();
@@ -396,7 +405,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 final card = _CartItemCard(
                   key: ValueKey('cart-item-${item.menuItemId}'),
                   item: item,
-                  currencySymbol: cart.currencySymbol,
+                  country: cart.effectiveCountry,
                   onUpdateQty: (newQty) =>
                       cartNotifier.setQuantity(item.menuItemId, newQty),
                   onRemove: () => cartNotifier.setQuantity(item.menuItemId, 0),
@@ -515,18 +524,18 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
               // ─── Order Total Card ───
               Container(
-                padding: const EdgeInsets.all(40),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(48),
+                  borderRadius: BorderRadius.circular(28),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.10),
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.40),
-                      blurRadius: 60,
-                      offset: const Offset(0, 30),
+                      blurRadius: 30,
+                      offset: const Offset(0, 14),
                     ),
                   ],
                 ),
@@ -535,22 +544,22 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     // Total row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(
                           'Total',
-                          style: tt.headlineSmall,
-                        ), // text-xl font-black
+                          style: tt.titleMedium,
+                        ),
                         Text(
-                          '${cart.currencySymbol}${finalTotal.toStringAsFixed(2)}',
-                          style: tt.displaySmall?.copyWith(
+                          cart.formatPrice(finalTotal),
+                          style: tt.headlineMedium?.copyWith(
                             color: cs.primary,
-                            letterSpacing: -2,
-                          ), // text-4xl primary
+                            letterSpacing: -1.5,
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppTheme.space8),
+                    const SizedBox(height: AppTheme.space4),
 
                     // ─── Payment Buttons (country-aware) ───
                     ..._buildPaymentButtons(
@@ -754,7 +763,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           break;
       }
 
-      if (i > 0) widgets.add(const SizedBox(height: AppTheme.space4));
+      if (i > 0) widgets.add(const SizedBox(height: AppTheme.space2));
 
       final icon = switch (method) {
         PaymentMethod.revolutLink => LucideIcons.creditCard,
@@ -771,20 +780,20 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       _isPlacing || orderingUnavailable || !isEnabled
                       ? null
                       : () => _placeOrder(method),
-                  icon: Icon(icon, size: 24),
+                  icon: Icon(icon, size: 18),
                   label: Text(
                     method.label,
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: cs.primary,
                     foregroundColor: cs.onPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     elevation: 0,
                   ),
@@ -794,11 +803,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       _isPlacing || orderingUnavailable || !isEnabled
                       ? null
                       : () => _placeOrder(method),
-                  icon: Icon(icon, size: 24),
+                  icon: Icon(icon, size: 18),
                   label: Text(
                     method.label,
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -808,9 +817,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       color: Colors.white.withValues(alpha: 0.10),
                     ),
                     backgroundColor: Colors.white.withValues(alpha: 0.05),
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                 ),
@@ -825,14 +834,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 /// w-24 h-24 image, name, note, price, qty +/-, delete button.
 class _CartItemCard extends StatelessWidget {
   final CartItem item;
-  final String currencySymbol;
+  final Country country;
   final ValueChanged<int> onUpdateQty;
   final VoidCallback onRemove;
 
   const _CartItemCard({
     super.key,
     required this.item,
-    required this.currencySymbol,
+    required this.country,
     required this.onUpdateQty,
     required this.onRemove,
   });
@@ -928,7 +937,7 @@ class _CartItemCard extends StatelessWidget {
                   children: [
                     // Price
                     Text(
-                      '$currencySymbol${item.price.toStringAsFixed(2)}',
+                      country.formatPrice(item.price),
                       style: tt.titleLarge?.copyWith(
                         color: cs.primary,
                         fontWeight: FontWeight.w900,

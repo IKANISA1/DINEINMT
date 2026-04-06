@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:core_pkg/constants/enums.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:ui/theme/app_theme.dart';
@@ -12,14 +13,14 @@ class ItemDetailSheet extends StatefulWidget {
   final MenuItem item;
   final int initialQuantity;
   final ValueChanged<int> onQuantityChanged;
-  final String currencySymbol;
+  final Country country;
 
   const ItemDetailSheet({
     super.key,
     required this.item,
     this.initialQuantity = 0,
     required this.onQuantityChanged,
-    this.currencySymbol = '€',
+    required this.country,
   });
 
   /// Show the bottom sheet for a menu item.
@@ -28,7 +29,7 @@ class ItemDetailSheet extends StatefulWidget {
     required MenuItem item,
     int initialQuantity = 0,
     required ValueChanged<int> onQuantityChanged,
-    String currencySymbol = '€',
+    required Country country,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -38,7 +39,7 @@ class ItemDetailSheet extends StatefulWidget {
         item: item,
         initialQuantity: initialQuantity,
         onQuantityChanged: onQuantityChanged,
-        currencySymbol: currencySymbol,
+        country: country,
       ),
     );
   }
@@ -119,7 +120,7 @@ class _ItemDetailSheetState extends State<ItemDetailSheet> {
                   Expanded(child: Text(item.name, style: tt.headlineMedium)),
                   const SizedBox(width: AppTheme.space4),
                   Text(
-                    '${widget.currencySymbol}${item.price.toStringAsFixed(2)}',
+                    widget.country.formatPrice(item.price),
                     style: tt.headlineMedium?.copyWith(
                       color: cs.primary,
                       fontWeight: FontWeight.w800,
@@ -245,7 +246,7 @@ class _ItemDetailSheetState extends State<ItemDetailSheet> {
                 width: double.infinity,
                 child: PremiumButton(
                   label: _quantity > 0
-                      ? 'ADD TO CART  •  ${widget.currencySymbol}${(item.price * _quantity).toStringAsFixed(2)}'
+                      ? 'ADD TO CART  •  ${widget.country.formatPrice(item.price * _quantity)}'
                       : 'SELECT QUANTITY',
                   onPressed: _quantity > 0
                       ? () {

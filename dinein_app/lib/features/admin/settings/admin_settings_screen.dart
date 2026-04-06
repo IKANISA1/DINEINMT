@@ -14,6 +14,70 @@ import 'package:ui/widgets/shared_widgets.dart';
 class AdminSettingsScreen extends StatelessWidget {
   const AdminSettingsScreen({super.key});
 
+  Future<void> _confirmLogout(
+    BuildContext context,
+    ColorScheme cs,
+    TextTheme tt,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radius3xl),
+        ),
+        title: Text(
+          'Sign Out?',
+          style: tt.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: cs.error,
+          ),
+        ),
+        content: Text(
+          'You will need to sign in again to access the admin console.',
+          style: tt.bodyLarge?.copyWith(
+            color: cs.onSurfaceVariant,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'CANCEL',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+              backgroundColor: cs.error.withValues(alpha: 0.10),
+            ),
+            child: Text(
+              'SIGN OUT',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                color: cs.error,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+
+    await AuthRepository.instance.signOut();
+    if (!context.mounted) return;
+    context.goNamed(AppRouteNames.splash);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -91,11 +155,7 @@ class AdminSettingsScreen extends StatelessWidget {
 
           // ─── Logout ───
           PressableScale(
-            onTap: () async {
-              await AuthRepository.instance.signOut();
-              if (!context.mounted) return;
-              context.goNamed(AppRouteNames.splash);
-            },
+            onTap: () => _confirmLogout(context, cs, tt),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(AppTheme.space6),
@@ -127,7 +187,7 @@ class AdminSettingsScreen extends StatelessWidget {
           // ─── Footer ───
           Center(
             child: Text(
-              'DINEIN PWA v1.0.0-beta',
+              'DINEIN PWA v1.0.0',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w900,

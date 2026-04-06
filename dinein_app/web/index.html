@@ -39,20 +39,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="dns-prefetch" href="https://firebaseinstallations.googleapis.com">
-  <link rel="preload" as="image" href="assets/assets/branding/dinein-brand-icon-512.png">
+  <link rel="prefetch" href="/assets/assets/branding/dinein-brand-icon-512.png">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="DineIn">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/Icon-192.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="icon" type="image/png" href="/favicon.png"/>
 
   <title>DineIn</title>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="/manifest.json">
   <script type="application/ld+json" id="structured-data">
     {
       "@context": "https://schema.org",
@@ -309,7 +309,7 @@
   <div id="app-loader" aria-live="polite">
     <div class="loader-shell">
       <div class="loader-mark" aria-hidden="true">
-        <img src="assets/assets/branding/dinein-brand-icon-512.png" alt="" />
+        <img src="/assets/assets/branding/dinein-brand-icon-512.png" alt="" />
       </div>
 
       <p class="loader-kicker" id="loader-role">GUEST EXPERIENCE</p>
@@ -378,6 +378,8 @@
         }, 320);
       };
 
+      const DISMISS_KEY = 'dinein-update-dismissed';
+
       const hideUpdateBanner = function () {
         if (!updateBanner) return;
         updateBanner.classList.remove('is-visible');
@@ -391,9 +393,56 @@
       const showUpdateBanner = function (worker) {
         waitingWorker = worker || waitingWorker;
         if (!updateBanner || !waitingWorker) return;
-        updateBanner.hidden = false;
-        updateBanner.classList.add('is-visible');
+
+        // Don't re-show if user already dismissed this session
+        try {
+          if (sessionStorage.getItem(DISMISS_KEY)) return;
+        } catch (_) {}
+
+        // Only show if there is an active controller (i.e. this is a real
+        // update, not the very first install)
+        if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+
+        // Small delay so it doesn't flash during initial load
+        window.setTimeout(function () {
+          updateBanner.hidden = false;
+          // Force reflow before adding class for CSS transition
+          void updateBanner.offsetHeight;
+          updateBanner.classList.add('is-visible');
+        }, 800);
       };
+
+      if (updateReload) {
+        updateReload.addEventListener('click', function () {
+          // Clear dismiss flag so the banner won't be suppressed after reload
+          try { sessionStorage.removeItem(DISMISS_KEY); } catch (_) {}
+          if (waitingWorker) {
+            pendingReload = true;
+            waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+            return;
+          }
+          window.location.reload();
+        });
+      }
+
+      if (updateDismiss) {
+        updateDismiss.addEventListener('click', function () {
+          try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch (_) {}
+          hideUpdateBanner();
+        });
+      }
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (pendingReload) {
+            window.location.reload();
+          }
+        });
+      }
+
+      window.addEventListener('dinein-pwa-update-ready', function (event) {
+        showUpdateBanner(event.detail && event.detail.worker ? event.detail.worker : null);
+      });
 
       const updateConnectionState = function () {
         const online = navigator.onLine;
@@ -480,32 +529,7 @@
         });
       }
 
-      if (updateReload) {
-        updateReload.addEventListener('click', function () {
-          if (waitingWorker) {
-            pendingReload = true;
-            waitingWorker.postMessage({ type: 'SKIP_WAITING' });
-            return;
-          }
-          window.location.reload();
-        });
-      }
 
-      if (updateDismiss) {
-        updateDismiss.addEventListener('click', hideUpdateBanner);
-      }
-
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.addEventListener('controllerchange', function () {
-          if (pendingReload) {
-            window.location.reload();
-          }
-        });
-      }
-
-      window.addEventListener('dinein-pwa-update-ready', function (event) {
-        showUpdateBanner(event.detail && event.detail.worker ? event.detail.worker : null);
-      });
 
       function resolveRoleConfig() {
         const host = window.location.hostname.toLowerCase();
@@ -638,6 +662,6 @@
       });
     }
   </script>
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="/flutter_bootstrap.js" async></script>
 </body>
 </html>

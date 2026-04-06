@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:core_pkg/constants/enums.dart';
 import 'dart:typed_data';
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
@@ -83,7 +84,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
         }
 
         final ordersAsync = ref.watch(venueOrdersProvider(venue.id));
-        final currency = venue.country.currencySymbol;
+        final country = venue.country;
 
         return ordersAsync.when(
           loading: () => const Center(
@@ -213,7 +214,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                                   icon: LucideIcons.dollarSign,
                                   label: 'TOTAL REVENUE',
                                   value:
-                                      '$currency${totalRevenue.toStringAsFixed(totalRevenue > 999 ? 0 : 2)}',
+                                      country.formatPrice(totalRevenue),
                                 ),
                               ),
                             ],
@@ -389,7 +390,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                                   onTap: () => _exportPdf(
                                     context,
                                     filtered,
-                                    currency,
+                                    country,
                                     venue.name,
                                   ),
                                 ),
@@ -404,7 +405,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                                   onTap: () => _exportCsv(
                                     context,
                                     filtered,
-                                    currency,
+                                    country,
                                     venue.name,
                                   ),
                                 ),
@@ -474,7 +475,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                             child:
                                 _ItemCard(
                                       stat: item,
-                                      currency: currency,
+                                      currency: country,
                                       viewMode: _viewMode,
                                       rank: index + 1,
                                     )
@@ -593,7 +594,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
   Future<void> _exportPdf(
     BuildContext context,
     List<_ItemStat> items,
-    String currency,
+    Country currency,
     String venueName,
   ) async {
     final doc = pw.Document();
@@ -631,7 +632,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                     ),
                     pw.SizedBox(width: 24),
                     pw.Text(
-                      'Total Revenue: $currency${totalRevenue.toStringAsFixed(2)}',
+                      'Total Revenue: ${currency.formatPrice(totalRevenue)}',
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                     ),
                   ],
@@ -651,7 +652,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                     e.value.name,
                     e.value.category,
                     '${e.value.totalOrders}',
-                    '$currency${e.value.totalRevenue.toStringAsFixed(2)}',
+                    currency.formatPrice(e.value.totalRevenue),
                   ],
                 )
                 .toList(),
@@ -683,7 +684,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
   Future<void> _exportCsv(
     BuildContext context,
     List<_ItemStat> items,
-    String currency,
+    Country currency,
     String venueName,
   ) async {
     final rows = <List<String>>[
@@ -694,7 +695,7 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
           e.value.name,
           e.value.category,
           '${e.value.totalOrders}',
-          '$currency${e.value.totalRevenue.toStringAsFixed(2)}',
+          currency.formatPrice(e.value.totalRevenue),
         ],
       ),
     ];

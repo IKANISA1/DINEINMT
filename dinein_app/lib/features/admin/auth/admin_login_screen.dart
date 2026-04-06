@@ -87,10 +87,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
   int get _configuredPhoneLength =>
       CountryRuntime.config.adminWhatsAppLocalDigits;
 
-  int get _inputPhoneLength =>
-      CountryRuntime.config.country.code == 'RW' && _configuredPhoneLength == 9
-      ? 10
-      : _configuredPhoneLength;
+  int get _inputPhoneLength => CountryRuntime.config.localPhoneLength;
 
   String _normalizeAdminPhoneInput(String value) {
     final normalized = normalizePhoneLocalInput(
@@ -98,8 +95,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       countryCode: _countryCode,
       maxDigits: _inputPhoneLength,
     );
-    if (CountryRuntime.config.country.code == 'RW' &&
-        normalized.length == _configuredPhoneLength + 1 &&
+    if (normalized.length == _configuredPhoneLength + 1 &&
         normalized.startsWith('0')) {
       return normalized.substring(1);
     }

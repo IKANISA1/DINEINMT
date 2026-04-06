@@ -488,24 +488,41 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                       child: Icon(LucideIcons.search, size: 24, color: cs.onSurfaceVariant.withValues(alpha: 0.20)),
                     ),
                     Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        autofocus: true,
-                        onChanged: (v) => setState(() => _query = v.trim()),
-                        textInputAction: TextInputAction.search,
-                        onSubmitted: (_) => Navigator.pop(sheetContext),
-                        style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.5),
-                        decoration: InputDecoration(
-                          hintText: 'Search orders by ID or venue...',
-                          border: InputBorder.none,
-                          filled: false,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                          hintStyle: tt.titleLarge?.copyWith(
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.10),
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
+                      child: StatefulBuilder(
+                        builder: (sheetContext, setSheetState) {
+                          return TextField(
+                            controller: _searchController,
+                            autofocus: true,
+                            onChanged: (v) {
+                              setState(() => _query = v.trim());
+                              setSheetState(() {});
+                            },
+                            textInputAction: TextInputAction.search,
+                            onSubmitted: (_) => Navigator.pop(sheetContext),
+                            style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                            decoration: InputDecoration(
+                              hintText: 'Search orders by ID or venue...',
+                              border: InputBorder.none,
+                              filled: false,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              hintStyle: tt.titleLarge?.copyWith(
+                                color: cs.onSurfaceVariant.withValues(alpha: 0.10),
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.5,
+                              ),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(LucideIcons.x, color: cs.onSurfaceVariant),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _query = '');
+                                        setSheetState(() {});
+                                      },
+                                    )
+                                  : null,
+                            ),
+                          );
+                        }
                       ),
                     ),
                   ],
@@ -611,6 +628,7 @@ class _OrderFeedCard extends StatelessWidget {
     }
 
     return PressableScale(
+      onTap: () {},
       child: Container(
         padding: const EdgeInsets.all(AppTheme.space8),
         decoration: BoxDecoration(
@@ -785,7 +803,7 @@ class _OrderFeedCard extends StatelessWidget {
                 const Spacer(),
                 // Total price
                 Text(
-                  '${order.currencySymbol}${order.total.toStringAsFixed(2)}',
+                  order.formatPrice(order.total),
                   style: tt.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,

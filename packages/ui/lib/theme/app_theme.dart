@@ -17,7 +17,8 @@ abstract final class AppTheme {
   static const double radiusMd = 12;
   static const double radiusLg = 16;
   static const double radiusXl = 24;
-  static const double radiusXxl = 40; // was 32 — matches React rounded-[2.5rem]
+  static const double radiusLgx = 32; // matches React rounded-[2rem]
+  static const double radiusXxl = 40; // matches React rounded-[2.5rem]
   static const double radius3xl = 48; // was 40 — matches React rounded-[3rem]
   static const double radiusFull = 999;
 

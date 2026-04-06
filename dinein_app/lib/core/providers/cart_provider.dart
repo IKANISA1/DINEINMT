@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core_pkg/config/country_runtime.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:core_pkg/constants/enums.dart';
+import 'package:dinein_app/core/services/cart_persistence_service.dart';
 import 'package:dinein_app/core/services/pwa_install_service.dart';
 
 /// Represents one item in the cart.
@@ -88,6 +89,13 @@ class CartState {
       venueCountry?.currencySymbol ??
       CountryRuntime.config.country.currencySymbol;
 
+  /// The effective country for this cart (venue country or app default).
+  Country get effectiveCountry =>
+      venueCountry ?? CountryRuntime.config.country;
+
+  /// Format an amount with the correct currency symbol and locale rules.
+  String formatPrice(double amount) => effectiveCountry.formatPrice(amount);
+
   /// Payment methods available for the venue's country.
   List<PaymentMethod> get paymentMethods =>
       venueCountry?.paymentMethods ??
@@ -118,8 +126,31 @@ class CartState {
 
 /// Cart provider using Riverpod Notifier.
 class CartNotifier extends Notifier<CartState> {
+  bool _restoredFromStorage = false;
+
   @override
-  CartState build() => const CartState();
+  CartState build() {
+    // Restore persisted cart on first build (async, fire-and-forget).
+    // The initial state is empty; once storage resolves, state updates.
+    if (!_restoredFromStorage) {
+      _restoredFromStorage = true;
+      _restoreCart();
+    }
+    return const CartState();
+  }
+
+  Future<void> _restoreCart() async {
+    final restored = await CartPersistenceService.restore();
+    if (restored != null && restored.items.isNotEmpty) {
+      state = restored;
+      PwaInstallService.updateCartBadgeCount(state.itemCount);
+    }
+  }
+
+  /// Persist the current state to localStorage.
+  void _persist() {
+    CartPersistenceService.save(state);
+  }
 
   /// Set the venue context (called when entering a menu screen).
   void setVenue({
@@ -150,6 +181,7 @@ class CartNotifier extends Notifier<CartState> {
         tableNumber: tableNumber,
       );
     }
+    _persist();
   }
 
   void setTableNumber(String? tableNumber) {
@@ -157,6 +189,7 @@ class CartNotifier extends Notifier<CartState> {
     state = state.copyWith(
       tableNumber: normalized == null || normalized.isEmpty ? null : normalized,
     );
+    _persist();
   }
 
   void setSpecialRequests(String? specialRequests) {
@@ -166,6 +199,7 @@ class CartNotifier extends Notifier<CartState> {
           ? null
           : normalized,
     );
+    _persist();
   }
 
   /// Add a menu item to the cart (or increase quantity by 1).
@@ -197,6 +231,7 @@ class CartNotifier extends Notifier<CartState> {
       PwaInstallService.triggerIfEligible(reason: 'cart_2_items');
     }
     PwaInstallService.updateCartBadgeCount(state.itemCount);
+    _persist();
   }
 
   /// Remove one unit of an item (if qty reaches 0, remove entirely).
@@ -213,6 +248,7 @@ class CartNotifier extends Notifier<CartState> {
     }
     state = state.copyWith(items: updated);
     PwaInstallService.updateCartBadgeCount(state.itemCount);
+    _persist();
   }
 
   /// Set the quantity of an item directly (used by item detail sheet).
@@ -254,6 +290,7 @@ class CartNotifier extends Notifier<CartState> {
       );
     }
     PwaInstallService.updateCartBadgeCount(state.itemCount);
+    _persist();
   }
 
   /// Get quantity for a specific item.
@@ -287,6 +324,7 @@ class CartNotifier extends Notifier<CartState> {
   void clear() {
     state = const CartState();
     PwaInstallService.updateCartBadgeCount(0);
+    CartPersistenceService.clear();
   }
 }
 

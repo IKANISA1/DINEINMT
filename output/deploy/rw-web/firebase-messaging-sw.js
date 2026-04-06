@@ -13,7 +13,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-messaging.onBackgroundMessage((payload) => {
+messaging.onBackgroundMessage(async (payload) => {
   const notification = payload.notification || {};
   const data = payload.data || {};
   const title = notification.title || data.title || 'Venue alert';
@@ -23,6 +23,31 @@ messaging.onBackgroundMessage((payload) => {
     'Open DineIn to review the latest venue activity.';
   const route = resolveNotificationRoute(data);
 
+  // Check if any app tab is focused/visible — if so, forward via postMessage
+  // instead of showing an OS notification (Flutter handles the in-app UX).
+  try {
+    const clientList = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true,
+    });
+
+    for (const client of clientList) {
+      if (client.visibilityState === 'visible' && client.focused) {
+        client.postMessage({
+          type: 'PUSH_RECEIVED',
+          title,
+          body,
+          route,
+          eventType: data.event_type || null,
+        });
+        return; // Don't show OS notification — Flutter shows a toast
+      }
+    }
+  } catch (_) {
+    // matchAll may throw in some contexts; fall through to showNotification
+  }
+
+  // No focused tab — show OS notification
   self.registration.showNotification(title, {
     body,
     icon: '/icons/Icon-192.png',
@@ -31,6 +56,13 @@ messaging.onBackgroundMessage((payload) => {
     tag: `dinein-${data.event_type || 'venue-alert'}`,
     requireInteraction: true,
   });
+
+  // Update app badge if supported
+  if (self.navigator && self.navigator.setAppBadge) {
+    try {
+      self.navigator.setAppBadge();
+    } catch (_) {}
+  }
 });
 
 self.addEventListener('notificationclick', (event) => {
@@ -57,6 +89,11 @@ self.addEventListener('notificationclick', (event) => {
 
       if ('focus' in client) {
         await client.focus();
+      }
+
+      // Clear badge on click-through
+      if (self.navigator && self.navigator.clearAppBadge) {
+        try { self.navigator.clearAppBadge(); } catch (_) {}
       }
       return;
     }

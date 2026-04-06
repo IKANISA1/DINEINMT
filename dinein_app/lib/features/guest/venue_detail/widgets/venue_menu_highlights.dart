@@ -146,7 +146,7 @@ class VenueMenuHighlights extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${venue.country.currencySymbol}${item.price.toStringAsFixed(2)}',
+                                    venue.country.formatPrice(item.price),
                                     style: TextStyle(
                                       color: cs.primary,
                                       fontSize: 18,

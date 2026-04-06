@@ -196,6 +196,9 @@ class Order extends Equatable {
   /// Currency symbol derived from the order venue country.
   String get currencySymbol => country.currencySymbol;
 
+  /// Format an amount with the correct currency symbol and locale rules.
+  String formatPrice(double amount) => country.formatPrice(amount);
+
   @override
   List<Object?> get props => [
     id,

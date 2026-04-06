@@ -24,6 +24,7 @@ class CountryConfig {
   final String? revolutMerchant;
   final String? momoUssdCode;
   final bool biopayEnabled;
+  final int localPhoneLength;
 
   const CountryConfig({
     required this.country,
@@ -44,6 +45,7 @@ class CountryConfig {
     this.revolutMerchant,
     this.momoUssdCode,
     this.biopayEnabled = false,
+    required this.localPhoneLength,
   }) : venueAccessWhatsApp = venueAccessWhatsApp ?? supportWhatsApp,
        venueAccessEmail = venueAccessEmail ?? supportEmail;
 
@@ -80,6 +82,7 @@ class CountryConfig {
     privacyPolicyUrl: 'https://dineinmt.ikanisa.com/privacy',
     revolutMerchant: 'dineinmalta',
     biopayEnabled: false,
+    localPhoneLength: 8,
   );
 
   /// Rwanda configuration.
@@ -101,6 +104,7 @@ class CountryConfig {
     privacyPolicyUrl: 'https://dineinrw.ikanisa.com/privacy',
     momoUssdCode: '*182*8*1#', // MTN MoMo Rwanda
     biopayEnabled: true,
+    localPhoneLength: 9,
   );
 
   /// Play Store URL.
@@ -129,6 +133,18 @@ class CountryConfig {
   /// Local-digit length accepted for admin WhatsApp login in this country.
   int get adminWhatsAppLocalDigits {
     final digits = supportWhatsApp.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.startsWith(defaultCountryCode)) {
+      final localDigits = digits.substring(defaultCountryCode.length);
+      if (localDigits.length >= 8 && localDigits.length <= 10) {
+        return localDigits.length;
+      }
+    }
+    return country == Country.rw ? 10 : 8;
+  }
+
+  /// Local-digit length accepted for venue WhatsApp login in this country.
+  int get venueWhatsAppLocalDigits {
+    final digits = venueAccessWhatsApp.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.startsWith(defaultCountryCode)) {
       final localDigits = digits.substring(defaultCountryCode.length);
       if (localDigits.length >= 8 && localDigits.length <= 10) {
