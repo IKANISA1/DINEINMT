@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -29,7 +29,7 @@ class OrderHistoryScreen extends ConsumerWidget {
               AppTheme.space6,
               0,
               AppTheme.space6,
-              AppTheme.space24,
+              AppTheme.space8,
             ),
             sliver: _OrderHistorySkeletonList(),
           ),
@@ -40,7 +40,7 @@ class OrderHistoryScreen extends ConsumerWidget {
                 AppTheme.space6,
                 0,
                 AppTheme.space6,
-                AppTheme.space16,
+                    AppTheme.space8,
               ),
               child: ErrorState(
                 message: 'Could not load order history.',
@@ -57,7 +57,7 @@ class OrderHistoryScreen extends ConsumerWidget {
                     AppTheme.space6,
                     0,
                     AppTheme.space6,
-                    AppTheme.space16,
+                        AppTheme.space8,
                   ),
                   child: _EmptyOrderHistoryState(),
                 ),
@@ -69,7 +69,7 @@ class OrderHistoryScreen extends ConsumerWidget {
                 AppTheme.space6,
                 0,
                 AppTheme.space6,
-                AppTheme.space24,
+                AppTheme.space8,
               ),
               sliver: SliverList.separated(
                 itemCount: orders.length,
@@ -83,10 +83,7 @@ class OrderHistoryScreen extends ConsumerWidget {
                           AppRouteNames.orderStatus,
                           pathParameters: {AppRouteParams.id: order.id},
                         ),
-                      )
-                      .animate(delay: (50 * index).ms)
-                      .fadeIn(duration: 350.ms)
-                      .slideY(begin: 0.08, end: 0);
+                      );
                 },
               ),
             );
@@ -110,7 +107,7 @@ class _OrderHistoryHeader extends StatelessWidget {
         AppTheme.space6,
         AppTheme.space6,
         AppTheme.space6,
-        AppTheme.space8,
+        AppTheme.space4,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
@@ -46,20 +46,12 @@ class OrderSuccessScreen extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: AppTheme.space12),
+                    const SizedBox(height: AppTheme.space6),
 
                     // ─── Success Icon ───
-                    _buildSuccessIcon(cs)
-                        .animate()
-                        .scale(
-                          begin: const Offset(0.5, 0.5),
-                          end: const Offset(1, 1),
-                          duration: 600.ms,
-                          curve: Curves.elasticOut,
-                        )
-                        .fadeIn(duration: 400.ms),
+                    _buildSuccessIcon(cs),
 
-                    const SizedBox(height: AppTheme.space12),
+                    const SizedBox(height: AppTheme.space6),
 
                     // ─── Message ───
                     Column(
@@ -73,7 +65,7 @@ class OrderSuccessScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: AppTheme.space6),
                             Text(
-                              'Your culinary journey has begun.',
+                              'Your order has been placed.',
                               textAlign: TextAlign.center,
                               style: tt.bodyLarge?.copyWith(
                                 color: cs.onSurfaceVariant,
@@ -81,17 +73,14 @@ class OrderSuccessScreen extends StatelessWidget {
                               ),
                             ),
                           ],
-                        )
-                        .animate(delay: 300.ms)
-                        .fadeIn(duration: 600.ms)
-                        .slideY(begin: 0.3, end: 0),
+                        ),
 
-                    const SizedBox(height: AppTheme.space12),
+                    const SizedBox(height: AppTheme.space6),
 
                     // ─── Order Details Card ───
                     Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(AppTheme.space10),
+                          padding: const EdgeInsets.all(AppTheme.space6),
                           decoration: BoxDecoration(
                             color: cs.surfaceContainerLow,
                             borderRadius:
@@ -131,12 +120,9 @@ class OrderSuccessScreen extends StatelessWidget {
                               Container(height: 1, color: AppColors.white5),
                             ],
                           ),
-                        )
-                        .animate(delay: 500.ms)
-                        .fadeIn(duration: 600.ms)
-                        .slideY(begin: 0.3, end: 0),
+                        ),
 
-                    const SizedBox(height: AppTheme.space16),
+                    const SizedBox(height: AppTheme.space6),
 
                     // ─── Actions ───
                     Column(
@@ -258,12 +244,9 @@ class OrderSuccessScreen extends StatelessWidget {
                               ),
                             ),
                           ],
-                        )
-                        .animate(delay: 700.ms)
-                        .fadeIn(duration: 600.ms)
-                        .slideY(begin: 0.3, end: 0),
+                        ),
 
-                    const SizedBox(height: AppTheme.space12),
+                    const SizedBox(height: AppTheme.space6),
                   ],
                 ),
               ),
@@ -280,19 +263,17 @@ class OrderSuccessScreen extends StatelessWidget {
       children: [
         // Glow
         Container(
-              width: 160,
-              height: 160,
+              width: 96,
+              height: 96,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: cs.secondary.withValues(alpha: 0.20),
               ),
-            )
-            .animate(onPlay: (c) => c.repeat(reverse: true))
-            .fade(begin: 0.4, end: 1, duration: 2000.ms),
+              ),
         // Icon
         Container(
-          width: 128,
-          height: 128,
+          width: 72,
+          height: 72,
           decoration: BoxDecoration(
             color: cs.secondary,
             borderRadius: BorderRadius.circular(AppTheme.radius3xl),
@@ -306,7 +287,7 @@ class OrderSuccessScreen extends StatelessWidget {
           ),
           child: Icon(
             LucideIcons.checkCircle2,
-            size: 64,
+            size: 36,
             color: cs.onSecondary,
           ),
         ),

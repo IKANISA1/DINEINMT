@@ -819,26 +819,77 @@ function sanitizeVenueUpdates(
   applyString("description");
   applyString("address");
   applyString("phone");
-  applyString("email");
   applyString("image_url");
-  applyString("website_url");
-  applyString("reservation_url");
+
+  // Payment link/code fields (owner-editable)
+  if ("revolut_url" in updates) {
+    sanitized.revolut_url = stringValue(updates.revolut_url) ?? null;
+  }
+  if ("revolutUrl" in updates) {
+    sanitized.revolut_url = stringValue(updates.revolutUrl) ?? null;
+  }
+  if ("momo_code" in updates) {
+    sanitized.momo_code = stringValue(updates.momo_code) ?? null;
+  }
+  if ("momoCode" in updates) {
+    sanitized.momo_code = stringValue(updates.momoCode) ?? null;
+  }
+
+  // Owner contact fields
+  if ("owner_contact_phone" in updates) {
+    sanitized.owner_contact_phone = stringValue(updates.owner_contact_phone) ?? null;
+  }
+  if ("owner_whatsapp_number" in updates) {
+    sanitized.owner_whatsapp_number = stringValue(updates.owner_whatsapp_number) ?? null;
+  }
+
+  // WiFi fields (owner-editable)
+  if ("wifi_ssid" in updates) {
+    sanitized.wifi_ssid = stringValue(updates.wifi_ssid) ?? null;
+  }
+  if ("wifi_password" in updates) {
+    sanitized.wifi_password = stringValue(updates.wifi_password) ?? null;
+  }
+  if ("wifi_security" in updates) {
+    sanitized.wifi_security = stringValue(updates.wifi_security) ?? null;
+  }
+
+  // Promo fields (owner-editable)
+  if ("promo_message" in updates) {
+    sanitized.promo_message = stringValue(updates.promo_message) ?? null;
+  }
+  if ("is_promo_active" in updates) {
+    sanitized.is_promo_active = booleanValue(updates.is_promo_active) ?? false;
+  }
+
+  // Supported payment methods — explicit or auto-derived from payment fields
+  if ("supported_payment_methods" in updates && Array.isArray(updates.supported_payment_methods)) {
+    sanitized.supported_payment_methods = (updates.supported_payment_methods as unknown[])
+      .map((v) => stringValue(v))
+      .filter((v): v is string => Boolean(v) && paymentMethods.has(v));
+  } else if ("revolut_url" in sanitized || "momo_code" in sanitized) {
+    // Auto-derive supported payment methods when payment fields change
+    const methods: string[] = ["cash"];
+    const revolutUrl = "revolut_url" in sanitized
+      ? stringValue(sanitized.revolut_url)
+      : null;
+    const momoCode = "momo_code" in sanitized
+      ? stringValue(sanitized.momo_code)
+      : null;
+    if (revolutUrl && revolutUrl.trim().length > 0) {
+      methods.push("revolut_link");
+    }
+    if (momoCode && momoCode.trim().length > 0) {
+      methods.push("momo_ussd");
+    }
+    sanitized.supported_payment_methods = methods;
+  }
 
   if ("imageUrl" in updates) {
     sanitized.image_url = stringValue(updates.imageUrl) ?? null;
   }
 
-  if ("websiteUrl" in updates) {
-    sanitized.website_url = stringValue(updates.websiteUrl) ?? null;
-  }
 
-  if ("reservationUrl" in updates) {
-    sanitized.reservation_url = stringValue(updates.reservationUrl) ?? null;
-  }
-
-  if ("opening_hours" in updates) {
-    sanitized.opening_hours = updates.opening_hours ?? null;
-  }
 
   if ("social_links" in updates || "socialLinks" in updates) {
     sanitized.social_links = asRecord(
@@ -858,6 +909,10 @@ function sanitizeVenueUpdates(
     if ("country" in updates) {
       sanitized.country =
         requireString(updates, "country").toUpperCase() == "RW" ? "RW" : "MT";
+    }
+
+    if ("ordering_enabled" in updates) {
+      sanitized.ordering_enabled = booleanValue(updates.ordering_enabled) ?? false;
     }
 
     const rating = numberValue(updates.rating);

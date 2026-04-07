@@ -240,32 +240,7 @@ class AdminVenueQrPreviewCard extends StatelessWidget {
   }
 }
 
-/// Value object for a single day's opening hours.
-class DayHours {
-  final bool isOpen;
-  final String open;
-  final String close;
 
-  const DayHours({
-    required this.isOpen,
-    required this.open,
-    required this.close,
-  });
-
-  DayHours copyWith({bool? isOpen, String? open, String? close}) {
-    return DayHours(
-      isOpen: isOpen ?? this.isOpen,
-      open: open ?? this.open,
-      close: close ?? this.close,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'is_open': isOpen,
-    'open': open,
-    'close': close,
-  };
-}
 
 /// Animated status indicator dot.
 class AdminStatusDot extends StatelessWidget {

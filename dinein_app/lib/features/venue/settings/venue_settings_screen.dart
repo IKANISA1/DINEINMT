@@ -164,13 +164,7 @@ class _VenueSettingsScreenState extends ConsumerState<VenueSettingsScreen> {
               subtitle: 'NAME, ADDRESS, AND CONTACT INFO',
               onTap: () => context.pushNamed(AppRouteNames.venueProfile),
             ),
-            _SettingTile(
-              icon: LucideIcons.clock,
-              iconColor: cs.primary,
-              title: 'Opening Hours',
-              subtitle: 'MANAGE WEEKLY SCHEDULE',
-              onTap: () => context.pushNamed(AppRouteNames.venueHours),
-            ),
+
             _SettingTile(
               icon: LucideIcons.qrCode,
               iconColor: cs.primary,

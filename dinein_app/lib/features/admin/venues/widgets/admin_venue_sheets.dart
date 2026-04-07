@@ -8,7 +8,7 @@ import 'package:dinein_app/core/services/venue_repository.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
-import 'admin_venue_form_widgets.dart';
+
 
 /// Static methods for admin venue bottom sheets.
 ///
@@ -242,90 +242,4 @@ abstract final class AdminVenueSheets {
     );
   }
 
-  /// Show the day hours editor.
-  static void showScheduleEditor({
-    required BuildContext context,
-    required String day,
-    required DayHours hours,
-    required ValueChanged<DayHours> onApply,
-  }) {
-    final openCtrl = TextEditingController(text: hours.open);
-    final closeCtrl = TextEditingController(text: hours.close);
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        final cs = Theme.of(ctx).colorScheme;
-        final tt = Theme.of(ctx).textTheme;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppTheme.space4,
-            AppTheme.space4,
-            AppTheme.space4,
-            MediaQuery.of(ctx).viewInsets.bottom + AppTheme.space4,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(AppTheme.space6),
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-              border: Border.all(color: AppColors.white5),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$day Hours',
-                  style: tt.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: AppTheme.space4),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AdminVenueInlineField(
-                        label: 'OPEN',
-                        controller: openCtrl,
-                        hint: '09:00',
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.space4),
-                    Expanded(
-                      child: AdminVenueInlineField(
-                        label: 'CLOSE',
-                        controller: closeCtrl,
-                        hint: '22:00',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppTheme.space4),
-                PremiumButton(
-                  label: 'APPLY HOURS',
-                  icon: LucideIcons.check,
-                  onPressed: () {
-                    onApply(
-                      hours.copyWith(
-                        open: openCtrl.text.trim().isEmpty
-                            ? hours.open
-                            : openCtrl.text.trim(),
-                        close: closeCtrl.text.trim().isEmpty
-                            ? hours.close
-                            : closeCtrl.text.trim(),
-                      ),
-                    );
-                    Navigator.of(ctx).pop();
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
 }

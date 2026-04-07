@@ -60,7 +60,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('FIND YOUR '), findsOneWidget);
-    expect(find.text('FLAVOR'), findsOneWidget);
+    expect(find.text('TABLE'), findsOneWidget);
     expect(find.text('Featured'), findsOneWidget);
     expect(find.text('All Venues'), findsOneWidget);
 

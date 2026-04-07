@@ -117,7 +117,6 @@ void main() {
 
     expect(find.text('VENUE CONFIGURATION'), findsOneWidget);
     expect(find.text('Venue Profile'), findsOneWidget);
-    expect(find.text('Opening Hours'), findsOneWidget);
     expect(find.text('Venue QR Codes'), findsOneWidget);
     expect(find.text('WiFi Sharing'), findsOneWidget);
   });

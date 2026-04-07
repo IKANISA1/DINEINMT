@@ -3,6 +3,7 @@ import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/main.dart';
+import 'package:ui/widgets/brand_mark.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,18 +31,26 @@ void main() {
     await tester.pump();
   }
 
+  /// Drain all pending timers (OrderReceiptService, notification service,
+  /// Riverpod keepAlive, etc.) then safely dispose the widget tree.
   Future<void> disposeApp(WidgetTester tester) async {
-    await tester.pump(const Duration(seconds: 2));
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pump(const Duration(seconds: 1));
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(seconds: 1));
+    }
   }
 
   group('Guest Checkout Smoke Tests', () {
-    testWidgets('splash screen shows brand tagline', (tester) async {
+    testWidgets('splash screen shows brand logo', (tester) async {
       await pumpApp(tester, bootstrapReady: false);
       // Wait for staggered animations to show content
       await tester.pump(const Duration(milliseconds: 1200));
-      expect(find.text('DINE IN, STAND OUT.'), findsOneWidget);
+      // Splash now shows DineInLogoText (wordmark) and a loading spinner
+      expect(find.byType(DineInLogoText), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
       await disposeApp(tester);
     });
 

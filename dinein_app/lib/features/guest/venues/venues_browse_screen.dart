@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -14,33 +14,12 @@ import 'package:dinein_app/core/services/app_telemetry.dart';
 import 'package:dinein_app/core/services/discovery_location_service.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
-import 'package:ui/theme/motion_preferences.dart';
+
 import 'package:ui/widgets/shared_widgets.dart';
 
-const _baseVenueFilters = ['All', 'Open Now', 'Ordering'];
+const _venueFilters = ['All', 'Ordering'];
 
-const _grayscaleMatrix = <double>[
-  0.2126,
-  0.7152,
-  0.0722,
-  0,
-  0,
-  0.2126,
-  0.7152,
-  0.0722,
-  0,
-  0,
-  0.2126,
-  0.7152,
-  0.0722,
-  0,
-  0,
-  0,
-  0,
-  0,
-  1,
-  0,
-];
+
 
 class VenuesBrowseScreen extends ConsumerStatefulWidget {
   const VenuesBrowseScreen({super.key});
@@ -55,7 +34,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
 
   final _searchController = TextEditingController();
   Timer? _queryDebounce;
-  List<String> _selectedCategories = const ['All'];
+  List<String> _selectedFilters = const ['All'];
   String _query = '';
   int _resultLimit = _pageSize;
   bool _requestingLocation = false;
@@ -94,7 +73,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
         details: {
           'query': normalized,
           'query_length': normalized.length,
-          'filters': _selectedCategories,
+          'filters': _selectedFilters,
           'has_location':
               ref.read(discoveryLocationProvider).asData?.value != null,
         },
@@ -125,7 +104,6 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
         'source': 'venues_browse',
         'slug': venue.slug,
         'can_order': venue.canAcceptGuestOrders,
-        'is_open_now': venue.isOpenNow,
       },
     );
     context.pushNamed(
@@ -134,44 +112,37 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
     );
   }
 
-  void _toggleCategory(String category) {
+  void _toggleFilter(String filter) {
     setState(() {
-      if (category == 'All') {
-        _selectedCategories = const ['All'];
+      if (filter == 'All') {
+        _selectedFilters = const ['All'];
       } else {
-        final next = _selectedCategories
+        final next = _selectedFilters
             .where((item) => item != 'All')
             .toList();
-        if (next.contains(category)) {
-          next.remove(category);
+        if (next.contains(filter)) {
+          next.remove(filter);
         } else {
-          next.add(category);
+          next.add(filter);
         }
-        _selectedCategories = next.isEmpty ? const ['All'] : next;
+        _selectedFilters = next.isEmpty ? const ['All'] : next;
       }
       _resultLimit = _pageSize;
     });
 
     _trackGuestEvent(
       'venues_filters_changed',
-      details: {'filters': _selectedCategories, 'query': _query},
+      details: {'filters': _selectedFilters, 'query': _query},
     );
   }
 
-  List<String> _buildCategoryOptions(GuestVenueFeed? feed) {
-    return [
-      ..._baseVenueFilters,
-      ...(feed?.categories ?? const <String>[])
-          .where((category) => !_baseVenueFilters.contains(category))
-          .take(6),
-    ];
-  }
+
 
   Future<void> _requestLocation() async {
     if (_requestingLocation) return;
     _trackGuestEvent(
       'venues_location_requested',
-      details: {'filters': _selectedCategories, 'query': _query},
+      details: {'filters': _selectedFilters, 'query': _query},
     );
     setState(() => _requestingLocation = true);
     try {
@@ -183,7 +154,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
         'venues_location_result',
         details: {
           'granted': result != null,
-          'filters': _selectedCategories,
+          'filters': _selectedFilters,
           'query': _query,
         },
       );
@@ -204,18 +175,11 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
   }
 
   GuestVenueQuery _buildGuestVenueQuery(DiscoveryCoordinates? location) {
-    final selected = _selectedCategories;
-    final categoryFilters = selected
-        .where((category) => !_baseVenueFilters.contains(category))
-        .toList(growable: false);
-    final backendCategory = categoryFilters.length == 1
-        ? categoryFilters.first
-        : null;
+    final selected = _selectedFilters;
 
     return GuestVenueQuery(
       limit: _resultLimit,
       query: _query.isEmpty ? null : _query,
-      category: backendCategory,
       orderingOnly: selected.contains('Ordering'),
       latitude: location?.latitude,
       longitude: location?.longitude,
@@ -223,24 +187,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
   }
 
   List<Venue> _applyClientFilters(List<Venue> venues) {
-    final selected = _selectedCategories;
-    final categoryFilters = selected.where(
-      (category) => !_baseVenueFilters.contains(category),
-    );
-
-    return venues
-        .where((venue) {
-          if (selected.contains('Open Now') && !venue.isOpenNow) {
-            return false;
-          }
-          if (categoryFilters.isNotEmpty &&
-              !categoryFilters.contains(venue.category)) {
-            return false;
-          }
-
-          return true;
-        })
-        .toList(growable: false);
+    return venues.toList(growable: false);
   }
 
   @override
@@ -271,7 +218,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
 
     return _VenuesBody(
       venues: venues,
-      categoryOptions: _buildCategoryOptions(feed),
+      filterOptions: _venueFilters,
       totalCount: feed?.totalCount ?? venues.length,
       query: _query,
       isLoading: feedAsync.isLoading,
@@ -283,7 +230,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
                 'venues_load_more',
                 details: {
                   'current_limit': _resultLimit,
-                  'filters': _selectedCategories,
+                  'filters': _selectedFilters,
                   'query': _query,
                 },
               );
@@ -293,17 +240,17 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
       searchController: _searchController,
       discoveryLocation: discoveryLocation,
       requestingLocation: _requestingLocation,
-      selectedCategories: _selectedCategories,
+      selectedFilters: _selectedFilters,
       onSearchChanged: _onSearchChanged,
       onUseMyLocation: _requestLocation,
-      onCategorySelected: _toggleCategory,
+      onFilterSelected: _toggleFilter,
       onOpenVenue: _openVenue,
       onResetFilters: () {
         _queryDebounce?.cancel();
         _searchController.clear();
         setState(() {
           _query = '';
-          _selectedCategories = const ['All'];
+          _selectedFilters = const ['All'];
           _resultLimit = _pageSize;
         });
         _trackGuestEvent('venues_filters_reset');
@@ -314,7 +261,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
 
 class _VenuesBody extends StatelessWidget {
   final List<Venue> venues;
-  final List<String> categoryOptions;
+  final List<String> filterOptions;
   final int totalCount;
   final String query;
   final bool isLoading;
@@ -324,16 +271,16 @@ class _VenuesBody extends StatelessWidget {
   final TextEditingController searchController;
   final DiscoveryCoordinates? discoveryLocation;
   final bool requestingLocation;
-  final List<String> selectedCategories;
+  final List<String> selectedFilters;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onUseMyLocation;
-  final ValueChanged<String> onCategorySelected;
+  final ValueChanged<String> onFilterSelected;
   final ValueChanged<Venue> onOpenVenue;
   final VoidCallback onResetFilters;
 
   const _VenuesBody({
     required this.venues,
-    required this.categoryOptions,
+    required this.filterOptions,
     required this.totalCount,
     required this.query,
     required this.isLoading,
@@ -343,10 +290,10 @@ class _VenuesBody extends StatelessWidget {
     required this.searchController,
     required this.discoveryLocation,
     required this.requestingLocation,
-    required this.selectedCategories,
+    required this.selectedFilters,
     required this.onSearchChanged,
     required this.onUseMyLocation,
-    required this.onCategorySelected,
+    required this.onFilterSelected,
     required this.onOpenVenue,
     required this.onResetFilters,
   });
@@ -355,11 +302,7 @@ class _VenuesBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final shouldAnimateVenues =
-        query.isEmpty &&
-        selectedCategories.length == 1 &&
-        selectedCategories.first == 'All' &&
-        !reduceMotionOf(context);
+
     final screenWidth = MediaQuery.of(context).size.width;
     final useGrid = screenWidth >= 1100;
     final crossAxisCount = screenWidth >= 1480 ? 3 : 2;
@@ -476,13 +419,7 @@ class _VenuesBody extends StatelessWidget {
                   ),
                   onTap: () => onOpenVenue(venue),
                 );
-                if (!shouldAnimateVenues) return card;
-                return RepaintBoundary(
-                  child: card
-                    .animate(delay: (50 * index).ms)
-                    .fadeIn(duration: 350.ms)
-                    .slideY(begin: 0.08, end: 0),
-                );
+                return card;
               }, childCount: venues.length),
             ),
           )
@@ -503,14 +440,7 @@ class _VenuesBody extends StatelessWidget {
                   ),
                   onTap: () => onOpenVenue(venue),
                 );
-                if (!shouldAnimateVenues) return card;
-
-                return RepaintBoundary(
-                  child: card
-                    .animate(delay: (50 * index).ms)
-                    .fadeIn(duration: 350.ms)
-                    .slideY(begin: 0.08, end: 0),
-                );
+                return card;
               },
             ),
           ),
@@ -533,7 +463,7 @@ class _VenuesBody extends StatelessWidget {
               ),
             ),
           ),
-        const SliverToBoxAdapter(child: SizedBox(height: AppTheme.space24)),
+        const SliverToBoxAdapter(child: SizedBox(height: AppTheme.space8)),
       ],
     );
   }
@@ -654,13 +584,10 @@ class _VenueCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ColorFiltered(
-                    colorFilter: const ColorFilter.matrix(_grayscaleMatrix),
-                    child: DineInImage(
-                      imageUrl: venue.imageUrl,
-                      fit: BoxFit.cover,
-                      fallbackIcon: LucideIcons.store,
-                    ),
+                  DineInImage(
+                    imageUrl: venue.imageUrl,
+                    fit: BoxFit.cover,
+                    fallbackIcon: LucideIcons.store,
                   ),
                   Positioned.fill(
                     child: DecoratedBox(
@@ -717,16 +644,7 @@ class _VenueCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          venue.category.toUpperCase(),
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 3,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
+
                         Text(
                           venue.name,
                           maxLines: 2,
@@ -769,10 +687,7 @@ class _VenueCard extends StatelessWidget {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _VenueMetaPill(
-                              label: venue.isOpenNow ? 'OPEN NOW' : 'CLOSED',
-                              isPrimary: venue.isOpenNow,
-                            ),
+
                             if (venue.canAcceptGuestOrders)
                               const _VenueMetaPill(label: 'ORDERING'),
                             if (venue.priceLevelLabel != null)
@@ -795,12 +710,11 @@ class _VenueCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(LucideIcons.clock3, size: 14, color: AppColors.white40),
+                Icon(LucideIcons.messageSquare, size: 14, color: AppColors.white40),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    venue.primaryReviewSnippet ??
-                        (venue.isOpenNow ? 'OPEN NOW' : 'CLOSED'),
+                    'View details',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

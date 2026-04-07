@@ -478,22 +478,12 @@ class MenuItem extends Equatable {
 
   bool get isSignature => tags.any((tag) => _isSignatureMenuTag(tag));
 
-  /// Returns the primary guest-facing badge label.
+  /// Guest-facing badge label — REMOVED.
   ///
-  /// Badge hierarchy (highest priority wins):
-  /// - "Top Pick"  → owner-curated (highlightRank) AND data-popular.
-  /// - "Popular"   → data-driven popularity only (order volume ≥ threshold).
-  /// - "Featured"  → owner-curated only (manually highlighted, not yet popular).
-  /// - "Signature" → tagged as signature dish.
-  ///
-  /// "Top Pick" is earned, not hardcoded — it requires real order traction.
-  String? get guestHighlightLabel {
-    if (isGuestHighlight && isPopular) return 'Top Pick';
-    if (isPopular) return 'Popular';
-    if (isGuestHighlight) return 'Featured';
-    if (isSignature) return 'Signature';
-    return null;
-  }
+  /// Previously returned 'Top Pick', 'Popular', 'Featured', or 'Signature'.
+  /// Hardcoded highlight labels were removed per DineIn design mandate.
+  /// Venue owners can still curate highlights via [highlightRank].
+  String? get guestHighlightLabel => null;
 
   List<String> get dietaryBadges {
     final badges = <String>[];
@@ -507,14 +497,13 @@ class MenuItem extends Equatable {
 
   List<String> get guestDisplayTags {
     final badges = <String>[];
-    final highlight = guestHighlightLabel;
-    if (highlight != null) badges.add(highlight);
     badges.addAll(dietaryBadges);
 
     for (final tag in tags) {
       final trimmed = tag.trim();
       if (trimmed.isEmpty) continue;
       final lc = trimmed.toLowerCase();
+      // Skip legacy highlight tags and dietary duplicates
       if (_isPopularMenuTag(trimmed) ||
           _isSignatureMenuTag(trimmed) ||
           lc == 'top pick' ||

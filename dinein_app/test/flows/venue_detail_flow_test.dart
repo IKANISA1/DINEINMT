@@ -6,18 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-String _todayName() {
-  return switch (DateTime.now().weekday) {
-    DateTime.monday => 'Monday',
-    DateTime.tuesday => 'Tuesday',
-    DateTime.wednesday => 'Wednesday',
-    DateTime.thursday => 'Thursday',
-    DateTime.friday => 'Friday',
-    DateTime.saturday => 'Saturday',
-    DateTime.sunday => 'Sunday',
-    _ => 'Monday',
-  };
-}
 
 class _FakeGuestWifiService extends GuestWifiService {
   _FakeGuestWifiService(this.result);
@@ -31,7 +19,7 @@ class _FakeGuestWifiService extends GuestWifiService {
 }
 
 void main() {
-  testWidgets('venue detail exposes phone, website, and opening-hours chips', (
+  testWidgets('venue detail exposes phone chip in about section', (
     tester,
   ) async {
     final venue = Venue(
@@ -42,12 +30,8 @@ void main() {
       description: 'Seafront seafood dining with sunset views.',
       address: 'Valletta Waterfront',
       phone: '+356 9999 1111',
-      websiteUrl: 'https://harbortable.mt',
       rating: 4.8,
       ratingCount: 210,
-      openingHours: {
-        _todayName(): const OpeningHours(open: '09:00', close: '22:00'),
-      },
     );
 
     await tester.binding.setSurfaceSize(const Size(430, 1200));
@@ -72,8 +56,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('+356 9999 1111'), findsOneWidget);
-    expect(find.text('WEBSITE'), findsOneWidget);
-    expect(find.text('OPEN UNTIL 10 PM'), findsOneWidget);
   });
 
   testWidgets(

@@ -45,16 +45,12 @@ class _AdminVenueDetailScreenState
     extends ConsumerState<AdminVenueDetailScreen> {
   final _nameCtrl = TextEditingController();
   final _slugCtrl = TextEditingController();
-  final _categoryCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _ownerWhatsAppCtrl = TextEditingController();
   final _ownerContactPhoneCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
   final _imageCtrl = TextEditingController();
-  final _websiteCtrl = TextEditingController();
-  final _reservationCtrl = TextEditingController();
 
   final _wifiSsidCtrl = TextEditingController();
   final _wifiPasswordCtrl = TextEditingController();
@@ -63,17 +59,7 @@ class _AdminVenueDetailScreenState
   final _tiktokCtrl = TextEditingController();
   final _promoMessageCtrl = TextEditingController();
 
-  static const _days = <String>[
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
 
-  final Map<String, DayHours> _schedule = <String, DayHours>{};
   VenueStatus _status = VenueStatus.inactive;
   bool _orderingEnabled = false;
   bool _isPromoActive = false;
@@ -87,16 +73,12 @@ class _AdminVenueDetailScreenState
   void dispose() {
     _nameCtrl.dispose();
     _slugCtrl.dispose();
-    _categoryCtrl.dispose();
     _descriptionCtrl.dispose();
     _addressCtrl.dispose();
     _phoneCtrl.dispose();
     _ownerWhatsAppCtrl.dispose();
     _ownerContactPhoneCtrl.dispose();
-    _emailCtrl.dispose();
     _imageCtrl.dispose();
-    _websiteCtrl.dispose();
-    _reservationCtrl.dispose();
 
     _wifiSsidCtrl.dispose();
     _wifiPasswordCtrl.dispose();
@@ -121,16 +103,12 @@ class _AdminVenueDetailScreenState
 
     _nameCtrl.text = venue?.name ?? '';
     _slugCtrl.text = venue?.slug ?? '';
-    _categoryCtrl.text = venue?.category ?? 'restaurant';
     _descriptionCtrl.text = venue?.description ?? '';
     _addressCtrl.text = venue?.address ?? '';
     _phoneCtrl.text = venue?.phone ?? '';
     _ownerWhatsAppCtrl.text = venue?.ownerWhatsAppNumber ?? '';
     _ownerContactPhoneCtrl.text = venue?.ownerContactPhone ?? '';
-    _emailCtrl.text = venue?.email ?? '';
     _imageCtrl.text = venue?.imageUrl ?? '';
-    _websiteCtrl.text = venue?.websiteUrl ?? '';
-    _reservationCtrl.text = venue?.reservationUrl ?? '';
 
     _wifiSsidCtrl.text = venue?.wifiSsid ?? '';
     _wifiPasswordCtrl.text = venue?.wifiPassword ?? '';
@@ -143,16 +121,6 @@ class _AdminVenueDetailScreenState
     _isPromoActive = venue?.isPromoActive ?? false;
     _promoMessageCtrl.text = venue?.promoMessage ?? '';
     _slugDirty = venue != null;
-
-    _schedule.clear();
-    for (final day in _days) {
-      final hours = venue?.openingHours?[day];
-      _schedule[day] = DayHours(
-        isOpen: hours?.isOpen ?? true,
-        open: hours?.open ?? '09:00',
-        close: hours?.close ?? '22:00',
-      );
-    }
   }
 
   void _handleNameChanged(String value) {
@@ -171,10 +139,6 @@ class _AdminVenueDetailScreenState
         .replaceAll(RegExp(r'-+'), '-')
         .replaceAll(RegExp(r'^-|-$'), '');
     return collapsed;
-  }
-
-  Map<String, dynamic> _buildOpeningHoursPayload() {
-    return {for (final day in _days) day: _schedule[day]!.toJson()};
   }
 
   Map<String, String> _buildSocialLinksPayload() {
@@ -214,24 +178,15 @@ class _AdminVenueDetailScreenState
     final updates = <String, dynamic>{
       'name': name,
       'slug': slug,
-      'category': _categoryCtrl.text.trim().isEmpty
-          ? 'restaurant'
-          : _categoryCtrl.text.trim(),
+      'category': 'Restaurant',
       'description': _descriptionCtrl.text.trim(),
       'address': _addressCtrl.text.trim(),
       'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
       'owner_whatsapp_number': _ownerWhatsAppCtrl.text.trim().isEmpty ? null : _ownerWhatsAppCtrl.text.trim(),
       'owner_contact_phone': _ownerContactPhoneCtrl.text.trim().isEmpty ? null : _ownerContactPhoneCtrl.text.trim(),
-      'email': _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
       'image_url': _imageCtrl.text.trim().isEmpty
           ? null
           : _imageCtrl.text.trim(),
-      'website_url': _websiteCtrl.text.trim().isEmpty
-          ? null
-          : _websiteCtrl.text.trim(),
-      'reservation_url': _reservationCtrl.text.trim().isEmpty
-          ? null
-          : _reservationCtrl.text.trim(),
 
       'wifi_ssid': wifiSsid.isEmpty ? null : wifiSsid,
       'wifi_password': wifiSsid.isEmpty
@@ -239,7 +194,7 @@ class _AdminVenueDetailScreenState
           : (wifiPassword.isEmpty ? null : wifiPassword),
       'wifi_security': wifiSsid.isEmpty ? null : _wifiSecurity,
       'social_links': _buildSocialLinksPayload(),
-      'opening_hours': _buildOpeningHoursPayload(),
+
       'status': _status.dbValue,
       'ordering_enabled': _orderingEnabled,
       'is_promo_active': _isPromoActive,
@@ -558,7 +513,7 @@ class _AdminVenueDetailScreenState
                 const SizedBox(height: AppTheme.space4),
                 _buildWifiSocialSection(),
                 const SizedBox(height: AppTheme.space4),
-                _buildOpeningHoursSection(cs, tt),
+
                 const SizedBox(height: AppTheme.space6),
                 _buildDangerZone(cs, tt, venue),
               ],
@@ -860,14 +815,6 @@ class _AdminVenueDetailScreenState
                 },
               ),
             ),
-            const SizedBox(width: AppTheme.space4),
-            Expanded(
-              child: AdminVenueLabeledField(
-                label: 'CATEGORY',
-                controller: _categoryCtrl,
-                hint: 'restaurant',
-              ),
-            ),
           ],
         ),
         AdminVenueLabeledField(
@@ -891,25 +838,10 @@ class _AdminVenueDetailScreenState
     return AdminVenueSectionCard(
       title: 'Profile Data',
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: AdminVenueLabeledField(
-                label: 'PUBLIC PHONE',
-                controller: _phoneCtrl,
-                hint: '${config.countryDialCode}...',
-              ),
-            ),
-            const SizedBox(width: AppTheme.space4),
-            Expanded(
-              child: AdminVenueLabeledField(
-                label: 'EMAIL',
-                controller: _emailCtrl,
-                hint: 'venue@example.com',
-                keyboardType: TextInputType.emailAddress,
-              ),
-            ),
-          ],
+        AdminVenueLabeledField(
+          label: 'PUBLIC PHONE',
+          controller: _phoneCtrl,
+          hint: '${config.countryDialCode}...',
         ),
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -938,27 +870,7 @@ class _AdminVenueDetailScreenState
             ),
           ],
         ),
-        Row(
-          children: [
-            Expanded(
-              child: AdminVenueLabeledField(
-                label: 'WEBSITE',
-                controller: _websiteCtrl,
-                hint: 'https://venue.example.com',
-                keyboardType: TextInputType.url,
-              ),
-            ),
-            const SizedBox(width: AppTheme.space4),
-            Expanded(
-              child: AdminVenueLabeledField(
-                label: 'RESERVATION URL',
-                controller: _reservationCtrl,
-                hint: 'https://reserve.example.com',
-                keyboardType: TextInputType.url,
-              ),
-            ),
-          ],
-        ),
+
           Padding(
             padding: const EdgeInsets.only(top: AppTheme.space2, bottom: AppTheme.space2),
             child: Text(
@@ -1511,91 +1423,4 @@ class _AdminVenueDetailScreenState
     );
   }
 
-  // ── Opening Hours ───────────────────────────────────────────────────
-
-  Widget _buildOpeningHoursSection(ColorScheme cs, TextTheme tt) {
-    return AdminVenueSectionCard(
-      title: 'Opening Hours',
-      children: [
-        ..._days.map((day) {
-          final hours = _schedule[day]!;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppTheme.space2),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainer,
-                borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      day,
-                      style: tt.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  PressableScale(
-                    onTap: () => setState(() {
-                      _schedule[day] = hours.copyWith(isOpen: !hours.isOpen);
-                    }),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: hours.isOpen
-                            ? cs.secondary.withValues(alpha: 0.12)
-                            : cs.error.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        hours.isOpen ? 'Open' : 'Closed',
-                        style: tt.labelSmall?.copyWith(
-                          color: hours.isOpen ? cs.secondary : cs.error,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppTheme.space3),
-                  PressableScale(
-                    onTap: () => AdminVenueSheets.showScheduleEditor(
-                      context: context,
-                      day: day,
-                      hours: hours,
-                      onApply: (updated) {
-                        setState(() => _schedule[day] = updated);
-                      },
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        hours.isOpen
-                            ? '${hours.open} - ${hours.close}'
-                            : 'Closed',
-                        style: tt.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ],
-    );
-  }
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -53,13 +53,9 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
           physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.all(24),
           children: const [
-            SkeletonLoader(width: double.infinity, height: 140, borderRadius: 24),
-            SizedBox(height: 24),
-            SkeletonLoader(width: 120, height: 12, borderRadius: 4),
-            SizedBox(height: 16),
-            SkeletonLoader(width: double.infinity, height: 180, borderRadius: 16),
-            SizedBox(height: 24),
-            SkeletonLoader(width: 120, height: 12, borderRadius: 4),
+            SkeletonLoader(width: double.infinity, height: 64, borderRadius: 16),
+            SizedBox(height: 12),
+            SkeletonLoader(width: double.infinity, height: 48, borderRadius: 12),
             SizedBox(height: 16),
             SkeletonLoader(width: double.infinity, height: 160, borderRadius: 20),
           ],
@@ -108,86 +104,73 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
             ],
           ),
           body: ListView(
-            padding: const EdgeInsets.all(AppTheme.space6),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.space6,
+              vertical: AppTheme.space4,
+            ),
             children: [
-              // ─── Status Header ───
+              // ─── Compact Status Banner ───
               Container(
-                padding: const EdgeInsets.all(AppTheme.space8),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.space5,
+                  vertical: AppTheme.space4,
                 ),
-                child: Column(
+                decoration: BoxDecoration(
+                  color: _statusColor(cs, currentStatus).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                  border: Border.all(
+                    color: _statusColor(cs, currentStatus).withValues(alpha: 0.20),
+                  ),
+                ),
+                child: Row(
                   children: [
                     Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            color: _statusColor(
-                              cs,
-                              currentStatus,
-                            ).withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _statusIcon(currentStatus),
-                            size: 36,
-                            color: _statusColor(cs, currentStatus),
-                          ),
-                        )
-                        .animate()
-                        .scale(
-                          begin: const Offset(0, 0),
-                          end: const Offset(1, 1),
-                          duration: 500.ms,
-                          curve: Curves.elasticOut,
-                        )
-                        .fadeIn(),
-                    const SizedBox(height: AppTheme.space5),
-                    Text(
-                      currentStatus.label,
-                      style: tt.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: _statusColor(cs, currentStatus).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        _statusIcon(currentStatus),
+                        size: 20,
+                        color: _statusColor(cs, currentStatus),
                       ),
                     ),
-                    const SizedBox(height: AppTheme.space2),
-                    Text(
-                      _statusMessage(currentStatus),
-                      textAlign: TextAlign.center,
-                      style: tt.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
+                    const SizedBox(width: AppTheme.space4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currentStatus.label,
+                            style: tt.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: _statusColor(cs, currentStatus),
+                            ),
+                          ),
+                          Text(
+                            _statusMessageShort(currentStatus),
+                            style: tt.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ).animate().fadeIn(duration: 400.ms),
-
-              const SizedBox(height: AppTheme.space8),
-
-              // ─── Step Indicator ───
-              Text(
-                'ORDER PROGRESS',
-                style: tt.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  letterSpacing: 3,
-                ),
               ),
-              const SizedBox(height: AppTheme.space5),
-              _StepIndicator(
-                currentStatus: currentStatus,
-              ).animate(delay: 300.ms).fadeIn(duration: 500.ms),
 
-              const SizedBox(height: AppTheme.space8),
-
-              // ─── Order Details ───
-              Text(
-                'ORDER DETAILS',
-                style: tt.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  letterSpacing: 3,
-                ),
-              ),
               const SizedBox(height: AppTheme.space4),
+
+              // ─── Compact Horizontal Progress ───
+              _CompactProgressBar(currentStatus: currentStatus),
+
+              const SizedBox(height: AppTheme.space6),
+
+              // ─── Order Info Row ───
               ClayCard(
                 child: Column(
                   children: [
@@ -195,18 +178,13 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
                       label: 'Venue',
                       value: displayOrder.venueName,
                     ),
-                    const SizedBox(height: 8),
-                    _OrderDetailRow(
-                      label: 'Items',
-                      value: '${displayOrder.itemCount} items',
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     _OrderDetailRow(
                       label: 'Payment',
                       value: displayOrder.paymentMethod.label,
                     ),
                     if (displayOrder.tableNumber != null) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       _OrderDetailRow(
                         label: 'Table',
                         value: displayOrder.tableNumber!,
@@ -214,26 +192,68 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
                     ],
                     if (displayOrder.specialRequests != null &&
                         displayOrder.specialRequests!.trim().isNotEmpty) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       _OrderDetailRow(
                         label: 'Requests',
                         value: displayOrder.specialRequests!,
                         multiline: true,
                       ),
                     ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: AppTheme.space6),
+
+              // ─── Items List ───
+              Text(
+                'ITEMS ORDERED',
+                style: tt.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  letterSpacing: 3,
+                ),
+              ),
+              const SizedBox(height: AppTheme.space3),
+              ClayCard(
+                child: Column(
+                  children: [
+                    for (int i = 0; i < displayOrder.items.length; i++) ...[
+                      if (i > 0)
+                        Divider(
+                          color: cs.outlineVariant.withValues(alpha: 0.08),
+                          height: 12,
+                        ),
+                      _ItemRow(
+                        item: displayOrder.items[i],
+                        formatPrice: displayOrder.formatPrice,
+                      ),
+                    ],
                     Divider(
                       color: cs.outlineVariant.withValues(alpha: 0.10),
-                      height: 24,
+                      height: 20,
                     ),
-                    _OrderDetailRow(
-                      label: 'Total',
-                      value:
+                    // Total
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Total',
+                          style: tt.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
                           displayOrder.formatPrice(displayOrder.total),
-                      isBold: true,
+                          style: tt.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: cs.primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ).animate(delay: 500.ms).fadeIn(),
+              ),
             ],
           ),
 
@@ -310,134 +330,160 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
     };
   }
 
-  String _statusMessage(OrderStatus status) {
+  String _statusMessageShort(OrderStatus status) {
     return switch (status) {
-      OrderStatus.placed =>
-        'Your order has been placed.\nWaiting for the venue to confirm.',
-      OrderStatus.received =>
-        'The venue has received your order\nand is preparing it now.',
-      OrderStatus.served => 'Your order has been served.\nEnjoy your meal!',
+      OrderStatus.placed => 'Waiting for the venue to confirm.',
+      OrderStatus.received => 'Being prepared now.',
+      OrderStatus.served => 'Enjoy your meal!',
       OrderStatus.cancelled => 'This order was cancelled.',
     };
   }
 }
 
-/// Vertical timeline matching React OrderStatus.tsx.
-class _StepIndicator extends StatelessWidget {
+/// Compact horizontal progress bar: 3 dots with connecting lines.
+class _CompactProgressBar extends StatelessWidget {
   final OrderStatus currentStatus;
 
-  const _StepIndicator({required this.currentStatus});
+  const _CompactProgressBar({required this.currentStatus});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     final steps = [
-      (LucideIcons.checkCircle2, 'Order Confirmed', OrderStatus.placed),
-      (LucideIcons.chefHat, 'Preparing', OrderStatus.received),
-      (LucideIcons.utensilsCrossed, 'Served', OrderStatus.served),
+      ('Confirmed', OrderStatus.placed),
+      ('Preparing', OrderStatus.received),
+      ('Served', OrderStatus.served),
     ];
 
-    return Column(
-      children: steps.asMap().entries.map((entry) {
-        final index = entry.key;
-        final (icon, label, status) = entry.value;
-        final isCompleted = currentStatus.stepIndex > status.stepIndex;
-        final isActive = currentStatus == status;
-        final isPending = !isCompleted && !isActive;
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: isCompleted
-                        ? AppColors.secondary
-                        : isActive
-                        ? cs.primary
-                        : cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      if (isActive)
-                        BoxShadow(
-                          color: cs.primary.withValues(alpha: 0.10),
-                          blurRadius: 24,
-                          spreadRadius: 8,
-                        ),
-                    ],
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 28,
-                    color: isPending
-                        ? cs.onSurfaceVariant.withValues(alpha: 0.50)
-                        : isCompleted
-                        ? AppColors.onSecondary
-                        : cs.onPrimary,
-                  ),
-                ),
-                if (index < steps.length - 1)
-                  Container(
-                    width: 4,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: isCompleted
-                          ? AppColors.secondary
-                          : cs.surfaceContainerHigh.withValues(alpha: 0.30),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 32),
+    return Row(
+      children: [
+        for (int i = 0; i < steps.length; i++) ...[
+          if (i > 0)
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                        color: isPending
-                            ? cs.onSurfaceVariant.withValues(alpha: 0.40)
-                            : cs.onSurface,
-                      ),
-                    ),
-                    if (isActive)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: RepaintBoundary(
-                          child:
-                            Text(
-                                  'IN PROGRESS',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 4.8,
-                                    color: cs.primary,
-                                  ),
-                                )
-                                .animate(onPlay: (c) => c.repeat(reverse: true))
-                                .fadeIn(duration: 1000.ms)
-                                .then()
-                                .fade(begin: 1, end: 0.4, duration: 1000.ms),
-                        ),
-                      ),
-                  ],
+              child: Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  color: currentStatus.stepIndex >= steps[i].$2.stepIndex
+                      ? AppColors.secondary
+                      : cs.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-          ],
-        );
-      }).toList(),
+          Column(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: currentStatus.stepIndex >= steps[i].$2.stepIndex
+                      ? (currentStatus == steps[i].$2
+                          ? cs.primary
+                          : AppColors.secondary)
+                      : cs.surfaceContainerHigh,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    if (currentStatus == steps[i].$2)
+                      BoxShadow(
+                        color: cs.primary.withValues(alpha: 0.20),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                  ],
+                ),
+                child: Icon(
+                  currentStatus.stepIndex > steps[i].$2.stepIndex
+                      ? LucideIcons.check
+                      : _stepIcon(steps[i].$2),
+                  size: 14,
+                  color: currentStatus.stepIndex >= steps[i].$2.stepIndex
+                      ? Colors.white
+                      : cs.onSurfaceVariant.withValues(alpha: 0.40),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                steps[i].$1,
+                style: tt.labelSmall?.copyWith(
+                  fontSize: 9,
+                  fontWeight: currentStatus == steps[i].$2
+                      ? FontWeight.w900
+                      : FontWeight.w600,
+                  color: currentStatus.stepIndex >= steps[i].$2.stepIndex
+                      ? cs.onSurface
+                      : cs.onSurfaceVariant.withValues(alpha: 0.40),
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  IconData _stepIcon(OrderStatus status) {
+    return switch (status) {
+      OrderStatus.placed => LucideIcons.checkCircle2,
+      OrderStatus.received => LucideIcons.chefHat,
+      OrderStatus.served => LucideIcons.utensilsCrossed,
+      OrderStatus.cancelled => LucideIcons.x,
+    };
+  }
+}
+
+/// A single item row showing name, qty × price, subtotal.
+class _ItemRow extends StatelessWidget {
+  final dynamic item;
+  final String Function(double) formatPrice;
+
+  const _ItemRow({required this.item, required this.formatPrice});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Quantity badge
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: cs.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            '${item.quantity}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              color: cs.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Item name
+        Expanded(
+          child: Text(
+            item.name,
+            style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Subtotal
+        Text(
+          formatPrice(item.subtotal),
+          style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ],
     );
   }
 }

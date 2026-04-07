@@ -131,70 +131,13 @@ class GooglePlacesService {
     }).toList();
   }
 
+  /// All venues are treated as restaurants — category differentiation removed.
   String _normalizeVenueCategory(
     String? primaryType,
     List<String> types, {
     String? fallback,
   }) {
-    final normalizedTypes = <String>{
-      if (primaryType != null && primaryType.trim().isNotEmpty)
-        primaryType.trim().toLowerCase(),
-      ...types.map((value) => value.trim().toLowerCase()),
-    };
-
-    const hotelTypes = {
-      'hotel',
-      'resort_hotel',
-      'extended_stay_hotel',
-      'inn',
-      'hostel',
-      'guest_house',
-      'bed_and_breakfast',
-      'lodging',
-      'motel',
-    };
-
-    const barTypes = {
-      'bar',
-      'bar_and_grill',
-      'cocktail_bar',
-      'sports_bar',
-      'wine_bar',
-      'lounge_bar',
-      'pub',
-      'irish_pub',
-      'gastropub',
-      'brewpub',
-      'beer_garden',
-      'night_club',
-      'hookah_bar',
-    };
-
-    final hasHotel = normalizedTypes.any(hotelTypes.contains);
-    if (hasHotel) return 'Hotels';
-
-    final hasBar = normalizedTypes.any(barTypes.contains);
-    final hasRestaurant = normalizedTypes.any(
-      (value) =>
-          value == 'restaurant' ||
-          value.endsWith('_restaurant') ||
-          value == 'cafe' ||
-          value == 'bistro' ||
-          value == 'cafeteria' ||
-          value == 'fine_dining_restaurant',
-    );
-
-    if (hasBar && hasRestaurant) return 'Bar & Restaurants';
-    if (hasBar) return 'Bar';
-    if (hasRestaurant) return 'Restaurants';
-
-    final fallbackValue = (fallback ?? '').toLowerCase();
-    if (fallbackValue.contains('hotel')) return 'Hotels';
-    if (fallbackValue.contains('bar') && fallbackValue.contains('restaurant')) {
-      return 'Bar & Restaurants';
-    }
-    if (fallbackValue.contains('bar')) return 'Bar';
-    return 'Restaurants';
+    return 'Restaurant';
   }
 
   /// Google Places Autocomplete (New) — returns address suggestions.

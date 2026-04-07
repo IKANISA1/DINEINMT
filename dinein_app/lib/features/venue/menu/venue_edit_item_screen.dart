@@ -834,14 +834,71 @@ class _ImagePanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppTheme.space5),
-          Text(
-            'Menu Image',
-            style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: AppTheme.space2),
-          Text(
-            'Upload a photo from your device or generate with AI.',
-            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Menu Image',
+                      style: tt.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Upload a photo or generate with AI.',
+                      style: tt.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppTheme.space3),
+              // Upload icon button
+              _ImageActionButton(
+                icon: LucideIcons.upload,
+                tooltip: 'Upload image',
+                isLoading: isUploadingImage,
+                onTap: isBusy
+                    ? null
+                    : hasExistingItem
+                        ? onUpload
+                        : () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Save the item first, then upload an image.',
+                                ),
+                              ),
+                            );
+                          },
+              ),
+              const SizedBox(width: AppTheme.space2),
+              // AI Generate icon button
+              _ImageActionButton(
+                icon: LucideIcons.sparkles,
+                tooltip: usesManualImage
+                    ? 'Manual image active'
+                    : 'Generate image with AI',
+                isLoading: isGeneratingImage,
+                onTap: isBusy || usesManualImage
+                    ? null
+                    : hasExistingItem
+                        ? onGenerate
+                        : () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Save the item first, then generate an image.',
+                                ),
+                              ),
+                            );
+                          },
+              ),
+            ],
           ),
           if (item?.imageError != null &&
               item!.imageError!.trim().isNotEmpty) ...[
@@ -851,35 +908,6 @@ class _ImagePanel extends StatelessWidget {
               style: tt.bodySmall?.copyWith(color: cs.error),
             ),
           ],
-          const SizedBox(height: AppTheme.space5),
-          // Upload button
-          SizedBox(
-            width: double.infinity,
-            child: PremiumButton(
-              label: isUploadingImage ? 'UPLOADING...' : 'UPLOAD IMAGE',
-              icon: LucideIcons.upload,
-              isLoading: isUploadingImage,
-              onPressed: hasExistingItem && !isBusy ? onUpload : null,
-            ),
-          ),
-          const SizedBox(height: AppTheme.space3),
-          // AI Generate button
-          SizedBox(
-            width: double.infinity,
-            child: PremiumButton(
-              label: usesManualImage
-                  ? 'MANUAL IMAGE ACTIVE'
-                  : item?.hasImage == true
-                  ? 'REGENERATE IMAGE'
-                  : 'GENERATE IMAGE',
-              icon: LucideIcons.sparkles,
-              isLoading: isGeneratingImage,
-              onPressed:
-                  hasExistingItem && !usesManualImage && !isBusy
-                  ? onGenerate
-                  : null,
-            ),
-          ),
           if (hasExistingItem && !usesManualImage) ...[
             const SizedBox(height: AppTheme.space4),
             SwitchListTile.adaptive(
@@ -894,6 +922,68 @@ class _ImagePanel extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Compact 44×44 icon button used for upload / generate image actions.
+class _ImageActionButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final bool isLoading;
+  final VoidCallback? onTap;
+
+  const _ImageActionButton({
+    required this.icon,
+    required this.tooltip,
+    this.isLoading = false,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDisabled = onTap == null && !isLoading;
+
+    return Tooltip(
+      message: tooltip,
+      child: PressableScale(
+        onTap: isLoading ? null : onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: isDisabled
+                ? cs.surfaceContainerHigh.withValues(alpha: 0.4)
+                : cs.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            border: Border.all(
+              color: isDisabled
+                  ? cs.outline.withValues(alpha: 0.1)
+                  : cs.outline.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Center(
+            child: isLoading
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cs.primary,
+                    ),
+                  )
+                : Icon(
+                    icon,
+                    size: 20,
+                    color: isDisabled
+                        ? cs.onSurface.withValues(alpha: 0.3)
+                        : cs.onSurface,
+                  ),
+          ),
+        ),
       ),
     );
   }

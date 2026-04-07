@@ -10,7 +10,7 @@ import '../../features/venue/menu/venue_menu_manager_screen.dart' deferred as ve
 import '../../features/venue/orders/venue_order_detail_screen.dart' deferred as venueorderdetailscreen;
 import '../../features/venue/orders/venue_orders_screen.dart' deferred as venueordersscreen;
 import '../../features/venue/reports/venue_item_report_screen.dart' deferred as venueitemreportscreen;
-import '../../features/venue/settings/venue_hours_screen.dart' deferred as venuehoursscreen;
+
 import '../../features/venue/settings/venue_language_region_screen.dart' deferred as venuelanguageregionscreen;
 import '../../features/venue/settings/venue_legal_screen.dart' deferred as venuelegalscreen;
 import '../../features/venue/settings/venue_notifications_screen.dart' deferred as venuenotificationsscreen;
@@ -65,12 +65,7 @@ final List<RouteBase> venueRoutes = [
     redirect: venueAuthGuard,
     builder: (context, state) => DeferredWidget(libraryLoader: venueitemreportscreen.loadLibrary, createWidget: (_) => venueitemreportscreen.VenueItemReportScreen()),
   ),
-  GoRoute(
-    path: AppRoutePaths.venueHours,
-    name: AppRouteNames.venueHours,
-    redirect: venueAuthGuard,
-    builder: (context, state) => DeferredWidget(libraryLoader: venuehoursscreen.loadLibrary, createWidget: (_) => venuehoursscreen.VenueHoursScreen()),
-  ),
+
   GoRoute(
     path: AppRoutePaths.venueNotifications,
     name: AppRouteNames.venueNotifications,

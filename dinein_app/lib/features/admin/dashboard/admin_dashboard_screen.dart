@@ -143,9 +143,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                             final card = entry.value;
                             return SizedBox(
                               width: cardWidth,
-                              child: card
-                                  .animate(delay: (80 + 80 * index).ms)
-                                  .fadeIn(duration: 500.ms),
+                              child: card,
                             );
                           }).toList(),
                     );
@@ -199,7 +197,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                         );
                       },
                     ),
-                  ).animate(delay: 600.ms).fadeIn(duration: 400.ms),
+                  ),
                   const SizedBox(height: AppTheme.space4),
 
                   // Active Venues Health
@@ -271,13 +269,6 @@ class AdminDashboardScreen extends ConsumerWidget {
                                               ],
                                             ),
                                           ),
-                                        )
-                                        .animate(delay: 500.ms)
-                                        .slideX(
-                                          begin: -1,
-                                          end: 0,
-                                          duration: 1500.ms,
-                                          curve: Curves.easeOutCubic,
                                         ),
                                   ],
                                 ),
@@ -285,7 +276,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                             ),
                             const SizedBox(height: AppTheme.space3),
                             Text(
-                              '$offline venues are currently in scheduled maintenance mode.',
+                              '$offline venues are currently offline.',
                               style: tt.bodySmall?.copyWith(
                                 color: cs.onSurfaceVariant.withValues(
                                   alpha: 0.40,
@@ -295,7 +286,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                             ),
                           ],
                         ),
-                      ).animate(delay: 700.ms).fadeIn(duration: 400.ms);
+                      );
                     },
                   ),
                   const SizedBox(height: AppTheme.space4),
@@ -369,13 +360,6 @@ class AdminDashboardScreen extends ConsumerWidget {
                                                   ],
                                                 ),
                                               ),
-                                            )
-                                            .animate(delay: 500.ms)
-                                            .slideX(
-                                              begin: -1,
-                                              end: 0,
-                                              duration: 1500.ms,
-                                              curve: Curves.easeOutCubic,
                                             ),
                                       ],
                                     ),
@@ -414,7 +398,7 @@ class AdminDashboardScreen extends ConsumerWidget {
             ),
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: AppTheme.space24)),
+          const SliverToBoxAdapter(child: SizedBox(height: AppTheme.space8)),
         ],
       ),
     );
@@ -442,7 +426,7 @@ class _AdminKpi extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.all(AppTheme.space10),
+      padding: const EdgeInsets.all(AppTheme.space6),
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppTheme.radius3xl),

@@ -27,7 +27,6 @@ class VenueProfileScreen extends ConsumerStatefulWidget {
 
 class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
   final _nameCtrl = TextEditingController();
-  final _categoryCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _revolutCtrl = TextEditingController();
@@ -65,7 +64,6 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
     _debounceTimer?.cancel();
     _addressFocusNode.dispose();
     _nameCtrl.dispose();
-    _categoryCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
     _revolutCtrl.dispose();
@@ -78,7 +76,6 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
     if (_seededId == venue.id) return;
     _seededId = venue.id;
     _nameCtrl.text = venue.name;
-    _categoryCtrl.text = venue.category;
     _phoneCtrl.text = venue.phone ?? '';
     _addressCtrl.text = venue.address;
     _revolutCtrl.text = venue.revolutUrl ?? '';
@@ -98,7 +95,6 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
     try {
       final updates = <String, dynamic>{
         'name': _nameCtrl.text.trim(),
-        'category': _categoryCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
         'address': _addressCtrl.text.trim(),
         'image_url': _coverCtrl.text.trim().isEmpty
@@ -106,16 +102,22 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
             : _coverCtrl.text.trim(),
       };
 
-      // Country-aware payment field
+      // Country-aware payment field + auto-derive supported_payment_methods
+      final paymentMethods = <String>['cash'];
       if (_country == Country.mt) {
-        updates['revolut_url'] = _revolutCtrl.text.trim().isEmpty
-            ? null
-            : _revolutCtrl.text.trim();
+        final revolutUrl = _revolutCtrl.text.trim();
+        updates['revolut_url'] = revolutUrl.isEmpty ? null : revolutUrl;
+        if (revolutUrl.isNotEmpty) {
+          paymentMethods.add('revolut_link');
+        }
       } else if (_country == Country.rw) {
-        updates['momo_code'] = _momoCtrl.text.trim().isEmpty
-            ? null
-            : _momoCtrl.text.trim();
+        final momoCode = _momoCtrl.text.trim();
+        updates['momo_code'] = momoCode.isEmpty ? null : momoCode;
+        if (momoCode.isNotEmpty) {
+          paymentMethods.add('momo_ussd');
+        }
       }
+      updates['supported_payment_methods'] = paymentMethods;
 
       await VenueRepository.instance.updateVenue(venue.id, updates);
       ref.invalidate(currentVenueProvider);
@@ -543,12 +545,7 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
                   controller: _nameCtrl,
                   hint: 'The Golden Spoon',
                 ),
-                _ProfileField(
-                  icon: LucideIcons.chefHat,
-                  label: 'CUISINE TYPE',
-                  controller: _categoryCtrl,
-                  hint: 'Modern Mediterranean',
-                ),
+
                 // Country-aware payment field
                 if (_country == Country.mt)
                   _ProfileField(

@@ -66,7 +66,7 @@ void main() {
     await pumpSettingsScreen(tester);
 
     // Version string in footer
-    expect(find.text('DINEIN PWA v1.0.0-beta'), findsOneWidget);
+    expect(find.text('DINEIN PWA v1.0.0'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();

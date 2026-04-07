@@ -95,10 +95,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
       countryCode: _countryCode,
       maxDigits: _inputPhoneLength,
     );
-    if (normalized.length == _configuredPhoneLength + 1 &&
-        normalized.startsWith('0')) {
-      return normalized.substring(1);
-    }
     return normalized;
   }
 
@@ -427,7 +423,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           countryFlag: CountryRuntime.config.countryFlag,
           dialCode: _dialCode,
           hintText: CountryRuntime.config.country.code == 'RW'
-              ? '078 123 4567'
+              ? '78 123 4567'
               : '9912 3456',
           countryCode: _countryCode,
           maxDigits: _inputPhoneLength,

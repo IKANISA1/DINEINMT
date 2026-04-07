@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
@@ -103,7 +103,7 @@ class AdminSettingsScreen extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: AppTheme.space12),
+          const SizedBox(height: AppTheme.space6),
 
           // ─── Admin Account Info ───
           Container(
@@ -117,13 +117,13 @@ class AdminSettingsScreen extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: cs.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                   ),
-                  child: Icon(LucideIcons.shieldCheck, size: 28, color: cs.primary),
+                  child: Icon(LucideIcons.shieldCheck, size: 22, color: cs.primary),
                 ),
                 const SizedBox(width: AppTheme.space5),
                 Expanded(
@@ -149,9 +149,9 @@ class AdminSettingsScreen extends StatelessWidget {
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.05, end: 0),
+          ),
 
-          const SizedBox(height: AppTheme.space12),
+          const SizedBox(height: AppTheme.space6),
 
           // ─── Logout ───
           PressableScale(
@@ -180,7 +180,7 @@ class AdminSettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
-          ).animate(delay: 100.ms).fadeIn(duration: 400.ms).slideY(begin: 0.05, end: 0),
+          ),
 
           const SizedBox(height: AppTheme.space8),
 
@@ -196,7 +196,7 @@ class AdminSettingsScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: AppTheme.space12),
+          const SizedBox(height: AppTheme.space6),
         ],
       ),
     );

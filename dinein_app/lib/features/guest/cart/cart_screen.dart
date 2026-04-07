@@ -396,7 +396,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ],
               ),
 
-              const SizedBox(height: AppTheme.space10),
+              const SizedBox(height: AppTheme.space6),
 
               // ─── Cart Items ───
               ...cart.items.asMap().entries.map((entry) {
@@ -462,6 +462,30 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       },
                     ),
                   ),
+                  if (orderingUnavailable) ...[
+                    const SizedBox(width: 10),
+                    // Validation warning icon
+                    Expanded(
+                      child: Tooltip(
+                        message: venue.guestAvailabilityReason,
+                        child: _CompactActionChip(
+                          icon: LucideIcons.alertTriangle,
+                          label: 'Preview',
+                          iconColor: cs.error,
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  venue.guestAvailabilityReason,
+                                ),
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               )
                   .animate(target: _tableError ? 1 : 0)
@@ -476,41 +500,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     duration: 400.ms,
                   ),
 
-              const SizedBox(height: AppTheme.space10),
+              const SizedBox(height: AppTheme.space6),
 
-              if (orderingUnavailable) ...[
-                Container(
-                  padding: const EdgeInsets.all(AppTheme.space5),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                    border: Border.all(
-                      color: cs.outlineVariant.withValues(alpha: 0.18),
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        LucideIcons.alertTriangle,
-                        size: 18,
-                        color: cs.primary,
-                      ),
-                      const SizedBox(width: AppTheme.space3),
-                      Expanded(
-                        child: Text(
-                          venue.guestAvailabilityReason,
-                          style: tt.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppTheme.space8),
-              ],
+
 
               // ─── Error message ───
               if (_error != null) ...[
@@ -572,7 +564,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ),
               ),
 
-              const SizedBox(height: AppTheme.space16),
+              const SizedBox(height: AppTheme.space8),
             ],
           ),
         ),

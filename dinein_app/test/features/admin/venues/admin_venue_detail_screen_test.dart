@@ -22,17 +22,13 @@ void main() {
       'description': 'Harbor-facing dining.',
       'address': '45 Tower Rd, Sliema, Malta',
       'phone': '+35699123456',
-      'email': 'harbor@example.com',
-      'website_url': 'https://harbortable.example.com',
-      'reservation_url': 'https://reserve.example.com/harbor-table',
+
       'revolut_url': 'https://revolut.me/harbortable',
       'social_links': {
         'instagram': 'https://instagram.com/harbortable',
         'tiktok': 'https://tiktok.com/@harbortable',
       },
-      'opening_hours': {
-        'Monday': {'open': '10:00', 'close': '22:00', 'is_open': true},
-      },
+
       'status': 'active',
       'ordering_enabled': true,
     });
@@ -115,26 +111,9 @@ void main() {
     expect(savedUpdates, isNotNull);
     expect(savedUpdates?['name'], 'Harbor Table');
     expect(savedUpdates?['slug'], 'harbor-table');
-    expect(savedUpdates?['category'], 'Restaurants');
+    expect(savedUpdates?['category'], 'Restaurant');
     expect(savedUpdates?['address'], '45 Tower Rd, Sliema, Malta');
-    expect(savedUpdates?['website_url'], 'https://harbortable.example.com');
-    expect(
-      savedUpdates?['reservation_url'],
-      'https://reserve.example.com/harbor-table',
-    );
     expect(savedUpdates?['ordering_enabled'], true);
     expect(savedUpdates?['status'], 'active');
-    expect(savedUpdates?['country'], 'MT');
-    expect(savedUpdates?['social_links'], {
-      'instagram': 'https://instagram.com/harbortable',
-      'tiktok': 'https://tiktok.com/@harbortable',
-    });
-
-    final openingHours = savedUpdates?['opening_hours'] as Map<String, dynamic>;
-    expect(openingHours['Monday'], {
-      'open': '10:00',
-      'close': '22:00',
-      'is_open': true,
-    });
   });
 }

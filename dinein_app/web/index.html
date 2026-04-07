@@ -378,7 +378,8 @@
         }, 320);
       };
 
-      const DISMISS_KEY = 'dinein-update-dismissed';
+      const DISMISS_KEY = 'dinein-update-dismissed-at';
+      var DISMISS_COOLDOWN_MS = 12 * 60 * 60 * 1000; // 12 hours
 
       const hideUpdateBanner = function () {
         if (!updateBanner) return;
@@ -394,9 +395,10 @@
         waitingWorker = worker || waitingWorker;
         if (!updateBanner || !waitingWorker) return;
 
-        // Don't re-show if user already dismissed this session
+        // Don't re-show if user dismissed within the cooldown window
         try {
-          if (sessionStorage.getItem(DISMISS_KEY)) return;
+          var dismissedAt = parseInt(localStorage.getItem(DISMISS_KEY), 10);
+          if (dismissedAt && (Date.now() - dismissedAt) < DISMISS_COOLDOWN_MS) return;
         } catch (_) {}
 
         // Only show if there is an active controller (i.e. this is a real
@@ -415,7 +417,7 @@
       if (updateReload) {
         updateReload.addEventListener('click', function () {
           // Clear dismiss flag so the banner won't be suppressed after reload
-          try { sessionStorage.removeItem(DISMISS_KEY); } catch (_) {}
+          try { localStorage.removeItem(DISMISS_KEY); } catch (_) {}
           if (waitingWorker) {
             pendingReload = true;
             waitingWorker.postMessage({ type: 'SKIP_WAITING' });
@@ -427,8 +429,16 @@
 
       if (updateDismiss) {
         updateDismiss.addEventListener('click', function () {
-          try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch (_) {}
+          try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch (_) {}
           hideUpdateBanner();
+          // Silently activate the waiting worker when the user tabs away or
+          // closes the page, so the update applies without another banner
+          // on the next visit.
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden' && waitingWorker) {
+              waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+          }, { once: true });
         });
       }
 

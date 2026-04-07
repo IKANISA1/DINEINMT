@@ -14,7 +14,7 @@ abstract final class MockData {
           'Contemporary Gastronomy & Prime Cuts. Experience the pinnacle of Japanese bovine excellence.',
       address: 'Republic Street, Valletta',
       phone: '+356 2123 4567',
-      email: 'concierge@artisangrill.com',
+
       imageUrl:
           'https://lh3.googleusercontent.com/aida-public/AB6AXuCUatAlz3wpD_Tt2oNiSY4Cx3f0blmu-5oK-XIKsGinZNizl2IwpTpfCML283GOry8oEw9aL2f4sEDP8eIuuOb3uCQCG3_L0EHNw9riD1HVa0hNOqlpAT4753-LI-DLw1UxEGMddODp0mdNOiKV2QVCvoKkcQiwpTl3vNEWf-Sc0o3l-QEr34t2Ma9ql43uPUiF-1Wt_YFwiJBNAI2h-rpftwb5GRHLeOGM9AY_UEkomiE_CtZ-bZdtPikaQu5ha5qAhGbtaErFbU8',
       status: VenueStatus.active,
@@ -22,19 +22,7 @@ abstract final class MockData {
       rating: 4.9,
       ratingCount: 156,
       country: Country.mt,
-      openingHours: {
-        'Monday': const OpeningHours(open: '09:00', close: '22:00'),
-        'Tuesday': const OpeningHours(open: '09:00', close: '22:00'),
-        'Wednesday': const OpeningHours(open: '09:00', close: '22:00'),
-        'Thursday': const OpeningHours(open: '09:00', close: '22:00'),
-        'Friday': const OpeningHours(open: '09:00', close: '23:30'),
-        'Saturday': const OpeningHours(open: '10:00', close: '00:00'),
-        'Sunday': const OpeningHours(
-          open: '10:00',
-          close: '22:00',
-          isOpen: false,
-        ),
-      },
+
     ),
     Venue(
       id: '2',
@@ -45,7 +33,7 @@ abstract final class MockData {
           'Skyline Vistas & Signature Cocktails. Open air rooftop bar with city skyline view at sunset.',
       address: 'The Strand, Sliema',
       phone: '+356 2134 5678',
-      email: 'hello@vantagerooftop.com',
+
       imageUrl:
           'https://lh3.googleusercontent.com/aida-public/AB6AXuAbkXthgBhDCfPymd-NsbizhRkF_9hyjh9C2b0GK5Ez_rofbY_ACktQHOpVbDWMBHZRXKGOXajM7cCNuymoWwSQkw0h2DGL-1iOqDpRGaC4xxx1elS2Z5qG6U5_9ERiH48r-bdoOP2hl0agYimat3gzUxBfk7fKD2EFM1Ub1eXIJ9e-Pdg59N0vxSUU4VuXItN63heZqOygyMMT4BMcFHKAXSyPfYEEMRUZx8W6AF9svch-XI-qjWwc2ic-5PCWWcTmO26QDhRi3WU',
       status: VenueStatus.active,
@@ -63,7 +51,7 @@ abstract final class MockData {
           'Immersive Sound & Velvet Comfort. Modern minimal lounge with neon accents and marble floors.',
       address: 'Paceville, St Julian\'s',
       phone: '+356 2138 9012',
-      email: 'info@luminalounge.jp',
+
       imageUrl:
           'https://lh3.googleusercontent.com/aida-public/AB6AXuBxzIovA2T99Wwsti94HX6kLODaF7SyoRzoGXD7kSqL6X6EnK6S_nnO8u1jZeWzHndlVAnSyvCQXGWHHCC8zVZUmQ8XvSDJXStA_RWj_9QDeEc7RI9wtY_GJ6JjkkaJDFLpR6qp6-x9ZgBLMqNlgz4ByiwBfR8SIje315wjsT5JhXeLnAzgRztqGYEkirqMzfM-i6ZhHTiKSy5I3VgIYU7FHFDBkdAVjXkjJlgfNIsDL8xWYasR65ul8V7EDWQQB4fuFyN0sr7WdIc',
       status: VenueStatus.inactive,

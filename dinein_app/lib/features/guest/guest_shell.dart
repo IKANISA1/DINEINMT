@@ -49,18 +49,7 @@ class _GuestShellState extends ConsumerState<GuestShell> {
 
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith(AppRoutePaths.venuesBrowse)) return 1;
-    if (location.startsWith('/venue/') ||
-        location.startsWith('/cart') ||
-        location.startsWith('/item/')) {
-      return 1;
-    }
-    if (location.startsWith(AppRoutePaths.orderHistory) ||
-        location.startsWith(AppRoutePaths.orderBase) ||
-        location.startsWith(AppRoutePaths.orderSuccess)) {
-      return 2;
-    }
-    if (location.startsWith(AppRoutePaths.guestSettings)) return 3;
+    if (location.startsWith(AppRoutePaths.guestSettings)) return 1;
     return 0;
   }
 
@@ -507,22 +496,12 @@ class _NavData {
 const _guestNavItems = [
   _NavData(
     icon: LucideIcons.home,
-    label: 'Discover',
+    label: 'Home',
     routeName: AppRouteNames.discover,
   ),
   _NavData(
-    icon: LucideIcons.store,
-    label: 'Venues',
-    routeName: AppRouteNames.venuesBrowse,
-  ),
-  _NavData(
-    icon: LucideIcons.history,
-    label: 'Orders',
-    routeName: AppRouteNames.orderHistory,
-  ),
-  _NavData(
-    icon: LucideIcons.user,
-    label: 'Profile',
+    icon: LucideIcons.settings,
+    label: 'Settings',
     routeName: AppRouteNames.guestSettings,
   ),
 ];

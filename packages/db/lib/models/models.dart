@@ -26,35 +26,14 @@ String _toTitleCaseLabel(String value) {
       .join(' ');
 }
 
+/// All venues are treated as restaurants — category differentiation removed.
 String normalizeVenueCategoryLabel(
   String? value, {
-  String fallback = 'Restaurants',
+  String fallback = 'Restaurant',
 }) {
-  final raw = (value ?? '').trim();
-  final normalized = raw.toLowerCase();
-  if (normalized.isEmpty) return fallback;
-  if (normalized.contains('hotel')) return 'Hotels';
-  if (normalized.contains('bar') && normalized.contains('restaurant')) {
-    return 'Bar & Restaurants';
-  }
-  if (normalized.contains('bar')) return 'Bar';
-  if (normalized.contains('restaurant')) return 'Restaurants';
-  return _toTitleCaseLabel(raw);
+  return fallback;
 }
 
-Map<String, OpeningHours>? _parseOpeningHours(Object? raw) {
-  if (raw is! Map) return null;
-
-  final parsed = <String, OpeningHours>{};
-  for (final entry in raw.entries) {
-    final key = entry.key;
-    final value = entry.value;
-    if (key is! String || value is! Map) continue;
-    parsed[key] = OpeningHours.fromJson(Map<String, dynamic>.from(value));
-  }
-
-  return parsed.isEmpty ? null : parsed;
-}
 
 Map<String, String>? _parseStringMap(Object? raw) {
   if (raw is! Map) return null;
@@ -90,6 +69,7 @@ double? _doubleFromDynamic(Object? raw) {
 List<PaymentMethod> _parseSupportedPaymentMethods(
   Object? raw, {
   String? revolutUrl,
+  String? momoCode,
 }) {
   final parsed = <PaymentMethod>[];
   if (raw is List) {
@@ -97,6 +77,7 @@ List<PaymentMethod> _parseSupportedPaymentMethods(
       final method = switch (value) {
         'cash' => PaymentMethod.cash,
         'revolut_link' => PaymentMethod.revolutLink,
+        'momo_ussd' => PaymentMethod.momoUssd,
         _ => null,
       };
       if (method != null && !parsed.contains(method)) {
@@ -107,8 +88,13 @@ List<PaymentMethod> _parseSupportedPaymentMethods(
 
   if (parsed.isNotEmpty) return parsed;
 
+  // Fallback: infer payment methods from configured payment links/codes.
   if ((revolutUrl ?? '').trim().isNotEmpty) {
     return const [PaymentMethod.cash, PaymentMethod.revolutLink];
+  }
+
+  if ((momoCode ?? '').trim().isNotEmpty) {
+    return const [PaymentMethod.cash, PaymentMethod.momoUssd];
   }
 
   return const [PaymentMethod.cash];
@@ -172,15 +158,7 @@ String? _normalizeDietaryMenuTag(String raw) {
   };
 }
 
-int? _minutesSinceMidnight(String raw) {
-  final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(raw.trim());
-  if (match == null) return null;
-  final hours = int.tryParse(match.group(1) ?? '');
-  final minutes = int.tryParse(match.group(2) ?? '');
-  if (hours == null || minutes == null) return null;
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-  return hours * 60 + minutes;
-}
+
 
 double _degreesToRadians(double degrees) =>
     degrees * (3.1415926535897932 / 180);

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -68,7 +68,6 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
         'slug': venue.slug,
         'table_context': widget.tableNumber?.trim().isNotEmpty == true,
         'can_order': venue.canAcceptGuestOrders,
-        'is_open_now': venue.isOpenNow,
       },
     );
   }
@@ -156,24 +155,7 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
     );
   }
 
-  Future<void> _openWebsite(Venue venue) async {
-    final uri = venue.websiteUri;
-    if (uri == null) return;
 
-    try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (launched || !mounted) return;
-    } catch (_) {
-      if (!mounted) return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Unable to open the venue website.')),
-    );
-  }
 
   Future<void> _openMaps(Venue venue) async {
     final raw = venue.googleMapsUri?.trim();
@@ -281,9 +263,7 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
           onToggleSaved: () => _toggleSavedVenue(venue),
           onToggleAbout: () => setState(() => _aboutExpanded = !_aboutExpanded),
           onCall: venue.phone == null ? null : () => _callVenue(venue),
-          onWebsite: venue.websiteUri == null
-              ? null
-              : () => _openWebsite(venue),
+
           onMaps: venue.googleMapsUri == null ? null : () => _openMaps(venue),
           onWifiTap: venue.hasWifi && !kIsWeb
               ? () => _handleWifiTap(venue)
@@ -305,7 +285,6 @@ class _VenueDetailBody extends StatelessWidget {
   final VoidCallback onToggleSaved;
   final VoidCallback onToggleAbout;
   final VoidCallback? onCall;
-  final VoidCallback? onWebsite;
   final VoidCallback? onMaps;
   final VoidCallback? onWifiTap;
   final VoidCallback onOpenMenu;
@@ -320,7 +299,6 @@ class _VenueDetailBody extends StatelessWidget {
     required this.onToggleSaved,
     required this.onToggleAbout,
     required this.onCall,
-    required this.onWebsite,
     required this.onMaps,
     required this.onWifiTap,
     required this.onOpenMenu,
@@ -391,35 +369,7 @@ class _VenueDetailBody extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: cs.primary,
-                            borderRadius: BorderRadius.circular(
-                              AppTheme.radiusFull,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: cs.primary.withValues(alpha: 0.28),
-                                blurRadius: 16,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            venue.category.toUpperCase(),
-                            style: TextStyle(
-                              color: cs.onPrimary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 3,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
+
                         Text(
                           venue.name,
                           style: tt.displayMedium?.copyWith(
@@ -498,7 +448,7 @@ class _VenueDetailBody extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ).animate().fadeIn(duration: 300.ms).slideX(begin: -0.08),
+                  ),
                 if (tableNumber != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppTheme.space4),
@@ -511,22 +461,21 @@ class _VenueDetailBody extends StatelessWidget {
                         ),
                       ],
                     ),
-                  ).animate().fadeIn(duration: 300.ms).slideX(begin: -0.08),
+                  ),
                 VenueAboutSection(
                   venue: venue,
                   isExpanded: aboutExpanded,
                   onToggle: onToggleAbout,
                   onCall: onCall,
-                  onWebsite: onWebsite,
                   onMaps: onMaps,
                   onWifiTap: onWifiTap,
-                ).animate(delay: 120.ms).fadeIn().slideY(begin: 0.05),
+                ),
                 const SizedBox(height: AppTheme.space6),
                 VenueMenuHighlights(
                   venue: venue,
                   onOpenMenu: onOpenMenu,
-                ).animate(delay: 240.ms).fadeIn().slideY(begin: 0.05),
-                const SizedBox(height: AppTheme.space16),
+                ),
+                const SizedBox(height: AppTheme.space6),
               ]),
             ),
           ),

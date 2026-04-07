@@ -333,13 +333,13 @@ class _SettingsTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: cs.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
               ),
-              child: Icon(icon, size: 24, color: cs.onSurfaceVariant),
+              child: Icon(icon, size: 18, color: cs.onSurfaceVariant),
             ),
             const SizedBox(width: AppTheme.space4),
             Expanded(

@@ -103,10 +103,7 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
   int get _configuredPhoneLength =>
       CountryRuntime.config.venueWhatsAppLocalDigits;
 
-  int get _inputPhoneLength =>
-      CountryRuntime.config.country.code == 'RW' && _configuredPhoneLength == 9
-      ? 10
-      : _configuredPhoneLength;
+  int get _inputPhoneLength => _configuredPhoneLength;
 
   String _normalizeVenuePhoneInput(String value) {
     final normalized = normalizePhoneLocalInput(
@@ -114,11 +111,6 @@ class _VenueLoginScreenState extends State<VenueLoginScreen>
       countryCode: _countryCode,
       maxDigits: _inputPhoneLength,
     );
-    if (CountryRuntime.config.country.code == 'RW' &&
-        normalized.length == _configuredPhoneLength + 1 &&
-        normalized.startsWith('0')) {
-      return normalized.substring(1);
-    }
     return normalized;
   }
 

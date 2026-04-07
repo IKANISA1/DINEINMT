@@ -79,12 +79,8 @@ class VenueRepository {
     final items = (json['items'] as List<dynamic>? ?? const [])
         .map((entry) => Venue.fromJson(Map<String, dynamic>.from(entry as Map)))
         .toList(growable: false);
-    final categories = (json['categories'] as List<dynamic>? ?? const [])
-        .map((entry) => entry.toString())
-        .toList(growable: false);
     return GuestVenueFeed(
       items: items,
-      categories: categories,
       totalCount: (json['total_count'] as num?)?.toInt() ?? items.length,
       hasMore: json['has_more'] as bool? ?? false,
     );

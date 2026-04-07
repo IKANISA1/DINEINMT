@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:ui/theme/app_colors.dart';
@@ -338,7 +338,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               AppTheme.space8,
-              AppTheme.space10,
+              AppTheme.space6,
               AppTheme.space8,
               0,
             ),
@@ -398,7 +398,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
               AppTheme.space8 + 16,
-              AppTheme.space12,
+              AppTheme.space6,
               AppTheme.space8,
               AppTheme.space4,
             ),
@@ -430,7 +430,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
               AppTheme.space8,
               0,
               AppTheme.space8,
-              AppTheme.space24,
+              AppTheme.space8,
             ),
             sliver: SliverList.separated(
               itemCount: visibleOrders.length,
@@ -438,10 +438,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                   const SizedBox(height: AppTheme.space5),
               itemBuilder: (context, index) {
                 final order = visibleOrders[index];
-                return _OrderFeedCard(order: order)
-                    .animate(delay: (100 * index).ms)
-                    .fadeIn(duration: 400.ms)
-                    .slideY(begin: 0.05, end: 0);
+                return _OrderFeedCard(order: order);
               },
             ),
           ),

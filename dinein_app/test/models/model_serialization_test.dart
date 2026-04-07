@@ -17,7 +17,7 @@ void main() {
         'phone': '+356 9999 1111',
         'owner_contact_phone': '+356 9999 2222',
         'owner_whatsapp_number': '+356 9999 3333',
-        'email': 'hello@harbor.mt',
+
         'image_url': 'https://example.com/venue.png',
         'status': 'active',
         'ordering_enabled': true,
@@ -33,11 +33,7 @@ void main() {
         'rating': 4.8,
         'rating_count': 210,
         'country': 'MT',
-        'website_url': 'https://harbortable.mt',
         'supported_payment_methods': ['cash', 'revolut_link'],
-        'opening_hours': {
-          'Monday': {'is_open': true, 'open': '09:00', 'close': '22:00'},
-        },
         'owner_id': 'owner_1',
         'wifi_ssid': 'HarborGuest',
         'wifi_password': 'seaside123',
@@ -55,16 +51,12 @@ void main() {
       expect(output['rating'], 4.8);
       expect(output['rating_count'], 210);
       expect(output['country'], 'MT');
-      expect(output['website_url'], 'https://harbortable.mt');
       expect(output['supported_payment_methods'], ['cash', 'revolut_link']);
-      expect(output['opening_hours'], {
-        'Monday': {'is_open': true, 'open': '09:00', 'close': '22:00'},
-      });
       expect(output['owner_id'], 'owner_1');
       expect(output['phone'], '+356 9999 1111');
       expect(output['owner_contact_phone'], '+356 9999 2222');
       expect(output['owner_whatsapp_number'], '+356 9999 3333');
-      expect(output['email'], 'hello@harbor.mt');
+
       expect(output['approved_at'], '2026-04-02T08:00:00.000Z');
       expect(output['access_verified_at'], '2026-04-02T08:05:00.000Z');
       expect(output['last_access_token_issued_at'], '2026-04-02T08:06:00.000Z');
@@ -91,7 +83,7 @@ void main() {
       expect(venue.description, '');
       expect(venue.address, '');
       expect(venue.phone, isNull);
-      expect(venue.email, isNull);
+
       expect(venue.imageUrl, isNull);
       expect(venue.status, VenueStatus.active);
       expect(venue.orderingEnabled, isFalse);
@@ -120,18 +112,16 @@ void main() {
       expect(venue.isAccessReady, isTrue);
     });
 
-    test('normalizeVenueCategoryLabel maps variants correctly', () {
-      expect(normalizeVenueCategoryLabel('hotel'), 'Hotels');
-      expect(
-        normalizeVenueCategoryLabel('Bar & Restaurant'),
-        'Bar & Restaurants',
-      );
-      expect(normalizeVenueCategoryLabel('bar'), 'Bar');
-      expect(normalizeVenueCategoryLabel('restaurant'), 'Restaurants');
-      expect(normalizeVenueCategoryLabel('seafood'), 'Seafood');
-      expect(normalizeVenueCategoryLabel(null), 'Restaurants');
-      expect(normalizeVenueCategoryLabel(''), 'Restaurants');
-      expect(normalizeVenueCategoryLabel('  '), 'Restaurants');
+    test('normalizeVenueCategoryLabel always returns fallback (category removed)', () {
+      // After category cleanup, all inputs return the fallback value.
+      expect(normalizeVenueCategoryLabel('hotel'), 'Restaurant');
+      expect(normalizeVenueCategoryLabel('Bar & Restaurant'), 'Restaurant');
+      expect(normalizeVenueCategoryLabel('bar'), 'Restaurant');
+      expect(normalizeVenueCategoryLabel('restaurant'), 'Restaurant');
+      expect(normalizeVenueCategoryLabel('seafood'), 'Restaurant');
+      expect(normalizeVenueCategoryLabel(null), 'Restaurant');
+      expect(normalizeVenueCategoryLabel(''), 'Restaurant');
+      expect(normalizeVenueCategoryLabel('  '), 'Restaurant');
     });
 
     test('isOpen reflects active status', () {
@@ -196,9 +186,14 @@ void main() {
           'supported_payment_methods': ['revolut_link', 'momo_ussd'],
         });
 
-        expect(venue.supportedPaymentMethods, [PaymentMethod.revolutLink]);
+        // Both known methods from the explicit list are preserved
+        expect(venue.supportedPaymentMethods, [
+          PaymentMethod.revolutLink,
+          PaymentMethod.momoUssd,
+        ]);
         expect(venue.supportsPaymentMethod(PaymentMethod.cash), isFalse);
         expect(venue.supportsPaymentMethod(PaymentMethod.revolutLink), isTrue);
+        expect(venue.supportsPaymentMethod(PaymentMethod.momoUssd), isTrue);
       },
     );
 
@@ -418,7 +413,7 @@ void main() {
       expect(locked.needsGeneratedImage, isFalse);
     });
 
-    test('guest display tags show Featured for highlight-only items', () {
+    test('guest display tags exclude removed highlight labels', () {
       final item = MenuItem.fromJson({
         'id': 'item_4',
         'venue_id': 'venue_1',
@@ -428,14 +423,13 @@ void main() {
         'tags': ['vegan', 'halal', 'Chef Pick'],
       });
 
-      // highlightRank alone → "Featured" (not yet earned "Top Pick")
-      expect(item.isPopular, isFalse);
+      // highlightRank is preserved but no longer generates badge labels
       expect(item.isGuestHighlight, isTrue);
-      expect(item.guestHighlightLabel, 'Featured');
+      expect(item.guestHighlightLabel, isNull);
       expect(item.dietaryBadges, ['Vegan', 'Halal']);
       expect(
         item.guestDisplayTags,
-        ['Featured', 'Vegan', 'Halal', 'Chef Pick'],
+        ['Vegan', 'Halal', 'Chef Pick'],
       );
     });
 
@@ -460,7 +454,8 @@ void main() {
       // At threshold (10 orders)
       final atThreshold = base.copyWith(totalOrdered: 10);
       expect(atThreshold.isPopular, isTrue);
-      expect(atThreshold.guestHighlightLabel, 'Popular');
+      // Highlight label removed — always null regardless of popularity
+      expect(atThreshold.guestHighlightLabel, isNull);
 
       // Above threshold
       final above = base.copyWith(totalOrdered: 25);
@@ -478,11 +473,12 @@ void main() {
 
       // Tag-based popularity, no orders needed
       expect(item.isPopular, isTrue);
-      expect(item.guestHighlightLabel, 'Popular');
+      // Highlight label removed — always null
+      expect(item.guestHighlightLabel, isNull);
     });
 
-    test('guestHighlightLabel priority: Top Pick > Popular > Featured > Signature', () {
-      // Case 1: highlighted AND popular → earned "Top Pick"
+    test('guestHighlightLabel always returns null (labels removed)', () {
+      // Case 1: highlighted AND popular
       const both = MenuItem(
         id: 'prio_1',
         venueId: 'v1',
@@ -493,9 +489,9 @@ void main() {
         highlightRank: 1,
         totalOrdered: 10,
       );
-      expect(both.guestHighlightLabel, 'Top Pick');
+      expect(both.guestHighlightLabel, isNull);
 
-      // Case 2: popular only → "Popular"
+      // Case 2: popular only
       const popularOnly = MenuItem(
         id: 'prio_2',
         venueId: 'v1',
@@ -505,9 +501,9 @@ void main() {
         category: 'C',
         totalOrdered: 15,
       );
-      expect(popularOnly.guestHighlightLabel, 'Popular');
+      expect(popularOnly.guestHighlightLabel, isNull);
 
-      // Case 3: highlighted only (no orders) → "Featured"
+      // Case 3: highlighted only (no orders)
       const highlightOnly = MenuItem(
         id: 'prio_2b',
         venueId: 'v1',
@@ -517,9 +513,9 @@ void main() {
         category: 'C',
         highlightRank: 2,
       );
-      expect(highlightOnly.guestHighlightLabel, 'Featured');
+      expect(highlightOnly.guestHighlightLabel, isNull);
 
-      // Case 4: signature only → "Signature"
+      // Case 4: signature only
       const signatureOnly = MenuItem(
         id: 'prio_3',
         venueId: 'v1',
@@ -529,7 +525,7 @@ void main() {
         category: 'C',
         tags: ['signature'],
       );
-      expect(signatureOnly.guestHighlightLabel, 'Signature');
+      expect(signatureOnly.guestHighlightLabel, isNull);
     });
   });
 

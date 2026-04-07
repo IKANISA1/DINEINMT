@@ -196,7 +196,7 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppTheme.space10),
+                    const SizedBox(height: AppTheme.space6),
                     Container(
                       padding: const EdgeInsets.all(AppTheme.space6),
                       decoration: BoxDecoration(

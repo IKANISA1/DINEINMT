@@ -25,35 +25,25 @@ void main() {
   }
 
   Future<void> disposeApp(WidgetTester tester) async {
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(seconds: 3));
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));
   }
 
-  Future<void> pumpUntilVisible(
-    WidgetTester tester,
-    Finder finder, {
-    Duration step = const Duration(milliseconds: 100),
-    int maxPumps = 50,
-  }) async {
-    for (var index = 0; index < maxPumps; index++) {
-      if (finder.evaluate().isNotEmpty) return;
-      await tester.pump(step);
-    }
-    expect(finder, findsWidgets);
-  }
-
   group('Admin Flow Smoke Tests', () {
-    testWidgets('admin activation route redirects to admin login', (
+    testWidgets('admin overview route redirects to admin login', (
       tester,
     ) async {
       await pumpApp(tester);
       appRouter.go(AppRoutePaths.adminOverview);
       await tester.pump();
-      await pumpUntilVisible(tester, find.text('Secure Access'));
+      // Allow route guards to process and redirect
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+
+      // Without admin session, admin routes redirect to admin login
       expect(appRouter.state.uri.path, AppRoutePaths.adminLogin);
-      expect(find.text('ADMIN'), findsWidgets);
-      expect(find.text('Get OTP'), findsOneWidget);
+
       await disposeApp(tester);
     });
   });

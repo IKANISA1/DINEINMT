@@ -11,7 +11,6 @@ class VenueAboutSection extends StatelessWidget {
   final bool isExpanded;
   final VoidCallback onToggle;
   final VoidCallback? onCall;
-  final VoidCallback? onWebsite;
   final VoidCallback? onMaps;
   final VoidCallback? onWifiTap;
 
@@ -20,7 +19,6 @@ class VenueAboutSection extends StatelessWidget {
     required this.isExpanded,
     required this.onToggle,
     required this.onCall,
-    required this.onWebsite,
     required this.onMaps,
     required this.onWifiTap,
   });
@@ -110,22 +108,14 @@ class VenueAboutSection extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    VenueDetailChip(
-                      icon: LucideIcons.clock3,
-                      label: venueOpeningHoursLabel(venue),
-                    ),
+
                     if (venue.phone != null && venue.phone!.trim().isNotEmpty)
                       VenueDetailChip(
                         icon: LucideIcons.phone,
                         label: venue.phone!,
                         onTap: onCall,
                       ),
-                    if (venue.websiteUri != null)
-                      VenueDetailChip(
-                        icon: LucideIcons.globe,
-                        label: 'Website',
-                        onTap: onWebsite,
-                      ),
+
                     if (venue.googleMapsUri != null)
                       VenueDetailChip(
                         icon: LucideIcons.mapPin,
@@ -146,26 +136,6 @@ class VenueAboutSection extends StatelessWidget {
                       ),
                   ],
                 ),
-                if (venue.primaryReviewSnippet != null) ...[
-                  const SizedBox(height: AppTheme.space5),
-                  Text(
-                    'WHAT GUESTS NOTICE',
-                    style: TextStyle(
-                      color: cs.primary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2.2,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    venue.primaryReviewSnippet!,
-                    style: tt.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.82),
-                      height: 1.55,
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -238,43 +208,3 @@ class VenueDetailChip extends StatelessWidget {
 }
 
 
-String venueOpeningHoursLabel(Venue venue) {
-  final hours = venue.openingHours;
-  if (hours == null || hours.isEmpty) {
-    return venue.isOpen ? 'Open Now' : 'Closed';
-  }
-
-  const weekdayNames = <int, String>{
-    DateTime.monday: 'Monday',
-    DateTime.tuesday: 'Tuesday',
-    DateTime.wednesday: 'Wednesday',
-    DateTime.thursday: 'Thursday',
-    DateTime.friday: 'Friday',
-    DateTime.saturday: 'Saturday',
-    DateTime.sunday: 'Sunday',
-  };
-
-  final today = weekdayNames[DateTime.now().weekday];
-  final todayHours = today == null ? null : hours[today];
-  if (todayHours == null) {
-    return venue.isOpen ? 'Open Now' : 'Closed';
-  }
-  if (!todayHours.isOpen) return 'Closed Today';
-  if (todayHours.close.trim().isEmpty) return 'Open Today';
-  return 'Open until ${formatHours(todayHours.close)}';
-}
-
-
-String formatHours(String raw) {
-  final parts = raw.split(':');
-  if (parts.length < 2) return raw.toUpperCase();
-
-  final hour = int.tryParse(parts[0]);
-  final minute = int.tryParse(parts[1]);
-  if (hour == null || minute == null) return raw.toUpperCase();
-
-  final normalizedHour = hour % 12 == 0 ? 12 : hour % 12;
-  final suffix = hour >= 12 ? 'PM' : 'AM';
-  final minutePart = minute == 0 ? '' : ':${minute.toString().padLeft(2, '0')}';
-  return '$normalizedHour$minutePart $suffix';
-}

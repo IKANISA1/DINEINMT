@@ -57,8 +57,7 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                       return venue.name.toLowerCase().contains(q) ||
                           venue.id.toLowerCase().contains(q) ||
                           venue.slug.toLowerCase().contains(q) ||
-                          venue.address.toLowerCase().contains(q) ||
-                          venue.category.toLowerCase().contains(q);
+                          venue.address.toLowerCase().contains(q);
                     })
                     .toList(growable: false);
 
@@ -321,12 +320,7 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                                               fontWeight: FontWeight.w800,
                                             ),
                                           ),
-                                          Text(
-                                            venue.category,
-                                            style: tt.bodySmall?.copyWith(
-                                              color: cs.onSurfaceVariant,
-                                            ),
-                                          ),
+
                                         ],
                                       ),
                                     ],
@@ -434,7 +428,7 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                   ),
                 ),
               const SliverToBoxAdapter(
-                child: SizedBox(height: AppTheme.space24),
+                child: SizedBox(height: AppTheme.space8),
               ),
             ],
           );

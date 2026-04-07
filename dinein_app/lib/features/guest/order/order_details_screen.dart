@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -159,7 +159,7 @@ class OrderDetailsScreen extends ConsumerWidget {
           child: Padding(
             padding: const EdgeInsets.all(AppTheme.space8),
             child: Container(
-              padding: const EdgeInsets.all(AppTheme.space10),
+              padding: const EdgeInsets.all(AppTheme.space6),
               decoration: BoxDecoration(
                 color: cs.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(AppTheme.radius3xl),
@@ -445,10 +445,7 @@ class OrderDetailsScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                  )
-                  .animate(delay: (100 * index).ms)
-                  .fadeIn(duration: 400.ms)
-                  .slideX(begin: -0.1, end: 0);
+                  );
             },
           ),
         ),
@@ -460,10 +457,10 @@ class OrderDetailsScreen extends ConsumerWidget {
               AppTheme.space8,
               0,
               AppTheme.space8,
-              AppTheme.space24,
+              AppTheme.space8,
             ),
             child: Container(
-              padding: const EdgeInsets.all(AppTheme.space10),
+              padding: const EdgeInsets.all(AppTheme.space4),
               decoration: BoxDecoration(
                 color: cs.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(AppTheme.radius3xl),

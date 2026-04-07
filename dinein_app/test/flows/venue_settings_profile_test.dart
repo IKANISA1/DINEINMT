@@ -31,11 +31,7 @@ void main() {
           name: AppRouteNames.venueProfile,
           builder: (_, _) => const Scaffold(body: Text('Profile Screen')),
         ),
-        GoRoute(
-          path: AppRoutePaths.venueHours,
-          name: AppRouteNames.venueHours,
-          builder: (_, _) => const Scaffold(body: Text('Hours Screen')),
-        ),
+
         GoRoute(
           path: AppRoutePaths.venueWifi,
           name: AppRouteNames.venueWifi,
@@ -85,7 +81,6 @@ void main() {
         description: 'Seafront dining.',
         address: 'Valletta Waterfront',
         phone: '+35679991234',
-        email: 'concierge@harbortable.mt',
       );
 
       await tester.pumpWidget(buildScreen(venue));
@@ -101,7 +96,7 @@ void main() {
 
       // Key tiles in the first section
       expect(find.text('Venue Profile'), findsOneWidget);
-      expect(find.text('Opening Hours'), findsOneWidget);
+
       expect(find.text('Venue QR Codes'), findsOneWidget);
 
       // Owner card shows venue name
@@ -128,7 +123,6 @@ void main() {
       description: 'Seafront dining.',
       address: 'Valletta Waterfront',
       phone: '+35679991234',
-      email: 'concierge@harbortable.mt',
     );
 
     await tester.pumpWidget(buildScreen(venue));
@@ -152,7 +146,6 @@ void main() {
       description: 'Seafront dining.',
       address: 'Valletta Waterfront',
       phone: '+35679991234',
-      email: 'concierge@harbortable.mt',
     );
 
     await tester.pumpWidget(buildScreen(venue));

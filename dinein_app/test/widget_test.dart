@@ -31,7 +31,6 @@ void main() {
         AppRoutePaths.venueSettings,
         AppRoutePaths.venueProfile,
         AppRoutePaths.venueTableQr,
-        AppRoutePaths.venueHours,
         AppRoutePaths.venueNotifications,
         AppRoutePaths.venueWaves,
       ];

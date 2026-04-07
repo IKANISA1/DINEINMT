@@ -139,7 +139,7 @@ class CountryConfig {
         return localDigits.length;
       }
     }
-    return country == Country.rw ? 10 : 8;
+    return country == Country.rw ? 9 : 8;
   }
 
   /// Local-digit length accepted for venue WhatsApp login in this country.
@@ -151,7 +151,7 @@ class CountryConfig {
         return localDigits.length;
       }
     }
-    return country == Country.rw ? 10 : 8;
+    return country == Country.rw ? 9 : 8;
   }
 
   /// Share text for venue discovery.

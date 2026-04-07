@@ -24,7 +24,7 @@ abstract final class AppRouteNames {
   static const venueItemReport = 'venueItemReport';
   static const venueProfile = 'venueProfile';
   static const venueTableQr = 'venueTableQr';
-  static const venueHours = 'venueHours';
+
   static const venueNotifications = 'venueNotifications';
   static const venueLanguageRegion = 'venueLanguageRegion';
   static const venueLegal = 'venueLegal';
@@ -85,7 +85,7 @@ abstract final class AppRoutePaths {
   static const venueItemReport = '/venue/item-report';
   static const venueProfile = '/venue/profile';
   static const venueTableQr = '/venue/table-qr';
-  static const venueHours = '/venue/hours';
+
   static const venueNotifications = '/venue/notifications';
   static const venueLanguageRegion = '/venue/language-region';
   static const venueLegal = '/venue/legal';

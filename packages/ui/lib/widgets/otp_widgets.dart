@@ -9,6 +9,9 @@ import 'package:ui/theme/app_theme.dart';
 import 'pressable_scale.dart';
 
 /// Normalize phone input — strips country code prefix, limits to [maxDigits].
+///
+/// Also strips a leading national-dialing '0' when the digit count exceeds
+/// [maxDigits] (e.g. user types '078...' instead of '78...' for RW).
 String normalizePhoneLocalInput(
   String value, {
   String countryCode = '356',
@@ -19,6 +22,10 @@ String normalizePhoneLocalInput(
     digits = digits.substring(2 + countryCode.length);
   } else if (digits.startsWith(countryCode) && digits.length > maxDigits) {
     digits = digits.substring(countryCode.length);
+  }
+  // Strip national-dial prefix '0' (e.g. 078... → 78... for RW)
+  if (digits.length > maxDigits && digits.startsWith('0')) {
+    digits = digits.substring(1);
   }
   if (digits.length > maxDigits) {
     digits = digits.substring(0, maxDigits);
@@ -120,9 +127,9 @@ class CountryPhoneInput extends StatelessWidget {
       onChanged: onChanged,
       countryFlag: config.countryFlag,
       dialCode: config.countryDialCode,
-      hintText: isRw ? '078 123 4567' : '9912 3456',
+      hintText: isRw ? '78 123 4567' : '9912 3456',
       countryCode: config.defaultCountryCode,
-      maxDigits: isRw ? 10 : 8,
+      maxDigits: config.localPhoneLength,
     );
   }
 

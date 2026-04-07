@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -298,7 +298,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                 ],
               ),
             ),
-          ).animate().fadeIn(duration: 300.ms),
+          ),
           const SizedBox(height: AppTheme.space4),
 
           // ═══ STAT CARDS (from orders) ═══
@@ -358,7 +358,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                     ),
                   ),
                 ],
-              ).animate().fadeIn(duration: 400.ms);
+              );
             },
           ),
           const SizedBox(height: AppTheme.space5),
@@ -428,10 +428,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                       child:
                         _OrderPreview(
                               order: order,
-                              // _OrderPreview uses order.formatPrice
-                            )
-                            .animate(delay: (400 + 80 * idx).ms)
-                            .fadeIn(duration: 300.ms),
+                            ),
                     ),
                   );
                 }).toList(),
@@ -473,7 +470,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                 ),
               ),
             ],
-          ).animate(delay: 400.ms).fadeIn(),
+          ),
           const SizedBox(height: AppTheme.space5),
 
           // ═══ ACTIVE WAVES ═══
@@ -638,7 +635,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
             ),
           ),
 
-          const SizedBox(height: AppTheme.space24),
+          const SizedBox(height: AppTheme.space8),
         ],
       ),
     );

@@ -11,7 +11,7 @@ class Venue extends Equatable {
   final String? phone;
   final String? ownerContactPhone;
   final String? ownerWhatsAppNumber;
-  final String? email;
+
   final String? imageUrl;
   final String? revolutUrl;
   final String? momoCode;
@@ -29,9 +29,7 @@ class Venue extends Equatable {
   final double rating;
   final int ratingCount;
   final Country country;
-  final Map<String, OpeningHours>? openingHours;
-  final String? websiteUrl;
-  final String? reservationUrl;
+
   final String? ownerId;
   final List<Review>? reviews;
   final String? googleMapsUri;
@@ -60,7 +58,7 @@ class Venue extends Equatable {
     this.phone,
     this.ownerContactPhone,
     this.ownerWhatsAppNumber,
-    this.email,
+
     this.imageUrl,
     this.revolutUrl,
     this.momoCode,
@@ -78,9 +76,7 @@ class Venue extends Equatable {
     this.rating = 0.0,
     this.ratingCount = 0,
     this.country = Country.mt,
-    this.openingHours,
-    this.websiteUrl,
-    this.reservationUrl,
+
     this.ownerId,
     this.reviews,
     this.googleMapsUri,
@@ -112,7 +108,7 @@ class Venue extends Equatable {
       phone: json['phone'] as String?,
       ownerContactPhone: json['owner_contact_phone'] as String?,
       ownerWhatsAppNumber: json['owner_whatsapp_number'] as String?,
-      email: json['email'] as String?,
+
       imageUrl: json['image_url'] as String?,
       revolutUrl: json['revolut_url'] as String?,
       momoCode: json['momo_code'] as String? ?? json['momoCode'] as String?,
@@ -149,14 +145,7 @@ class Venue extends Equatable {
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
       country: Country.fromCode(json['country'] as String? ?? 'MT'),
-      openingHours: _parseOpeningHours(
-        json['opening_hours'] ?? json['openingHours'],
-      ),
-      websiteUrl:
-          json['website_url'] as String? ?? json['websiteUrl'] as String?,
-      reservationUrl:
-          json['reservation_url'] as String? ??
-          json['reservationUrl'] as String?,
+
       ownerId: json['owner_id'] as String?,
       reviews: (json['reviews'] as List<dynamic>?)
           ?.map((r) => Review.fromJson(r as Map<String, dynamic>))
@@ -191,6 +180,8 @@ class Venue extends Equatable {
         json['supported_payment_methods'] ?? json['supportedPaymentMethods'],
         revolutUrl:
             json['revolut_url'] as String? ?? json['revolutUrl'] as String?,
+        momoCode:
+            json['momo_code'] as String? ?? json['momoCode'] as String?,
       ),
       wifiSsid: json['wifi_ssid'] as String?,
       wifiPassword: json['wifi_password'] as String?,
@@ -212,7 +203,7 @@ class Venue extends Equatable {
     'phone': phone,
     'owner_contact_phone': ownerContactPhone,
     'owner_whatsapp_number': ownerWhatsAppNumber,
-    'email': email,
+
     'image_url': imageUrl,
     'revolut_url': revolutUrl,
     'momo_code': momoCode,
@@ -230,11 +221,7 @@ class Venue extends Equatable {
     'rating': rating,
     'rating_count': ratingCount,
     'country': country.code,
-    'opening_hours': openingHours?.map(
-      (key, value) => MapEntry(key, value.toJson()),
-    ),
-    'website_url': websiteUrl,
-    'reservation_url': reservationUrl,
+
     'owner_id': ownerId,
     'google_maps_uri': googleMapsUri,
     'google_location': googleLocation,
@@ -361,64 +348,6 @@ class Venue extends Equatable {
     return first;
   }
 
-  /// Compact hours hint for card display (e.g. "Closes 22:00" or "Opens 09:00").
-  String? get closingTimeHint {
-    final hours = openingHours;
-    if (hours == null || hours.isEmpty) return null;
-
-    final now = DateTime.now();
-    final dayName = switch (now.weekday) {
-      DateTime.monday => 'Monday',
-      DateTime.tuesday => 'Tuesday',
-      DateTime.wednesday => 'Wednesday',
-      DateTime.thursday => 'Thursday',
-      DateTime.friday => 'Friday',
-      DateTime.saturday => 'Saturday',
-      DateTime.sunday => 'Sunday',
-      _ => 'Monday',
-    };
-
-    final today = hours[dayName];
-    if (today == null || !today.isOpen) return 'Closed today';
-
-    if (isOpenNow) {
-      return today.close.isNotEmpty ? 'Closes ${today.close}' : null;
-    }
-
-    return today.open.isNotEmpty ? 'Opens ${today.open}' : null;
-  }
-
-  bool get isOpenNow {
-    final hours = openingHours;
-    // No hours configured → we don't know if they're open, default to closed.
-    if (hours == null || hours.isEmpty) return false;
-
-    final now = DateTime.now();
-    final dayName = switch (now.weekday) {
-      DateTime.monday => 'Monday',
-      DateTime.tuesday => 'Tuesday',
-      DateTime.wednesday => 'Wednesday',
-      DateTime.thursday => 'Thursday',
-      DateTime.friday => 'Friday',
-      DateTime.saturday => 'Saturday',
-      DateTime.sunday => 'Sunday',
-      _ => 'Monday',
-    };
-
-    final today = hours[dayName];
-    if (today == null || !today.isOpen) return false;
-
-    final openMinutes = _minutesSinceMidnight(today.open);
-    final closeMinutes = _minutesSinceMidnight(today.close);
-    if (openMinutes == null || closeMinutes == null) return false;
-
-    final nowMinutes = now.hour * 60 + now.minute;
-    if (closeMinutes < openMinutes) {
-      return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
-    }
-    return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
-  }
-
   double? distanceInKmFrom(double latitude, double longitude) {
     final venueLatitude = this.latitude;
     final venueLongitude = this.longitude;
@@ -449,15 +378,6 @@ class Venue extends Equatable {
   bool supportsPaymentMethod(PaymentMethod method) =>
       supportedPaymentMethods.contains(method);
 
-  Uri? get websiteUri {
-    final raw = websiteUrl?.trim();
-    if (raw == null || raw.isEmpty) return null;
-    final resolved = raw.startsWith('http://') || raw.startsWith('https://')
-        ? raw
-        : 'https://$raw';
-    return Uri.tryParse(resolved);
-  }
-
   @override
   List<Object?> get props => [
     id,
@@ -468,8 +388,7 @@ class Venue extends Equatable {
     phone,
     ownerContactPhone,
     ownerWhatsAppNumber,
-    websiteUrl,
-    reservationUrl,
+
     revolutUrl,
     momoCode,
     status,
@@ -484,7 +403,7 @@ class Venue extends Equatable {
     accessNumberUpdatedBy,
     normalizedAccessPhone,
     country,
-    openingHours,
+
     ownerId,
     reviews,
     googleMapsUri,
@@ -569,30 +488,3 @@ class Review extends Equatable {
   List<Object?> get props => [author, rating, text];
 }
 
-/// Opening hours for a single day.
-class OpeningHours extends Equatable {
-  final String open;
-  final String close;
-  final bool isOpen;
-
-  const OpeningHours({
-    required this.open,
-    required this.close,
-    this.isOpen = true,
-  });
-
-  factory OpeningHours.fromJson(Map<String, dynamic> json) => OpeningHours(
-    open: json['open'] as String? ?? '',
-    close: json['close'] as String? ?? '',
-    isOpen: json['is_open'] as bool? ?? json['isOpen'] as bool? ?? true,
-  );
-
-  Map<String, dynamic> toJson() => {
-    'open': open,
-    'close': close,
-    'is_open': isOpen,
-  };
-
-  @override
-  List<Object?> get props => [open, close, isOpen];
-}
