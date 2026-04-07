@@ -189,7 +189,10 @@ class MenuRepository {
     final created = MenuItem.fromJson(data as Map<String, dynamic>);
     await _mergeAndPersistLocalMenuItems(created.venueId, [created]);
     if (created.needsGeneratedImage) {
-      unawaited(_queueMenuItemImageGenerationSilently(created.id));
+      unawaited(_queueMenuItemImageGenerationSilently(
+        created.id,
+        venueId: created.venueId,
+      ));
     }
     return created;
   }
@@ -330,9 +333,12 @@ class MenuRepository {
     }
   }
 
-  Future<void> _queueMenuItemImageGenerationSilently(String itemId) async {
+  Future<void> _queueMenuItemImageGenerationSilently(
+    String itemId, {
+    String? venueId,
+  }) async {
     try {
-      await generateMenuItemImage(itemId);
+      await generateMenuItemImage(itemId, venueId: venueId);
     } catch (_) {
       // Background queue attempts should never block CRUD flows.
     }

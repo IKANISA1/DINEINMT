@@ -12,7 +12,7 @@ import '../../core/providers/bell_providers.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:dinein_app/shared/widgets/shell_scroll_chrome.dart';
-import 'package:dinein_app/shared/widgets/notification_bell_button.dart';
+
 import 'shared/bell_requests_sheet.dart';
 
 /// Venue portal shell — matches React VenueLayout.tsx exactly.
@@ -531,7 +531,7 @@ class _VenueTopBar extends ConsumerWidget {
                     );
                   },
                 ),
-              const NotificationBellButton(),
+
               const SizedBox(width: 4),
 
               // ─── Avatar ───

@@ -257,7 +257,10 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
       }
 
       if (existing != null && savedItem.needsGeneratedImage) {
-        unawaited(MenuRepository.instance.generateMenuItemImage(savedItem.id));
+        unawaited(MenuRepository.instance.generateMenuItemImage(
+          savedItem.id,
+          venueId: venue.id,
+        ));
       }
 
       ref.invalidate(menuItemsProvider(venue.id));
@@ -340,6 +343,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
       );
       final result = await MenuRepository.instance.generateMenuItemImage(
         existing.id,
+        venueId: venue.id,
         forceRegenerate: existing.hasImage,
       );
       ref.invalidate(menuItemsProvider(venue.id));
