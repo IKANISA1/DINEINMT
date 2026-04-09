@@ -156,6 +156,52 @@ void main() {
     expect(notifier.quantityOf('nonexistent'), 0);
   });
 
+  test('different notes create separate cart lines for the same menu item', () {
+    final item = MockData.menuItems.first;
+    notifier.addItem(item, note: 'No onions');
+    notifier.addItem(item, note: 'Extra spicy');
+
+    final state = container.read(cartProvider);
+
+    expect(state.items, hasLength(2));
+    expect(state.items.map((entry) => entry.note), containsAll([
+      'No onions',
+      'Extra spicy',
+    ]));
+  });
+
+  test('quantityOf aggregates across note variants', () {
+    final item = MockData.menuItems.first;
+    notifier.addItem(item, note: 'No onions');
+    notifier.addItem(item, note: 'Extra spicy');
+    notifier.addItem(item);
+
+    expect(notifier.quantityOf(item.id), 3);
+  });
+
+  test('setQuantity updates a specific note-aware cart line', () {
+    final item = MockData.menuItems.first;
+    notifier.addItem(item, note: 'No onions');
+    notifier.addItem(item, note: 'Extra spicy');
+
+    final state = container.read(cartProvider);
+    final noOnionsLine = state.items.firstWhere(
+      (entry) => entry.note == 'No onions',
+    );
+
+    notifier.setQuantity(noOnionsLine.lineId, 4, note: noOnionsLine.note);
+
+    final updatedState = container.read(cartProvider);
+    expect(
+      updatedState.items.firstWhere((entry) => entry.note == 'No onions').quantity,
+      4,
+    );
+    expect(
+      updatedState.items.firstWhere((entry) => entry.note == 'Extra spicy').quantity,
+      1,
+    );
+  });
+
   test('currency symbol defaults to EUR', () {
     final state = container.read(cartProvider);
     expect(state.currencySymbol, '€');

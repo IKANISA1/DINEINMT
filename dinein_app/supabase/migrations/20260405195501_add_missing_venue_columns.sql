@@ -1,16 +1,8 @@
 -- Add missing columns directly from Edge Function payloads
 DO $$ 
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dinein_venues' AND column_name='owner_contact_phone') THEN
-    ALTER TABLE public.dinein_venues ADD COLUMN owner_contact_phone TEXT;
-  END IF;
-
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dinein_venues' AND column_name='owner_whatsapp_number') THEN
     ALTER TABLE public.dinein_venues ADD COLUMN owner_whatsapp_number TEXT;
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dinein_venues' AND column_name='normalized_access_phone') THEN
-    ALTER TABLE public.dinein_venues ADD COLUMN normalized_access_phone TEXT;
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dinein_venues' AND column_name='revolut_url') THEN

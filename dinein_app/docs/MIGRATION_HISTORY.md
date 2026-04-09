@@ -45,7 +45,7 @@ These are the active migrations for the DineIn dine-in ordering system.
 
 | Range | Count | Purpose |
 |-------|-------|---------|
-| `20260301*` – `20260307*` | 14 | Foundation: venues, menus, orders, profiles, claims, bell system |
+| `20260301*` – `20260307*` | 14 | Foundation: venues, menus, orders, profiles, venue access, bell system |
 | `20260308*` – `20260318*` | 8 | Menu images, OCR pipelines, analytics, admin tools |
 | `20260319*` – `20260321*` | 11 | Order security, image backfill, venue enrichment, normalization |
 | `20260322000100` – `20260322014000` | 13 | Release hardening, bell/storage policies, order numbers, profile images, push notifications |
@@ -61,7 +61,6 @@ These are the active migrations for the DineIn dine-in ordering system.
 - `dinein_orders`, `dinein_order_items`
 - `dinein_bell_requests`
 - `dinein_profiles`
-- `dinein_venue_claims`
 - `dinein_push_registrations`
 - `dinein_admin_managed_menu_groups`
 - `dinein_guest_analytics_events`

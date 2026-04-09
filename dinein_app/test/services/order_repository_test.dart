@@ -1,8 +1,14 @@
+import 'dart:convert';
+
 import 'package:core_pkg/constants/enums.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/services/auth_repository.dart';
 import 'package:dinein_app/core/services/order_repository.dart';
+import 'package:dinein_app/core/services/order_receipt_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fixtures/mock_api_invoker.dart';
+import '../fixtures/mock_secure_storage.dart';
 
 /// Minimal order JSON matching Order.fromJson expectations.
 Map<String, dynamic> _orderJson({
@@ -35,12 +41,82 @@ Map<String, dynamic> _orderJson({
 };
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   late MockApiInvoker mock;
   late OrderRepository repo;
 
   setUp(() {
+    MockSecureStorage.setup();
+    MockSecureStorage.clear();
     mock = MockApiInvoker();
     repo = OrderRepository.forTesting(invoker: mock.invoke);
+  });
+
+  tearDown(() async {
+    await AuthRepository.instance.clearVenueSession();
+  });
+
+  group('issueRealtimeAccess', () {
+    test(
+      'issues order-scoped access and forwards a saved receipt token',
+      () async {
+        await OrderReceiptService.instance.saveReceiptToken(
+          'order-123',
+          'receipt-token-123',
+        );
+        mock.registerResponse('issue_order_realtime_access', {
+          'access_token': 'jwt-order-token',
+          'expires_at': '2026-04-08T18:30:00Z',
+        });
+
+        final access = await repo.issueRealtimeAccess(orderId: 'order-123');
+
+        final inv = mock.lastInvocation('issue_order_realtime_access')!;
+        expect(inv.payload?['orderId'], 'order-123');
+        expect(inv.payload?['receiptToken'], 'receipt-token-123');
+        expect(inv.payload?.containsKey('venueId'), isFalse);
+        expect(access.accessToken, 'jwt-order-token');
+        expect(access.expiresAt, DateTime.parse('2026-04-08T18:30:00Z'));
+      },
+    );
+
+    test('issues venue-scoped access without receipt data', () async {
+      await AuthRepository.instance.saveVenueSession(
+        VenueAccessSession(
+          venueId: 'venue-789',
+          venueName: 'Realtime Venue',
+          whatsAppNumber: '+250795588248',
+          accessToken: 'venue-session-token',
+          issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
+          expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
+        ),
+      );
+      mock.registerResponse('issue_order_realtime_access', {
+        'accessToken': 'jwt-venue-token',
+        'expiresAt': '2026-04-08T19:00:00Z',
+      });
+
+      final access = await repo.issueRealtimeAccess(venueId: 'venue-789');
+
+      final inv = mock.lastInvocation('issue_order_realtime_access')!;
+      expect(inv.payload?['venueId'], 'venue-789');
+      expect(inv.payload?['venue_session'], {
+        'access_token': 'venue-session-token',
+      });
+      expect(inv.payload?.containsKey('orderId'), isFalse);
+      expect(inv.payload?.containsKey('receiptToken'), isFalse);
+      expect(access.accessToken, 'jwt-venue-token');
+      expect(access.expiresAt, DateTime.parse('2026-04-08T19:00:00Z'));
+    });
+
+    test('rejects missing and mixed scopes', () {
+      expect(() => repo.issueRealtimeAccess(), throwsA(isA<AssertionError>()));
+      expect(
+        () => repo.issueRealtimeAccess(orderId: 'o1', venueId: 'v1'),
+        throwsA(isA<AssertionError>()),
+      );
+    });
   });
 
   group('getOrdersForVenue', () {
@@ -71,6 +147,28 @@ void main() {
       expect(inv.payload?['venueId'], 'my-venue');
       expect(inv.payload?['limit'], 20);
       expect(inv.payload?['offset'], 0);
+    });
+
+    test('restores the persisted venue session into the payload', () async {
+      MockSecureStorage.setMockValue(
+        'dinein.venue_session',
+        jsonEncode(
+          VenueAccessSession(
+            venueId: 'my-venue',
+            venueName: 'My Venue',
+            whatsAppNumber: '+250795588248',
+            accessToken: 'venue-token',
+            issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
+            expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
+          ).toJson(),
+        ),
+      );
+      mock.registerResponse('get_orders_for_venue', <dynamic>[]);
+
+      await repo.getOrdersForVenue('my-venue');
+
+      final inv = mock.lastInvocation('get_orders_for_venue')!;
+      expect(inv.payload?['venue_session'], {'access_token': 'venue-token'});
     });
 
     test('returns empty list when no orders', () async {
@@ -130,6 +228,16 @@ void main() {
 
   group('updateOrderStatus', () {
     test('sends correct action and payload', () async {
+      await AuthRepository.instance.saveVenueSession(
+        VenueAccessSession(
+          venueId: 'venue-1',
+          venueName: 'Updater',
+          whatsAppNumber: '+35677186193',
+          accessToken: 'update-token',
+          issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
+          expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
+        ),
+      );
       mock.registerResponse('update_order_status', null);
 
       await repo.updateOrderStatus('order-x', OrderStatus.received);
@@ -137,6 +245,7 @@ void main() {
       final inv = mock.lastInvocation('update_order_status')!;
       expect(inv.payload?['orderId'], 'order-x');
       expect(inv.payload?['status'], 'received');
+      expect(inv.payload?['venue_session'], {'access_token': 'update-token'});
     });
 
     test('supports all valid status transitions', () async {

@@ -14,8 +14,8 @@ class BellRepository {
 
   static const _pollInterval = Duration(seconds: 4);
 
-  Map<String, dynamic> _venueSessionPayload() {
-    final session = AuthRepository.instance.currentVenueSession;
+  Future<Map<String, dynamic>> _venueSessionPayload() async {
+    final session = await AuthRepository.instance.ensureVenueSession();
     if (session == null || session.accessToken.isEmpty) return const {};
     return {
       'venue_session': {'access_token': session.accessToken},
@@ -40,7 +40,7 @@ class BellRepository {
   Future<void> resolveWave(String requestId) async {
     await _invoke(
       'resolve_bell_request',
-      payload: {'requestId': requestId, ..._venueSessionPayload()},
+      payload: {'requestId': requestId, ...await _venueSessionPayload()},
     );
   }
 
@@ -54,7 +54,7 @@ class BellRepository {
               payload: {
                 'venueId': venueId,
                 if (status != null) 'status': status.dbValue,
-                ..._venueSessionPayload(),
+                ...await _venueSessionPayload(),
               },
             )
             as List<dynamic>;
@@ -80,9 +80,9 @@ class BellRepository {
       // Yield empty on first fetch failure — UI will show empty state.
     }
     yield lastGood;
-    yield* Stream<List<BellRequest>>.periodic(
-      _pollInterval,
-    ).asyncMap((_) async {
+    yield* Stream<List<BellRequest>>.periodic(_pollInterval).asyncMap((
+      _,
+    ) async {
       try {
         lastGood = await getBellRequests(venueId, status: status);
       } catch (_) {

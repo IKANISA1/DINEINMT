@@ -4,13 +4,13 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('CountryConfig admin WhatsApp settings', () {
     test('Malta uses the current admin WhatsApp number and local length', () {
-      expect(CountryConfig.mt.supportWhatsApp, '35699711145');
+      expect(CountryConfig.mt.adminAccessWhatsApp, '35699711145');
       expect(CountryConfig.mt.adminWhatsAppLocalDigits, 8);
     });
 
     test('Rwanda uses the current admin WhatsApp number and local length', () {
-      expect(CountryConfig.rw.supportWhatsApp, '250795588248');
-      expect(CountryConfig.rw.adminWhatsAppLocalDigits, 9);
+      expect(CountryConfig.rw.adminAccessWhatsApp, '25075588248');
+      expect(CountryConfig.rw.adminWhatsAppLocalDigits, 8);
     });
   });
 
@@ -25,18 +25,24 @@ void main() {
       expect(CountryConfig.rw.venueWhatsAppLocalDigits, 9);
     });
 
-    test('venueWhatsAppLocalDigits matches adminWhatsAppLocalDigits for MT', () {
-      expect(
-        CountryConfig.mt.venueWhatsAppLocalDigits,
-        CountryConfig.mt.adminWhatsAppLocalDigits,
-      );
-    });
+    test(
+      'venueWhatsAppLocalDigits matches adminWhatsAppLocalDigits for MT',
+      () {
+        expect(
+          CountryConfig.mt.venueWhatsAppLocalDigits,
+          CountryConfig.mt.adminWhatsAppLocalDigits,
+        );
+      },
+    );
 
-    test('venueWhatsAppLocalDigits matches adminWhatsAppLocalDigits for RW', () {
-      expect(
-        CountryConfig.rw.venueWhatsAppLocalDigits,
-        CountryConfig.rw.adminWhatsAppLocalDigits,
-      );
-    });
+    test(
+      'Rwanda venue and admin WhatsApp lengths are intentionally different',
+      () {
+        expect(
+          CountryConfig.rw.venueWhatsAppLocalDigits,
+          isNot(CountryConfig.rw.adminWhatsAppLocalDigits),
+        );
+      },
+    );
   });
 }

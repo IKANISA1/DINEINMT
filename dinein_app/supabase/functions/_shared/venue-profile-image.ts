@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildGooglePlacePhotoUri } from "./google-places.ts";
 import {
   createVenueAdminClient,
   fetchVenueForEnrichment,
@@ -14,8 +15,13 @@ export interface VenueProfileImageEnv {
   supabaseUrl: string;
   supabaseServiceRoleKey: string;
   geminiApiKey: string;
+  googleMapsApiKey: string | null;
   venueImageModels: string[];
   venueImageBucket: string;
+  venueImageReferenceLimit: number;
+  venueDeepResearchAgent: string | null;
+  venueDeepResearchPollMs: number;
+  venueDeepResearchMaxWaitMs: number;
   cronSecret: string | null;
 }
 
@@ -47,11 +53,22 @@ interface GeminiImagePayload {
   model: string;
 }
 
+interface VenueReferenceImagePayload {
+  data: string;
+  mimeType: string;
+  sourceUrl: string;
+}
+
 interface VenueSceneDirection {
   scene: string;
   lighting: string;
   styling: string;
   background: string;
+}
+
+interface VenueDeepResearchResult {
+  summary: string;
+  sourceUrls: string[];
 }
 
 const externalRequestTimeoutMs = 60000;
@@ -91,6 +108,7 @@ export function getVenueProfileImageEnv(): VenueProfileImageEnv {
     supabaseUrl,
     supabaseServiceRoleKey,
     geminiApiKey,
+    googleMapsApiKey: Deno.env.get("GOOGLE_MAPS_API_KEY")?.trim() || null,
     venueImageModels: (
       Deno.env.get("GEMINI_VENUE_IMAGE_MODELS") ??
         "gemini-2.5-flash-image"
@@ -100,6 +118,33 @@ export function getVenueProfileImageEnv(): VenueProfileImageEnv {
       .filter(Boolean),
     venueImageBucket: Deno.env.get("VENUE_IMAGE_BUCKET")?.trim() ||
       "venue-images",
+    venueImageReferenceLimit: Math.max(
+      1,
+      Math.min(
+        4,
+        Number.parseInt(
+          Deno.env.get("VENUE_IMAGE_REFERENCE_LIMIT")?.trim() ?? "3",
+          10,
+        ) || 3,
+      ),
+    ),
+    venueDeepResearchAgent:
+      Deno.env.get("GEMINI_VENUE_DEEP_RESEARCH_AGENT")?.trim() ||
+      null,
+    venueDeepResearchPollMs: Math.max(
+      1000,
+      Number.parseInt(
+        Deno.env.get("GEMINI_VENUE_DEEP_RESEARCH_POLL_MS")?.trim() ?? "5000",
+        10,
+      ) || 5000,
+    ),
+    venueDeepResearchMaxWaitMs: Math.max(
+      0,
+      Number.parseInt(
+        Deno.env.get("GEMINI_VENUE_DEEP_RESEARCH_MAX_WAIT_MS")?.trim() ?? "0",
+        10,
+      ) || 0,
+    ),
     cronSecret: Deno.env.get("VENUE_IMAGE_CRON_SECRET")?.trim() || null,
   };
 }
@@ -245,9 +290,12 @@ export async function processVenueProfileImageGeneration(
 
   try {
     let groundedVenue = venue;
+    const needsReferenceGrounding = countVenueReferenceImages(groundedVenue) ===
+      0;
     if (
       forceGroundingRefresh ||
-      !hasGroundedVenueImageContext(groundedVenue, skipSearchGrounding)
+      !hasGroundedVenueImageContext(groundedVenue, skipSearchGrounding) ||
+      needsReferenceGrounding
     ) {
       groundedVenue = await ensureGroundedVenueContext(
         adminClient,
@@ -266,11 +314,22 @@ export async function processVenueProfileImageGeneration(
       );
     }
 
-    const prompt = buildVenueProfileImagePrompt(groundedVenue);
+    const referenceImageUrls = extractVenueReferenceImageUrls(
+      groundedVenue,
+      env.venueImageReferenceLimit,
+      env.googleMapsApiKey,
+    );
+    const referenceImages = await loadVenueReferenceImages(referenceImageUrls);
+    const deepResearch = await maybeRunVenueDeepResearch(env, groundedVenue);
+    const prompt = buildVenueProfileImagePrompt(groundedVenue, {
+      referenceImageCount: referenceImages.length,
+      deepResearchSummary: deepResearch?.summary ?? null,
+    });
     const generated = await generateGeminiVenueImage({
       apiKey: env.geminiApiKey,
       models: env.venueImageModels,
       prompt,
+      referenceImages,
     });
 
     const extension = extensionForMimeType(generated.mimeType);
@@ -339,7 +398,15 @@ export async function processVenueProfileImageGeneration(
   }
 }
 
-export function buildVenueProfileImagePrompt(venue: VenueRecord): string {
+export interface VenueProfileImagePromptOptions {
+  referenceImageCount?: number;
+  deepResearchSummary?: string | null;
+}
+
+export function buildVenueProfileImagePrompt(
+  venue: VenueRecord,
+  options: VenueProfileImagePromptOptions = {},
+): string {
   const category = venue.category?.trim() || "Restaurants";
   const primaryType = venue.google_primary_type?.trim() || "";
   const placeSummary = cleanPromptText(venue.google_place_summary) ||
@@ -358,12 +425,19 @@ export function buildVenueProfileImagePrompt(venue: VenueRecord): string {
     ? `${venue.rating_count}`
     : "";
   const sceneDirection = buildVenueSceneDirection(venue);
+  const localityCue = buildVenueLocalityCue(venue);
+  const visualEvidenceCue = buildVenueVisualEvidenceCue(venue);
+  const deepResearchCue = cleanPromptText(options.deepResearchSummary) || "";
+  const referenceInstruction =
+    options.referenceImageCount && options.referenceImageCount > 0
+      ? `Use the ${options.referenceImageCount} attached public venue reference image(s) as factual guidance for the venue's architecture, facade, interior materials, lighting mood, streetscape, and geographic setting.`
+      : "No reference images are attached, so rely strictly on the grounded venue facts and locality rules below.";
 
   return `
 Create a photorealistic venue profile hero image for a hospitality marketplace app.
 
 The image must represent the venue itself, not a food product shot.
-Use only the grounded venue facts below. Do not invent amenities, views, architecture, or decor that are not supported by the grounded facts.
+Use only the grounded venue facts and attached public reference images below. Do not invent amenities, views, architecture, decor, or regional context that are not supported by the grounded facts or visual references.
 
 ═══ GROUNDED VENUE FACTS ═══
 Venue name: "${venue.name}"
@@ -376,9 +450,15 @@ Price level hint: "${priceLevel}"
 Public rating: "${rating}"
 Public review count: "${ratingCount}"
 
+═══ LOCALITY & VISUAL IDENTITY ═══
+- ${localityCue}
+- ${visualEvidenceCue}
+- ${referenceInstruction}
+${deepResearchCue ? `- Deep research note: "${deepResearchCue}"` : ""}
+
 ═══ IMAGE GOAL ═══
 Generate the most relevant hero image for the venue profile based on the grounded facts above.
-Focus on the venue space, atmosphere, facade, or signature hospitality setting that best represents the venue.
+Focus on the venue space, atmosphere, facade, or signature hospitality setting that best represents this specific venue.
 Do not make a dish, cocktail, coffee cup, or menu item the hero subject unless the grounded venue facts clearly describe a counter scene where it supports the venue environment.
 
 ═══ COMPOSITION ═══
@@ -393,6 +473,8 @@ Do not make a dish, cocktail, coffee cup, or menu item the hero subject unless t
 - No readable logos, signage text, menus, watermarks, or captions.
 - No people as the hero subject. If any guests appear, they must be distant and non-identifiable.
 - No plated dish close-up, isolated drink product shot, or kitchen prep scene as the main image.
+- Do not copy brand marks, signage lettering, or copyrighted artwork from the reference images.
+- Do not genericize the locale; the scene must read as the grounded venue country and setting.
 - No surreal interiors, fantasy architecture, neon cyberpunk styling, or exaggerated luxury cues not grounded in the venue facts.
 - No collage layout. One coherent scene only.
 `.trim();
@@ -402,6 +484,172 @@ export function getErrorMessage(error: unknown): string {
   if (error instanceof HttpError) return error.message;
   if (error instanceof Error) return error.message;
   return String(error);
+}
+
+export function buildVenueLocalityCue(venue: VenueRecord): string {
+  const address = cleanPromptText(venue.address);
+  switch ((venue.country ?? "").trim().toUpperCase()) {
+    case "RW":
+      return [
+        "The venue must read as Rwanda",
+        address
+          ? `and specifically align with the grounded address "${address}"`
+          : "",
+        "with a realistic contemporary Rwandan or Kigali hospitality setting, East African urban context, local greenery, and architecture consistent with public venue photos and grounded venue data.",
+      ].filter(Boolean).join(" ");
+    case "MT":
+      return [
+        "The venue must read as Malta",
+        address
+          ? `and specifically align with the grounded address "${address}"`
+          : "",
+        "with realistic Maltese Mediterranean architecture, limestone textures, coastal or historic urban atmosphere where appropriate, and a streetscape consistent with public venue photos and grounded venue data.",
+      ].filter(Boolean).join(" ");
+    default:
+      return address
+        ? `The venue must align with the grounded address "${address}" and its real local streetscape, architecture, and environment.`
+        : "The venue must align with its grounded local streetscape, architecture, and environment.";
+  }
+}
+
+export function buildVenueVisualEvidenceCue(venue: VenueRecord): string {
+  const photoCount = countVenueReferenceImages(venue);
+  if (photoCount > 0) {
+    return `There are ${photoCount} public venue reference images available. Use them to anchor the facade, interior materials, lighting mood, streetscape, and environmental context of the generated scene.`;
+  }
+
+  return "No public venue reference image is attached, so lean on the grounded Google Maps and Google Search venue summaries without drifting into a generic hospitality stock scene.";
+}
+
+async function maybeRunVenueDeepResearch(
+  env: VenueProfileImageEnv,
+  venue: VenueRecord,
+): Promise<VenueDeepResearchResult | null> {
+  if (!env.venueDeepResearchAgent || env.venueDeepResearchMaxWaitMs <= 0) {
+    return null;
+  }
+
+  const createResponse = await fetchWithTimeout(
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": env.geminiApiKey,
+      },
+      body: JSON.stringify({
+        agent: env.venueDeepResearchAgent,
+        background: true,
+        input: buildVenueDeepResearchPrompt(venue),
+      }),
+    },
+    Math.min(env.venueDeepResearchMaxWaitMs, 15000),
+  );
+
+  if (!createResponse.ok) {
+    return null;
+  }
+
+  let interaction = asRecord(await safeJson(createResponse));
+  const interactionId = stringOrNull(interaction.id);
+  if (!interactionId) {
+    return null;
+  }
+
+  const deadline = Date.now() + env.venueDeepResearchMaxWaitMs;
+  while (Date.now() < deadline) {
+    const status = stringOrNull(interaction.status)?.toLowerCase() ?? "";
+    if (status === "completed") {
+      const report = extractInteractionText(interaction);
+      if (!report) return null;
+      return {
+        summary: summarizeDeepResearchReport(report),
+        sourceUrls: extractUrlsFromText(report),
+      };
+    }
+    if (status === "failed" || status === "cancelled") {
+      return null;
+    }
+
+    await delay(env.venueDeepResearchPollMs);
+    const pollResponse = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/interactions/${
+        encodeURIComponent(interactionId)
+      }`,
+      {
+        method: "GET",
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": env.geminiApiKey,
+        },
+      },
+      Math.min(env.venueDeepResearchPollMs + 2000, 10000),
+    );
+    if (!pollResponse.ok) {
+      return null;
+    }
+    interaction = asRecord(await safeJson(pollResponse));
+  }
+
+  return null;
+}
+
+function buildVenueDeepResearchPrompt(venue: VenueRecord): string {
+  return [
+    "Research this hospitality venue for brand-image generation.",
+    "Prioritize verified public information that helps depict the real venue faithfully.",
+    "Focus on venue identity, facade, interior atmosphere, locality, architecture, materials, streetscape, landscape, and any recurring visual cues visible in public sources.",
+    "Prefer Google Maps, official website, major review sources, and public venue photos.",
+    "Do not invent facts. If something is uncertain, omit it.",
+    "",
+    `Venue name: ${venue.name}`,
+    `Country code: ${venue.country ?? ""}`,
+    `Address: ${venue.address ?? ""}`,
+    `Category: ${venue.category ?? ""}`,
+    `Google Maps summary: ${venue.google_place_summary ?? ""}`,
+    `Google review summary: ${venue.google_review_summary ?? ""}`,
+    `Google Maps URI: ${venue.google_maps_uri ?? ""}`,
+    `Official website: ${venue.website_url ?? ""}`,
+  ].join("\n");
+}
+
+function extractInteractionText(interaction: Json): string | null {
+  const texts: string[] = [];
+  for (const output of asArray(interaction.outputs)) {
+    const row = asRecord(output);
+    const directText = stringOrNull(row.text);
+    if (directText) {
+      texts.push(directText);
+    }
+
+    const parts = asArray(asRecord(row.content).parts);
+    for (const part of parts) {
+      const text = stringOrNull(asRecord(part).text);
+      if (text) {
+        texts.push(text);
+      }
+    }
+  }
+
+  const combined = texts.join("\n\n").trim();
+  return combined.length > 0 ? combined : null;
+}
+
+function summarizeDeepResearchReport(report: string): string {
+  const cleaned = report
+    .replace(/\[[^\]]+\]\([^)]+\)/g, "")
+    .replace(/^#+\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (cleaned.length <= 540) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, 537).trimEnd()}...`;
+}
+
+function extractUrlsFromText(value: string): string[] {
+  const matches = value.match(/https?:\/\/[^\s)>\]]+/g) ?? [];
+  return [...new Set(matches)].slice(0, 8);
 }
 
 async function ensureGroundedVenueContext(
@@ -453,14 +701,25 @@ async function generateGeminiVenueImage({
   apiKey,
   models,
   prompt,
+  referenceImages,
 }: {
   apiKey: string;
   models: string[];
   prompt: string;
+  referenceImages: VenueReferenceImagePayload[];
 }): Promise<GeminiImagePayload> {
   let lastError = "Gemini did not return a venue image.";
 
   for (const model of models) {
+    const parts = [
+      ...referenceImages.map((reference) => ({
+        inlineData: {
+          data: reference.data,
+          mimeType: reference.mimeType,
+        },
+      })),
+      { text: prompt },
+    ];
     const response = await fetchWithTimeout(
       `https://generativelanguage.googleapis.com/v1beta/models/${
         encodeURIComponent(model)
@@ -473,7 +732,7 @@ async function generateGeminiVenueImage({
         },
         body: JSON.stringify({
           contents: [{
-            parts: [{ text: prompt }],
+            parts,
           }],
           generationConfig: buildGeminiImageGenerationConfig({
             aspectRatio: "16:9",
@@ -710,6 +969,167 @@ function buildVenueSceneDirection(venue: VenueRecord): VenueSceneDirection {
   };
 }
 
+export function extractVenueReferenceImageUrls(
+  venue: VenueRecord,
+  limit = 3,
+  googleMapsApiKey?: string | null,
+): string[] {
+  const urls: string[] = [];
+  const normalizedLimit = Math.max(0, Math.min(6, limit));
+  const mapsApiKey = googleMapsApiKey?.trim() || null;
+
+  for (const photo of asArray(venue.google_photos)) {
+    const row = asRecord(photo);
+    const url = cleanReferenceImageUrl(
+      (mapsApiKey && stringOrNull(row.name))
+        ? buildGooglePlacePhotoUri(stringOrNull(row.name)!, mapsApiKey)
+        : null,
+    ) ?? cleanReferenceImageUrl(
+      buildGooglePlacePhotoUrlFromStoredPath(
+        stringOrNull(row.photo_path) ?? stringOrNull(row.photoPath),
+        mapsApiKey,
+      ),
+    ) ?? cleanReferenceImageUrl(
+      stringOrNull(row.photo_uri) ?? stringOrNull(row.photoUri) ??
+        stringOrNull(row.uri),
+    );
+    if (url && !urls.includes(url)) {
+      urls.push(url);
+    }
+    if (urls.length >= normalizedLimit) {
+      return urls;
+    }
+  }
+
+  const discoveredImageUrl = cleanReferenceImageUrl(venue.image_url);
+  if (
+    discoveredImageUrl &&
+    normalizeVenueImageSource(venue.image_source) == null &&
+    !urls.includes(discoveredImageUrl)
+  ) {
+    urls.push(discoveredImageUrl);
+  }
+
+  return urls.slice(0, normalizedLimit);
+}
+
+export function countVenueReferenceImages(venue: VenueRecord): number {
+  let count = 0;
+  for (const photo of asArray(venue.google_photos)) {
+    const row = asRecord(photo);
+    if (
+      stringOrNull(row.name) ||
+      stringOrNull(row.photo_path) ||
+      stringOrNull(row.photoPath) ||
+      stringOrNull(row.photo_uri) ||
+      stringOrNull(row.photoUri) ||
+      stringOrNull(row.uri)
+    ) {
+      count += 1;
+    }
+  }
+  if (
+    count === 0 &&
+    cleanReferenceImageUrl(venue.image_url) &&
+    normalizeVenueImageSource(venue.image_source) == null
+  ) {
+    return 1;
+  }
+  return count;
+}
+
+function buildGooglePlacePhotoUrlFromStoredPath(
+  path: string | null,
+  googleMapsApiKey: string | null,
+): string | null {
+  const candidate = path?.trim();
+  if (!candidate || !googleMapsApiKey) {
+    return null;
+  }
+  try {
+    const url = new URL(candidate);
+    url.searchParams.set("key", googleMapsApiKey);
+    return url.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
+async function loadVenueReferenceImages(
+  urls: string[],
+): Promise<VenueReferenceImagePayload[]> {
+  const results: VenueReferenceImagePayload[] = [];
+  for (const url of urls) {
+    try {
+      const reference = await fetchVenueReferenceImage(url);
+      if (reference) {
+        results.push(reference);
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+  return results;
+}
+
+async function fetchVenueReferenceImage(
+  url: string,
+): Promise<VenueReferenceImagePayload | null> {
+  const response = await fetchWithTimeout(url, undefined, 12000);
+  if (!response.ok) return null;
+
+  const mimeType = normalizeReferenceImageMimeType(
+    response.headers.get("content-type"),
+  );
+  if (!mimeType) return null;
+
+  const contentLength = Number.parseInt(
+    response.headers.get("content-length") ?? "",
+    10,
+  );
+  if (Number.isFinite(contentLength) && contentLength > 6_000_000) {
+    return null;
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.length == 0 || bytes.length > 6_000_000) {
+    return null;
+  }
+
+  return {
+    data: encodeBytesToBase64(bytes),
+    mimeType,
+    sourceUrl: url,
+  };
+}
+
+function cleanReferenceImageUrl(
+  value: string | null | undefined,
+): string | null {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+  const normalized = candidate.toLowerCase();
+  if (
+    normalized.endsWith(".svg") ||
+    normalized.includes("logo") ||
+    normalized.includes("favicon") ||
+    normalized.includes("icon") ||
+    normalized.includes("avatar")
+  ) {
+    return null;
+  }
+
+  try {
+    const url = new URL(candidate);
+    if (!["http:", "https:"].includes(url.protocol)) {
+      return null;
+    }
+    return url.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
 function normalizeVenueImageStatus(
   value: string | null,
 ): "pending" | "generating" | "ready" | "failed" {
@@ -795,6 +1215,18 @@ function extensionForMimeType(mimeType: string): string {
   }
 }
 
+function normalizeReferenceImageMimeType(value: string | null): string | null {
+  const normalized = value?.split(";")[0]?.trim().toLowerCase() ?? "";
+  switch (normalized) {
+    case "image/jpeg":
+    case "image/png":
+    case "image/webp":
+      return normalized;
+    default:
+      return null;
+  }
+}
+
 async function fetchWithTimeout(
   input: Request | URL | string,
   init?: RequestInit,
@@ -826,6 +1258,14 @@ async function extractGeminiError(response: Response): Promise<string> {
     );
   } catch (_) {
     return `Gemini request failed with HTTP ${response.status}.`;
+  }
+}
+
+async function safeJson(response: Response): Promise<Json> {
+  try {
+    return asRecord(await response.json());
+  } catch (_) {
+    return {};
   }
 }
 
@@ -865,8 +1305,47 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
   return bytes;
 }
 
+function encodeBytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const slice = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
+}
+
 function parseIsoTime(value: string | null | undefined): number | null {
   if (!value) return null;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function asRecord(value: unknown): Json {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Json
+    : {};
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function stringValue(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return undefined;
+}
+
+function stringOrNull(value: unknown): string | null {
+  return stringValue(value) ?? null;
 }

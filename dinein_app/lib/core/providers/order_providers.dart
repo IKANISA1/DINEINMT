@@ -3,12 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import '../services/order_repository.dart';
+import '../services/order_realtime_service.dart';
 import '../services/order_receipt_service.dart';
 import 'auth_providers.dart';
 import 'order_history_loader.dart';
-import 'order_status_polling.dart';
-
-const _orderPollInterval = Duration(seconds: 4);
 
 /// Orders for the current user (order history).
 final userOrdersProvider = FutureProvider<List<Order>>((ref) async {
@@ -27,10 +25,7 @@ final venueOrdersProvider = StreamProvider.family<List<Order>, String>((
   ref,
   venueId,
 ) async* {
-  yield await OrderRepository.instance.getOrdersForVenue(venueId);
-  yield* Stream<List<Order>>.periodic(
-    _orderPollInterval,
-  ).asyncMap((_) => OrderRepository.instance.getOrdersForVenue(venueId));
+  yield* OrderRealtimeService.instance.watchVenueOrders(venueId);
 });
 
 /// Single order by ID.
@@ -62,11 +57,5 @@ final orderStreamProvider = StreamProvider.family<OrderStatus, String>((
   ref,
   orderId,
 ) async* {
-  yield* pollOrderStatus(
-    pollInterval: _orderPollInterval,
-    fetchStatus: () async {
-      final order = await OrderRepository.instance.getOrderById(orderId);
-      return order?.status;
-    },
-  );
+  yield* OrderRealtimeService.instance.watchOrderStatus(orderId);
 });

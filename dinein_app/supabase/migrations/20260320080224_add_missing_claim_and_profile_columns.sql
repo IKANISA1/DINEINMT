@@ -1,8 +1,3 @@
--- Add missing columns to dinein_venue_claims
-ALTER TABLE dinein_venue_claims ADD COLUMN IF NOT EXISTS venue_name text DEFAULT '';
-ALTER TABLE dinein_venue_claims ADD COLUMN IF NOT EXISTS venue_area text DEFAULT '';
-ALTER TABLE dinein_venue_claims ADD COLUMN IF NOT EXISTS pin text;
-
 -- Add email column to dinein_profiles
 ALTER TABLE dinein_profiles ADD COLUMN IF NOT EXISTS email text;
 

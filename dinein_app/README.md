@@ -7,7 +7,7 @@ It consolidates the previous Flutter app and the Kigali React/Vite app into a
 single Flutter codebase with:
 
 - guest, venue, and admin flows
-- merged venue onboarding and OCR menu-review flows
+- admin-managed venue access plus OCR-assisted menu management
 - mobile apps plus web/PWA app surfaces from one product line
 
 ## Run
@@ -192,9 +192,10 @@ supabase functions deploy --project-ref uskfnszcdqpcfrhjxitl
 - `../dinein-kigali` is now a legacy reference copy, not the primary app.
 - Web and PWA app surfaces are now part of the product direction alongside the
   native mobile apps.
+- Venue access is provisioned from the admin panel. Venue staff log in with the
+  WhatsApp number saved on their venue record.
 - The mobile backend depends on the `whatsapp-otp` and `dinein-api` Edge
   Functions under `supabase/functions/`.
-- New venue onboarding draft state is stored locally with `shared_preferences`.
 - Committed Flutter smoke and provider tests live under `test/`.
 - `flutter analyze` and `flutter test` are the main automated quality gates for
   this mobile app.

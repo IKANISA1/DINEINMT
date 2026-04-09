@@ -119,7 +119,7 @@ Evidence from current packaged Android artifact:
   - `READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` are merged from the camera stack
   - `GET_CONTENT` query comes from `file_picker`
   Source: `/Volumes/PRO-G40/DINEIN MALTA/dinein_app/build/app/intermediates/manifest_merge_blame_file/mtDebug/processMtDebugMainManifest/manifest-merger-blame-mt-debug-report.txt`
-- Android package diagnostics on the installed app showed requested permissions including `CAMERA`, `RECORD_AUDIO`, `READ_EXTERNAL_STORAGE`, `ACCESS_FINE_LOCATION`, `NEARBY_WIFI_DEVICES`, `POST_NOTIFICATIONS`, and install/runtime grants on the test device.
+- Android package diagnostics on the installed app showed requested permissions including `CAMERA`, `RECORD_AUDIO`, `READ_EXTERNAL_STORAGE`, and `POST_NOTIFICATIONS`, plus install/runtime grants on the test device.
 
 Policy significance:
 
@@ -267,7 +267,7 @@ Recommendation:
 Evidence:
 
 - The only explicit `Semantics` wrapper found in the Flutter codebase is the shared `PressableScale` control: [`pressable_scale.dart`](/Volumes/PRO-G40/DINEIN%20MALTA/dinein_app/lib/shared/widgets/pressable_scale.dart#L103)
-- The app uses many `10px` and `12px` text styles and many truncation patterns across venue and guest surfaces: `rg` findings across venue dashboard, orders, settings, guest menu, venue onboarding, venue browse, admin claims, and shared widgets
+- The app uses many `10px` and `12px` text styles and many truncation patterns across venue and guest surfaces: `rg` findings across venue dashboard, orders, settings, guest menu, venue management, admin venue workflows, and shared widgets
 - The app is forced into dark mode at the app root and on iOS: [`main_mt.dart`](/Volumes/PRO-G40/DINEIN%20MALTA/dinein_app/lib/main_mt.dart#L52), [`Info.plist`](/Volumes/PRO-G40/DINEIN%20MALTA/dinein_app/ios/Runner/Info.plist#L45)
 
 Positive evidence:

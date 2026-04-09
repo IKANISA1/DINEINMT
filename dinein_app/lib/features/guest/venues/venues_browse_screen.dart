@@ -18,8 +18,7 @@ import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
 const _venueFilters = ['All', 'Ordering'];
-
-
+const _openSearchIntent = '1';
 
 class VenuesBrowseScreen extends ConsumerStatefulWidget {
   const VenuesBrowseScreen({super.key});
@@ -39,7 +38,30 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
   int _resultLimit = _pageSize;
   bool _requestingLocation = false;
   bool _trackedBrowseView = false;
+  bool _searchIntentHandled = false;
   GuestVenueFeed? _lastFeed;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final shouldOpenSearch =
+        GoRouterState.of(context).uri.queryParameters[AppRouteParams.search] ==
+        _openSearchIntent;
+
+    if (shouldOpenSearch && !_searchIntentHandled) {
+      _searchIntentHandled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _triggerRouteSearch();
+      });
+      return;
+    }
+
+    if (!shouldOpenSearch) {
+      _searchIntentHandled = false;
+    }
+  }
 
   @override
   void dispose() {
@@ -117,9 +139,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
       if (filter == 'All') {
         _selectedFilters = const ['All'];
       } else {
-        final next = _selectedFilters
-            .where((item) => item != 'All')
-            .toList();
+        final next = _selectedFilters.where((item) => item != 'All').toList();
         if (next.contains(filter)) {
           next.remove(filter);
         } else {
@@ -136,7 +156,19 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
     );
   }
 
-
+  void _triggerRouteSearch() {
+    GoRouter.of(context).replaceNamed(AppRouteNames.venuesBrowse);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _showVenueSearchSheet(
+        context: context,
+        cs: Theme.of(context).colorScheme,
+        tt: Theme.of(context).textTheme,
+        searchController: _searchController,
+        onSearchChanged: _onSearchChanged,
+      );
+    });
+  }
 
   Future<void> _requestLocation() async {
     if (_requestingLocation) return;
@@ -257,6 +289,84 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
       },
     );
   }
+}
+
+void _showVenueSearchSheet({
+  required BuildContext context,
+  required ColorScheme cs,
+  required TextTheme tt,
+  required TextEditingController searchController,
+  required ValueChanged<String> onSearchChanged,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(AppTheme.radiusXl),
+      ),
+    ),
+    builder: (sheetContext) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppTheme.space6,
+          AppTheme.space6,
+          AppTheme.space6,
+          MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: AppTheme.space5),
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainer,
+                borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+                border: Border.all(color: AppColors.white5),
+              ),
+              child: Row(
+                children: [
+                  Icon(LucideIcons.search, size: 20, color: AppColors.white10),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: searchController,
+                      autofocus: true,
+                      onChanged: onSearchChanged,
+                      textInputAction: TextInputAction.search,
+                      onSubmitted: (_) => Navigator.pop(sheetContext),
+                      style: tt.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        filled: false,
+                        hintText: 'Search venues...',
+                        hintStyle: tt.bodyLarge?.copyWith(
+                          color: AppColors.white10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
 
 class _VenuesBody extends StatelessWidget {
@@ -467,73 +577,6 @@ class _VenuesBody extends StatelessWidget {
       ],
     );
   }
-
-  void _showSearchSheet(BuildContext context, ColorScheme cs, TextTheme tt) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppTheme.radiusXl),
-        ),
-      ),
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppTheme.space6, AppTheme.space6, AppTheme.space6,
-            MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36, height: 4,
-                margin: const EdgeInsets.only(bottom: AppTheme.space5),
-                decoration: BoxDecoration(
-                  color: cs.onSurface.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainer,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                  border: Border.all(color: AppColors.white5),
-                ),
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.search, size: 20, color: AppColors.white10),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: searchController,
-                        autofocus: true,
-                        onChanged: onSearchChanged,
-                        textInputAction: TextInputAction.search,
-                        onSubmitted: (_) => Navigator.pop(sheetContext),
-                        style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w800),
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          filled: false,
-                          hintText: 'Search venues...',
-                          hintStyle: tt.bodyLarge?.copyWith(
-                            color: AppColors.white10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 }
 
 class _VenueBrowseLoadingState extends StatelessWidget {
@@ -644,7 +687,6 @@ class _VenueCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
                         Text(
                           venue.name,
                           maxLines: 2,
@@ -655,18 +697,28 @@ class _VenueCard extends StatelessWidget {
                             height: 0.96,
                           ),
                         ),
-                        if (venue.isPromoActive && venue.promoMessage?.isNotEmpty == true)
+                        if (venue.isPromoActive &&
+                            venue.promoMessage?.isNotEmpty == true)
                           Container(
                             margin: const EdgeInsets.only(top: 10),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: cs.secondary.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                              borderRadius: BorderRadius.circular(
+                                AppTheme.radiusMd,
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(LucideIcons.tag, size: 12, color: cs.onSecondary),
+                                Icon(
+                                  LucideIcons.tag,
+                                  size: 12,
+                                  color: cs.onSecondary,
+                                ),
                                 const SizedBox(width: 6),
                                 Flexible(
                                   child: Text(
@@ -687,7 +739,6 @@ class _VenueCard extends StatelessWidget {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-
                             if (venue.canAcceptGuestOrders)
                               const _VenueMetaPill(label: 'ORDERING'),
                             if (venue.priceLevelLabel != null)
@@ -710,7 +761,11 @@ class _VenueCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(LucideIcons.messageSquare, size: 14, color: AppColors.white40),
+                Icon(
+                  LucideIcons.messageSquare,
+                  size: 14,
+                  color: AppColors.white40,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -749,30 +804,22 @@ class _VenueCard extends StatelessWidget {
 
 class _VenueMetaPill extends StatelessWidget {
   final String label;
-  final bool isPrimary;
 
-  const _VenueMetaPill({required this.label, this.isPrimary = false});
+  const _VenueMetaPill({required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isPrimary
-            ? cs.primary.withValues(alpha: 0.14)
-            : Colors.black.withValues(alpha: 0.22),
+        color: Colors.black.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-        border: Border.all(
-          color: isPrimary
-              ? cs.primary.withValues(alpha: 0.28)
-              : AppColors.white10,
-        ),
+        border: Border.all(color: AppColors.white10),
       ),
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          color: isPrimary ? cs.primary : Colors.white,
+          color: Colors.white,
           fontSize: 10,
           fontWeight: FontWeight.w900,
           letterSpacing: 2.0,

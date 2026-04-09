@@ -1,6 +1,7 @@
+// ignore_for_file: avoid_print
 import 'dart:io';
 import 'dart:convert';
-import 'package:supabase/supabase.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   print('Starting E2E Guest Simulator Audit...');
@@ -37,9 +38,6 @@ void main() async {
     final ms = DateTime.now().difference(startTime).inMilliseconds;
     reportResult('Read public venues (Limit 1)', res.isNotEmpty, '- ${ms}ms');
     
-    // Store venue ID for order test if exists
-    final activeVenueId = res.isNotEmpty ? res.first['id'] as String : null;
-
     // TEST 2: Latency testing
     if (ms > 1000) {
       print('⚠️ WARNING: Venue query latency > 1000ms ($ms ms)');

@@ -201,13 +201,13 @@ class WhatsAppOtpService {
         _ =>
           error.message.toLowerCase().contains('not registered for admin') ||
               error.message.toLowerCase().contains(
-                'not linked to a validated venue',
+                'not linked to a registered venue',
               ),
       };
     }
     final raw = error.toString().toLowerCase();
     return raw.contains('not registered for admin') ||
-        raw.contains('not linked to a validated venue');
+        raw.contains('not linked to a registered venue');
   }
 
   Future<WhatsAppOtpVerificationResult> _verifyRemote({

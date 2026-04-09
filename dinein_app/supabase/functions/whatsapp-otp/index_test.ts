@@ -1,6 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import {
-  buildVenueAccessAuditUpdate,
   configuredAdminWhatsAppNumberForCountry,
   selectAdminProfileForPhone,
 } from "./index.ts";
@@ -8,11 +7,11 @@ import {
 Deno.test("configuredAdminWhatsAppNumberForCountry returns the current country number", () => {
   assertEquals(
     configuredAdminWhatsAppNumberForCountry("356"),
-    "+35677186193",
+    "+35699711145",
   );
   assertEquals(
     configuredAdminWhatsAppNumberForCountry("250"),
-    "+250788767816",
+    "+25075588248",
   );
 });
 
@@ -25,42 +24,60 @@ Deno.test("selectAdminProfileForPhone falls back to the configured country admin
       role: "admin",
       whatsapp_number: "+35699742524",
     }],
-    "+35677186193",
+    "+35699711145",
     "356",
   );
 
   assertEquals(profile?.id, "admin-1");
 });
 
-Deno.test("buildVenueAccessAuditUpdate preserves venue access data and verification audit", () => {
-  const issuedAt = "2026-03-21T11:00:00.000Z";
-  const verifiedAt = "2026-03-21T11:01:00.000Z";
-  assertEquals(
-    buildVenueAccessAuditUpdate({
-      id: "venue-123",
-      phone: "+35699123456",
-      owner_contact_phone: "+35699222333",
-      owner_whatsapp_number: "+35699888777",
-      approved_at: "2026-03-21T10:50:00.000Z",
-    }, {
-      issuedAt,
-      verifiedAt,
-      normalizedPhone: "+35699123456",
-      verificationMethod: "otp",
-      verifiedBy: "+35699123456",
-      verificationNote: "Verified via WhatsApp OTP.",
-    }),
-    {
-      normalized_access_phone: "+35699123456",
-      phone: "+35699123456",
-      approved_at: "2026-03-21T10:50:00.000Z",
-      owner_contact_phone: "+35699222333",
-      owner_whatsapp_number: "+35699888777",
-      last_access_token_issued_at: issuedAt,
-      access_verified_at: verifiedAt,
-      access_verification_method: "otp",
-      access_verified_by: "+35699123456",
-      access_verification_note: "Verified via WhatsApp OTP.",
-    },
+Deno.test("selectAdminProfileForPhone matches canonicalized Rwanda numbers", () => {
+  const profile = selectAdminProfileForPhone(
+    [{
+      id: "admin-rw",
+      display_name: "RW Admin",
+      role: "admin",
+      whatsapp_number: "+250075588248",
+    }],
+    "+25075588248",
+    "250",
   );
+
+  assertEquals(profile?.id, "admin-rw");
+});
+
+Deno.test("selectAdminProfileForPhone still falls back when the stored profile has no phone", () => {
+  const profile = selectAdminProfileForPhone(
+    [{
+      id: "admin-2",
+      display_name: "Fallback Admin",
+      role: "admin",
+      whatsapp_number: null,
+    }],
+    "+25075588248",
+    "250",
+  );
+
+  assertEquals(profile?.id, "admin-2");
+});
+
+Deno.test("selectAdminProfileForPhone synthesizes an admin profile when storage is missing", () => {
+  const profile = selectAdminProfileForPhone(
+    [],
+    "+25075588248",
+    "250",
+  );
+
+  assertEquals(profile?.id, "00000000-0000-0000-0000-000000000250");
+  assertEquals(profile?.role, "admin");
+});
+
+Deno.test("selectAdminProfileForPhone still finds configured admin numbers across country defaults", () => {
+  const profile = selectAdminProfileForPhone(
+    [],
+    "+35699711145",
+    "250",
+  );
+
+  assertEquals(profile?.id, "00000000-0000-0000-0000-000000000356");
 });

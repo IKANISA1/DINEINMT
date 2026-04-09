@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd "${script_dir}/.." && pwd)"
 key_properties="${project_dir}/android/key.properties"
 materialize_env_script="${project_dir}/scripts/materialize_release_env.sh"
+icon_validation_script="${project_dir}/scripts/validate_icon_assets.py"
 
 skip_checks=false
 flavor="mt"
@@ -70,6 +71,7 @@ if [[ -f "${materialize_env_script}" ]]; then
 fi
 
 require_file "${env_file}" "release env file"
+require_file "${icon_validation_script}" "icon validation script"
 
 if [[ ! -f "${key_properties}" ]] && ! has_env_signing; then
   echo "Missing Android release signing configuration." >&2
@@ -120,6 +122,8 @@ fi
 
 echo "✅ Supabase credentials validated in ${env_file}"
 # ─────────────────────────────────────────────────────────────────────────────
+
+python3 "${icon_validation_script}"
 
 if [[ "${skip_checks}" != "true" ]]; then
   flutter analyze

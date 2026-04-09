@@ -10,6 +10,7 @@ plugins {
 }
 
 val appId = "com.dineinmalta.app"
+val appNamespace = "com.dinein.app"
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
@@ -38,7 +39,7 @@ val hasReleaseSigning =
     ).all { !it.isNullOrBlank() }
 
 android {
-    namespace = appId
+    namespace = appNamespace
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -86,12 +87,14 @@ android {
             applicationId = "com.dineinmalta.app"
             resValue("string", "app_name", "Dinein MT")
             manifestPlaceholders["appLinkHost"] = "dineinmt.ikanisa.com"
+            manifestPlaceholders["mainActivity"] = "com.dineinmalta.app.MainActivity"
         }
         create("rw") {
             dimension = "country"
             applicationId = "com.dineinrw.app"
             resValue("string", "app_name", "Dinein RW")
             manifestPlaceholders["appLinkHost"] = "dineinrw.ikanisa.com"
+            manifestPlaceholders["mainActivity"] = "com.dineinrw.app.MainActivity"
         }
     }
 

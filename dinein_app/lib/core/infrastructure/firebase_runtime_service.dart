@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
@@ -18,6 +20,12 @@ class FirebaseRuntimeService {
   }
 
   static Future<bool> _initialize() async {
+    if (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST')) {
+      _initialized = true;
+      _initializing = null;
+      return true;
+    }
+
     if (!kIsWeb) {
       try {
         await Firebase.initializeApp();

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS dinein_venues (
   phone TEXT,
   email TEXT,
   image_url TEXT,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'pending_claim', 'pending_activation')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
   rating NUMERIC(3,2) NOT NULL DEFAULT 0.00,
   rating_count INTEGER NOT NULL DEFAULT 0,
   country TEXT NOT NULL DEFAULT 'MT' CHECK (country IN ('MT', 'RW')),

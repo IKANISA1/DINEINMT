@@ -18,7 +18,6 @@ const venue = {
   description: "Cocktails and spirits",
   owner_id: null,
   phone: null,
-  owner_contact_phone: null,
   owner_whatsapp_number: null,
 };
 

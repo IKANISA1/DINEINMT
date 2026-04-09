@@ -74,7 +74,9 @@ class _GuestShellState extends ConsumerState<GuestShell> {
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: AppLayout.guestContentMaxWidth(constraints.maxWidth),
+                  maxWidth: AppLayout.guestContentMaxWidth(
+                    constraints.maxWidth,
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -307,7 +309,10 @@ class _TopAppBarState extends ConsumerState<_TopAppBar> {
               // Search icon
               _AppBarIcon(
                 icon: LucideIcons.search,
-                onTap: () => context.goNamed(AppRouteNames.venuesBrowse),
+                onTap: () => context.goNamed(
+                  AppRouteNames.venuesBrowse,
+                  queryParameters: const {AppRouteParams.search: '1'},
+                ),
               ),
               const SizedBox(width: 4),
               // Notifications

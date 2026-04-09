@@ -1,6 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { postWhatsAppMessage } from "../_shared/whatsapp.ts";
+import {
+  listAdminProfilesWithFallback,
+  persistAdminWhatsAppNumberWithFallback,
+} from "../_shared/admin-profile.ts";
 import { boolEnv, getEnv, intEnv, optionalEnv } from "../_shared/env.ts";
 import {
   base64UrlEncode,
@@ -16,6 +20,11 @@ import {
   errorResponse,
   jsonResponse,
 } from "../_shared/http.ts";
+import {
+  normalizeWhatsAppPhone,
+  optionalNormalizedWhatsAppPhone,
+  phoneNumbersMatch,
+} from "../_shared/phone.ts";
 
 const tableName = "venue_whatsapp_otp_challenges";
 const otpTtlMinutes = intEnv("WHATSAPP_OTP_TTL_MINUTES", 10);
@@ -29,13 +38,16 @@ const defaultCountryCode =
   (Deno.env.get("DEFAULT_WHATSAPP_COUNTRY_CODE") ?? "356")
     .replace(/\D/g, "");
 const fallbackAdminWhatsAppByCountry = new Map<string, string>([
-  ["250", "+250788767816"],
-  ["356", "+35677186193"],
+  ["250", "+25075588248"],
+  ["356", "+35699711145"],
+]);
+const syntheticAdminProfileIdByCountry = new Map<string, string>([
+  ["250", "00000000-0000-0000-0000-000000000250"],
+  ["356", "00000000-0000-0000-0000-000000000356"],
 ]);
 const allowMock = boolEnv("WHATSAPP_OTP_ALLOW_MOCK", false);
 const allowTextFallback = boolEnv("WHATSAPP_OTP_ALLOW_TEXT_FALLBACK", false);
 const allowTestOverride = boolEnv("WHATSAPP_OTP_ALLOW_TEST_OVERRIDE", false);
-const accessVerificationMethods = new Set(["otp", "admin_override"]);
 
 type JsonRecord = Record<string, unknown>;
 type AdminProfile = {
@@ -52,11 +64,7 @@ type VenueAccessRow = {
   slug?: string | null;
   image_url?: string | null;
   status?: string | null;
-  approved_at?: string | null;
-  access_verified_at?: string | null;
-  normalized_access_phone?: string | null;
-  phone?: string | null;
-  owner_contact_phone?: string | null;
+  country?: string | null;
   owner_whatsapp_number?: string | null;
 };
 
@@ -78,46 +86,15 @@ function adminClient() {
 // Imported from crypto.ts
 
 function normalizePhone(raw: string): string {
-  const trimmed = raw.trim();
-  const digits = digitsOnly(trimmed);
-
-  if (!digits) {
-    throw new Error("A valid WhatsApp number is required.");
-  }
-
-  if (trimmed.startsWith("+")) {
-    if (digits.length < 8 || digits.length > 15) {
-      throw new Error("A valid WhatsApp number is required.");
-    }
-    return `+${digits}`;
-  }
-
-  if (trimmed.startsWith("00")) {
-    const normalized = digits.slice(2);
-    if (normalized.length < 8 || normalized.length > 15) {
-      throw new Error("A valid WhatsApp number is required.");
-    }
-    return `+${normalized}`;
-  }
-
-  if (digits.length === 8 && defaultCountryCode.length > 0) {
-    return `+${defaultCountryCode}${digits}`;
-  }
-
-  if (digits.length >= 10 && digits.length <= 15) {
-    return `+${digits}`;
-  }
-
-  throw new Error("A valid WhatsApp number is required.");
+  return normalizeWhatsAppPhone(raw, {
+    defaultCountryCode,
+  });
 }
 
 function optionalNormalizedPhone(raw?: string | null): string | null {
-  if (!raw || !raw.trim()) return null;
-  try {
-    return normalizePhone(raw);
-  } catch {
-    return null;
-  }
+  return optionalNormalizedWhatsAppPhone(raw, {
+    defaultCountryCode,
+  });
 }
 
 export function configuredAdminWhatsAppNumberForCountry(
@@ -137,6 +114,19 @@ export function configuredAdminWhatsAppNumberForCountry(
 
 function configuredAdminWhatsAppNumber(): string | null {
   return configuredAdminWhatsAppNumberForCountry(defaultCountryCode);
+}
+
+function syntheticAdminProfileIdForCountry(countryCode: string): string {
+  const normalizedCountryCode = countryCode.replace(/\D/g, "");
+  return syntheticAdminProfileIdByCountry.get(normalizedCountryCode) ??
+    "00000000-0000-0000-0000-000000000000";
+}
+
+function phoneDefaultCountryCode(value?: string | null): string {
+  const normalized = value?.trim().toUpperCase();
+  if (normalized == "RW") return "250";
+  if (normalized == "MT") return "356";
+  return defaultCountryCode;
 }
 
 function numericOtp(length = 6): string {
@@ -284,20 +274,22 @@ async function getAdminProfileByPhone(
   supabase: ReturnType<typeof adminClient>,
   normalizedPhone: string,
 ): Promise<AdminProfile | null> {
-  const { data, error } = await supabase
-    .from("dinein_profiles")
-    .select("id, display_name, email, role, whatsapp_number")
-    .eq("role", "admin");
-
-  if (error) {
+  try {
+    return selectAdminProfileForPhone(
+      await listAdminProfilesWithFallback(supabase) as AdminProfile[],
+      normalizedPhone,
+      defaultCountryCode,
+    );
+  } catch (error) {
     console.error("[whatsapp-otp] admin profile lookup failed", error);
+    const fallbackProfile = selectAdminProfileForPhone(
+      [],
+      normalizedPhone,
+      defaultCountryCode,
+    );
+    if (fallbackProfile) return fallbackProfile;
     throw new Error("Could not verify admin access configuration.");
   }
-
-  return selectAdminProfileForPhone(
-    (data ?? []) as AdminProfile[],
-    normalizedPhone,
-  );
 }
 
 export function selectAdminProfileForPhone(
@@ -305,125 +297,77 @@ export function selectAdminProfileForPhone(
   normalizedPhone: string,
   countryCode = defaultCountryCode,
 ): AdminProfile | null {
-  const normalizedDigits = digitsOnly(normalizedPhone);
   for (const row of profiles) {
     const rowPhone = typeof row.whatsapp_number === "string"
       ? row.whatsapp_number
       : "";
-    if (digitsOnly(rowPhone) === normalizedDigits) {
+    if (
+      phoneNumbersMatch(rowPhone, normalizedPhone, {
+        defaultCountryCode: countryCode,
+      })
+    ) {
       return row;
     }
   }
 
-  const configuredAdminPhone = configuredAdminWhatsAppNumberForCountry(
+  for (const candidateCountryCode of new Set([
     countryCode,
-  );
-  if (
-    configuredAdminPhone != null &&
-    digitsOnly(configuredAdminPhone) === normalizedDigits
-  ) {
-    return profiles[0] ?? null;
+    defaultCountryCode,
+    "250",
+    "356",
+  ])) {
+    const configuredAdminPhone = configuredAdminWhatsAppNumberForCountry(
+      candidateCountryCode,
+    );
+    if (
+      configuredAdminPhone != null &&
+      phoneNumbersMatch(configuredAdminPhone, normalizedPhone, {
+        defaultCountryCode: candidateCountryCode,
+      })
+    ) {
+      return profiles[0] ?? {
+        id: syntheticAdminProfileIdForCountry(candidateCountryCode),
+        display_name: "Admin",
+        email: null,
+        role: "admin",
+        whatsapp_number: configuredAdminPhone,
+      };
+    }
   }
 
   return null;
+}
+
+function isSyntheticAdminProfile(profile: AdminProfile): boolean {
+  return profile.id === syntheticAdminProfileIdForCountry("250") ||
+    profile.id === syntheticAdminProfileIdForCountry("356") ||
+    profile.id === syntheticAdminProfileIdForCountry(defaultCountryCode);
 }
 
 function venueMatchesPhone(
   venue: VenueAccessRow,
   normalizedPhone: string,
 ): boolean {
-  const targetDigits = digitsOnly(normalizedPhone);
-  if (digitsOnly(venue.normalized_access_phone ?? "") === targetDigits) {
-    return true;
-  }
-  return [
-    venue.phone,
-    venue.owner_contact_phone,
-    venue.owner_whatsapp_number,
-  ].some((value) => digitsOnly(value ?? "") === targetDigits);
-}
-
-export function buildVenueAccessAuditUpdate(
-  venue: VenueAccessRow,
-  args: {
-    issuedAt: string;
-    verifiedAt?: string;
-    normalizedPhone?: string;
-    verificationMethod?: string;
-    verifiedBy?: string;
-    verificationNote?: string | null;
-  },
-): JsonRecord {
-  if (
-    args.verificationMethod &&
-    !accessVerificationMethods.has(args.verificationMethod)
-  ) {
-    throw new Error(
-      `Unsupported access verification method: ${args.verificationMethod}`,
-    );
-  }
-  return {
-    normalized_access_phone: args.normalizedPhone ?? null,
-    phone: venue.phone?.trim() || args.normalizedPhone || null,
-    owner_contact_phone: venue.owner_contact_phone?.trim() ||
-      args.normalizedPhone || null,
-    owner_whatsapp_number: venue.owner_whatsapp_number?.trim() ||
-      args.normalizedPhone || null,
-    approved_at: venue.approved_at ?? args.verifiedAt ?? args.issuedAt,
-    last_access_token_issued_at: args.issuedAt,
-    ...(args.verifiedAt ? { access_verified_at: args.verifiedAt } : {}),
-    ...(args.verifiedAt && args.verificationMethod
-      ? { access_verification_method: args.verificationMethod }
-      : {}),
-    ...(args.verifiedAt && args.verifiedBy
-      ? { access_verified_by: args.verifiedBy }
-      : {}),
-    ...(args.verifiedAt && args.verificationNote !== undefined
-      ? { access_verification_note: args.verificationNote }
-      : {}),
-  };
+  return phoneNumbersMatch(venue.owner_whatsapp_number, normalizedPhone, {
+    defaultCountryCode: phoneDefaultCountryCode(venue.country),
+  });
 }
 
 async function getValidatedVenueByPhone(
   supabase: ReturnType<typeof adminClient>,
   normalizedPhone: string,
 ): Promise<VenueAccessRow | null> {
-  const selectClause =
-    "id, name, slug, image_url, status, approved_at, access_verified_at, normalized_access_phone, phone, owner_contact_phone, owner_whatsapp_number";
   const { data, error } = await supabase
     .from("dinein_venues")
-    .select(selectClause)
-    .eq("status", "active")
-    .eq("normalized_access_phone", normalizedPhone)
-    .maybeSingle();
+    .select("id, name, slug, image_url, status, country, owner_whatsapp_number")
+    .neq("status", "deleted");
 
-  if (!error) {
-    return data as VenueAccessRow | null;
-  }
-
-  const missingNormalizedColumn = `${error.message ?? ""} ${
-    error.details ?? ""
-  }`
-    .toLowerCase()
-    .includes("normalized_access_phone");
-  if (!missingNormalizedColumn) {
+  if (error) {
     console.error("[whatsapp-otp] venue lookup failed", error);
     throw new Error("Could not verify venue access configuration.");
   }
 
-  const { data: legacyData, error: legacyError } = await supabase
-    .from("dinein_venues")
-    .select(
-      "id, name, slug, image_url, status, approved_at, access_verified_at, phone, owner_contact_phone, owner_whatsapp_number",
-    )
-    .eq("status", "active");
-
-  if (legacyError) {
-    console.error("[whatsapp-otp] legacy venue lookup failed", legacyError);
-    throw new Error("Could not verify venue access configuration.");
-  }
-
-  for (const venue of (legacyData ?? []) as VenueAccessRow[]) {
+  for (const venue of (data ?? []) as VenueAccessRow[]) {
     if (venueMatchesPhone(venue, normalizedPhone)) {
       return venue;
     }
@@ -468,16 +412,19 @@ async function persistAdminProfilePhone(
   profile: AdminProfile,
   normalizedPhone: string,
 ): Promise<void> {
+  if (isSyntheticAdminProfile(profile)) return;
+
   const currentDigits = digitsOnly(profile.whatsapp_number ?? "");
   const nextDigits = digitsOnly(normalizedPhone);
   if (currentDigits === nextDigits) return;
 
-  const { error } = await supabase
-    .from("dinein_profiles")
-    .update({ whatsapp_number: normalizedPhone })
-    .eq("id", profile.id);
-
-  if (error) {
+  try {
+    await persistAdminWhatsAppNumberWithFallback(
+      supabase,
+      profile.id,
+      normalizedPhone,
+    );
+  } catch (error) {
     console.error("[whatsapp-otp] admin profile whatsapp sync failed", error);
     throw new Error("Could not persist the admin WhatsApp number.");
   }
@@ -488,7 +435,7 @@ async function buildVenueSession(
   normalizedPhone: string,
 ) {
   if (!venue.id) {
-    throw new Error("The validated venue could not be found.");
+    throw new Error("The registered venue could not be found.");
   }
 
   const issuedAt = new Date();
@@ -524,32 +471,6 @@ async function buildVenueSession(
   };
 }
 
-async function persistVerifiedVenueAccess(
-  supabase: ReturnType<typeof adminClient>,
-  venue: VenueAccessRow,
-  args: {
-    issuedAt: string;
-    verifiedAt: string;
-    normalizedPhone: string;
-    verificationMethod: string;
-    verifiedBy: string;
-    verificationNote?: string | null;
-  },
-): Promise<void> {
-  const { error } = await supabase
-    .from("dinein_venues")
-    .update(buildVenueAccessAuditUpdate(venue, args))
-    .eq("id", venue.id);
-
-  if (error) {
-    console.error(
-      "[whatsapp-otp] venue access audit update failed",
-      error,
-    );
-    throw new Error("Could not persist venue access verification.");
-  }
-}
-
 function testOverrideCode(
   normalizedPhone: string,
   appScope: string,
@@ -569,6 +490,22 @@ function testOverrideCode(
 
   if (configuredScope !== appScope) return null;
   return configuredPhone === normalizedPhone ? configuredCode : null;
+}
+
+function accessLookupErrorResponse(appScope: string): Response {
+  if (appScope === "admin") {
+    return errorResponse(
+      "Admin OTP access is not configured correctly.",
+      500,
+      { reason: "admin_lookup_failed" },
+    );
+  }
+
+  return errorResponse(
+    "Venue OTP access is not configured correctly.",
+    500,
+    { reason: "venue_lookup_failed" },
+  );
 }
 
 async function handleSend(
@@ -599,10 +536,15 @@ async function handleSend(
   }
 
   if (appScope === "admin") {
-    const adminProfile = await getAdminProfileByPhone(
-      supabase,
-      normalizedPhone,
-    );
+    let adminProfile: AdminProfile | null = null;
+    try {
+      adminProfile = await getAdminProfileByPhone(
+        supabase,
+        normalizedPhone,
+      );
+    } catch {
+      return accessLookupErrorResponse(appScope);
+    }
     if (!adminProfile) {
       return errorResponse(
         "This WhatsApp number is not registered for admin console access.",
@@ -611,13 +553,18 @@ async function handleSend(
       );
     }
   } else if (appScope === "venue") {
-    const validatedVenue = await getValidatedVenueByPhone(
-      supabase,
-      normalizedPhone,
-    );
+    let validatedVenue: VenueAccessRow | null = null;
+    try {
+      validatedVenue = await getValidatedVenueByPhone(
+        supabase,
+        normalizedPhone,
+      );
+    } catch {
+      return accessLookupErrorResponse(appScope);
+    }
     if (!validatedVenue) {
       return errorResponse(
-        "This WhatsApp number is not linked to a validated venue account.",
+        "This WhatsApp number is not registered to any venue account.",
         403,
         { reason: "venue_not_found" },
       );
@@ -893,10 +840,15 @@ async function handleVerify(
   let venueSession: JsonRecord | null = null;
   let validatedVenue: VenueAccessRow | null = null;
   if (data.app_scope === "admin") {
-    const adminProfile = await getAdminProfileByPhone(
-      supabase,
-      normalizedPhone,
-    );
+    let adminProfile: AdminProfile | null = null;
+    try {
+      adminProfile = await getAdminProfileByPhone(
+        supabase,
+        normalizedPhone,
+      );
+    } catch {
+      return accessLookupErrorResponse("admin");
+    }
     if (!adminProfile) {
       return jsonResponse(200, {
         success: true,
@@ -920,10 +872,14 @@ async function handleVerify(
       console.error("[whatsapp-otp] admin profile sync failed", error);
     }
   } else if (data.app_scope === "venue") {
-    validatedVenue = await getValidatedVenueByPhone(
-      supabase,
-      normalizedPhone,
-    );
+    try {
+      validatedVenue = await getValidatedVenueByPhone(
+        supabase,
+        normalizedPhone,
+      );
+    } catch {
+      return accessLookupErrorResponse("venue");
+    }
     if (!validatedVenue) {
       return jsonResponse(200, {
         success: true,
@@ -960,31 +916,6 @@ async function handleVerify(
     });
   }
 
-  if (validatedVenue && venueSession?.issued_at) {
-    try {
-      await persistVerifiedVenueAccess(supabase, validatedVenue, {
-        issuedAt: venueSession.issued_at as string,
-        verifiedAt,
-        normalizedPhone,
-        verificationMethod: "otp",
-        verifiedBy: normalizedPhone,
-        verificationNote: "Verified via WhatsApp OTP.",
-      });
-    } catch (error) {
-      console.error(
-        "[whatsapp-otp] venue verification persistence failed",
-        error,
-      );
-      return errorResponse(
-        "Could not persist venue access verification.",
-        500,
-        {
-          reason: "verification_persist_failed",
-        },
-      );
-    }
-  }
-
   return jsonResponse(200, {
     success: true,
     verified: true,
@@ -994,75 +925,82 @@ async function handleVerify(
   });
 }
 
-Deno.serve(async (req) => {
-  let allowedOrigin: string | null = null;
+if (import.meta.main) {
+  Deno.serve(async (req) => {
+    let allowedOrigin: string | null = null;
 
-  try {
-    allowedOrigin = assertAllowedAppOrigin(req);
-    if (req.method === "OPTIONS") {
-      return new Response("ok", {
-        headers: buildResponseHeaders(allowedOrigin, {
-          fallbackWildcard: false,
-        }),
-      });
-    }
-
-    if (req.method !== "POST") {
-      return errorResponse(
-        "Method not allowed.",
-        405,
-        undefined,
-        allowedOrigin,
-      );
-    }
-
-    let body: JsonRecord;
     try {
-      body = (await req.json()) as JsonRecord;
-    } catch {
+      allowedOrigin = assertAllowedAppOrigin(req);
+      if (req.method === "OPTIONS") {
+        return new Response("ok", {
+          headers: buildResponseHeaders(allowedOrigin, {
+            fallbackWildcard: false,
+          }),
+        });
+      }
+
+      if (req.method !== "POST") {
+        return errorResponse(
+          "Method not allowed.",
+          405,
+          undefined,
+          allowedOrigin,
+        );
+      }
+
+      let body: JsonRecord;
+      try {
+        body = (await req.json()) as JsonRecord;
+      } catch {
+        return errorResponse(
+          "A JSON body is required.",
+          400,
+          undefined,
+          allowedOrigin,
+        );
+      }
+
+      const action = String(body.action ?? "").trim().toLowerCase();
+      if (!action) {
+        return errorResponse(
+          "An action is required.",
+          400,
+          undefined,
+          allowedOrigin,
+        );
+      }
+
+      const supabase = adminClient();
+      let response: Response;
+
+      if (action === "send") {
+        response = await handleSend(supabase, body, req);
+        return applyCorsHeaders(response, allowedOrigin, {
+          fallbackWildcard: false,
+        });
+      }
+
+      if (action === "verify") {
+        response = await handleVerify(supabase, body);
+        return applyCorsHeaders(response, allowedOrigin, {
+          fallbackWildcard: false,
+        });
+      }
+
       return errorResponse(
-        "A JSON body is required.",
+        "Unsupported action.",
         400,
         undefined,
         allowedOrigin,
       );
-    }
-
-    const action = String(body.action ?? "").trim().toLowerCase();
-    if (!action) {
+    } catch (error) {
+      console.error("[whatsapp-otp] unhandled error", error);
       return errorResponse(
-        "An action is required.",
-        400,
+        "Unexpected OTP service failure.",
+        500,
         undefined,
         allowedOrigin,
       );
     }
-
-    const supabase = adminClient();
-    let response: Response;
-
-    if (action === "send") {
-      response = await handleSend(supabase, body, req);
-      return applyCorsHeaders(response, allowedOrigin, {
-        fallbackWildcard: false,
-      });
-    }
-
-    if (action === "verify") {
-      response = await handleVerify(supabase, body);
-      return applyCorsHeaders(response, allowedOrigin, {
-        fallbackWildcard: false,
-      });
-    }
-
-    return errorResponse("Unsupported action.", 400, undefined, allowedOrigin);
-  } catch (error) {
-    console.error("[whatsapp-otp] unhandled error", error);
-    return errorResponse(
-      "Unexpected OTP service failure.",
-      500,
-      undefined,
-      allowedOrigin,
-    );
-  }
-});
+  });
+}

@@ -55,6 +55,31 @@ void main() {
     expect(order.items.single.imageUrl, item.imageUrl);
   });
 
+  test('cart preserves item-level notes in built orders', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final venue = MockData.venues.first;
+    final item = MockData.menuItems.firstWhere(
+      (entry) => entry.venueId == venue.id,
+    );
+    final notifier = container.read(cartProvider.notifier);
+
+    notifier.setVenue(
+      venueId: venue.id,
+      venueSlug: venue.slug,
+      venueName: venue.name,
+      venueCountry: venue.country,
+      tableNumber: '4',
+    );
+    notifier.addItem(item, note: 'No onions');
+
+    final order = notifier.buildOrder(paymentMethod: PaymentMethod.cash);
+
+    expect(order.items, hasLength(1));
+    expect(order.items.single.note, 'No onions');
+  });
+
   test(
     'switching venues resets cart items and keeps the new venue context',
     () {

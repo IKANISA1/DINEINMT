@@ -5,7 +5,7 @@ INSERT INTO dinein_venues (id, name, slug, category, description, address, count
   ('a1000000-0000-0000-0000-000000000002', 'Vantage Rooftop', 'vantage-rooftop', 'Rooftop Bar', 'Panoramic harbour views, craft cocktails, and elevated small plates above the Sliema skyline.', '15 Tower Road, Sliema', 'MT', 'active', 4.65, 187),
   ('a1000000-0000-0000-0000-000000000003', 'Lumina Lounge', 'lumina-lounge', 'Cocktail Lounge', 'Ambient cocktail lounge with live jazz, small bites, and an award-winning bar program.', '8 Spinola Bay, St. Julian''s', 'MT', 'active', 4.50, 245),
   ('a1000000-0000-0000-0000-000000000004', 'Porto Fino', 'porto-fino', 'Italian', 'Authentic Italian trattoria nestled in the silent city. Wood-fired pizzas and handmade pasta.', '3 Villegaignon Street, Mdina', 'MT', 'inactive', 4.30, 98),
-  ('a1000000-0000-0000-0000-000000000005', 'Azure Bar', 'azure-bar', 'Beach Bar', 'Laid-back beachside vibes with fresh seafood, local wines, and sunset sessions.', 'Xlendi Bay, Gozo', 'MT', 'pending_claim', 4.10, 56);
+  ('a1000000-0000-0000-0000-000000000005', 'Azure Bar', 'azure-bar', 'Beach Bar', 'Laid-back beachside vibes with fresh seafood, local wines, and sunset sessions.', 'Xlendi Bay, Gozo', 'MT', 'inactive', 4.10, 56);
 
 -- Seed menu items for The Artisan Grill
 INSERT INTO dinein_menu_items (venue_id, name, description, price, category, tags, sort_order) VALUES

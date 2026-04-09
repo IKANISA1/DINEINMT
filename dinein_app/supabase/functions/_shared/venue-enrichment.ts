@@ -1,9 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  fetchGooglePlaceDetails,
+  type GooglePlaceSnapshot,
+  searchGooglePlaceByText,
+} from "./google-places.ts";
 
 export interface VenueEnrichmentEnv {
   supabaseUrl: string;
   supabaseServiceRoleKey: string;
   geminiApiKey: string;
+  googleMapsApiKey: string | null;
   venueEnrichmentModels: string[];
   cronSecret: string | null;
 }
@@ -112,6 +118,7 @@ interface MapsGroundingResult {
   canonicalCategory: string | null;
   confidence: number | null;
   sources: Json[];
+  photos: Json[];
 }
 
 interface SearchGroundingResult {
@@ -237,6 +244,9 @@ export function getVenueEnrichmentEnv(): VenueEnrichmentEnv {
   const supabaseServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")?.trim() ??
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ?? "";
   const geminiApiKey = Deno.env.get("GEMINI_API_KEY")?.trim() ?? "";
+  const googleMapsApiKey = Deno.env.get("GOOGLE_MAPS_API_KEY")?.trim() ||
+    geminiApiKey ||
+    null;
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new HttpError(
       500,
@@ -252,6 +262,7 @@ export function getVenueEnrichmentEnv(): VenueEnrichmentEnv {
     supabaseUrl,
     supabaseServiceRoleKey,
     geminiApiKey,
+    googleMapsApiKey,
     venueEnrichmentModels: (
       Deno.env.get("GEMINI_VENUE_MODELS") ??
         "gemini-2.5-flash,gemini-2.5-flash-lite"
@@ -341,6 +352,10 @@ export function venueNeedsEnrichment(
     venue.google_maps_uri,
     venue.google_primary_type,
   ].some(isBlankString) && !hasSearchBackfill;
+  const missingPlacePhotos = !hasUnknownArrayContent(venue.google_photos) &&
+    [venue.google_place_id, venue.google_maps_uri].some((value) =>
+      !isBlankString(value)
+    );
 
   const weakRating = (venue.rating_count ?? 0) <= 0 || (venue.rating ?? 0) <= 0;
   const hasNoReviews = (!Array.isArray(venue.reviews) ||
@@ -349,7 +364,7 @@ export function venueNeedsEnrichment(
   const failedPreviously = venue.enrichment_status === "failed";
 
   return missingPrimaryFields || missingProviderFields || weakRating ||
-    hasNoReviews || failedPreviously;
+    hasNoReviews || missingPlacePhotos || failedPreviously;
 }
 
 export function isVenueEnrichmentInFlight(venue: VenueRecord): boolean {
@@ -445,6 +460,38 @@ export async function processVenueEnrichment(
         venue.id,
         mapsLookupError,
       );
+    }
+
+    if (env.googleMapsApiKey) {
+      try {
+        const placeSnapshot = await fetchGooglePlacesContext(
+          env,
+          venue,
+          mapsGrounding,
+        );
+        if (placeSnapshot) {
+          mapsGrounding = mergeMapsGroundingWithPlaceSnapshot(
+            mapsGrounding,
+            placeSnapshot,
+            venue,
+          );
+          normalizedCategory = normalizeVenueCategory(
+            mapsGrounding.primaryType,
+            mapsGrounding.types,
+            venue.category,
+          );
+          mapsConfidence = Math.max(
+            mapsConfidence,
+            mapsGrounding.confidence ?? 0.76,
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "[venue-enrichment] google places hydration skipped",
+          venue.id,
+          getErrorMessage(error),
+        );
+      }
     }
 
     const searchGrounding = skipSearchGrounding
@@ -574,6 +621,9 @@ function buildVenueUpdate(
     google_place_summary: mapsGrounding.placeSummary,
     google_place_summary_disclosure: mapsGrounding.placeSummary
       ? "Grounded with Google Maps via Gemini."
+      : null,
+    google_photos: mapsGrounding.photos.length > 0
+      ? mapsGrounding.photos
       : null,
     google_attributions: mapGroundingSourcesToAttributions(
       mapsGrounding.sources,
@@ -918,6 +968,114 @@ function normalizeMapsGroundingResult(
     ),
     confidence: clampConfidence(numberOrNull(parsedValue.confidence)),
     sources,
+    photos: [],
+  };
+}
+
+async function fetchGooglePlacesContext(
+  env: VenueEnrichmentEnv,
+  venue: VenueRecord,
+  mapsGrounding: MapsGroundingResult | null,
+): Promise<GooglePlaceSnapshot | null> {
+  const apiKey = env.googleMapsApiKey?.trim();
+  if (!apiKey) return null;
+
+  const directSnapshot = await fetchGooglePlaceDetails({
+    apiKey,
+    placeId: mapsGrounding?.googlePlaceId,
+    resourceName: mapsGrounding?.googlePlaceResourceName,
+  });
+  if (directSnapshot) return directSnapshot;
+
+  const query = buildGooglePlaceSearchTextQuery(venue, mapsGrounding);
+  if (!query) return null;
+
+  return await searchGooglePlaceByText({
+    apiKey,
+    query,
+    pageSize: 1,
+  });
+}
+
+function buildGooglePlaceSearchTextQuery(
+  venue: VenueRecord,
+  mapsGrounding: MapsGroundingResult | null,
+): string | null {
+  const parts = [
+    venue.name,
+    mapsGrounding?.formattedAddress,
+    venue.address,
+    venue.country === "RW" ? "Rwanda" : venue.country === "MT" ? "Malta" : null,
+  ]
+    .map((entry) => stringOrNull(entry))
+    .filter((entry): entry is string => Boolean(entry))
+    .map((entry) => entry.trim())
+    .filter((entry, index, self) =>
+      entry.length > 0 && self.indexOf(entry) === index
+    );
+
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function mergeMapsGroundingWithPlaceSnapshot(
+  mapsGrounding: MapsGroundingResult | null,
+  snapshot: GooglePlaceSnapshot,
+  venue: VenueRecord,
+): MapsGroundingResult {
+  const fallback = mapsGrounding ?? normalizeMapsGroundingResult(
+    null,
+    [],
+    venue,
+  );
+  const primaryType = snapshot.primaryType ?? fallback.primaryType;
+  const types = snapshot.types.length > 0 ? snapshot.types : fallback.types;
+  const canonicalCategory = normalizeVenueCategory(
+    primaryType,
+    types,
+    venue.category,
+  );
+  const sourceUri = snapshot.googleMapsUri ?? fallback.googleMapsUri;
+  const mergedSources = [
+    ...fallback.sources,
+    ...(sourceUri || snapshot.placeId || snapshot.displayName
+      ? [
+        {
+          uri: sourceUri,
+          title: snapshot.displayName,
+          place_id: snapshot.placeId,
+        } satisfies Json,
+      ]
+      : []),
+  ].filter((entry, index, self) =>
+    self.findIndex((candidate) =>
+      stringOrNull(candidate.place_id) === stringOrNull(entry.place_id) &&
+      stringOrNull(candidate.uri) === stringOrNull(entry.uri)
+    ) === index
+  );
+
+  return {
+    googlePlaceId: snapshot.placeId ?? fallback.googlePlaceId,
+    googlePlaceResourceName: snapshot.resourceName ??
+      fallback.googlePlaceResourceName,
+    googleMapsUri: snapshot.googleMapsUri ?? fallback.googleMapsUri,
+    formattedAddress: snapshot.formattedAddress ?? fallback.formattedAddress,
+    contactPhone: snapshot.nationalPhoneNumber ?? fallback.contactPhone,
+    officialWebsite: snapshot.websiteUri ?? fallback.officialWebsite,
+    primaryType,
+    types,
+    businessStatus: fallback.businessStatus,
+    priceLevel: snapshot.priceLevel ?? fallback.priceLevel,
+    rating: snapshot.rating ?? fallback.rating,
+    ratingCount: snapshot.userRatingCount ?? fallback.ratingCount,
+    reviewSummary: fallback.reviewSummary,
+    placeSummary: fallback.placeSummary,
+    openingHours: fallback.openingHours,
+    location: snapshot.location ?? fallback.location,
+    reviews: fallback.reviews,
+    canonicalCategory,
+    confidence: fallback.confidence ?? 0.76,
+    sources: mergedSources,
+    photos: snapshot.photos as unknown as Json[],
   };
 }
 

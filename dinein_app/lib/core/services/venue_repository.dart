@@ -22,9 +22,9 @@ class VenueRepository {
     };
   }
 
-  /// Fetch all guest-visible venues for discovery.
+  /// Fetch guest-visible venues.
   ///
-  /// Use [limit] and [offset] for pagination. Omit both to fetch all.
+  /// Used for direct venue listing and fallback browse surfaces.
   Future<List<Venue>> getVenues({
     int? limit,
     int? offset,
@@ -141,7 +141,11 @@ class VenueRepository {
   Future<void> updateVenue(String id, Map<String, dynamic> updates) async {
     await _invoke(
       'update_venue',
-      payload: {'venueId': id, 'updates': updates, ..._venueSessionPayload()},
+      payload: {
+        'venueId': id,
+        'updates': _normalizeVenueUpdates(updates),
+        ..._venueSessionPayload(),
+      },
     );
   }
 
@@ -154,40 +158,12 @@ class VenueRepository {
       useAdminSession: true,
       payload: {
         'venueId': venueId,
-        'updates': updates,
+        'updates': _normalizeVenueUpdates(updates),
         ..._venueSessionPayload(),
       },
     );
   }
 
-  /// Update the operational status of a venue (admin action).
-  Future<void> updateVenueStatus(String venueId, String status) async {
-    await updateVenueAsAdmin(venueId, {'status': status});
-  }
-
-  /// Update whether the venue can accept guest orders.
-  Future<void> updateVenueOrderingEnabled(
-    String venueId,
-    bool orderingEnabled,
-  ) async {
-    await updateVenueAsAdmin(venueId, {'ordering_enabled': orderingEnabled});
-  }
-
-  /// Soft-delete a venue by setting its status to 'deleted'.
-  Future<void> deleteVenue(String venueId) async {
-    await updateVenueStatus(venueId, 'deleted');
-  }
-
-  /// Search for venues on Google Maps through the backend-only grounded path.
-  Future<List<Map<String, dynamic>>> searchGoogleMaps(String query) async {
-    final data = await _invoke(
-      'search_google_maps',
-      payload: {'query': query},
-    );
-    return _normalizeGoogleResults(data);
-  }
-
-  /// Refresh Gemini Google Maps-grounded plus Gemini Search-grounded profile data.
   Future<Map<String, dynamic>> enrichVenueProfile(
     String venueId, {
     bool overwriteExisting = false,
@@ -209,38 +185,32 @@ class VenueRepository {
     return (data as Map<String, dynamic>?) ?? const {};
   }
 
-  /// Batch-fill venue profile gaps from grounded Maps data and grounded web search.
-  Future<Map<String, dynamic>> backfillVenueProfiles({
-    String? venueId,
-    int limit = 5,
-    bool overwriteExisting = false,
-    bool forcePlaceRefresh = false,
-    bool skipSearchGrounding = false,
-    bool useAdminSession = false,
-  }) async {
-    final data = await _invoke(
-      'backfill_venue_profiles',
-      useAdminSession: useAdminSession,
-      payload: {
-        ...(venueId == null ? const {} : {'venueId': venueId}),
-        'limit': limit,
-        'overwriteExisting': overwriteExisting,
-        'forcePlaceRefresh': forcePlaceRefresh,
-        'skipSearchGrounding': skipSearchGrounding,
-        ..._venueSessionPayload(),
-      },
-    );
-    return (data as Map<String, dynamic>?) ?? const {};
+  /// Update the operational status of a venue (admin action).
+  Future<void> updateVenueStatus(String venueId, String status) async {
+    await updateVenueAsAdmin(venueId, {'status': status});
   }
 
-  List<Map<String, dynamic>> _normalizeGoogleResults(dynamic data) {
-    if (data is List) {
-      return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  /// Update whether the venue can accept guest orders.
+  Future<void> updateVenueOrderingEnabled(
+    String venueId,
+    bool orderingEnabled,
+  ) async {
+    await updateVenueAsAdmin(venueId, {'ordering_enabled': orderingEnabled});
+  }
+
+  /// Soft-delete a venue by setting its status to 'deleted'.
+  Future<void> deleteVenue(String venueId) async {
+    await updateVenueStatus(venueId, 'deleted');
+  }
+
+  Map<String, dynamic> _normalizeVenueUpdates(Map<String, dynamic> updates) {
+    final normalized = Map<String, dynamic>.from(updates);
+    final ownerContact = (normalized.remove('owner_contact_phone') as String?)
+        ?.trim();
+    final hasPhone = (normalized['phone'] as String?)?.trim().isNotEmpty ?? false;
+    if (!hasPhone && ownerContact != null && ownerContact.isNotEmpty) {
+      normalized['phone'] = ownerContact;
     }
-    if (data is Map && data.containsKey('results')) {
-      final results = data['results'] as List<dynamic>? ?? [];
-      return results.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    }
-    return const [];
+    return normalized;
   }
 }

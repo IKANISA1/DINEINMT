@@ -49,11 +49,21 @@ case "$flavor" in
     guest_origin="https://dineinmtg.ikanisa.com"
     mt_guest_origin="https://dineinmtg.ikanisa.com"
     rw_guest_origin="https://dineinrwg.ikanisa.com"
+    site_host="dineinmt.ikanisa.com"
+    guest_host="dineinmtg.ikanisa.com"
+    venue_host="dineinmtv.ikanisa.com"
+    admin_host="dineinmta.ikanisa.com"
+    landing_source_dir="${project_dir}/../landing"
     ;;
   rw)
     guest_origin="https://dineinrwg.ikanisa.com"
     mt_guest_origin="https://dineinmtg.ikanisa.com"
     rw_guest_origin="https://dineinrwg.ikanisa.com"
+    site_host="dineinrw.ikanisa.com"
+    guest_host="dineinrwg.ikanisa.com"
+    venue_host="dineinrwv.ikanisa.com"
+    admin_host="dineinrwa.ikanisa.com"
+    landing_source_dir="${project_dir}/../landing-rw"
     ;;
   *)
     echo "Unsupported flavor: $flavor" >&2
@@ -149,6 +159,27 @@ if [[ -f "${project_dir}/web/_headers" ]]; then
   echo "✅ Copied _headers to build output"
 fi
 
+if [[ -f "${project_dir}/web/_worker.js" ]]; then
+  cp "${project_dir}/web/_worker.js" "${build_output}/_worker.js"
+  python3 - "${build_output}/_worker.js" "${site_host}" "${guest_host}" "${venue_host}" "${admin_host}" <<'PY'
+import sys
+from pathlib import Path
+
+worker_path = Path(sys.argv[1])
+site_host = sys.argv[2]
+guest_host = sys.argv[3]
+venue_host = sys.argv[4]
+admin_host = sys.argv[5]
+contents = worker_path.read_text(encoding="utf-8")
+contents = contents.replace("__DINEIN_SITE_HOST__", site_host)
+contents = contents.replace("__DINEIN_GUEST_HOST__", guest_host)
+contents = contents.replace("__DINEIN_VENUE_HOST__", venue_host)
+contents = contents.replace("__DINEIN_ADMIN_HOST__", admin_host)
+worker_path.write_text(contents, encoding="utf-8")
+PY
+  echo "✅ Copied host-aware _worker.js to build output"
+fi
+
 # _redirects should already be in web/ and copied by flutter build,
 # but ensure it's there
 if [[ -f "${project_dir}/web/_redirects" ]] && [[ ! -f "${build_output}/_redirects" ]]; then
@@ -168,6 +199,37 @@ if [[ -d "${project_dir}/web/screenshots" ]]; then
   mkdir -p "${build_output}/screenshots"
   rsync -a "${project_dir}/web/screenshots/" "${build_output}/screenshots/"
   echo "✅ Copied manifest screenshots to build output"
+fi
+
+landing_files=(
+  "index.css"
+  "app-mockup.png"
+  "logo.png"
+)
+
+if [[ -d "${landing_source_dir}" ]]; then
+  for landing_file in "${landing_files[@]}"; do
+    if [[ -f "${landing_source_dir}/${landing_file}" ]]; then
+      cp "${landing_source_dir}/${landing_file}" "${build_output}/${landing_file}"
+    fi
+  done
+  if [[ -f "${landing_source_dir}/index.html" ]]; then
+    mkdir -p "${build_output}/landing"
+    cp "${landing_source_dir}/index.html" "${build_output}/landing/index.html"
+  fi
+  if [[ -f "${landing_source_dir}/privacy.html" ]]; then
+    mkdir -p "${build_output}/privacy"
+    cp "${landing_source_dir}/privacy.html" "${build_output}/privacy/index.html"
+  fi
+  if [[ -f "${landing_source_dir}/terms.html" ]]; then
+    mkdir -p "${build_output}/terms"
+    cp "${landing_source_dir}/terms.html" "${build_output}/terms/index.html"
+  fi
+  if [[ -d "${landing_source_dir}/download" ]]; then
+    rm -rf "${build_output}/download"
+    rsync -a "${landing_source_dir}/download/" "${build_output}/download/"
+  fi
+  echo "✅ Copied landing assets into build output"
 fi
 
 python3 - "${build_output}" "${guest_origin}" <<'PY'
@@ -219,6 +281,11 @@ if [[ ! -f "${build_output}/offline.html" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${build_output}/landing/index.html" ]]; then
+  echo "⛔ Built web output is missing landing/index.html." >&2
+  exit 1
+fi
+
 if [[ ! -f "${build_output}/robots.txt" ]]; then
   echo "⛔ Built web output is missing robots.txt." >&2
   exit 1
@@ -244,6 +311,11 @@ fi
 # ── Service worker hygiene ──────────────────────────────────────────────────
 if [[ ! -f "${build_output}/custom_sw.js" ]]; then
   echo "⛔ custom_sw.js is missing from build output." >&2
+  exit 1
+fi
+
+if [[ ! -f "${build_output}/_worker.js" ]]; then
+  echo "⛔ _worker.js is missing from build output." >&2
   exit 1
 fi
 

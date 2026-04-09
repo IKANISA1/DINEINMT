@@ -1,6 +1,9 @@
 import { assertEquals } from "jsr:@std/assert@1";
 
-import { handleTrackGuestEvent } from "./core.ts";
+import {
+  configuredAdminUserIdForSessionPhone,
+  handleTrackGuestEvent,
+} from "./core.ts";
 
 function buildSupabaseStub(error: Record<string, unknown> | null) {
   return {
@@ -68,3 +71,15 @@ Deno.test(
     assertEquals(await response.json(), { data: false });
   },
 );
+
+Deno.test("configuredAdminUserIdForSessionPhone recognizes configured fallback admin numbers", () => {
+  assertEquals(
+    configuredAdminUserIdForSessionPhone("+25075588248"),
+    "00000000-0000-0000-0000-000000000250",
+  );
+  assertEquals(
+    configuredAdminUserIdForSessionPhone("+35699711145"),
+    "00000000-0000-0000-0000-000000000356",
+  );
+  assertEquals(configuredAdminUserIdForSessionPhone("+35699900000"), null);
+});

@@ -12,6 +12,7 @@ class CountryConfig {
   final String siteHost;
   final String playStoreId;
   final String supportWhatsApp;
+  final String adminAccessWhatsApp;
   final String supportEmail;
   final String venueAccessWhatsApp;
   final String venueAccessEmail;
@@ -33,6 +34,7 @@ class CountryConfig {
     required this.siteHost,
     required this.playStoreId,
     required this.supportWhatsApp,
+    String? adminAccessWhatsApp,
     required this.supportEmail,
     String? venueAccessWhatsApp,
     String? venueAccessEmail,
@@ -46,7 +48,8 @@ class CountryConfig {
     this.momoUssdCode,
     this.biopayEnabled = false,
     required this.localPhoneLength,
-  }) : venueAccessWhatsApp = venueAccessWhatsApp ?? supportWhatsApp,
+  }) : adminAccessWhatsApp = adminAccessWhatsApp ?? supportWhatsApp,
+       venueAccessWhatsApp = venueAccessWhatsApp ?? supportWhatsApp,
        venueAccessEmail = venueAccessEmail ?? supportEmail;
 
   /// Host prefix used for the role-specific app domains.
@@ -71,6 +74,7 @@ class CountryConfig {
     siteHost: 'dineinmt.ikanisa.com',
     playStoreId: 'com.dineinmalta.app',
     supportWhatsApp: '35699711145',
+    adminAccessWhatsApp: '35699711145',
     supportEmail: 'info@ikanisa.com',
     venueAccessWhatsApp: '35699711145',
     venueAccessEmail: 'info@ikanisa.com',
@@ -93,6 +97,7 @@ class CountryConfig {
     siteHost: 'dineinrw.ikanisa.com',
     playStoreId: 'com.dineinrw.app',
     supportWhatsApp: '250795588248',
+    adminAccessWhatsApp: '25075588248',
     supportEmail: 'info@ikanisa.com',
     venueAccessWhatsApp: '250795588248',
     venueAccessEmail: 'info@ikanisa.com',
@@ -132,7 +137,7 @@ class CountryConfig {
 
   /// Local-digit length accepted for admin WhatsApp login in this country.
   int get adminWhatsAppLocalDigits {
-    final digits = supportWhatsApp.replaceAll(RegExp(r'[^0-9]'), '');
+    final digits = adminAccessWhatsApp.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.startsWith(defaultCountryCode)) {
       final localDigits = digits.substring(defaultCountryCode.length);
       if (localDigits.length >= 8 && localDigits.length <= 10) {
@@ -154,7 +159,7 @@ class CountryConfig {
     return country == Country.rw ? 9 : 8;
   }
 
-  /// Share text for venue discovery.
+  /// Share text for venue links.
   String shareText(String content) => '$content\nhttps://$siteHost';
 
   /// Terms of service URL.

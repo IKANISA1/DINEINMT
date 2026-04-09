@@ -15,21 +15,11 @@ void main() {
         'description': 'Seafront dining.',
         'address': 'Valletta Waterfront',
         'phone': '+356 9999 1111',
-        'owner_contact_phone': '+356 9999 2222',
         'owner_whatsapp_number': '+356 9999 3333',
 
         'image_url': 'https://example.com/venue.png',
         'status': 'active',
         'ordering_enabled': true,
-        'approved_at': '2026-04-02T08:00:00.000Z',
-        'access_verified_at': '2026-04-02T08:05:00.000Z',
-        'last_access_token_issued_at': '2026-04-02T08:06:00.000Z',
-        'access_number_updated_at': '2026-04-02T08:07:00.000Z',
-        'access_verification_method': 'otp',
-        'access_verified_by': '+35699991111',
-        'access_verification_note': 'Verified via OTP',
-        'access_number_updated_by': 'admin-1',
-        'normalized_access_phone': '+35699991111',
         'rating': 4.8,
         'rating_count': 210,
         'country': 'MT',
@@ -54,18 +44,7 @@ void main() {
       expect(output['supported_payment_methods'], ['cash', 'revolut_link']);
       expect(output['owner_id'], 'owner_1');
       expect(output['phone'], '+356 9999 1111');
-      expect(output['owner_contact_phone'], '+356 9999 2222');
       expect(output['owner_whatsapp_number'], '+356 9999 3333');
-
-      expect(output['approved_at'], '2026-04-02T08:00:00.000Z');
-      expect(output['access_verified_at'], '2026-04-02T08:05:00.000Z');
-      expect(output['last_access_token_issued_at'], '2026-04-02T08:06:00.000Z');
-      expect(output['access_number_updated_at'], '2026-04-02T08:07:00.000Z');
-      expect(output['access_verification_method'], 'otp');
-      expect(output['access_verified_by'], '+35699991111');
-      expect(output['access_verification_note'], 'Verified via OTP');
-      expect(output['access_number_updated_by'], 'admin-1');
-      expect(output['normalized_access_phone'], '+35699991111');
       expect(output['wifi_ssid'], 'HarborGuest');
       expect(output['wifi_password'], 'seaside123');
       expect(output['wifi_security'], 'WPA');
@@ -94,22 +73,17 @@ void main() {
       expect(venue.supportedPaymentMethods, [PaymentMethod.cash]);
     });
 
-    test('effective access helpers prefer configured and verified access', () {
+    test('owner WhatsApp is preserved when present', () {
       final venue = Venue.fromJson({
         'id': 'venue_4',
         'name': 'Late Table',
         'slug': 'late-table',
         'status': 'active',
         'phone': '',
-        'owner_contact_phone': '+35699994444',
-        'normalized_access_phone': '+35699994444',
-        'access_verified_at': '2026-04-02T08:05:00.000Z',
+        'owner_whatsapp_number': '+35699994444',
       });
 
-      expect(venue.effectiveAccessPhone, '+35699994444');
-      expect(venue.hasAssignedAccessPhone, isTrue);
-      expect(venue.isAccessVerified, isTrue);
-      expect(venue.isAccessReady, isTrue);
+      expect(venue.ownerWhatsAppNumber, '+35699994444');
     });
 
     test('normalizeVenueCategoryLabel always returns fallback (category removed)', () {

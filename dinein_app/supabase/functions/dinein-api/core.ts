@@ -59,6 +59,12 @@ import {
   optionalEnv,
   stringValue,
 } from "../_shared/env.ts";
+import { isAdminUserWithFallback } from "../_shared/admin-profile.ts";
+import {
+  normalizeWhatsAppPhone,
+  optionalNormalizedWhatsAppPhone,
+  phoneNumbersMatch,
+} from "../_shared/phone.ts";
 
 // Re-export domain error types so index.ts can catch them
 export const MenuImageHttpError = MenuImageHttpError_;
@@ -74,19 +80,25 @@ export const corsHeaders = {
 
 const defaultCountryCode =
   (Deno.env.get("DEFAULT_WHATSAPP_COUNTRY_CODE") ?? "356").replace(/\D/g, "");
+const fallbackAdminWhatsAppByCountry = new Map<string, string>([
+  ["250", "+25075588248"],
+  ["356", "+35699711145"],
+]);
+const syntheticAdminUserIdByCountry = new Map<string, string>([
+  ["250", "00000000-0000-0000-0000-000000000250"],
+  ["356", "00000000-0000-0000-0000-000000000356"],
+]);
 const venueStatuses = new Set([
   "active",
   "inactive",
   "maintenance",
   "suspended",
   "deleted",
-  "pending_activation",
 ]);
 const publicVenueStatuses = new Set([
   "active",
   "inactive",
   "maintenance",
-  "pending_activation",
 ]);
 const orderStatuses = new Set(["placed", "received", "served", "cancelled"]);
 const paymentMethods = new Set(["cash", "momo_ussd", "revolut_link"]);
@@ -96,7 +108,6 @@ const orderPaymentStatuses = new Set([
   "not_required",
   "failed",
 ]);
-const accessVerificationMethods = new Set(["otp", "admin_override"]);
 const menuImageStatuses = new Set(["pending", "generating", "ready", "failed"]);
 const menuImageSources = new Set(["manual", "ai_gemini"]);
 const pushPlatforms = new Set(["android", "ios", "web"]);
@@ -129,9 +140,67 @@ type VenuePushNotificationPayload = {
 // block to miss exceptions thrown by _shared/http.ts helpers (e.g.
 // assertAllowedAppOrigin), resulting in CORS rejections returning HTTP 500
 // instead of 403.
-export { HttpError } from "../_shared/http.ts";
+import { HttpError } from "../_shared/http.ts";
+export { HttpError };
 
 // getEnv, optionalEnv imported from ../_shared/env.ts
+
+function configuredAdminWhatsAppNumberForCountry(
+  countryCode: string,
+): string | null {
+  const normalizedCountryCode = countryCode.replace(/\D/g, "");
+  const envKey = normalizedCountryCode === "250"
+    ? "DINEIN_ADMIN_WHATSAPP_NUMBER_RW"
+    : normalizedCountryCode === "356"
+    ? "DINEIN_ADMIN_WHATSAPP_NUMBER_MT"
+    : "DINEIN_ADMIN_WHATSAPP_NUMBER";
+  const configured = optionalNormalizedWhatsAppPhone(Deno.env.get(envKey), {
+    defaultCountryCode,
+  }) ??
+    optionalNormalizedWhatsAppPhone(
+      Deno.env.get("DINEIN_ADMIN_WHATSAPP_NUMBER"),
+      {
+        defaultCountryCode,
+      },
+    );
+  if (configured != null) return configured;
+  return fallbackAdminWhatsAppByCountry.get(normalizedCountryCode) ?? null;
+}
+
+function configuredAdminUserIdForCountry(countryCode: string): string {
+  const normalizedCountryCode = countryCode.replace(/\D/g, "");
+  return syntheticAdminUserIdByCountry.get(normalizedCountryCode) ??
+    "00000000-0000-0000-0000-000000000000";
+}
+
+export function configuredAdminUserIdForSessionPhone(
+  rawPhone?: string | null,
+): string | null {
+  const phone = rawPhone?.trim();
+  if (!phone) return null;
+
+  for (
+    const candidateCountryCode of new Set([
+      defaultCountryCode,
+      "250",
+      "356",
+    ])
+  ) {
+    const configuredPhone = configuredAdminWhatsAppNumberForCountry(
+      candidateCountryCode,
+    );
+    if (
+      configuredPhone != null &&
+      phoneNumbersMatch(phone, configuredPhone, {
+        defaultCountryCode: candidateCountryCode,
+      })
+    ) {
+      return configuredAdminUserIdForCountry(candidateCountryCode);
+    }
+  }
+
+  return null;
+}
 
 function hasMatchingSecretHeader(req: Request, envName: string): boolean {
   const expected = optionalEnv(envName);
@@ -747,10 +816,6 @@ export function venueOrderingReadiness(rawVenue: unknown): {
 } {
   const venue = asRecord(rawVenue);
   const reasons: string[] = [];
-  const googleBusinessStatus =
-    stringValue(venue.google_business_status)?.trim().toUpperCase() ?? null;
-  const googleClosedOverride =
-    booleanValue(venue.google_closed_override_enabled) ?? false;
   const declaredPaymentMethods = normalizeVenueSupportedPaymentMethods(
     venue.supported_payment_methods,
     venue.revolut_url,
@@ -771,26 +836,11 @@ export function venueOrderingReadiness(rawVenue: unknown): {
   if (venueStatus(venue) != "active") {
     reasons.push("venue_not_active");
   }
-  if (
-    googleBusinessStatus == "CLOSED_PERMANENTLY" &&
-    !googleClosedOverride
-  ) {
-    reasons.push("google_business_closed_permanently");
-  }
-  if (!stringValue(venue.access_verified_at)) {
-    reasons.push("access_verification_required");
-  }
   if (!stringValue(venue.name)) {
     reasons.push("venue_name_required");
   }
   if (!stringValue(venue.address)) {
     reasons.push("venue_address_required");
-  }
-  if (!effectiveVenuePhone(venue)) {
-    reasons.push("venue_phone_required");
-  }
-  if (!stringValue(venue.image_url)) {
-    reasons.push("venue_image_required");
   }
   if (supportedPaymentMethods.length == 0) {
     if (
@@ -855,41 +905,14 @@ export function assertValidOrderStatusTransition(
   );
 }
 
-function digitsOnly(value: string): string {
-  return value.replace(/\D/g, "");
-}
-
 function normalizePhone(raw: string): string {
-  const trimmed = raw.trim();
-  const digits = digitsOnly(trimmed);
-  if (!digits) {
+  try {
+    return normalizeWhatsAppPhone(raw, {
+      defaultCountryCode,
+    });
+  } catch {
     throw new HttpError(400, "A valid WhatsApp number is required.");
   }
-
-  if (trimmed.startsWith("+")) {
-    if (digits.length < 8 || digits.length > 15) {
-      throw new HttpError(400, "A valid WhatsApp number is required.");
-    }
-    return `+${digits}`;
-  }
-
-  if (trimmed.startsWith("00")) {
-    const normalized = digits.slice(2);
-    if (normalized.length < 8 || normalized.length > 15) {
-      throw new HttpError(400, "A valid WhatsApp number is required.");
-    }
-    return `+${normalized}`;
-  }
-
-  if (digits.length == 8 && defaultCountryCode.length > 0) {
-    return `+${defaultCountryCode}${digits}`;
-  }
-
-  if (digits.length >= 10 && digits.length <= 15) {
-    return `+${digits}`;
-  }
-
-  throw new HttpError(400, "A valid WhatsApp number is required.");
 }
 
 export function requireString(body: JsonRecord, ...keys: string[]): string {
@@ -949,6 +972,8 @@ type SignedClaimsOptions = {
   secret: string;
   fallbackSecret?: string;
 };
+
+const ORDER_REALTIME_TOKEN_TTL_SECONDS = 30 * 60;
 
 function bearerToken(req: Request): string | null {
   const authorization = req.headers.get("Authorization") ?? "";
@@ -1059,24 +1084,60 @@ async function currentUser(req: Request) {
   return data.user;
 }
 
+async function signSupabaseScopedJwt(payload: JsonRecord): Promise<string> {
+  const header = { alg: "HS256", typ: "JWT" };
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const signature = await hmacSha256Base64Url(
+    signingInput,
+    getEnv("SUPABASE_JWT_SECRET"),
+  );
+  return `${signingInput}.${signature}`;
+}
+
+async function issueScopedRealtimeAccessToken(
+  claims: JsonRecord,
+): Promise<
+  { access_token: string; expires_at: string; realtime_enabled: boolean }
+> {
+  const issuedAtSeconds = Math.floor(Date.now() / 1000);
+  const expiresAtSeconds = issuedAtSeconds + ORDER_REALTIME_TOKEN_TTL_SECONDS;
+
+  if (!optionalEnv("SUPABASE_JWT_SECRET")) {
+    return {
+      access_token: "",
+      expires_at: new Date(expiresAtSeconds * 1000).toISOString(),
+      realtime_enabled: false,
+    };
+  }
+
+  const payload: JsonRecord = {
+    iss: getEnv("SUPABASE_URL"),
+    iat: issuedAtSeconds,
+    exp: expiresAtSeconds,
+    role: "authenticated",
+    ...claims,
+  };
+
+  return {
+    access_token: await signSupabaseScopedJwt(payload),
+    expires_at: new Date(expiresAtSeconds * 1000).toISOString(),
+    realtime_enabled: true,
+  };
+}
+
 async function isAdmin(
   supabase: ReturnType<typeof adminClient>,
   userId?: string | null,
 ) {
   if (!userId) return false;
-
-  const { data, error } = await supabase
-    .from("dinein_profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
+  try {
+    return await isAdminUserWithFallback(supabase, userId);
+  } catch (error) {
     console.error("[dinein-api] admin lookup failed", error);
     return false;
   }
-
-  return data?.role == "admin";
 }
 
 async function adminUserId(
@@ -1087,6 +1148,13 @@ async function adminUserId(
   const customAdminId = stringValue(claims?.sub);
   if (customAdminId && await isAdmin(supabase, customAdminId)) {
     return customAdminId;
+  }
+
+  const configuredAdminId = configuredAdminUserIdForSessionPhone(
+    stringValue(claims?.phone),
+  );
+  if (configuredAdminId) {
+    return customAdminId ?? configuredAdminId;
   }
 
   const user = await currentUser(req);
@@ -1130,23 +1198,15 @@ async function requireSelfOrAdmin(
 
 function effectiveVenuePhone(rawVenue: unknown): string | null {
   const venue = asRecord(rawVenue);
-  return stringValue(venue.phone) ?? stringValue(venue.owner_contact_phone) ??
-    stringValue(venue.owner_whatsapp_number) ?? null;
+  return stringValue(venue.phone) ?? stringValue(venue.owner_whatsapp_number) ??
+    null;
 }
 
-function normalizedVenueAccessPhone(rawVenue: unknown): string | null {
-  const venue = asRecord(rawVenue);
-  const explicit = stringValue(venue.normalized_access_phone);
-  if (explicit) return explicit;
-
-  const phone = effectiveVenuePhone(venue);
-  if (!phone) return null;
-
-  try {
-    return normalizePhone(phone);
-  } catch {
-    return null;
-  }
+function venuePhoneDefaultCountryCode(country?: string | null): string {
+  const normalized = country?.trim().toUpperCase();
+  if (normalized == "RW") return "250";
+  if (normalized == "MT") return "356";
+  return defaultCountryCode;
 }
 
 async function ensureUniqueVenueAccessPhone(
@@ -1156,19 +1216,30 @@ async function ensureUniqueVenueAccessPhone(
 ): Promise<void> {
   const { data, error } = await supabase
     .from("dinein_venues")
-    .select("id, name, status")
-    .eq("normalized_access_phone", normalizedPhone)
+    .select("id, name, status, country, owner_whatsapp_number")
     .neq("id", venueId)
     .not("status", "eq", "deleted")
-    .limit(1);
+    .not("owner_whatsapp_number", "is", null);
 
   if (error) {
     console.error("[dinein-api] venue access duplicate lookup failed", error);
     throw new HttpError(500, "Could not validate venue access ownership.");
   }
 
-  const conflict = Array.isArray(data) && data.length > 0
-    ? asRecord(data[0])
+  const conflict = Array.isArray(data)
+    ? data
+      .map((entry) => asRecord(entry))
+      .find((entry) =>
+        phoneNumbersMatch(
+          stringValue(entry.owner_whatsapp_number),
+          normalizedPhone,
+          {
+            defaultCountryCode: venuePhoneDefaultCountryCode(
+              stringValue(entry.country),
+            ),
+          },
+        )
+      ) ?? null
     : null;
   if (conflict == null) return;
 
@@ -1427,7 +1498,6 @@ async function resolveVenueNotificationContactPhone(
 
   const venue = await venueSnapshot(supabase, venueId);
   return stringValue(venue.owner_whatsapp_number) ??
-    stringValue(venue.owner_contact_phone) ??
     stringValue(venue.phone) ??
     null;
 }
@@ -1582,7 +1652,7 @@ async function venueOwnerWhatsAppNumber(
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("dinein_venues")
-    .select("owner_whatsapp_number, owner_contact_phone")
+    .select("owner_whatsapp_number, country")
     .eq("id", venueId)
     .maybeSingle();
 
@@ -1591,9 +1661,14 @@ async function venueOwnerWhatsAppNumber(
     return null;
   }
 
-  return stringValue(data?.owner_whatsapp_number) ??
-    stringValue(data?.owner_contact_phone) ??
-    null;
+  return optionalNormalizedWhatsAppPhone(
+    stringValue(data?.owner_whatsapp_number),
+    {
+      defaultCountryCode: venuePhoneDefaultCountryCode(
+        stringValue(asRecord(data ?? {}).country),
+      ),
+    },
+  );
 }
 
 async function dispatchVenueWhatsAppAlert(
@@ -2104,11 +2179,6 @@ function sanitizeVenueUpdates(
     sanitized.owner_whatsapp_number = raw ? normalizePhone(raw) : null;
   }
 
-  if ("owner_contact_phone" in updates) {
-    const raw = stringValue(updates.owner_contact_phone);
-    sanitized.owner_contact_phone = raw ? normalizePhone(raw) : null;
-  }
-
   if ("wifi_security" in updates || "wifiSecurity" in updates) {
     const raw = stringValue(updates.wifi_security ?? updates.wifiSecurity);
     if (raw) {
@@ -2186,9 +2256,7 @@ function sanitizeVenueUpdates(
 
   if ("status" in updates) {
     const rawStatus = requireString(updates, "status");
-    const status = rawStatus == "pending_claim"
-      ? "pending_activation"
-      : rawStatus;
+    const status = rawStatus;
     const allowedStatuses = allowAdminFields
       ? venueStatuses
       : new Set(["active", "inactive"]);
@@ -2221,23 +2289,6 @@ function sanitizeVenueUpdates(
         );
       }
       sanitized.ordering_enabled = orderingEnabled;
-    }
-
-    if (
-      "google_closed_override_enabled" in updates ||
-      "googleClosedOverrideEnabled" in updates
-    ) {
-      const overrideEnabled = booleanValue(
-        updates.google_closed_override_enabled ??
-          updates.googleClosedOverrideEnabled,
-      );
-      if (overrideEnabled == undefined) {
-        throw new HttpError(
-          400,
-          "A valid google_closed_override_enabled flag is required.",
-        );
-      }
-      sanitized.google_closed_override_enabled = overrideEnabled;
     }
 
     if ("country" in updates) {
@@ -2324,8 +2375,8 @@ function publicVenueDetailPayload(rawVenue: unknown): JsonRecord {
 }
 
 function venueStatus(rawVenue: unknown): string {
-  const status = stringValue(asRecord(rawVenue).status) ?? "active";
-  return status === "pending_claim" ? "pending_activation" : status;
+  const status = stringValue(asRecord(rawVenue).status) ?? "inactive";
+  return venueStatuses.has(status) ? status : "inactive";
 }
 
 function venueOrderingEnabled(rawVenue: unknown): boolean {
@@ -3165,9 +3216,7 @@ export async function handleCreateVenue(
     opening_hours: updates.opening_hours ?? null,
     social_links: updates.social_links ?? {},
     phone: stringValue(updates.phone) ?? null,
-    owner_contact_phone: stringValue(updates.owner_contact_phone) ?? null,
     owner_whatsapp_number: stringValue(updates.owner_whatsapp_number) ?? null,
-    normalized_access_phone: stringValue(updates.owner_whatsapp_number) ?? null,
     status: stringValue(updates.status) ?? "inactive",
     ordering_enabled: booleanValue(updates.ordering_enabled) ?? false,
     country: normalizeCountryCode(
@@ -3227,7 +3276,7 @@ export async function handleGetVenueBySlug(
   }
 
   // Read-only: venue data is always accessible if the venue exists.
-  // Venue login/claiming is verification, not an access gate for reads.
+  // Venue login is separate from public venue reads.
   return ok(venue);
 }
 
@@ -3256,7 +3305,7 @@ export async function handleGetVenueById(
   }
 
   // Read-only: venue data is always accessible if the venue exists.
-  // Venue login/claiming is verification, not an access gate for reads.
+  // Venue login is separate from public venue reads.
   return ok(data);
 }
 
@@ -3326,7 +3375,9 @@ export async function handleUpdateVenue(
       await venueSnapshot(supabase, venueId);
     if ("owner_whatsapp_number" in updates) {
       const nextAccessPhone = stringValue(updates.owner_whatsapp_number);
-      const previousAccessPhone = normalizedVenueAccessPhone(persistedVenue);
+      const previousAccessPhone = stringValue(
+        persistedVenue.owner_whatsapp_number,
+      );
       const accessPhoneChanged = nextAccessPhone != previousAccessPhone;
 
       if (nextAccessPhone && accessPhoneChanged) {
@@ -3338,28 +3389,13 @@ export async function handleUpdateVenue(
       }
 
       updates.owner_whatsapp_number = nextAccessPhone;
-      updates.normalized_access_phone = nextAccessPhone;
-      updates.access_number_updated_at = new Date().toISOString();
-      updates.access_number_updated_by = adminActorId;
-
-      if (!nextAccessPhone || accessPhoneChanged) {
-        updates.access_verified_at = null;
-        updates.access_verification_method = null;
-        updates.access_verified_by = null;
-        updates.access_verification_note = null;
-        updates.last_access_token_issued_at = null;
-      }
-    }
-    
-    if ("owner_contact_phone" in updates) {
-      updates.owner_contact_phone = stringValue(updates.owner_contact_phone);
     }
 
     const nextVenue = { ...persistedVenue, ...updates };
     const readiness = venueOrderingReadiness(nextVenue);
     const explicitEnable = updates.ordering_enabled === true;
-    const wasAlreadyEnabled =
-      booleanValue(persistedVenue.ordering_enabled) ?? false;
+    const wasAlreadyEnabled = booleanValue(persistedVenue.ordering_enabled) ??
+      false;
 
     // Only reject when the admin is NEWLY turning ordering ON (false → true).
     // Re-submitting ordering_enabled=true on a venue that was already enabled
@@ -3457,7 +3493,7 @@ export async function handleGetMenuItems(
   }
 
   // Read-only: menu items are always accessible if the venue exists.
-  // Venue login/claiming is verification, not an access gate for reads.
+  // Venue login is separate from public venue reads.
   // Venue owners see all items; guests see only available items.
   const canReadPrivate = await hasPrivateVenueAccess(
     supabase,
@@ -5194,6 +5230,38 @@ async function bellRequestVenueId(
   return venueId;
 }
 
+function bellRequestSchemaMismatch(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+  const text = [
+    record.code,
+    record.message,
+    record.details,
+    record.hint,
+  ].filter((value) => typeof value === "string" && value.length > 0).join(" ")
+    .toLowerCase();
+  return text.includes("bell_requests") &&
+    (text.includes("does not exist") ||
+      text.includes("schema cache") ||
+      text.includes("could not find the table") ||
+      text.includes("could not find the column"));
+}
+
+function bellRequestFailure(
+  error: unknown,
+  message: string,
+): HttpError {
+  if (bellRequestSchemaMismatch(error)) {
+    return new HttpError(
+      500,
+      "Bell requests are not configured correctly for this project.",
+      { code: "bell_requests_not_configured" },
+    );
+  }
+
+  return new HttpError(500, message);
+}
+
 export async function handleSendWave(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
@@ -5234,7 +5302,10 @@ export async function handleSendWave(
     .maybeSingle();
   if (existingError) {
     console.error("[dinein-api] wave dedupe lookup failed", existingError);
-    throw new HttpError(500, "Could not create the wave request.");
+    throw bellRequestFailure(
+      existingError,
+      "Could not create the wave request.",
+    );
   }
   if (existing) {
     return ok(existing, 200);
@@ -5261,7 +5332,7 @@ export async function handleSendWave(
     .single();
   if (error) {
     console.error("[dinein-api] wave insert failed", error);
-    throw new HttpError(500, "Could not create the wave request.");
+    throw bellRequestFailure(error, "Could not create the wave request.");
   }
 
   await recordRateLimit(
@@ -5306,7 +5377,7 @@ export async function handleGetBellRequests(
   const { data, error } = await query;
   if (error) {
     console.error("[dinein-api] get bell requests failed", error);
-    throw new HttpError(500, "Could not load bell requests.");
+    throw bellRequestFailure(error, "Could not load bell requests.");
   }
 
   return ok(data ?? []);
@@ -5330,7 +5401,7 @@ export async function handleResolveBellRequest(
     .eq("id", requestId);
   if (error) {
     console.error("[dinein-api] resolve bell request failed", error);
-    throw new HttpError(500, "Could not resolve the bell request.");
+    throw bellRequestFailure(error, "Could not resolve the bell request.");
   }
 
   return ok(true);
@@ -5642,9 +5713,7 @@ export async function handleGetOrdersForVenue(
   body: JsonRecord,
 ): Promise<Response> {
   const venueId = requireString(body, "venueId", "venue_id");
-  // Read-only: venue orders are accessible by venue_id without session.
-  // Venue login/claiming is verification, not an access gate for reads.
-  // The venue_id itself provides data isolation.
+  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
 
   const { data, error } = await supabase
     .from("dinein_orders")
@@ -5752,10 +5821,11 @@ export async function handleGetAdminDashboardKpis(
 
   const tz = stringValue(body.timeZone) ?? "UTC";
   // The client passes the start of today as an ISO string to handle timezone safely
-  const startOfDay = stringValue(body.startOfDay) ?? new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+  const startOfDay = stringValue(body.startOfDay) ??
+    new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
 
   const [ordersResp] = await Promise.all([
-    supabase.from("dinein_orders").select("total, created_at, status")
+    supabase.from("dinein_orders").select("total, created_at, status"),
   ]);
 
   const ordersData = ordersResp.data ?? [];
@@ -5768,10 +5838,10 @@ export async function handleGetAdminDashboardKpis(
     const total = numberValue(o.total) ?? 0;
     const createdAt = stringValue(o.created_at);
     const status = stringValue(o.status);
-    
+
     total_revenue += total;
-    if (status === 'cancelled') {
-        cancelled_orders++;
+    if (status === "cancelled") {
+      cancelled_orders++;
     }
 
     if (createdAt && createdAt >= startOfDay) {
@@ -5844,6 +5914,71 @@ export async function handleGetOrderById(
   }
 
   throw new HttpError(403, "You are not allowed to access this order.");
+}
+
+export async function handleIssueOrderRealtimeAccess(
+  supabase: ReturnType<typeof adminClient>,
+  req: Request,
+  body: JsonRecord,
+): Promise<Response> {
+  const orderId = stringValue(body.orderId) ?? stringValue(body.order_id);
+  if (orderId) {
+    const receiptToken = stringValue(body.receiptToken) ??
+      stringValue(body.receipt_token);
+
+    const { data, error } = await supabase
+      .from("dinein_orders")
+      .select("id, venue_id, user_id")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        "[dinein-api] issue order realtime access lookup failed",
+        error,
+      );
+      throw new HttpError(500, "Could not load the order.");
+    }
+
+    if (!data) {
+      throw new HttpError(404, "Order not found.");
+    }
+
+    const order = asRecord(data);
+    const venueId = stringValue(order.venue_id);
+    const userId = stringValue(order.user_id);
+    const venueClaims = await venueSessionClaims(req);
+    const current = await currentUser(req);
+    const isAdmin = await adminUserId(supabase, req) != null;
+    const hasGuestReceipt = receiptToken != null &&
+      await verifyOrderReceiptToken(receiptToken, orderId);
+    const hasVenueAccess = venueId != null &&
+      stringValue(venueClaims?.venue_id) == venueId;
+    const hasUserAccess = current != null && userId == current.id;
+
+    if (!hasGuestReceipt && !hasVenueAccess && !hasUserAccess && !isAdmin) {
+      throw new HttpError(403, "You are not allowed to access this order.");
+    }
+
+    return ok(
+      await issueScopedRealtimeAccessToken({
+        aud: "dinein-order-realtime",
+        sub: orderId,
+        order_id: orderId,
+      }),
+    );
+  }
+
+  const venueId = requireString(body, "venueId", "venue_id");
+  await authorizeVenueSession(req, supabase, body.venue_session, venueId);
+
+  return ok(
+    await issueScopedRealtimeAccessToken({
+      aud: "dinein-venue-realtime",
+      sub: venueId,
+      venue_id: venueId,
+    }),
+  );
 }
 
 export async function handleUpdateOrderStatus(
@@ -5934,7 +6069,10 @@ export async function handleUploadVenueImage(
 
   const imageData = requireString(body, "image_data");
   if (!imageData || imageData.length < 100) {
-    throw new HttpError(400, "image_data is required and must be a valid base64 image.");
+    throw new HttpError(
+      400,
+      "image_data is required and must be a valid base64 image.",
+    );
   }
 
   // Enforce ~10MB base64 limit (~7.5MB decoded)
@@ -5965,7 +6103,10 @@ export async function handleUploadVenueImage(
   const publicUrl = urlData?.publicUrl;
 
   if (!publicUrl) {
-    throw new HttpError(500, "Upload succeeded but could not resolve public URL.");
+    throw new HttpError(
+      500,
+      "Upload succeeded but could not resolve public URL.",
+    );
   }
 
   // Update venue record
@@ -5983,7 +6124,10 @@ export async function handleUploadVenueImage(
 
   if (dbError) {
     console.error("[dinein-api] venue image DB update failed", dbError);
-    throw new HttpError(500, "Image uploaded but could not update venue record.");
+    throw new HttpError(
+      500,
+      "Image uploaded but could not update venue record.",
+    );
   }
 
   return ok({ image_url: publicUrl, storage_path: storagePath });
@@ -6006,7 +6150,10 @@ export async function handleUploadMenuItemImage(
 
   const imageData = requireString(body, "image_data");
   if (!imageData || imageData.length < 100) {
-    throw new HttpError(400, "image_data is required and must be a valid base64 image.");
+    throw new HttpError(
+      400,
+      "image_data is required and must be a valid base64 image.",
+    );
   }
 
   if (imageData.length > 14_000_000) {
@@ -6035,7 +6182,10 @@ export async function handleUploadMenuItemImage(
   const publicUrl = urlData?.publicUrl;
 
   if (!publicUrl) {
-    throw new HttpError(500, "Upload succeeded but could not resolve public URL.");
+    throw new HttpError(
+      500,
+      "Upload succeeded but could not resolve public URL.",
+    );
   }
 
   // Update menu item record
@@ -6055,7 +6205,10 @@ export async function handleUploadMenuItemImage(
 
   if (dbError) {
     console.error("[dinein-api] menu item image DB update failed", dbError);
-    throw new HttpError(500, "Image uploaded but could not update menu item record.");
+    throw new HttpError(
+      500,
+      "Image uploaded but could not update menu item record.",
+    );
   }
 
   return ok({ image_url: publicUrl, storage_path: storagePath });
@@ -6097,7 +6250,9 @@ function buildMenuExtractionPrompt(
 
   return [
     "You are a restaurant menu extraction specialist.",
-    `You are analyzing a menu document from "${venueName}" in ${countryLabel(countryCode)}.`,
+    `You are analyzing a menu document from "${venueName}" in ${
+      countryLabel(countryCode)
+    }.`,
     "",
     "TASK: Extract ALL menu items from this document into a structured JSON array.",
     "",
@@ -6114,7 +6269,7 @@ function buildMenuExtractionPrompt(
     "1. Return ONLY a valid JSON array of objects. No markdown, no explanation.",
     "2. If a price is not visible or unclear, set it to 0.",
     "3. Normalize category names (capitalize first letter, group similar items).",
-    '4. For multi-size items (S/M/L), create ONE item with the most common/medium price.',
+    "4. For multi-size items (S/M/L), create ONE item with the most common/medium price.",
     "5. Skip headers, footers, restaurant info — extract only menu items.",
     "6. If the document contains NO menu items, return an empty array: []",
     "7. Clean up OCR artifacts (fix common typos, normalize spacing).",
@@ -6460,9 +6615,7 @@ export async function handleIngestMenuDocument(
       created_count: insertedData?.length ?? 0,
       skipped_count: skippedCount,
       items: insertedData ?? [],
-      message: `Successfully imported ${
-        insertedData?.length ?? 0
-      } menu items.`,
+      message: `Successfully imported ${insertedData?.length ?? 0} menu items.`,
     },
     201,
   );

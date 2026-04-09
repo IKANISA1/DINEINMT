@@ -30,7 +30,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules">
         <activity
-            android:name=".MainActivity"
+            android:name="${mainActivity}"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""

@@ -9,7 +9,6 @@ class Venue extends Equatable {
   final String description;
   final String address;
   final String? phone;
-  final String? ownerContactPhone;
   final String? ownerWhatsAppNumber;
 
   final String? imageUrl;
@@ -17,15 +16,6 @@ class Venue extends Equatable {
   final String? momoCode;
   final VenueStatus status;
   final bool orderingEnabled;
-  final DateTime? approvedAt;
-  final DateTime? accessVerifiedAt;
-  final DateTime? lastAccessTokenIssuedAt;
-  final DateTime? accessNumberUpdatedAt;
-  final String? accessVerificationMethod;
-  final String? accessVerifiedBy;
-  final String? accessVerificationNote;
-  final String? accessNumberUpdatedBy;
-  final String? normalizedAccessPhone;
   final double rating;
   final int ratingCount;
   final Country country;
@@ -56,7 +46,6 @@ class Venue extends Equatable {
     required this.description,
     required this.address,
     this.phone,
-    this.ownerContactPhone,
     this.ownerWhatsAppNumber,
 
     this.imageUrl,
@@ -64,15 +53,6 @@ class Venue extends Equatable {
     this.momoCode,
     this.status = VenueStatus.active,
     this.orderingEnabled = false,
-    this.approvedAt,
-    this.accessVerifiedAt,
-    this.lastAccessTokenIssuedAt,
-    this.accessNumberUpdatedAt,
-    this.accessVerificationMethod,
-    this.accessVerifiedBy,
-    this.accessVerificationNote,
-    this.accessNumberUpdatedBy,
-    this.normalizedAccessPhone,
     this.rating = 0.0,
     this.ratingCount = 0,
     this.country = Country.mt,
@@ -106,7 +86,6 @@ class Venue extends Equatable {
       description: json['description'] as String? ?? '',
       address: json['address'] as String? ?? '',
       phone: json['phone'] as String?,
-      ownerContactPhone: json['owner_contact_phone'] as String?,
       ownerWhatsAppNumber: json['owner_whatsapp_number'] as String?,
 
       imageUrl: json['image_url'] as String?,
@@ -117,31 +96,6 @@ class Venue extends Equatable {
           json['ordering_enabled'] as bool? ??
           json['orderingEnabled'] as bool? ??
           false,
-      approvedAt: DateTime.tryParse(json['approved_at'] as String? ?? ''),
-      accessVerifiedAt: DateTime.tryParse(
-        json['access_verified_at'] as String? ?? '',
-      ),
-      lastAccessTokenIssuedAt: DateTime.tryParse(
-        json['last_access_token_issued_at'] as String? ?? '',
-      ),
-      accessNumberUpdatedAt: DateTime.tryParse(
-        json['access_number_updated_at'] as String? ?? '',
-      ),
-      accessVerificationMethod:
-          json['access_verification_method'] as String? ??
-          json['accessVerificationMethod'] as String?,
-      accessVerifiedBy:
-          json['access_verified_by'] as String? ??
-          json['accessVerifiedBy'] as String?,
-      accessVerificationNote:
-          json['access_verification_note'] as String? ??
-          json['accessVerificationNote'] as String?,
-      accessNumberUpdatedBy:
-          json['access_number_updated_by'] as String? ??
-          json['accessNumberUpdatedBy'] as String?,
-      normalizedAccessPhone:
-          json['normalized_access_phone'] as String? ??
-          json['normalizedAccessPhone'] as String?,
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       ratingCount: json['rating_count'] as int? ?? 0,
       country: Country.fromCode(json['country'] as String? ?? 'MT'),
@@ -201,7 +155,6 @@ class Venue extends Equatable {
     'description': description,
     'address': address,
     'phone': phone,
-    'owner_contact_phone': ownerContactPhone,
     'owner_whatsapp_number': ownerWhatsAppNumber,
 
     'image_url': imageUrl,
@@ -209,15 +162,6 @@ class Venue extends Equatable {
     'momo_code': momoCode,
     'status': status.dbValue,
     'ordering_enabled': orderingEnabled,
-    'approved_at': approvedAt?.toIso8601String(),
-    'access_verified_at': accessVerifiedAt?.toIso8601String(),
-    'last_access_token_issued_at': lastAccessTokenIssuedAt?.toIso8601String(),
-    'access_number_updated_at': accessNumberUpdatedAt?.toIso8601String(),
-    'access_verification_method': accessVerificationMethod,
-    'access_verified_by': accessVerifiedBy,
-    'access_verification_note': accessVerificationNote,
-    'access_number_updated_by': accessNumberUpdatedBy,
-    'normalized_access_phone': normalizedAccessPhone,
     'rating': rating,
     'rating_count': ratingCount,
     'country': country.code,
@@ -245,8 +189,12 @@ class Venue extends Equatable {
   /// Whether this venue is currently accepting orders.
   bool get isOpen => status == VenueStatus.active;
 
+  /// Legacy admin-form fallback after owner contact storage was merged away.
+  String? get ownerContactPhone => phone;
+
+  /// Backwards-compatible access-number lookup used by restored admin sheets.
   String? get effectiveAccessPhone {
-    for (final candidate in [phone, ownerWhatsAppNumber, ownerContactPhone]) {
+    for (final candidate in [ownerWhatsAppNumber, phone, ownerContactPhone]) {
       final trimmed = candidate?.trim();
       if (trimmed != null && trimmed.isNotEmpty) return trimmed;
     }
@@ -255,22 +203,17 @@ class Venue extends Equatable {
 
   bool get hasAssignedAccessPhone => effectiveAccessPhone != null;
 
-  bool get isAccessVerified => accessVerifiedAt != null;
-
-  bool get isAccessReady =>
-      isOpen && hasAssignedAccessPhone && isAccessVerified;
-
   /// Whether guests can place orders with this venue right now.
   bool get canAcceptGuestOrders => isOpen && orderingEnabled;
 
   /// Whether guest-facing pricing should be hidden for this venue.
   bool get shouldHideGuestPricing => !canAcceptGuestOrders;
 
-  /// Guest-facing browse label shown in discovery and venue detail surfaces.
+  /// Guest-facing availability label shown in venue detail surfaces.
   String get guestAvailabilityLabel => canAcceptGuestOrders
       ? 'Available'
       : switch (status) {
-          VenueStatus.active || VenueStatus.pendingActivation => 'Browse Menu',
+          VenueStatus.active => 'Browse Menu',
           VenueStatus.maintenance ||
           VenueStatus.inactive ||
           VenueStatus.suspended ||
@@ -283,12 +226,11 @@ class Venue extends Equatable {
     return switch (status) {
       VenueStatus.maintenance => 'Temporarily unavailable for orders.',
       VenueStatus.inactive => 'Currently unavailable for ordering.',
-      VenueStatus.pendingActivation => 'Activation pending. Menu preview only.',
       VenueStatus.suspended ||
       VenueStatus.deleted => 'Currently unavailable for ordering.',
       VenueStatus.active =>
         !orderingEnabled
-            ? 'Validation pending. Menu preview only.'
+            ? 'Ordering is disabled. Menu preview only.'
             : 'Currently unavailable for ordering.',
     };
   }
@@ -335,29 +277,16 @@ class Venue extends Equatable {
       priceLevelLabel != null ||
       primaryReviewSnippet != null;
 
-  /// Compact address for card display — first comma-segment, trimmed.
-  String? get addressLocality {
-    final raw = address.trim();
-    if (raw.isEmpty) return null;
-    final parts = raw.split(',');
-    // Skip very short segments (e.g. street numbers) if a second part exists.
-    final first = parts.first.trim();
-    if (parts.length > 1 && first.length < 6) {
-      return parts[1].trim();
-    }
-    return first;
-  }
-
   double? distanceInKmFrom(double latitude, double longitude) {
     final venueLatitude = this.latitude;
     final venueLongitude = this.longitude;
     if (venueLatitude == null || venueLongitude == null) return null;
 
     const earthRadiusKm = 6371.0;
-    final dLat = _degreesToRadians(venueLatitude - latitude);
-    final dLon = _degreesToRadians(venueLongitude - longitude);
-    final lat1 = _degreesToRadians(latitude);
-    final lat2 = _degreesToRadians(venueLatitude);
+    final dLat = (venueLatitude - latitude) * (pi / 180.0);
+    final dLon = (venueLongitude - longitude) * (pi / 180.0);
+    final lat1 = latitude * (pi / 180.0);
+    final lat2 = venueLatitude * (pi / 180.0);
 
     final a =
         (sin(dLat / 2) * sin(dLat / 2)) +
@@ -375,6 +304,19 @@ class Venue extends Equatable {
     return '${distance.toStringAsFixed(distance < 10 ? 1 : 0)} km away';
   }
 
+  /// Compact address for card display — first comma-segment, trimmed.
+  String? get addressLocality {
+    final raw = address.trim();
+    if (raw.isEmpty) return null;
+    final parts = raw.split(',');
+    // Skip very short segments (e.g. street numbers) if a second part exists.
+    final first = parts.first.trim();
+    if (parts.length > 1 && first.length < 6) {
+      return parts[1].trim();
+    }
+    return first;
+  }
+
   bool supportsPaymentMethod(PaymentMethod method) =>
       supportedPaymentMethods.contains(method);
 
@@ -386,22 +328,12 @@ class Venue extends Equatable {
     category,
     address,
     phone,
-    ownerContactPhone,
     ownerWhatsAppNumber,
 
     revolutUrl,
     momoCode,
     status,
     orderingEnabled,
-    approvedAt,
-    accessVerifiedAt,
-    lastAccessTokenIssuedAt,
-    accessNumberUpdatedAt,
-    accessVerificationMethod,
-    accessVerifiedBy,
-    accessVerificationNote,
-    accessNumberUpdatedBy,
-    normalizedAccessPhone,
     country,
 
     ownerId,
@@ -487,4 +419,3 @@ class Review extends Equatable {
   @override
   List<Object?> get props => [author, rating, text];
 }
-

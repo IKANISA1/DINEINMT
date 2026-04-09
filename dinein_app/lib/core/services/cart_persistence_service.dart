@@ -93,6 +93,7 @@ class CartPersistenceService {
       'imageUrl': item.imageUrl,
       'price': item.price,
       'quantity': item.quantity,
+      'note': item.note,
     };
   }
 
@@ -129,6 +130,7 @@ class CartPersistenceService {
       imageUrl: json['imageUrl'] as String?,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      note: json['note'] as String?,
     );
   }
 }

@@ -53,6 +53,7 @@ abstract final class AppRouteParams {
   static const orderNumber = 'orderNumber';
   static const slug = 'slug';
   static const table = 't';
+  static const search = 'search';
   static const manual = 'manual';
   static const source = 'source';
   static const venueId = 'venueId';

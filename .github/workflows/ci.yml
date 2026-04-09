@@ -36,6 +36,7 @@ jobs:
       - name: Run Flutter tests
         run: flutter test
 
+
   release-tooling:
     runs-on: ubuntu-latest
     strategy:

@@ -14,8 +14,6 @@ grant select, insert, update, delete on table public.dinein_menu_items
   to anon, authenticated;
 grant select, insert, update, delete on table public.dinein_orders
   to anon, authenticated;
-grant select, insert, update, delete on table public.dinein_venue_claims
-  to anon, authenticated;
 
 alter default privileges in schema public
   grant all on tables to service_role;

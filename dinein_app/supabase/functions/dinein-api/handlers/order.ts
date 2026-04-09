@@ -8,5 +8,6 @@ export {
   handleGetAllOrders,
   handleGetAdminDashboardKpis,
   handleGetOrderById,
+  handleIssueOrderRealtimeAccess,
   handleUpdateOrderStatus,
 } from "../core.ts";

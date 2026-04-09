@@ -43,9 +43,14 @@ Set these in **each** Supabase project before deploying the functions:
 # Replace --project-ref with the target project
 supabase secrets set \
   GEMINI_API_KEY=your_google_api_key \
+  GOOGLE_MAPS_API_KEY=your_google_places_api_key \
   GEMINI_IMAGE_MODELS=gemini-3.1-flash-image-preview,gemini-2.5-flash-image \
   GEMINI_VENUE_MODELS=gemini-2.5-flash,gemini-2.5-flash-lite \
   GEMINI_VENUE_IMAGE_MODELS=gemini-2.5-flash-image \
+  VENUE_IMAGE_REFERENCE_LIMIT=3 \
+  GEMINI_VENUE_DEEP_RESEARCH_AGENT=deep-research-pro-preview-12-2025 \
+  GEMINI_VENUE_DEEP_RESEARCH_POLL_MS=5000 \
+  GEMINI_VENUE_DEEP_RESEARCH_MAX_WAIT_MS=0 \
   FIREBASE_PROJECT_ID=your_firebase_project_id \
   FIREBASE_CLIENT_EMAIL=your_service_account_email \
   FIREBASE_PRIVATE_KEY='-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n' \
@@ -62,6 +67,16 @@ supabase secrets set \
 
 `GEMINI_API_KEY` must be able to call Gemini image generation, Gemini Google
 Maps grounding, and Gemini Google Search grounding.
+
+`GOOGLE_MAPS_API_KEY` should have Places API (New) enabled so venue enrichment
+can fetch Place Details and Place Photos for image-reference grounding. If you
+do not set it explicitly, the functions fall back to `GEMINI_API_KEY`.
+
+`GEMINI_VENUE_DEEP_RESEARCH_*` is optional. Google documents the Interactions
+API and Deep Research agent as beta/preview and recommends `generateContent`
+for stable production paths, so keep the wait budget bounded and use it
+primarily for curated branding backfills rather than latency-sensitive request
+paths.
 
 `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` must come from a Firebase
 service account with permission to call the FCM HTTP v1 API for

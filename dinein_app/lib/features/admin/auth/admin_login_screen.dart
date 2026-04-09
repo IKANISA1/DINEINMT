@@ -87,7 +87,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
   int get _configuredPhoneLength =>
       CountryRuntime.config.adminWhatsAppLocalDigits;
 
-  int get _inputPhoneLength => CountryRuntime.config.localPhoneLength;
+  int get _inputPhoneLength => _configuredPhoneLength;
 
   String _normalizeAdminPhoneInput(String value) {
     final normalized = normalizePhoneLocalInput(
@@ -156,7 +156,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           'This WhatsApp number is not registered for admin access. Contact support to activate or recover admin access.',
       onContactSupport: () => SupportContactService.contactSupport(
         context,
-        whatsAppNumber: CountryRuntime.config.venueAccessWhatsApp,
+        whatsAppNumber: CountryRuntime.config.adminAccessWhatsApp,
         email: CountryRuntime.config.venueAccessEmail,
       ),
     );

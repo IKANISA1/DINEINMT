@@ -140,8 +140,8 @@ void main() {
   // ─── VenueStatus ───
 
   group('VenueStatus', () {
-    test('has exactly 6 values', () {
-      expect(VenueStatus.values, hasLength(6));
+    test('has exactly 5 values', () {
+      expect(VenueStatus.values, hasLength(5));
     });
 
     test('fromString resolves all known values', () {
@@ -150,19 +150,11 @@ void main() {
       expect(VenueStatus.fromString('maintenance'), VenueStatus.maintenance);
       expect(VenueStatus.fromString('suspended'), VenueStatus.suspended);
       expect(VenueStatus.fromString('deleted'), VenueStatus.deleted);
-      expect(
-        VenueStatus.fromString('pending_claim'),
-        VenueStatus.pendingActivation,
-      );
-      expect(
-        VenueStatus.fromString('pending_activation'),
-        VenueStatus.pendingActivation,
-      );
     });
 
-    test('fromString falls back to active for unknown', () {
-      expect(VenueStatus.fromString('archived'), VenueStatus.active);
-      expect(VenueStatus.fromString(''), VenueStatus.active);
+    test('fromString falls back to inactive for unknown', () {
+      expect(VenueStatus.fromString('archived'), VenueStatus.inactive);
+      expect(VenueStatus.fromString(''), VenueStatus.inactive);
     });
 
     test('dbValue round-trips through fromString', () {
@@ -173,7 +165,7 @@ void main() {
 
     test('labels are capitalised and human-readable', () {
       expect(VenueStatus.active.label, 'Active');
-      expect(VenueStatus.pendingActivation.label, 'Pending Activation');
+      expect(VenueStatus.inactive.label, 'Inactive');
     });
   });
 

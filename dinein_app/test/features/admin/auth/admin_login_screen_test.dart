@@ -30,7 +30,7 @@ void main() {
   ) async {
     await pumpAdminLogin(tester, CountryConfig.mt);
 
-    await tester.enterText(find.byType(TextField).first, '77186193');
+    await tester.enterText(find.byType(TextField).first, '99711145');
     await tester.pump();
 
     expect(otpButton(tester).onTap, isNotNull);
@@ -41,7 +41,7 @@ void main() {
     (tester) async {
       await pumpAdminLogin(tester, CountryConfig.rw);
 
-      await tester.enterText(find.byType(TextField).first, '0788767816');
+      await tester.enterText(find.byType(TextField).first, '075588248');
       await tester.pump();
 
       expect(otpButton(tester).onTap, isNotNull);

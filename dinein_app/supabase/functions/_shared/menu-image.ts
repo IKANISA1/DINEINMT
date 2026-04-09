@@ -62,7 +62,6 @@ export interface VenueRecord {
   description: string | null;
   owner_id: string | null;
   phone: string | null;
-  owner_contact_phone: string | null;
   owner_whatsapp_number: string | null;
 }
 
@@ -445,7 +444,7 @@ export async function fetchVenue(
   const { data, error } = await adminClient
     .from("dinein_venues")
     .select(
-      "id, name, category, description, owner_id, phone, owner_contact_phone, owner_whatsapp_number",
+      "id, name, category, description, owner_id, phone, owner_whatsapp_number",
     )
     .eq("id", venueId)
     .maybeSingle();
@@ -1340,11 +1339,9 @@ function venueMatchesContact(
 ): boolean {
   const target = digitsOnly(normalizeContact(contactPhone));
   if (!target) return false;
-  return [
-    venue.phone,
-    venue.owner_contact_phone,
-    venue.owner_whatsapp_number,
-  ].some((value) => digitsOnly(value ?? "") === target);
+  return [venue.phone, venue.owner_whatsapp_number].some((value) =>
+    digitsOnly(value ?? "") === target
+  );
 }
 
 async function verifyVenueAccessToken(

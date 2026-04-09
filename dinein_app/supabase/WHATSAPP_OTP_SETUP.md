@@ -1,6 +1,6 @@
 # WhatsApp OTP Setup
 
-This app uses the Supabase Edge Function `whatsapp-otp` for venue login, venue claim verification, and admin console login.
+This app uses the Supabase Edge Function `whatsapp-otp` for venue login and admin console login.
 
 ## Required remote secrets
 

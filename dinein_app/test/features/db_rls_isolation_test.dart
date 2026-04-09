@@ -1,81 +1,105 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 
-// WARNING: This test requires a running local Supabase instance.
-// Ensure Docker is running and you have run `supabase start` before running this test.
-// 
-// Run using:
-// flutter test test/features/db_rls_isolation_test.dart
+import 'package:flutter_test/flutter_test.dart';
+
+String _readMigration(String filename) {
+  final file = File('supabase/migrations/$filename');
+  expect(file.existsSync(), isTrue, reason: 'Missing migration $filename');
+  return file.readAsStringSync();
+}
 
 void main() {
-  // Use local Supabase instance configuration
-  const supabaseUrl = 'http://127.0.0.1:54321';
-  const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1zZXNzaW9uIiwicm9sZSI6ImFub24ifQ...'; // Standard local anon key if needed, or initialized via env
+  group('Database RLS isolation contracts', () {
+    test('orders writes stay behind the edge API and receipt access is indexed', () {
+      final secureOrders = _readMigration(
+        '20260321012000_secure_orders_and_totals.sql',
+      );
+      final orderReceipt = _readMigration(
+        '20260321001100_add_order_money_columns.sql',
+      );
 
-  group('Database RLS Isolation Tests', () {
-    late SupabaseClient adminClient;
-    late SupabaseClient anonClient;
-    late SupabaseClient venueAClient;
-    late SupabaseClient venueBClient;
-
-    setUpAll(() async {
-      // Setup logic would initialize the Supabase clients.
-      // E.g. creating test users via the admin API or using service role key
-      // This is a harness schema for the required tests.
+      expect(
+        secureOrders,
+        contains(
+          'revoke insert, update, delete on table public.dinein_orders\n  from anon, authenticated;',
+        ),
+      );
+      expect(
+        secureOrders,
+        contains(
+          'drop policy if exists "Customers can insert orders" on public.dinein_orders;',
+        ),
+      );
+      expect(
+        orderReceipt,
+        contains('ADD COLUMN IF NOT EXISTS guest_receipt_token TEXT;'),
+      );
+      expect(
+        orderReceipt,
+        contains('ON dinein_orders(guest_receipt_token)'),
+      );
     });
 
-    tearDownAll(() async {
-      // Clean up generated users and data
+    test('menu items remain publicly readable but owner-scoped for writes', () {
+      final sql = _readMigration('20260320000446_create_dinein_menu_items.sql');
+
+      expect(sql, contains('CREATE POLICY "Anyone can read menu items"'));
+      expect(
+        sql,
+        contains('CREATE POLICY "Venue owners can insert own menu items"'),
+      );
+      expect(
+        sql,
+        contains('CREATE POLICY "Venue owners can update own menu items"'),
+      );
+      expect(
+        sql,
+        contains('CREATE POLICY "Venue owners can delete own menu items"'),
+      );
+      expect(sql, contains('owner_id = auth.uid()'));
     });
 
-    group('dinein_orders table RLS', () {
-      test('Anon (Guest) cannot read orders', () async {
-        // test logic
-      });
+    test('bell requests only allow inserts for active venues', () {
+      final hardening = _readMigration(
+        '20260322000200_tighten_bell_and_storage_policies.sql',
+      );
 
-      test('Anon (Guest) can insert order', () async {
-        // test logic
-      });
-
-      test('Venue Owner A can read ONLY their venues orders', () async {
-        // test logic
-      });
-
-      test('Venue Owner A cannot update Venue B orders', () async {
-        // test logic
-      });
-      
-      test('Admin can read all orders', () async {
-        // test logic
-      });
+      expect(
+        hardening,
+        contains('DROP POLICY IF EXISTS "Anyone can insert bell requests"'),
+      );
+      expect(
+        hardening,
+        contains('CREATE POLICY "Insert bell requests for active venues"'),
+      );
+      expect(hardening, contains("WHERE id = venue_id AND status = 'active'"));
     });
 
-    group('dinein_menu_items table RLS', () {
-      test('Anon can read all menu items', () async {
-        // test logic
-      });
+    test('realtime order reads are scoped to signed JWT claims', () {
+      final realtime = _readMigration(
+        '20260408000100_add_scoped_order_realtime_policies.sql',
+      );
 
-      test('Anon cannot insert menu items', () async {
-        // test logic
-      });
-
-      test('Venue Owner A can update their own menu items', () async {
-        // test logic
-      });
-
-      test('Venue Owner A cannot update Venue B menu items', () async {
-        // test logic
-      });
-    });
-
-    group('bell_requests table RLS', () {
-      test('Venue Owner A can only read their own bell requests', () async {
-        // test logic
-      });
-      
-      test('Anon can insert bell requests for active venues', () async {
-        // test logic
-      });
+      expect(
+        realtime,
+        contains('grant select on public.dinein_orders to authenticated;'),
+      );
+      expect(
+        realtime,
+        contains('coalesce(auth.jwt() ->> \'aud\', \'\') = \'dinein-venue-realtime\''),
+      );
+      expect(
+        realtime,
+        contains('and venue_id::text = auth.jwt() ->> \'venue_id\''),
+      );
+      expect(
+        realtime,
+        contains('coalesce(auth.jwt() ->> \'aud\', \'\') = \'dinein-order-realtime\''),
+      );
+      expect(
+        realtime,
+        contains('and id::text = auth.jwt() ->> \'order_id\''),
+      );
     });
   });
 }

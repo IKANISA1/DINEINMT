@@ -200,8 +200,7 @@ enum VenueStatus {
   inactive,
   maintenance,
   suspended,
-  deleted,
-  pendingActivation;
+  deleted;
 
   String get label {
     return switch (this) {
@@ -210,7 +209,6 @@ enum VenueStatus {
       VenueStatus.maintenance => 'Maintenance',
       VenueStatus.suspended => 'Suspended',
       VenueStatus.deleted => 'Deleted',
-      VenueStatus.pendingActivation => 'Pending Activation',
     };
   }
 
@@ -222,7 +220,6 @@ enum VenueStatus {
       VenueStatus.maintenance => 'maintenance',
       VenueStatus.suspended => 'suspended',
       VenueStatus.deleted => 'deleted',
-      VenueStatus.pendingActivation => 'pending_activation',
     };
   }
 
@@ -234,9 +231,7 @@ enum VenueStatus {
       'maintenance' => VenueStatus.maintenance,
       'suspended' => VenueStatus.suspended,
       'deleted' => VenueStatus.deleted,
-      'pending_claim' => VenueStatus.pendingActivation,
-      'pending_activation' => VenueStatus.pendingActivation,
-      _ => VenueStatus.active,
+      _ => VenueStatus.inactive,
     };
   }
 }

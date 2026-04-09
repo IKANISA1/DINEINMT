@@ -1,31 +1,40 @@
 import 'package:db_pkg/models/bell_request.dart';
+import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/services/auth_repository.dart';
 import 'package:dinein_app/core/services/bell_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fixtures/mock_api_invoker.dart';
+import '../fixtures/mock_secure_storage.dart';
 
 Map<String, dynamic> _bellRequestJson({
   String id = 'req1',
   String venueId = 'v1',
   String tableNumber = '12',
   String status = 'pending',
-}) =>
-    {
-      'id': id,
-      'venue_id': venueId,
-      'user_id': null,
-      'table_number': tableNumber,
-      'status': status,
-      'created_at': DateTime.now().toIso8601String(),
-    };
+}) => {
+  'id': id,
+  'venue_id': venueId,
+  'user_id': null,
+  'table_number': tableNumber,
+  'status': status,
+  'created_at': DateTime.now().toIso8601String(),
+};
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late MockApiInvoker mock;
   late BellRepository repo;
 
   setUp(() {
+    MockSecureStorage.setup();
+    MockSecureStorage.clear();
     mock = MockApiInvoker();
     repo = BellRepository.forTesting(invoker: mock.invoke);
+  });
+
+  tearDown(() async {
+    await AuthRepository.instance.clearVenueSession();
   });
 
   group('sendWave', () {
@@ -52,12 +61,23 @@ void main() {
 
   group('resolveWave', () {
     test('passes requestId', () async {
+      await AuthRepository.instance.saveVenueSession(
+        VenueAccessSession(
+          venueId: 'v1',
+          venueName: 'Bell Venue',
+          whatsAppNumber: '+35677186193',
+          accessToken: 'bell-token',
+          issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
+          expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
+        ),
+      );
       mock.registerResponse('resolve_bell_request', null);
 
       await repo.resolveWave('req123');
 
       final inv = mock.lastInvocation('resolve_bell_request')!;
       expect(inv.payload?['requestId'], 'req123');
+      expect(inv.payload?['venue_session'], {'access_token': 'bell-token'});
     });
   });
 
@@ -78,6 +98,16 @@ void main() {
     });
 
     test('passes status filter if provided', () async {
+      await AuthRepository.instance.saveVenueSession(
+        VenueAccessSession(
+          venueId: 'v1',
+          venueName: 'Bell Venue',
+          whatsAppNumber: '+35677186193',
+          accessToken: 'bell-token',
+          issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
+          expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
+        ),
+      );
       mock.registerResponse('get_bell_requests', <dynamic>[]);
 
       await repo.getBellRequests('v1', status: WaveStatus.pending);
@@ -85,6 +115,7 @@ void main() {
       final inv = mock.lastInvocation('get_bell_requests')!;
       expect(inv.payload?['venueId'], 'v1');
       expect(inv.payload?['status'], 'pending');
+      expect(inv.payload?['venue_session'], {'access_token': 'bell-token'});
     });
   });
 }

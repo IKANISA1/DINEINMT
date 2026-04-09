@@ -57,17 +57,4 @@ BEGIN
   END IF;
 END $$;
 
--- 5. Venue Claims
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_views WHERE viewname = 'dinein_venue_claims' AND schemaname = 'public') THEN
-    DROP VIEW public.dinein_venue_claims CASCADE;
-  END IF;
-
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'venue_claims' AND schemaname = 'public') AND 
-     NOT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'dinein_venue_claims' AND schemaname = 'public') THEN
-    ALTER TABLE public.venue_claims RENAME TO dinein_venue_claims;
-  END IF;
-END $$;
-
 COMMIT;

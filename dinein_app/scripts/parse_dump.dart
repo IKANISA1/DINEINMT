@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:io';
 import 'dart:convert';
 
@@ -10,13 +11,13 @@ void main() {
 
   print('Parsing 100MB+ json file...');
   final data = jsonDecode(file.readAsStringSync());
-  final Map<String, dynamic> programInfosMap = data['elements']?['library'];
-  if (programInfosMap == null) {
+  final libraryEntries = data['elements']?['library'];
+  if (libraryEntries is! Map<String, dynamic>) {
     print('No library info found in dump.');
     exit(1);
   }
 
-  final List<dynamic> programInfos = programInfosMap.values.toList();
+  final List<dynamic> programInfos = libraryEntries.values.toList();
   final Map<String, int> packageSizes = {};
   int totalSize = 0;
 
@@ -33,7 +34,7 @@ void main() {
     if (uri.startsWith('package:')) {
       pkgName = uri.split('/')[0];
     } else if (uri.startsWith('dart:')) {
-      pkgName = uri.split(':')[0] + ':' + uri.split(':')[1].split('/')[0];
+      pkgName = '${uri.split(':')[0]}:${uri.split(':')[1].split('/')[0]}';
     } else if (uri.startsWith('file://')) {
       pkgName = 'App Source Code';
     } else {

@@ -62,8 +62,8 @@ import {
   handleGenerateMenuItemImage,
   handleGenerateVenueProfileImage,
   handleImageHealth,
-  handleUploadVenueImage,
   handleUploadMenuItemImage,
+  handleUploadVenueImage,
 } from "./handlers/image.ts";
 import {
   handleGetVenueNotificationSettings,
@@ -72,11 +72,12 @@ import {
   handleUpdateVenueNotificationSettings,
 } from "./handlers/notification.ts";
 import {
-  handleGetAllOrders,
   handleGetAdminDashboardKpis,
+  handleGetAllOrders,
   handleGetOrderById,
   handleGetOrdersForUser,
   handleGetOrdersForVenue,
+  handleIssueOrderRealtimeAccess,
   handlePlaceOrder,
   handleUpdateOrderStatus,
 } from "./handlers/order.ts";
@@ -216,6 +217,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
           return await handleGetAdminDashboardKpis(supabase, req, body);
         case "get_order_by_id":
           return await handleGetOrderById(supabase, req, body);
+        case "issue_order_realtime_access":
+          return await handleIssueOrderRealtimeAccess(supabase, req, body);
         case "update_order_status":
           return await handleUpdateOrderStatus(supabase, req, body);
         case "search_google_maps":
@@ -279,4 +282,6 @@ export async function handleAppRequest(req: Request): Promise<Response> {
   }
 }
 
-Deno.serve(handleAppRequest);
+if (import.meta.main) {
+  Deno.serve(handleAppRequest);
+}

@@ -5,6 +5,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 app_root="$(cd "$script_dir/.." && pwd)"
 materialize_env_script="$app_root/scripts/materialize_release_env.sh"
+icon_validation_script="$app_root/scripts/validate_icon_assets.py"
 flavor="mt"
 android_only=false
 well_known_dir=""
@@ -109,6 +110,15 @@ else
   fi
 fi
 # ─────────────────────────────────────────────────────────────────────────────
+
+if [[ -f "$icon_validation_script" ]]; then
+  if ! python3 "$icon_validation_script"; then
+    failures=$((failures + 1))
+  fi
+else
+  echo "FAIL: Missing icon validation script ($icon_validation_script)"
+  failures=$((failures + 1))
+fi
 
 (
   cd "$app_root/android"
@@ -311,7 +321,7 @@ require_file "${app_root}/web/flutter_bootstrap.js" 'Custom flutter_bootstrap.js
 if [[ -f "$web_headers" ]]; then
   require_contains \
     "$web_headers" \
-    'Permissions-Policy: camera=(), microphone=(), geolocation=(self)' \
+    'Permissions-Policy: camera=(), microphone=(), geolocation=()' \
     'Web headers are missing the geolocation permissions policy.'
 fi
 if [[ -f "$web_index" ]]; then

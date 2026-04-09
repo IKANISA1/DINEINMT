@@ -44,45 +44,12 @@ BEGIN
     reasons := array_append(reasons, 'venue_not_active');
   END IF;
 
-  IF venue.approved_claim_id IS NULL THEN
-    reasons := array_append(reasons, 'approved_claim_required');
-  END IF;
-
-  IF venue.approved_at IS NULL THEN
-    reasons := array_append(reasons, 'approved_at_required');
-  END IF;
-
-  IF venue.access_verified_at IS NULL THEN
-    reasons := array_append(reasons, 'access_verification_required');
-  END IF;
-
   IF NULLIF(BTRIM(COALESCE(venue.name, '')), '') IS NULL THEN
     reasons := array_append(reasons, 'venue_name_required');
   END IF;
 
   IF NULLIF(BTRIM(COALESCE(venue.address, '')), '') IS NULL THEN
     reasons := array_append(reasons, 'venue_address_required');
-  END IF;
-
-  IF NULLIF(BTRIM(COALESCE(venue.phone, '')), '') IS NULL THEN
-    reasons := array_append(reasons, 'venue_phone_required');
-  END IF;
-
-  IF NULLIF(BTRIM(COALESCE(venue.image_url, '')), '') IS NULL THEN
-    reasons := array_append(reasons, 'venue_image_required');
-  END IF;
-
-  IF NULLIF(
-    BTRIM(
-      COALESCE(
-        NULLIF(BTRIM(COALESCE(venue.owner_contact_phone, '')), ''),
-        NULLIF(BTRIM(COALESCE(venue.owner_whatsapp_number, '')), ''),
-        ''
-      )
-    ),
-    ''
-  ) IS NULL THEN
-    reasons := array_append(reasons, 'owner_contact_required');
   END IF;
 
   IF COALESCE(array_length(venue.supported_payment_methods, 1), 0) = 0 THEN

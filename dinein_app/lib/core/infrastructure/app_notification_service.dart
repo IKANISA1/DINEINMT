@@ -61,6 +61,13 @@ class AppNotificationService {
   }
 
   static Future<void> _initializeInternal() async {
+    if (_isWidgetTestBinding()) {
+      _messagingAvailable = false;
+      _initialized = false;
+      _initializing = null;
+      return;
+    }
+
     final firebaseReady = await FirebaseRuntimeService.ensureInitialized();
     if (!firebaseReady) {
       _initializing = null;
@@ -446,5 +453,10 @@ class AppNotificationService {
       TargetPlatform.iOS => 'ios',
       _ => null,
     };
+  }
+
+  static bool _isWidgetTestBinding() {
+    final binding = WidgetsBinding.instance;
+    return binding.runtimeType.toString().contains('TestWidgetsFlutterBinding');
   }
 }

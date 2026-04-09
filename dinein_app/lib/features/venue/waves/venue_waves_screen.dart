@@ -1,11 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import 'package:db_pkg/models/bell_request.dart';
-import '../../../core/providers/bell_providers.dart';
-import 'package:dinein_app/core/services/auth_repository.dart';
+import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/services/bell_repository.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
@@ -16,30 +17,95 @@ class VenueWavesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final venueId = AuthRepository.instance.currentVenueSession?.venueId;
+    final venueAsync = ref.watch(currentVenueProvider);
 
-    if (venueId == null) {
-      return const Scaffold(
-        body: Center(child: Text('No venue session')),
-      );
-    }
+    return venueAsync.when(
+      loading: () => const Center(
+        child: SkeletonLoader(width: double.infinity, height: 200),
+      ),
+      error: (_, _) => ErrorState(
+        message: 'Could not load venue data.',
+        onRetry: () => ref.invalidate(currentVenueProvider),
+      ),
+      data: (venue) {
+        if (venue == null) {
+          return const Scaffold(body: Center(child: Text('No venue session')));
+        }
 
-    return DefaultTabController(
-      length: 2,
-      child: _WavesBody(venueId: venueId),
+        return DefaultTabController(
+          length: 2,
+          child: _WavesBody(venueId: venue.id),
+        );
+      },
     );
   }
 }
 
-class _WavesBody extends ConsumerWidget {
+class _WavesBody extends ConsumerStatefulWidget {
   final String venueId;
   const _WavesBody({required this.venueId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_WavesBody> createState() => _WavesBodyState();
+}
+
+class _WavesBodyState extends ConsumerState<_WavesBody> {
+  static const _pollInterval = Duration(seconds: 4);
+
+  Timer? _pollTimer;
+  List<BellRequest> _allWaves = const [];
+  Object? _loadError;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadWaves());
+    _pollTimer = Timer.periodic(_pollInterval, (_) {
+      unawaited(_loadWaves(background: true));
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadWaves({bool background = false}) async {
+    if (!mounted) return;
+    if (!background) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+
+    try {
+      final waves = await BellRepository.instance.getBellRequests(
+        widget.venueId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _allWaves = waves;
+        _loadError = null;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        if (_allWaves.isEmpty) {
+          _loadError = error;
+        }
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final wavesAsync = ref.watch(allWavesProvider(venueId));
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -70,51 +136,48 @@ class _WavesBody extends ConsumerWidget {
           ],
         ),
       ),
-      body: wavesAsync.when(
-        loading: () => Padding(
-          padding: const EdgeInsets.all(AppTheme.space6),
-          child: Column(
-            children: List.generate(
-              4,
-              (_) => const Padding(
-                padding: EdgeInsets.only(bottom: AppTheme.space4),
-                child: SkeletonLoader(width: double.infinity, height: 80),
+      body: _isLoading
+          ? Padding(
+              padding: const EdgeInsets.all(AppTheme.space6),
+              child: Column(
+                children: List.generate(
+                  4,
+                  (_) => const Padding(
+                    padding: EdgeInsets.only(bottom: AppTheme.space4),
+                    child: SkeletonLoader(width: double.infinity, height: 80),
+                  ),
+                ),
               ),
-            ),
-          ),
-        ),
-        error: (_, _) => ErrorState(
-          message: 'Could not load waves.',
-          onRetry: () => ref.invalidate(allWavesProvider(venueId)),
-        ),
-        data: (allWaves) {
-          final active = allWaves
-              .where((w) => w.status == WaveStatus.pending)
-              .toList();
-          final resolved = allWaves
-              .where((w) => w.status == WaveStatus.resolved)
-              .toList();
+            )
+          : _loadError != null
+          ? ErrorState(message: 'Could not load waves.', onRetry: _loadWaves)
+          : (() {
+              final active = _allWaves
+                  .where((w) => w.status == WaveStatus.pending)
+                  .toList();
+              final resolved = _allWaves
+                  .where((w) => w.status == WaveStatus.resolved)
+                  .toList();
 
-          return TabBarView(
-            children: [
-              _WavesList(
-                waves: active,
-                emptyIcon: LucideIcons.checkCircle2,
-                emptyTitle: 'All clear',
-                emptySubtitle: 'No pending guest requests right now.',
-                showResolveAction: true,
-              ),
-              _WavesList(
-                waves: resolved,
-                emptyIcon: LucideIcons.history,
-                emptyTitle: 'No history',
-                emptySubtitle: 'Resolved waves will appear here.',
-                showResolveAction: false,
-              ),
-            ],
-          );
-        },
-      ),
+              return TabBarView(
+                children: [
+                  _WavesList(
+                    waves: active,
+                    emptyIcon: LucideIcons.checkCircle2,
+                    emptyTitle: 'All clear',
+                    emptySubtitle: 'No pending guest requests right now.',
+                    showResolveAction: true,
+                  ),
+                  _WavesList(
+                    waves: resolved,
+                    emptyIcon: LucideIcons.history,
+                    emptyTitle: 'No history',
+                    emptySubtitle: 'Resolved waves will appear here.',
+                    showResolveAction: false,
+                  ),
+                ],
+              );
+            })(),
     );
   }
 }
@@ -150,10 +213,7 @@ class _WavesList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: AppTheme.space4),
       itemBuilder: (context, index) {
         final wave = waves[index];
-        return _WaveCard(
-          wave: wave,
-          showResolveAction: showResolveAction,
-        );
+        return _WaveCard(wave: wave, showResolveAction: showResolveAction);
       },
     );
   }
@@ -163,10 +223,7 @@ class _WaveCard extends ConsumerStatefulWidget {
   final BellRequest wave;
   final bool showResolveAction;
 
-  const _WaveCard({
-    required this.wave,
-    required this.showResolveAction,
-  });
+  const _WaveCard({required this.wave, required this.showResolveAction});
 
   @override
   ConsumerState<_WaveCard> createState() => _WaveCardState();
@@ -183,9 +240,9 @@ class _WaveCardState extends ConsumerState<_WaveCard> {
     } catch (e) {
       if (mounted) {
         setState(() => _isResolving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to resolve wave')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to resolve wave')));
       }
     }
   }
@@ -216,8 +273,8 @@ class _WaveCardState extends ConsumerState<_WaveCard> {
             decoration: BoxDecoration(
               color: isPending
                   ? (isUrgent
-                      ? cs.error.withValues(alpha: 0.1)
-                      : cs.primaryContainer.withValues(alpha: 0.5))
+                        ? cs.error.withValues(alpha: 0.1)
+                        : cs.primaryContainer.withValues(alpha: 0.5))
                   : cs.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(16),
             ),
@@ -242,9 +299,7 @@ class _WaveCardState extends ConsumerState<_WaveCard> {
               children: [
                 Text(
                   'Table ${widget.wave.tableNumber}',
-                  style: tt.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                  style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -278,10 +333,7 @@ class _WaveCardState extends ConsumerState<_WaveCard> {
                   )
           else if (!isPending)
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.secondary.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),

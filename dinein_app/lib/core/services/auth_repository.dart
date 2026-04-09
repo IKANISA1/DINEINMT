@@ -106,6 +106,22 @@ class AuthRepository {
   /// Whether a valid admin session exists.
   bool get hasAdminSession => currentAdminSession != null;
 
+  /// Restore the persisted venue session when memory is cold (for example after a web refresh).
+  Future<VenueAccessSession?> ensureVenueSession() async {
+    final session = currentVenueSession;
+    if (session != null) return session;
+    await restoreVenueSession();
+    return currentVenueSession;
+  }
+
+  /// Restore the persisted admin session when memory is cold (for example after a web refresh).
+  Future<AdminAccessSession?> ensureAdminSession() async {
+    final session = currentAdminSession;
+    if (session != null) return session;
+    await restoreAdminSession();
+    return currentAdminSession;
+  }
+
   /// Whether admin routes may be accessed.
   bool get hasAdminAccess => hasAdminSession;
 
@@ -161,7 +177,7 @@ class AuthRepository {
   Future<void> saveVenueSession(VenueAccessSession session) async {
     _venueSession = session;
     await _writeSessionValue(_venueSessionKey, jsonEncode(session.toJson()));
-    unawaited(AppNotificationService.handleVenueSessionUpdated(session));
+    unawaited(_syncVenueSessionNotifications(session));
   }
 
   /// Persist an admin console session after OTP verification.
@@ -176,7 +192,27 @@ class AuthRepository {
     _venueSession = null;
     await _deleteSessionValue(_venueSessionKey);
     if (session != null) {
-      unawaited(AppNotificationService.handleVenueSessionCleared(session));
+      unawaited(_clearVenueSessionNotifications(session));
+    }
+  }
+
+  Future<void> _syncVenueSessionNotifications(
+    VenueAccessSession session,
+  ) async {
+    try {
+      await AppNotificationService.handleVenueSessionUpdated(session);
+    } catch (_) {
+      // Notification setup is best-effort and must not break auth persistence.
+    }
+  }
+
+  Future<void> _clearVenueSessionNotifications(
+    VenueAccessSession session,
+  ) async {
+    try {
+      await AppNotificationService.handleVenueSessionCleared(session);
+    } catch (_) {
+      // Notification teardown is best-effort and must not break auth cleanup.
     }
   }
 
@@ -232,10 +268,7 @@ class AuthRepository {
 
   /// Get the current user's profile role.
   Future<String?> getUserRole(String userId) async {
-    final data = await _invoke(
-      'get_user_role',
-      payload: {'userId': userId},
-    );
+    final data = await _invoke('get_user_role', payload: {'userId': userId});
     return data as String?;
   }
 }

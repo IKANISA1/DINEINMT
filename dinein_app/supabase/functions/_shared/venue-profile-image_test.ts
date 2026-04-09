@@ -5,7 +5,10 @@ import {
 
 import type { VenueRecord } from "./venue-enrichment.ts";
 import {
+  buildVenueLocalityCue,
   buildVenueProfileImagePrompt,
+  countVenueReferenceImages,
+  extractVenueReferenceImageUrls,
   hasGroundedVenueImageContext,
   isVenueProfileImageGenerationInFlight,
   venueNeedsProfileImageGeneration,
@@ -174,7 +177,18 @@ Deno.test("isVenueProfileImageGenerationInFlight expires stale generating rows",
 });
 
 Deno.test("buildVenueProfileImagePrompt incorporates grounded venue cues", () => {
-  const prompt = buildVenueProfileImagePrompt(makeVenue());
+  const prompt = buildVenueProfileImagePrompt(
+    makeVenue({
+      google_photos: [
+        {
+          name: "places/test/photos/1",
+          photo_path:
+            "https://places.googleapis.com/v1/places/test/photos/1/media?maxWidthPx=1600",
+        },
+      ],
+    }),
+    { referenceImageCount: 1 },
+  );
 
   assertStringIncludes(prompt, 'Venue name: "Skyline Lounge"');
   assertStringIncludes(
@@ -185,5 +199,71 @@ Deno.test("buildVenueProfileImagePrompt incorporates grounded venue cues", () =>
     prompt,
     "Show a refined rooftop or terrace hospitality scene",
   );
+  assertStringIncludes(prompt, "The venue must read as Malta");
+  assertStringIncludes(prompt, "attached public venue reference image");
   assertStringIncludes(prompt, "No plated dish close-up");
+});
+
+Deno.test("buildVenueLocalityCue distinguishes Rwanda from Malta", () => {
+  assertStringIncludes(
+    buildVenueLocalityCue(
+      makeVenue({ country: "RW", address: "Kigali, Rwanda" }),
+    ),
+    "The venue must read as Rwanda",
+  );
+  assertStringIncludes(
+    buildVenueLocalityCue(
+      makeVenue({ country: "MT", address: "Valletta Waterfront, Malta" }),
+    ),
+    "The venue must read as Malta",
+  );
+});
+
+Deno.test("extractVenueReferenceImageUrls prioritizes grounded Google place photos", () => {
+  const urls = extractVenueReferenceImageUrls(
+    makeVenue({
+      google_photos: [
+        {
+          name: "places/test/photos/1",
+          photo_path:
+            "https://places.googleapis.com/v1/places/test/photos/1/media?maxWidthPx=1600",
+        },
+        {
+          name: "places/test/photos/2",
+          photo_path:
+            "https://places.googleapis.com/v1/places/test/photos/2/media?maxWidthPx=1600",
+        },
+      ],
+      image_url: "https://example.com/logo.png",
+      image_source: null,
+    }),
+    2,
+    "maps-key",
+  );
+
+  assertEquals(urls.length, 2);
+  assertStringIncludes(
+    urls[0],
+    "https://places.googleapis.com/v1/places/test/photos/1/media",
+  );
+  assertStringIncludes(urls[0], "key=maps-key");
+  assertStringIncludes(
+    urls[1],
+    "https://places.googleapis.com/v1/places/test/photos/2/media",
+  );
+  assertStringIncludes(urls[1], "key=maps-key");
+});
+
+Deno.test("countVenueReferenceImages counts stored Google photo metadata without signed URLs", () => {
+  const venue = makeVenue({
+    google_photos: [
+      {
+        name: "places/1/photos/a",
+        photo_path:
+          "https://places.googleapis.com/v1/places/1/photos/a/media?maxWidthPx=1600",
+      },
+    ],
+  });
+
+  assertEquals(countVenueReferenceImages(venue), 1);
 });

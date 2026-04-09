@@ -157,8 +157,3 @@ String? _normalizeDietaryMenuTag(String raw) {
     _ => null,
   };
 }
-
-
-
-double _degreesToRadians(double degrees) =>
-    degrees * (3.1415926535897932 / 180);

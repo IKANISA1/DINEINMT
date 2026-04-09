@@ -5,6 +5,25 @@ import 'package:core_pkg/constants/enums.dart';
 import 'package:dinein_app/core/services/cart_persistence_service.dart';
 import 'package:dinein_app/core/services/pwa_install_service.dart';
 
+const _cartItemNoChange = Object();
+
+String? _normalizeCartNote(String? note) {
+  final normalized = note?.trim();
+  return normalized == null || normalized.isEmpty ? null : normalized;
+}
+
+String _cartLineId(String menuItemId, String? note) {
+  final normalizedNote = _normalizeCartNote(note);
+  if (normalizedNote == null) return menuItemId;
+  return '$menuItemId::$normalizedNote';
+}
+
+String _menuItemIdFromCartKey(String itemKey) {
+  final separatorIndex = itemKey.indexOf('::');
+  if (separatorIndex < 0) return itemKey;
+  return itemKey.substring(0, separatorIndex);
+}
+
 /// Represents one item in the cart.
 class CartItem {
   final String menuItemId;
@@ -13,6 +32,7 @@ class CartItem {
   final String? imageUrl;
   final double price;
   final int quantity;
+  final String? note;
 
   const CartItem({
     required this.menuItemId,
@@ -21,9 +41,11 @@ class CartItem {
     this.imageUrl,
     required this.price,
     this.quantity = 1,
+    this.note,
   });
 
   double get subtotal => price * quantity;
+  String get lineId => _cartLineId(menuItemId, note);
 
   CartItem copyWith({
     String? name,
@@ -31,6 +53,7 @@ class CartItem {
     String? imageUrl,
     double? price,
     int? quantity,
+    Object? note = _cartItemNoChange,
   }) => CartItem(
     menuItemId: menuItemId,
     name: name ?? this.name,
@@ -38,6 +61,7 @@ class CartItem {
     imageUrl: imageUrl ?? this.imageUrl,
     price: price ?? this.price,
     quantity: quantity ?? this.quantity,
+    note: identical(note, _cartItemNoChange) ? this.note : note as String?,
   );
 
   /// Convert to [OrderItem] for order placement.
@@ -48,6 +72,7 @@ class CartItem {
     imageUrl: imageUrl,
     price: price,
     quantity: quantity,
+    note: note,
   );
 }
 
@@ -202,13 +227,28 @@ class CartNotifier extends Notifier<CartState> {
     _persist();
   }
 
-  /// Add a menu item to the cart (or increase quantity by 1).
-  void addItem(MenuItem item) {
-    final existing = state.items.indexWhere((i) => i.menuItemId == item.id);
+  int _indexForLine(String itemKey) {
+    final lineMatch = state.items.indexWhere((item) => item.lineId == itemKey);
+    if (lineMatch >= 0) return lineMatch;
+    return state.items.indexWhere((item) => item.menuItemId == itemKey);
+  }
+
+  /// Add a menu item to the cart or increase the quantity of the same
+  /// note-specific line item.
+  void addItem(
+    MenuItem item, {
+    String? note,
+    int quantity = 1,
+  }) {
+    final normalizedNote = _normalizeCartNote(note);
+    final safeQuantity = quantity < 1 ? 1 : quantity;
+    final existing = state.items.indexWhere(
+      (cartItem) => cartItem.lineId == _cartLineId(item.id, normalizedNote),
+    );
     if (existing >= 0) {
       final updated = List<CartItem>.from(state.items);
       updated[existing] = updated[existing].copyWith(
-        quantity: updated[existing].quantity + 1,
+        quantity: updated[existing].quantity + safeQuantity,
       );
       state = state.copyWith(items: updated);
     } else {
@@ -221,6 +261,8 @@ class CartNotifier extends Notifier<CartState> {
             description: item.description,
             imageUrl: item.imageUrl,
             price: item.price,
+            quantity: safeQuantity,
+            note: normalizedNote,
           ),
         ],
       );
@@ -235,8 +277,8 @@ class CartNotifier extends Notifier<CartState> {
   }
 
   /// Remove one unit of an item (if qty reaches 0, remove entirely).
-  void removeItem(String menuItemId) {
-    final existing = state.items.indexWhere((i) => i.menuItemId == menuItemId);
+  void removeItem(String itemKey) {
+    final existing = _indexForLine(itemKey);
     if (existing < 0) return;
 
     final updated = List<CartItem>.from(state.items);
@@ -253,23 +295,25 @@ class CartNotifier extends Notifier<CartState> {
 
   /// Set the quantity of an item directly (used by item detail sheet).
   void setQuantity(
-    String menuItemId,
+    String itemKey,
     int quantity, {
     String? name,
     String? description,
     String? imageUrl,
     double? price,
+    String? note,
   }) {
     if (quantity <= 0) {
-      final updated = state.items
-          .where((i) => i.menuItemId != menuItemId)
-          .toList();
+      final existing = _indexForLine(itemKey);
+      if (existing < 0) return;
+      final updated = List<CartItem>.from(state.items)..removeAt(existing);
       state = state.copyWith(items: updated);
       PwaInstallService.updateCartBadgeCount(state.itemCount);
+      _persist();
       return;
     }
 
-    final existing = state.items.indexWhere((i) => i.menuItemId == menuItemId);
+    final existing = _indexForLine(itemKey);
     if (existing >= 0) {
       final updated = List<CartItem>.from(state.items);
       updated[existing] = updated[existing].copyWith(quantity: quantity);
@@ -279,12 +323,13 @@ class CartNotifier extends Notifier<CartState> {
         items: [
           ...state.items,
           CartItem(
-            menuItemId: menuItemId,
+            menuItemId: _menuItemIdFromCartKey(itemKey),
             name: name,
             description: description ?? '',
             imageUrl: imageUrl,
             price: price,
             quantity: quantity,
+            note: _normalizeCartNote(note),
           ),
         ],
       );
@@ -295,10 +340,9 @@ class CartNotifier extends Notifier<CartState> {
 
   /// Get quantity for a specific item.
   int quantityOf(String menuItemId) {
-    final item = state.items
-        .where((i) => i.menuItemId == menuItemId)
-        .firstOrNull;
-    return item?.quantity ?? 0;
+    return state.items
+        .where((item) => item.menuItemId == menuItemId)
+        .fold(0, (sum, item) => sum + item.quantity);
   }
 
   /// Build an Order object for placement.

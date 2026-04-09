@@ -208,33 +208,4 @@ void main() {
       expect((inv.payload?['updates'] as Map)['name'], 'Updated Name');
     });
   });
-
-  group('searchGoogleMaps', () {
-    test('parses array results', () async {
-      mock.registerResponse('search_google_maps', [
-        {'name': 'Place A', 'address': '1 St'},
-        {'name': 'Place B', 'address': '2 Ave'},
-      ]);
-
-      final results = await repo.searchGoogleMaps('coffee');
-
-      expect(results, hasLength(2));
-      expect(results[0]['name'], 'Place A');
-      final inv = mock.lastInvocation('search_google_maps')!;
-      expect(inv.payload?['query'], 'coffee');
-    });
-
-    test('parses wrapped results object', () async {
-      mock.registerResponse('search_google_maps', {
-        'results': [
-          {'name': 'Wrapped Place'},
-        ],
-      });
-
-      final results = await repo.searchGoogleMaps('tea');
-
-      expect(results, hasLength(1));
-      expect(results[0]['name'], 'Wrapped Place');
-    });
-  });
 }
