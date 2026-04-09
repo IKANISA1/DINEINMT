@@ -1089,9 +1089,11 @@ async function signSupabaseScopedJwt(payload: JsonRecord): Promise<string> {
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const jwtSecret = optionalEnv("SUPABASE_JWT_SECRET") ??
+    getEnv("DINEIN_SUPABASE_JWT_SECRET");
   const signature = await hmacSha256Base64Url(
     signingInput,
-    getEnv("SUPABASE_JWT_SECRET"),
+    jwtSecret,
   );
   return `${signingInput}.${signature}`;
 }
@@ -1103,8 +1105,10 @@ async function issueScopedRealtimeAccessToken(
 > {
   const issuedAtSeconds = Math.floor(Date.now() / 1000);
   const expiresAtSeconds = issuedAtSeconds + ORDER_REALTIME_TOKEN_TTL_SECONDS;
+  const jwtSecretAvailable = optionalEnv("SUPABASE_JWT_SECRET") != null ||
+    optionalEnv("DINEIN_SUPABASE_JWT_SECRET") != null;
 
-  if (!optionalEnv("SUPABASE_JWT_SECRET")) {
+  if (!jwtSecretAvailable) {
     return {
       access_token: "",
       expires_at: new Date(expiresAtSeconds * 1000).toISOString(),
