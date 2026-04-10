@@ -21,6 +21,12 @@
 # Main JS must revalidate to ensure updates propagate after deploy
 /main.dart.js
   Cache-Control: no-cache
+/main.dart.js_*
+  Cache-Control: no-cache
+/main.dart.mjs
+  Cache-Control: no-cache
+/main.dart.wasm
+  Cache-Control: no-cache
 
 # Flutter bootstrap must not be stale
 /flutter_bootstrap.js

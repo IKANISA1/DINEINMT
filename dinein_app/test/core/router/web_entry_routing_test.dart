@@ -4,6 +4,41 @@ import 'package:dinein_app/core/router/web_entry_routing.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('resolveWebAppSurface', () {
+    test('detects the landing host separately from app hosts', () {
+      final surface = resolveWebAppSurface(
+        uri: Uri.parse('https://dineinmt.ikanisa.com/'),
+        config: CountryConfig.mt,
+      );
+
+      expect(surface, WebAppSurface.landing);
+    });
+
+    test('detects guest, venue, and admin hosts', () {
+      expect(
+        resolveWebAppSurface(
+          uri: Uri.parse('https://dineinmtg.ikanisa.com/'),
+          config: CountryConfig.mt,
+        ),
+        WebAppSurface.guest,
+      );
+      expect(
+        resolveWebAppSurface(
+          uri: Uri.parse('https://dineinmtv.ikanisa.com/'),
+          config: CountryConfig.mt,
+        ),
+        WebAppSurface.venue,
+      );
+      expect(
+        resolveWebAppSurface(
+          uri: Uri.parse('https://dineinmta.ikanisa.com/'),
+          config: CountryConfig.mt,
+        ),
+        WebAppSurface.admin,
+      );
+    });
+  });
+
   group('resolveWebRootRoute', () {
     test('routes guest host to discover', () {
       final route = resolveWebRootRoute(
@@ -75,6 +110,17 @@ void main() {
       final route = resolveWebRootRoute(
         uri: Uri.parse('https://example.com/'),
         config: CountryConfig.mt,
+        hasVenueAccess: false,
+        hasAdminAccess: false,
+      );
+
+      expect(route, isNull);
+    });
+
+    test('returns null for the landing host', () {
+      final route = resolveWebRootRoute(
+        uri: Uri.parse('https://dineinrw.ikanisa.com/'),
+        config: CountryConfig.rw,
         hasVenueAccess: false,
         hasAdminAccess: false,
       );

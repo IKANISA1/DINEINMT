@@ -18,6 +18,10 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="apple-touch-icon" href="logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@700;800;900&family=Inter:wght@500;600;700&display=swap">
+  <link rel="preload" as="image" href="app-mockup.png">
   
   <link rel="stylesheet" href="index.css">
 </head>
@@ -27,7 +31,7 @@
   <nav class="nav" id="mainNav">
     <div class="container nav-inner">
       <a href="/" class="brand-mark">
-        <img src="logo.png" alt="DINEIN" class="brand-icon">
+        <img src="logo.png" alt="DINEIN" class="brand-icon" width="512" height="512" decoding="async">
       </a>
       
       <ul class="nav-links">
@@ -53,6 +57,7 @@
     <a href="#download" class="btn btn-primary" onclick="closeMobileNav()">Get the App</a>
   </div>
 
+  <main id="main-content">
   <!-- ═══ Hero ═══ -->
   <section class="hero" id="hero">
     <div class="container">
@@ -73,14 +78,14 @@
           </p>
           
           <div class="hero-ctas" id="download">
-            <a href="https://play.google.com/store/apps/details?id=com.dineinrw.app" class="store-badge" aria-label="Download on Google Play">
+            <a href="https://play.google.com/store/apps/details?id=com.dineinrw.app" class="store-badge" aria-label="Get it on Google Play">
               <span class="store-badge-icon">▶</span>
               <div class="store-badge-text">
                 <span>Get it on</span>
                 <strong>Google Play</strong>
               </div>
             </a>
-            <a href="https://apps.apple.com" class="store-badge store-badge-disabled" aria-label="App Store — Coming Soon" style="opacity: 0.5; pointer-events: none;">
+            <a href="https://apps.apple.com" class="store-badge store-badge-disabled" aria-label="Coming soon on App Store" style="opacity: 0.5; pointer-events: none;">
               <span class="store-badge-icon">🍎</span>
               <div class="store-badge-text">
                 <span>Coming soon on</span>
@@ -109,7 +114,7 @@
           <div class="hero-glow"></div>
           <div class="hero-phone-mockup">
             <div class="hero-phone-notch"></div>
-            <img src="app-mockup.png" alt="DINEIN app showing restaurant menu" class="phone-screen">
+            <img src="app-mockup.png" alt="DINEIN app showing restaurant menu" class="phone-screen" width="640" height="640" decoding="async" fetchpriority="high">
           </div>
         </div>
       </div>
@@ -154,28 +159,28 @@
       <div class="steps-grid">
         <div class="step animate-in">
           <div class="step-number">1</div>
-          <h4>Scan</h4>
+          <h3 class="step-title">Scan</h3>
           <p>Use your phone camera to scan the QR code on your table.</p>
           <span class="step-connector">→</span>
         </div>
         
         <div class="step animate-in">
           <div class="step-number">2</div>
-          <h4>Browse</h4>
+          <h3 class="step-title">Browse</h3>
           <p>Explore the full menu with categories, descriptions, and prices.</p>
           <span class="step-connector">→</span>
         </div>
         
         <div class="step animate-in">
           <div class="step-number">3</div>
-          <h4>Order</h4>
+          <h3 class="step-title">Order</h3>
           <p>Add items to your cart, review, and place your order in just a few taps.</p>
           <span class="step-connector">→</span>
         </div>
         
         <div class="step animate-in">
           <div class="step-number">4</div>
-          <h4>Enjoy</h4>
+          <h3 class="step-title">Enjoy</h3>
           <p>Sit back and relax. Your food is on its way to your table.</p>
         </div>
       </div>
@@ -193,6 +198,7 @@
       </div>
     </div>
   </section>
+  </main>
 
   <!-- ═══ Footer ═══ -->
   <footer class="footer">
@@ -200,13 +206,13 @@
       <div class="footer-grid">
         <div class="footer-brand">
           <div class="brand-mark">
-            <img src="logo.png" alt="DINEIN" class="brand-icon">
+            <img src="logo.png" alt="DINEIN" class="brand-icon" width="512" height="512" decoding="async" loading="lazy">
           </div>
           <p>The smart way to dine in Rwanda. Scan, order, and enjoy — from any partner restaurant.</p>
         </div>
         
         <div class="footer-col">
-          <h6>Product</h6>
+          <h3 class="footer-heading">Product</h3>
           <ul>
             <li><a href="#features">Features</a></li>
             <li><a href="#how-it-works">How It Works</a></li>
@@ -215,7 +221,7 @@
         </div>
         
         <div class="footer-col">
-          <h6>Company</h6>
+          <h3 class="footer-heading">Company</h3>
           <ul>
             <li><a href="#venues">For Venues</a></li>
             <li><a href="mailto:info@ikanisa.com">Contact</a></li>
@@ -223,7 +229,7 @@
         </div>
         
         <div class="footer-col">
-          <h6>Legal</h6>
+          <h3 class="footer-heading">Legal</h3>
           <ul>
             <li><a href="privacy.html">Privacy Policy</a></li>
             <li><a href="terms.html">Terms & Conditions</a></li>

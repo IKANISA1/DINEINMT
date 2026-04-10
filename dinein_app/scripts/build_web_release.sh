@@ -144,6 +144,7 @@ rm -rf "${project_dir}/build/web"
 
 flutter build web \
   --release \
+  --wasm \
   --pwa-strategy=none \
   --no-web-resources-cdn \
   --no-wasm-dry-run \
@@ -356,6 +357,16 @@ if ! grep -q 'main.dart.js?v=' "${build_output}/flutter_bootstrap.js"; then
   exit 1
 fi
 
+if [[ -f "${build_output}/main.dart.wasm" ]] && ! grep -q 'main.dart.wasm?v=' "${build_output}/flutter_bootstrap.js"; then
+  echo "⛔ flutter_bootstrap.js is not requesting a versioned main.dart.wasm entrypoint." >&2
+  exit 1
+fi
+
+if [[ -f "${build_output}/main.dart.mjs" ]] && ! grep -q 'main.dart.mjs?v=' "${build_output}/flutter_bootstrap.js"; then
+  echo "⛔ flutter_bootstrap.js is not requesting a versioned main.dart.mjs support runtime." >&2
+  exit 1
+fi
+
 service_worker_registrations=$(grep -o 'serviceWorker\.register' "${build_output}/index.html" | wc -l | tr -d ' ')
 if [[ "${service_worker_registrations}" != "1" ]]; then
   echo "⛔ Expected exactly one manual service worker registration in index.html, found ${service_worker_registrations}." >&2
@@ -366,6 +377,14 @@ for prerendered_route in discover venues; do
   route_file="${build_output}/${prerendered_route}/index.html"
   if ! grep -q 'hreflang="en-MT"' "${route_file}" || ! grep -q 'hreflang="en-RW"' "${route_file}"; then
     echo "⛔ ${prerendered_route}/index.html is missing hreflang alternates." >&2
+    exit 1
+  fi
+  if grep -q '__DINEIN_PWA_' "${route_file}"; then
+    echo "⛔ ${prerendered_route}/index.html still contains unresolved PWA placeholders." >&2
+    exit 1
+  fi
+  if ! grep -q 'custom_sw.js?v=' "${route_file}"; then
+    echo "⛔ ${prerendered_route}/index.html is missing the versioned custom service worker registration." >&2
     exit 1
   fi
 done
@@ -383,6 +402,8 @@ from pathlib import Path
 
 build_dir = Path(sys.argv[1])
 MAIN_JS_GZIP_BUDGET = 1_100_000
+MAIN_WASM_GZIP_BUDGET = 1_900_000
+MAIN_MJS_GZIP_BUDGET = 60_000
 # Keep this slightly above the current paired-country production bundle size so
 # routine content additions do not fail deploys on a ~2% overage.
 DEFERRED_JS_BUDGET = 3_200_000
@@ -398,6 +419,26 @@ if main_gzip_size > MAIN_JS_GZIP_BUDGET:
         file=sys.stderr,
     )
     raise SystemExit(1)
+
+main_wasm = build_dir / "main.dart.wasm"
+if main_wasm.is_file():
+    main_wasm_gzip_size = len(gzip.compress(main_wasm.read_bytes(), compresslevel=9))
+    if main_wasm_gzip_size > MAIN_WASM_GZIP_BUDGET:
+        print(
+            f"⛔ main.dart.wasm exceeds the gzip budget: {main_wasm_gzip_size} bytes.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+main_mjs = build_dir / "main.dart.mjs"
+if main_mjs.is_file():
+    main_mjs_gzip_size = len(gzip.compress(main_mjs.read_bytes(), compresslevel=9))
+    if main_mjs_gzip_size > MAIN_MJS_GZIP_BUDGET:
+        print(
+            f"⛔ main.dart.mjs exceeds the gzip budget: {main_mjs_gzip_size} bytes.",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 
 deferred_total = sum(path.stat().st_size for path in build_dir.glob("main.dart.js_*.part.js"))
 if deferred_total > DEFERRED_JS_BUDGET:
@@ -474,6 +515,8 @@ du -sh "${build_output}"
 echo ""
 echo "Key files:"
 ls -lh "${build_output}/main.dart.js" 2>/dev/null || echo "  (using wasm build)"
+ls -lh "${build_output}/main.dart.wasm" 2>/dev/null || true
+ls -lh "${build_output}/main.dart.mjs" 2>/dev/null || true
 ls -lh "${build_output}/flutter_bootstrap.js" 2>/dev/null || true
 ls -lh "${build_output}/custom_sw.js" 2>/dev/null || true
 ls -lh "${build_output}/pwa-shell-manifest.json" 2>/dev/null || true

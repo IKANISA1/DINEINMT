@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:core_pkg/config/country_runtime.dart';
 import 'package:core_pkg/config/country_config.dart';
 import '../services/auth_repository.dart';
 import 'app_routes.dart';
+
+enum WebAppSurface { guest, venue, admin, landing, unknown }
 
 /// Resolves the browser root path to the correct role-specific start route.
 ///
@@ -15,26 +19,38 @@ String? resolveWebRootRoute({
   required bool hasVenueAccess,
   required bool hasAdminAccess,
 }) {
-  final host = uri.host.toLowerCase();
-  if (host.isEmpty) return null;
+  return switch (resolveWebAppSurface(uri: uri, config: config)) {
+    WebAppSurface.guest => AppRoutePaths.discover,
+    WebAppSurface.venue =>
+      hasVenueAccess ? AppRoutePaths.venueDashboard : AppRoutePaths.venueLogin,
+    WebAppSurface.admin =>
+      hasAdminAccess ? AppRoutePaths.adminOverview : AppRoutePaths.adminLogin,
+    WebAppSurface.landing || WebAppSurface.unknown => null,
+  };
+}
 
+WebAppSurface resolveWebAppSurface({
+  required Uri uri,
+  required CountryConfig config,
+}) {
+  final host = uri.host.toLowerCase().trim();
+  if (host.isEmpty) {
+    return WebAppSurface.unknown;
+  }
+
+  if (host == config.siteHost) {
+    return WebAppSurface.landing;
+  }
   if (_isGuestHost(host, config)) {
-    return AppRoutePaths.discover;
+    return WebAppSurface.guest;
   }
-
   if (_isVenueHost(host, config)) {
-    return hasVenueAccess
-        ? AppRoutePaths.venueDashboard
-        : AppRoutePaths.venueLogin;
+    return WebAppSurface.venue;
   }
-
   if (_isAdminHost(host, config)) {
-    return hasAdminAccess
-        ? AppRoutePaths.adminOverview
-        : AppRoutePaths.adminLogin;
+    return WebAppSurface.admin;
   }
-
-  return null;
+  return WebAppSurface.unknown;
 }
 
 bool _isGuestHost(String host, CountryConfig config) {
@@ -66,5 +82,15 @@ String? resolveCurrentWebRootRoute(Uri uri) {
     config: CountryRuntime.config,
     hasVenueAccess: AuthRepository.instance.hasVenueAccess,
     hasAdminAccess: AuthRepository.instance.hasAdminAccess,
+  );
+}
+
+WebAppSurface resolveCurrentWebAppSurface([Uri? uri]) {
+  if (!kIsWeb) {
+    return WebAppSurface.unknown;
+  }
+  return resolveWebAppSurface(
+    uri: uri ?? Uri.base,
+    config: CountryRuntime.config,
   );
 }

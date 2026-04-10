@@ -21,6 +21,14 @@ import 'package:google_fonts/google_fonts.dart';
 /// - Body/Labels: Inter Medium.
 /// - Hierarchy via Scale + Color, not weight reduction.
 abstract final class AppTypography {
+  static const List<String> _fontFallbacks = [
+    'Noto Sans',
+    'Noto Color Emoji',
+    'Segoe UI Emoji',
+    'Apple Color Emoji',
+    'sans-serif',
+  ];
+
   // ─── Headline Font ───
   static TextStyle _headline({
     double fontSize = 24,
@@ -35,6 +43,7 @@ abstract final class AppTypography {
       letterSpacing: fontSize * letterSpacing,
       height: height,
       color: color,
+      textStyle: const TextStyle(fontFamilyFallback: _fontFallbacks),
     );
   }
 
@@ -52,6 +61,7 @@ abstract final class AppTypography {
       letterSpacing: letterSpacing,
       height: height,
       color: color,
+      textStyle: const TextStyle(fontFamilyFallback: _fontFallbacks),
     );
   }
 

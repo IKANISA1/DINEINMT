@@ -3,9 +3,6 @@
    Exact mapping from Flutter AppColors / AppTheme / AppTypography
    ═══════════════════════════════════════════════════════════════ */
 
-/* ─── Google Fonts ─── */
-@import url('https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,700;0,800;0,900;1,800;1,900&family=Inter:wght@400;500;600;700;900&display=swap');
-
 /* ─── CSS Custom Properties (Design Tokens) ─── */
 :root {
   /* Primary Palette */
@@ -152,6 +149,14 @@ h3 { font-size: clamp(22px, 3vw, 30px); }
 h4 { font-size: 24px; }
 h5 { font-size: 20px; }
 h6 { font-size: 18px; }
+
+.step-title {
+  font-size: 24px;
+}
+
+.footer-heading {
+  font-size: 18px;
+}
 
 p {
   color: var(--on-surface-variant);

@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:db_pkg/models/models.dart';
 import '../services/api_invoker.dart';
 import '../infrastructure/app_notification_service.dart'
-    if (dart.library.html) 'app_notification_service_web.dart';
+    if (dart.library.js_interop) 'app_notification_service_web.dart';
 import '../services/dinein_api_service.dart';
 import '../services/supabase_config.dart';
 

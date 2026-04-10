@@ -22,6 +22,8 @@ PRIORITY_ASSETS = [
     "/manifest.json",
     "/flutter.js",
     "/flutter_bootstrap.js",
+    "/main.dart.mjs",
+    "/main.dart.wasm",
     "/main.dart.js",
 ]
 FLUTTER_LOCKED_VIEWPORT = (
@@ -99,13 +101,21 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    index_path = build_dir / "index.html"
-    index_contents = index_path.read_text(encoding="utf-8")
-    index_contents = index_contents.replace("__DINEIN_PWA_VERSION__", version)
-    if "__DINEIN_PWA_" in index_contents:
-        print("index.html still contains unresolved PWA placeholders.", file=sys.stderr)
+    html_paths = sorted(build_dir.rglob("*.html"))
+    if not html_paths:
+        print("Build output is missing HTML entrypoints.", file=sys.stderr)
         return 1
-    index_path.write_text(index_contents, encoding="utf-8")
+
+    for html_path in html_paths:
+        html_contents = html_path.read_text(encoding="utf-8")
+        html_contents = html_contents.replace("__DINEIN_PWA_VERSION__", version)
+        if "__DINEIN_PWA_" in html_contents:
+            print(
+                f"{html_path.relative_to(build_dir)} still contains unresolved PWA placeholders.",
+                file=sys.stderr,
+            )
+            return 1
+        html_path.write_text(html_contents, encoding="utf-8")
 
     bootstrap_path = build_dir / "flutter_bootstrap.js"
     if bootstrap_path.is_file():
@@ -123,7 +133,40 @@ def main() -> int:
                 versioned_main_path,
                 1,
             )
-            bootstrap_path.write_text(bootstrap_contents, encoding="utf-8")
+
+        wasm_path = build_dir / "main.dart.wasm"
+        if wasm_path.is_file():
+            versioned_wasm_path = f'"mainWasmPath":"main.dart.wasm?v={version}"'
+            if versioned_wasm_path not in bootstrap_contents:
+                if '"mainWasmPath":"main.dart.wasm"' not in bootstrap_contents:
+                    print(
+                        "flutter_bootstrap.js is missing the expected mainWasmPath marker.",
+                        file=sys.stderr,
+                    )
+                    return 1
+                bootstrap_contents = bootstrap_contents.replace(
+                    '"mainWasmPath":"main.dart.wasm"',
+                    versioned_wasm_path,
+                    1,
+                )
+
+        mjs_path = build_dir / "main.dart.mjs"
+        if mjs_path.is_file():
+            versioned_mjs_path = f'"jsSupportRuntimePath":"main.dart.mjs?v={version}"'
+            if versioned_mjs_path not in bootstrap_contents:
+                if '"jsSupportRuntimePath":"main.dart.mjs"' not in bootstrap_contents:
+                    print(
+                        "flutter_bootstrap.js is missing the expected jsSupportRuntimePath marker.",
+                        file=sys.stderr,
+                    )
+                    return 1
+                bootstrap_contents = bootstrap_contents.replace(
+                    '"jsSupportRuntimePath":"main.dart.mjs"',
+                    versioned_mjs_path,
+                    1,
+                )
+
+        bootstrap_path.write_text(bootstrap_contents, encoding="utf-8")
 
     sw_contents = custom_sw_path.read_text(encoding="utf-8")
     sw_contents = sw_contents.replace("__DINEIN_PWA_VERSION__", version)

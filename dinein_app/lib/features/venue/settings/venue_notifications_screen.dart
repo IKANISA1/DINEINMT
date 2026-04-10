@@ -9,7 +9,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/infrastructure/app_notification_service.dart'
-    if (dart.library.html) 'package:dinein_app/core/services/app_notification_service_web.dart';
+    if (dart.library.js_interop) 'package:dinein_app/core/services/app_notification_service_web.dart';
 import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import '../../../core/providers/providers.dart';
@@ -59,7 +59,8 @@ class _VenueNotificationsScreenState
 
   Future<void> _checkOsNotificationStatus() async {
     try {
-      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      final settings = await FirebaseMessaging.instance
+          .getNotificationSettings();
       if (!mounted) return;
       setState(() {
         _osPushStatus = settings.authorizationStatus;
@@ -251,8 +252,8 @@ class _VenueNotificationsScreenState
                     title: 'New Order Push',
                     subtitle: kIsWeb
                         ? pushAvailable
-                            ? 'INSTANT BROWSER NOTIFICATIONS'
-                            : 'AVAILABLE ON MOBILE APP ONLY'
+                              ? 'INSTANT BROWSER NOTIFICATIONS'
+                              : 'AVAILABLE ON MOBILE APP ONLY'
                         : 'INSTANT MOBILE NOTIFICATIONS',
                     value: pushAvailable ? _orderPush : false,
                     onChanged: pushAvailable && canEditToggles
@@ -270,34 +271,43 @@ class _VenueNotificationsScreenState
 
               if (_orderPush && _osPushStatus == AuthorizationStatus.denied)
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  margin: const EdgeInsets.only(bottom: AppTheme.space2),
-                  decoration: BoxDecoration(
-                    color: cs.errorContainer.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: cs.error.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(LucideIcons.alertTriangle,
-                          color: cs.error, size: 16),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Push alerts are disabled in your Device Settings. Please enable them to receive incoming orders.',
-                          style: tt.bodySmall?.copyWith(
-                            color: cs.error,
-                            fontSize: 10,
-                            height: 1.3,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      margin: const EdgeInsets.only(bottom: AppTheme.space2),
+                      decoration: BoxDecoration(
+                        color: cs.errorContainer.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: cs.error.withValues(alpha: 0.2),
                         ),
                       ),
-                    ],
-                  ),
-                ).animate().fadeIn(duration: 300.ms).slideY(
-                    begin: -0.1, end: 0, duration: 300.ms),
+                      child: Row(
+                        children: [
+                          Icon(
+                            LucideIcons.alertTriangle,
+                            color: cs.error,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Push alerts are disabled in your Device Settings. Please enable them to receive incoming orders.',
+                              style: tt.bodySmall?.copyWith(
+                                color: cs.error,
+                                fontSize: 10,
+                                height: 1.3,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    .animate()
+                    .fadeIn(duration: 300.ms)
+                    .slideY(begin: -0.1, end: 0, duration: 300.ms),
 
               // ─── WhatsApp Updates ───
               _ToggleTile(

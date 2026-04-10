@@ -6,6 +6,7 @@ import 'package:core_pkg/config/country_config_provider.dart';
 import 'package:core_pkg/config/country_runtime.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/router/url_strategy.dart';
+import 'package:dinein_app/core/router/web_entry_routing.dart';
 import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/core/services/pwa_install_service.dart';
 import 'package:dinein_app/features/guest/permissions/guest_location_permission_host.dart';
@@ -35,8 +36,22 @@ Future<void> bootApp(CountryConfig config) async {
     ErrorWidget.builder = (_) => const ProductionErrorWidget();
   }
 
-  PwaInstallService.init();
-  unawaited(AppBootstrapService.instance.ensureStarted());
+  final webAppSurface = resolveCurrentWebAppSurface();
+  final startupProfile = switch (webAppSurface) {
+    WebAppSurface.guest => const AppStartupProfile.guestWeb(),
+    WebAppSurface.venue => const AppStartupProfile.venueWeb(),
+    WebAppSurface.admin => const AppStartupProfile.adminWeb(),
+    WebAppSurface.landing ||
+    WebAppSurface.unknown => const AppStartupProfile.defaultProfile(),
+  };
+
+  if (webAppSurface == WebAppSurface.guest ||
+      webAppSurface == WebAppSurface.unknown) {
+    PwaInstallService.init();
+  }
+  unawaited(
+    AppBootstrapService.instance.ensureStarted(profile: startupProfile),
+  );
 
   runApp(
     DineInToastOverlay(
