@@ -15,17 +15,6 @@ part 'auth_session.dart';
 // Shared private helpers used by model factories across part files.
 // ---------------------------------------------------------------------------
 
-String _toTitleCaseLabel(String value) {
-  return value
-      .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty)
-      .map((part) {
-        if (part.length == 1) return part.toUpperCase();
-        return '${part[0].toUpperCase()}${part.substring(1)}';
-      })
-      .join(' ');
-}
-
 /// All venues are treated as restaurants — category differentiation removed.
 String normalizeVenueCategoryLabel(
   String? value, {

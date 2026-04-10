@@ -757,9 +757,8 @@ class _NearbyVenueCard extends StatelessWidget {
 
 class _MetaPill extends StatelessWidget {
   final String label;
-  final bool isPrimary;
 
-  const _MetaPill({required this.label, this.isPrimary = false});
+  const _MetaPill({required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -767,20 +766,14 @@ class _MetaPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isPrimary
-            ? cs.primary.withValues(alpha: 0.14)
-            : AppColors.white5,
+        color: AppColors.white5,
         borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-        border: Border.all(
-          color: isPrimary
-              ? cs.primary.withValues(alpha: 0.24)
-              : AppColors.white5,
-        ),
+        border: Border.all(color: AppColors.white5),
       ),
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          color: isPrimary ? cs.primary : cs.onSurfaceVariant,
+          color: cs.onSurfaceVariant,
           fontSize: 10,
           fontWeight: FontWeight.w900,
           letterSpacing: 2.0,
@@ -930,4 +923,3 @@ class _SmartReorderSection extends ConsumerWidget {
     );
   }
 }
-

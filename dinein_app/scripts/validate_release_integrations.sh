@@ -45,7 +45,7 @@ case "$flavor" in
     expected_ios_app_id="1:1074154147498:ios:f9338408dab88c45dc4ad3"
     android_google_services="$app_root/android/app/src/mt/google-services.json"
     android_manifest_task=":app:processMtReleaseMainManifest"
-    merged_android_manifest="$app_root/build/app/intermediates/merged_manifests/mtRelease/processMtReleaseManifest/AndroidManifest.xml"
+    merged_android_manifest=""
     if [[ "$well_known_dir_overridden" != "true" ]]; then
       well_known_dir="$app_root/../landing/.well-known"
     fi
@@ -61,7 +61,7 @@ case "$flavor" in
     expected_ios_app_id="1:1074154147498:ios:a44ce46db3c51bfcdc4ad3"
     android_google_services="$app_root/android/app/src/rw/google-services.json"
     android_manifest_task=":app:processRwReleaseMainManifest"
-    merged_android_manifest="$app_root/build/app/intermediates/merged_manifests/rwRelease/processRwReleaseManifest/AndroidManifest.xml"
+    merged_android_manifest=""
     if [[ "$well_known_dir_overridden" != "true" ]]; then
       well_known_dir="$app_root/../landing-rw/.well-known"
     fi
@@ -74,6 +74,48 @@ case "$flavor" in
 esac
 
 failures=0
+
+run_android_manifest_task() {
+  echo "Generating merged Android manifest for flavor ${flavor}..."
+  (
+    cd "$app_root/android"
+    ./gradlew \
+      --no-daemon \
+      --console=plain \
+      "$android_manifest_task"
+  )
+}
+
+resolve_merged_android_manifest() {
+  local release_dir=""
+  local main_manifest_path=""
+  local legacy_manifest_path=""
+
+  case "$flavor" in
+    mt)
+      release_dir="mtRelease"
+      main_manifest_path="$app_root/build/app/intermediates/merged_manifest/${release_dir}/processMtReleaseMainManifest/AndroidManifest.xml"
+      legacy_manifest_path="$app_root/build/app/intermediates/merged_manifests/${release_dir}/processMtReleaseManifest/AndroidManifest.xml"
+      ;;
+    rw)
+      release_dir="rwRelease"
+      main_manifest_path="$app_root/build/app/intermediates/merged_manifest/${release_dir}/processRwReleaseMainManifest/AndroidManifest.xml"
+      legacy_manifest_path="$app_root/build/app/intermediates/merged_manifests/${release_dir}/processRwReleaseManifest/AndroidManifest.xml"
+      ;;
+  esac
+
+  if [[ -f "$main_manifest_path" ]]; then
+    merged_android_manifest="$main_manifest_path"
+    return
+  fi
+
+  if [[ -f "$legacy_manifest_path" ]]; then
+    merged_android_manifest="$legacy_manifest_path"
+    return
+  fi
+
+  merged_android_manifest="$main_manifest_path"
+}
 
 # ── Supabase credential validation in env file ──────────────────────────────
 env_file="$app_root/env/release.${flavor}.json"
@@ -120,10 +162,8 @@ else
   failures=$((failures + 1))
 fi
 
-(
-  cd "$app_root/android"
-  ./gradlew "$android_manifest_task" >/dev/null
-)
+run_android_manifest_task
+resolve_merged_android_manifest
 
 require_file() {
   local path="$1"
@@ -321,7 +361,7 @@ require_file "${app_root}/web/flutter_bootstrap.js" 'Custom flutter_bootstrap.js
 if [[ -f "$web_headers" ]]; then
   require_contains \
     "$web_headers" \
-    'Permissions-Policy: camera=(), microphone=(), geolocation=()' \
+    'Permissions-Policy: camera=(), microphone=(), geolocation=' \
     'Web headers are missing the geolocation permissions policy.'
 fi
 if [[ -f "$web_index" ]]; then

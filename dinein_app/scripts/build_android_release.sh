@@ -59,6 +59,72 @@ require_file() {
   fi
 }
 
+reset_flutter_build_cache() {
+  local cache_dir="${project_dir}/.dart_tool/flutter_build"
+  if [[ -d "${cache_dir}" ]]; then
+    echo "Resetting Flutter build cache (${cache_dir})"
+    rm -rf "${cache_dir}"
+  fi
+}
+
+stop_gradle_daemons() {
+  local gradle_dir="${project_dir}/android"
+  if [[ -x "${gradle_dir}/gradlew" ]]; then
+    (
+      cd "${gradle_dir}"
+      ./gradlew --stop >/dev/null 2>&1 || true
+    )
+  fi
+}
+
+configure_gradle_runtime() {
+  local profile="${1:-default}"
+  case "${profile}" in
+    constrained)
+      export GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=1 -Dorg.gradle.jvmargs=-Xmx4G\\ -XX:MaxMetaspaceSize=1G\\ -XX:ReservedCodeCacheSize=256m\\ -XX:+HeapDumpOnOutOfMemoryError"
+      ;;
+    *)
+      export GRADLE_OPTS="-Dorg.gradle.daemon=false"
+      ;;
+  esac
+}
+
+build_flutter_artifact() {
+  local label="$1"
+  shift
+
+  local attempt=1
+  local max_attempts=2
+  local build_log
+  build_log="$(mktemp)"
+
+  while (( attempt <= max_attempts )); do
+    if (( attempt > 1 )); then
+      echo "Retrying ${label} with constrained Gradle settings (attempt ${attempt}/${max_attempts})"
+      reset_flutter_build_cache
+      stop_gradle_daemons
+      configure_gradle_runtime constrained
+      sleep 2
+    fi
+
+    if "$@" 2>&1 | tee "${build_log}"; then
+      rm -f "${build_log}"
+      return 0
+    fi
+
+    if ! grep -q "Gradle build daemon disappeared unexpectedly" "${build_log}" || (( attempt == max_attempts )); then
+      rm -f "${build_log}"
+      return 1
+    fi
+
+    echo "Transient Gradle daemon failure detected while building ${label}; retrying..."
+    attempt=$((attempt + 1))
+  done
+
+  rm -f "${build_log}"
+  return 1
+}
+
 has_env_signing() {
   [[ -n "${ANDROID_KEYSTORE_FILE:-}" ]] &&
     [[ -n "${ANDROID_KEYSTORE_PASSWORD:-}" ]] &&
@@ -131,13 +197,16 @@ if [[ "${skip_checks}" != "true" ]]; then
 fi
 
 echo "Using env file: ${env_file}"
+reset_flutter_build_cache
+stop_gradle_daemons
+configure_gradle_runtime default
 
-flutter build apk \
+build_flutter_artifact "APK" flutter build apk \
   --release \
   --flavor "${flavor}" \
   -t "${entrypoint}" \
   --dart-define-from-file="${env_file}"
-flutter build appbundle \
+build_flutter_artifact "AAB" flutter build appbundle \
   --release \
   --flavor "${flavor}" \
   -t "${entrypoint}" \

@@ -29,7 +29,6 @@ void main() {
         address: 'Kigali',
         phone: '+250788767816',
         status: VenueStatus.active,
-        accessVerifiedAt: now,
         country: Country.rw,
       ),
       Venue(
@@ -39,7 +38,7 @@ void main() {
         category: 'Restaurants',
         description: 'Popular restaurant venue.',
         address: 'Kigali',
-        status: VenueStatus.pendingActivation,
+        status: VenueStatus.inactive,
         country: Country.rw,
       ),
     ];
@@ -88,6 +87,15 @@ void main() {
         overrides: [
           allVenuesProvider.overrideWith((ref) async => venues),
           allOrdersProvider.overrideWith((ref) async => orders),
+          adminDashboardKpisProvider.overrideWith(
+            (ref) async => {
+              'orders_today': 1,
+              'revenue_today': 4000,
+              'total_orders': 2,
+              'total_revenue': 9000,
+              'cancelled_orders': 1,
+            },
+          ),
           imageHealthProvider.overrideWith(
             (ref) async => const ImageHealthStats(
               total: 10,

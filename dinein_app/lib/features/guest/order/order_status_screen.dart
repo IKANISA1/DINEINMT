@@ -491,13 +491,11 @@ class _ItemRow extends StatelessWidget {
 class _OrderDetailRow extends StatelessWidget {
   final String label;
   final String value;
-  final bool isBold;
   final bool multiline;
 
   const _OrderDetailRow({
     required this.label,
     required this.value,
-    this.isBold = false,
     this.multiline = false,
   });
 
@@ -515,9 +513,7 @@ class _OrderDetailRow extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: isBold
-                ? tt.titleSmall?.copyWith(fontWeight: FontWeight.w800)
-                : tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
         ),
         const SizedBox(width: 16),
@@ -525,12 +521,7 @@ class _OrderDetailRow extends StatelessWidget {
           child: Text(
             value,
             textAlign: TextAlign.right,
-            style: isBold
-                ? tt.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: cs.primary,
-                  )
-                : tt.bodyMedium,
+            style: tt.bodyMedium,
           ),
         ),
       ],

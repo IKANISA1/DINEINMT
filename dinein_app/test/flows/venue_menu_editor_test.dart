@@ -53,8 +53,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('MANUAL IMAGE ACTIVE'), findsOneWidget);
-    // Manual-image items hide the "Protect current image" toggle (source code #883)
+    expect(find.byTooltip('Manual image active'), findsOneWidget);
+    // Manual-image items hide the "Protect current image" toggle.
     expect(find.text('Protect current image'), findsNothing);
   });
 
@@ -95,7 +95,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    await tester.tap(find.text('GENERATE IMAGE'));
+    await tester.tap(find.byTooltip('Generate image with AI'));
     await tester.pumpAndSettle();
 
     expect(find.text('Generate Item Image'), findsOneWidget);

@@ -76,18 +76,48 @@ class AppBootstrapService extends ChangeNotifier {
   }
 
   Future<void> _finishBackgroundBoot() async {
-    await Future.wait<void>([
-      AppNotificationService.initialize(),
-      AppTelemetryService.initialize(),
-      NotificationInboxService.instance.init(),
-    ]);
+    // Give the first routed screen a moment to settle before kicking off
+    // heavier platform integrations that can contend on startup.
+    await Future<void>.delayed(const Duration(milliseconds: 200));
 
-    // Start listening for offline sync SW messages (web only)
+    await _runBackgroundStep(
+      'notification inbox',
+      NotificationInboxService.instance.init,
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    await _runBackgroundStep(
+      'telemetry',
+      AppTelemetryService.initialize,
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    await _runBackgroundStep(
+      'push notifications',
+      AppNotificationService.initialize,
+    );
+
+    // Start listening for offline sync SW messages (web only).
     OfflineSyncListener.instance.init();
 
     final venueSession = AuthRepository.instance.currentVenueSession;
     if (venueSession != null) {
-      await AppNotificationService.handleVenueSessionUpdated(venueSession);
+      await _runBackgroundStep(
+        'venue notification sync',
+        () => AppNotificationService.handleVenueSessionUpdated(venueSession),
+      );
+    }
+  }
+
+  Future<void> _runBackgroundStep(
+    String label,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action();
+    } catch (error, stackTrace) {
+      debugPrint('[bootstrap] $label failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 

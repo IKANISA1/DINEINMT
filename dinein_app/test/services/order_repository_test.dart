@@ -40,6 +40,23 @@ Map<String, dynamic> _orderJson({
   'created_at': '2026-04-03T12:00:00Z',
 };
 
+VenueAccessSession _activeVenueSession({
+  required String venueId,
+  required String venueName,
+  required String whatsAppNumber,
+  required String accessToken,
+}) {
+  final now = DateTime.now().toUtc();
+  return VenueAccessSession(
+    venueId: venueId,
+    venueName: venueName,
+    whatsAppNumber: whatsAppNumber,
+    accessToken: accessToken,
+    issuedAt: now.subtract(const Duration(minutes: 5)),
+    expiresAt: now.add(const Duration(days: 1)),
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -83,13 +100,11 @@ void main() {
 
     test('issues venue-scoped access without receipt data', () async {
       await AuthRepository.instance.saveVenueSession(
-        VenueAccessSession(
+        _activeVenueSession(
           venueId: 'venue-789',
           venueName: 'Realtime Venue',
           whatsAppNumber: '+250795588248',
           accessToken: 'venue-session-token',
-          issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
-          expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
         ),
       );
       mock.registerResponse('issue_order_realtime_access', {
@@ -153,13 +168,11 @@ void main() {
       MockSecureStorage.setMockValue(
         'dinein.venue_session',
         jsonEncode(
-          VenueAccessSession(
+          _activeVenueSession(
             venueId: 'my-venue',
             venueName: 'My Venue',
             whatsAppNumber: '+250795588248',
             accessToken: 'venue-token',
-            issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
-            expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
           ).toJson(),
         ),
       );
@@ -229,13 +242,11 @@ void main() {
   group('updateOrderStatus', () {
     test('sends correct action and payload', () async {
       await AuthRepository.instance.saveVenueSession(
-        VenueAccessSession(
+        _activeVenueSession(
           venueId: 'venue-1',
           venueName: 'Updater',
           whatsAppNumber: '+35677186193',
           accessToken: 'update-token',
-          issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
-          expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
         ),
       );
       mock.registerResponse('update_order_status', null);

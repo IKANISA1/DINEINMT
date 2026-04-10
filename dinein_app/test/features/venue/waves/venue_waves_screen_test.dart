@@ -1,6 +1,5 @@
 import 'package:db_pkg/models/bell_request.dart';
 import 'package:dinein_app/core/providers/bell_providers.dart';
-import 'package:dinein_app/core/services/auth_repository.dart';
 import 'package:dinein_app/features/venue/waves/venue_waves_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,32 +31,6 @@ void main() {
     createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
     resolvedAt: DateTime.now().subtract(const Duration(minutes: 7)),
   );
-
-  Widget buildWaves({
-    required List<BellRequest> waves,
-  }) {
-    return ProviderScope(
-      overrides: [
-        allWavesProvider(venueId)
-            .overrideWith((ref) => Stream.value(waves)),
-      ],
-      child: MaterialApp(
-        home: DefaultTabController(
-          length: 2,
-          child: Scaffold(
-            body: Builder(
-              builder: (_) {
-                // We test the inner _WavesBody directly because
-                // VenueWavesScreen reads AuthRepository singleton.
-                // Instead, we build the same structure.
-                return const VenueWavesScreen();
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   // ─── No Session Guard ───
 

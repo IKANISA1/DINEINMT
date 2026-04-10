@@ -139,7 +139,6 @@ class AdminDashboardScreen extends ConsumerWidget {
                       runSpacing: AppTheme.space3,
                       children:
                           kpiCards.asMap().entries.map((entry) {
-                            final index = entry.key;
                             final card = entry.value;
                             return SizedBox(
                               width: cardWidth,

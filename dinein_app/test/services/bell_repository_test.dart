@@ -21,6 +21,23 @@ Map<String, dynamic> _bellRequestJson({
   'created_at': DateTime.now().toIso8601String(),
 };
 
+VenueAccessSession _activeVenueSession({
+  required String venueId,
+  required String venueName,
+  required String whatsAppNumber,
+  required String accessToken,
+}) {
+  final now = DateTime.now().toUtc();
+  return VenueAccessSession(
+    venueId: venueId,
+    venueName: venueName,
+    whatsAppNumber: whatsAppNumber,
+    accessToken: accessToken,
+    issuedAt: now.subtract(const Duration(minutes: 5)),
+    expiresAt: now.add(const Duration(days: 1)),
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late MockApiInvoker mock;
@@ -62,13 +79,11 @@ void main() {
   group('resolveWave', () {
     test('passes requestId', () async {
       await AuthRepository.instance.saveVenueSession(
-        VenueAccessSession(
+        _activeVenueSession(
           venueId: 'v1',
           venueName: 'Bell Venue',
           whatsAppNumber: '+35677186193',
           accessToken: 'bell-token',
-          issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
-          expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
         ),
       );
       mock.registerResponse('resolve_bell_request', null);
@@ -99,13 +114,11 @@ void main() {
 
     test('passes status filter if provided', () async {
       await AuthRepository.instance.saveVenueSession(
-        VenueAccessSession(
+        _activeVenueSession(
           venueId: 'v1',
           venueName: 'Bell Venue',
           whatsAppNumber: '+35677186193',
           accessToken: 'bell-token',
-          issuedAt: DateTime.parse('2026-04-08T08:00:00Z'),
-          expiresAt: DateTime.parse('2026-04-09T08:00:00Z'),
         ),
       );
       mock.registerResponse('get_bell_requests', <dynamic>[]);

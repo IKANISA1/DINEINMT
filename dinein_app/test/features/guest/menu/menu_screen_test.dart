@@ -25,7 +25,7 @@ class MockCartNotifier extends Notifier<CartState> implements CartNotifier {
   @override
   void setSpecialRequests(String? specialRequests) {}
   @override
-  void addItem(MenuItem item) {}
+  void addItem(MenuItem item, {String? note, int quantity = 1}) {}
   @override
   void removeItem(String menuItemId) {}
   @override
@@ -36,6 +36,7 @@ class MockCartNotifier extends Notifier<CartState> implements CartNotifier {
     String? description,
     String? imageUrl,
     double? price,
+    String? note,
   }) {}
   @override
   void clear() {}
