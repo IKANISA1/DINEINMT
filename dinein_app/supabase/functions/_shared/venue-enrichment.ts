@@ -4,6 +4,7 @@ import {
   type GooglePlaceSnapshot,
   searchGooglePlaceByText,
 } from "./google-places.ts";
+import { verifySupabaseServiceRoleHeader } from "./signed-jwt.ts";
 
 export interface VenueEnrichmentEnv {
   supabaseUrl: string;
@@ -66,6 +67,19 @@ export interface VenueRecord {
   search_summary: string | null;
   search_sources: unknown[] | null;
   search_queries: string[] | null;
+  deep_research_status: string | null;
+  deep_research_summary: string | null;
+  deep_research_sources: unknown[] | null;
+  deep_research_error: string | null;
+  deep_research_interaction_id: string | null;
+  deep_research_updated_at: string | null;
+  deep_research_attempts: number | null;
+  deep_research_model: string | null;
+  deep_research_last_observed_status: string | null;
+  deep_research_last_http_status: number | null;
+  deep_research_last_polled_at: string | null;
+  deep_research_last_provider_error: string | null;
+  deep_research_debug: Json | null;
   enrichment_status: string | null;
   enrichment_error: string | null;
   enrichment_attempts: number | null;
@@ -153,7 +167,7 @@ interface WebsiteMetadata {
 }
 
 const venueSelect =
-  "id, name, slug, updated_at, category, description, address, phone, email, image_url, image_source, image_status, image_model, image_prompt, image_generated_at, image_error, image_attempts, image_locked, image_storage_path, status, rating, rating_count, country, opening_hours, owner_id, website_url, reservation_url, social_links, reviews, google_place_id, google_place_resource_name, google_maps_uri, google_maps_links, google_primary_type, google_types, google_business_status, google_location, google_opening_hours, google_price_level, google_review_summary, google_review_summary_disclosure, google_review_summary_uri, google_place_summary, google_place_summary_disclosure, google_photos, google_attributions, search_summary, search_sources, search_queries, enrichment_status, enrichment_error, enrichment_attempts, enrichment_locked, last_enriched_at, enrichment_confidence, category_source";
+  "id, name, slug, updated_at, category, description, address, phone, email, image_url, image_source, image_status, image_model, image_prompt, image_generated_at, image_error, image_attempts, image_locked, image_storage_path, status, rating, rating_count, country, opening_hours, owner_id, website_url, reservation_url, social_links, reviews, google_place_id, google_place_resource_name, google_maps_uri, google_maps_links, google_primary_type, google_types, google_business_status, google_location, google_opening_hours, google_price_level, google_review_summary, google_review_summary_disclosure, google_review_summary_uri, google_place_summary, google_place_summary_disclosure, google_photos, google_attributions, search_summary, search_sources, search_queries, deep_research_status, deep_research_summary, deep_research_sources, deep_research_error, deep_research_interaction_id, deep_research_updated_at, deep_research_attempts, deep_research_model, deep_research_last_observed_status, deep_research_last_http_status, deep_research_last_polled_at, deep_research_last_provider_error, deep_research_debug, enrichment_status, enrichment_error, enrichment_attempts, enrichment_locked, last_enriched_at, enrichment_confidence, category_source";
 
 const googleSearchSchema = {
   type: "object",
@@ -192,6 +206,81 @@ const googleSearchSchema = {
     "ratingCount",
     "priceLevel",
     "reviewSummary",
+    "confidence",
+  ],
+} as const;
+
+const googleMapsGroundingSchema = {
+  type: "object",
+  properties: {
+    canonicalCategory: {
+      type: "string",
+      enum: ["Bar", "Bar & Restaurants", "Restaurants", "Hotels", ""],
+    },
+    googlePlaceId: { type: "string" },
+    googlePlaceResourceName: { type: "string" },
+    googleMapsUri: { type: "string" },
+    formattedAddress: { type: "string" },
+    contactPhone: { type: "string" },
+    officialWebsite: { type: "string" },
+    primaryType: { type: "string" },
+    types: {
+      type: "array",
+      items: { type: "string" },
+    },
+    businessStatus: { type: "string" },
+    priceLevel: { type: "string" },
+    rating: { type: "number" },
+    ratingCount: { type: "number" },
+    reviewSummary: { type: "string" },
+    placeSummary: { type: "string" },
+    openingHours: {
+      type: "array",
+      items: { type: "string" },
+    },
+    location: {
+      type: "object",
+      properties: {
+        latitude: { type: ["number", "null"] },
+        longitude: { type: ["number", "null"] },
+      },
+      required: ["latitude", "longitude"],
+    },
+    reviews: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          author: { type: "string" },
+          rating: { type: "number" },
+          text: { type: "string" },
+          publishTime: { type: "string" },
+          googleMapsUri: { type: "string" },
+        },
+        required: ["author", "rating", "text", "publishTime", "googleMapsUri"],
+      },
+    },
+    confidence: { type: "number" },
+  },
+  required: [
+    "canonicalCategory",
+    "googlePlaceId",
+    "googlePlaceResourceName",
+    "googleMapsUri",
+    "formattedAddress",
+    "contactPhone",
+    "officialWebsite",
+    "primaryType",
+    "types",
+    "businessStatus",
+    "priceLevel",
+    "rating",
+    "ratingCount",
+    "reviewSummary",
+    "placeSummary",
+    "openingHours",
+    "location",
+    "reviews",
     "confidence",
   ],
 } as const;
@@ -280,16 +369,16 @@ export function createVenueAdminClient(env: VenueEnrichmentEnv) {
   });
 }
 
-export function requireServiceOrCronInvocation(
+export async function requireServiceOrCronInvocation(
   req: Request,
   env: VenueEnrichmentEnv,
-) {
+): Promise<void> {
   const cronSecret = req.headers.get("x-cron-secret");
   if (env.cronSecret && cronSecret === env.cronSecret) {
     return;
   }
 
-  if (decodeJwtRole(req.headers.get("Authorization")) === "service_role") {
+  if (await verifySupabaseServiceRoleHeader(req.headers.get("Authorization"))) {
     return;
   }
 
@@ -790,6 +879,10 @@ async function enrichWithGoogleMapsGrounding(
             parts: [{ text: prompt }],
           }],
           tools: [{ googleMaps: {} }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseJsonSchema: googleMapsGroundingSchema,
+          },
         }),
       },
     );
@@ -1573,18 +1666,19 @@ async function fetchWebsiteMetadata(
     }
   }
 
+  merged.imageUrl = await validateWebsiteImageCandidate(merged.imageUrl);
   return hasWebsiteMetadata(merged) ? merged : null;
 }
 
 function parseWebsiteMetadata(pageUrl: string, html: string): WebsiteMetadata {
   const metadata = emptyWebsiteMetadata();
-  metadata.imageUrl = resolveUrl(
+  metadata.imageUrl = normalizeWebsiteImageCandidateUrl(resolveUrl(
     pageUrl,
     extractMetaContent(
       html,
       /<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/i,
     ),
-  );
+  ));
   metadata.description = cleanDescription(
     extractMetaContent(
       html,
@@ -1617,12 +1711,12 @@ function parseJsonLdMetadata(
   let metadata = emptyWebsiteMetadata();
   for (const entry of flattenJsonLd(jsonLd)) {
     const row = asRecord(entry);
-    const image = resolveUrl(
+    const image = normalizeWebsiteImageCandidateUrl(resolveUrl(
       pageUrl,
       stringOrNull(row.image) ??
         stringOrNull(asArray(row.image)[0]) ??
         nestedString(row.image, "url"),
-    );
+    ));
     const aggregateRating = asRecord(row.aggregateRating);
     const next = {
       imageUrl: image,
@@ -1644,6 +1738,210 @@ function parseJsonLdMetadata(
     metadata = mergeWebsiteMetadata(metadata, next);
   }
   return metadata;
+}
+
+function normalizeWebsiteImageCandidateUrl(
+  value: string | null | undefined,
+): string | null {
+  const url = sanitizeUrl(value);
+  if (!url) return null;
+
+  const normalized = url.toLowerCase();
+  if (
+    [
+      "logo",
+      "brandmark",
+      "favicon",
+      "icon",
+      "avatar",
+      "badge",
+      "sprite",
+      "mask-icon",
+      "apple-touch",
+      "android-chrome",
+      "monogram",
+    ].some((needle) => normalized.includes(needle))
+  ) {
+    return null;
+  }
+
+  if (normalized.endsWith(".svg") || normalized.endsWith(".ico")) {
+    return null;
+  }
+
+  return url;
+}
+
+async function validateWebsiteImageCandidate(
+  value: string | null | undefined,
+): Promise<string | null> {
+  const url = normalizeWebsiteImageCandidateUrl(value);
+  if (!url) return null;
+
+  try {
+    const response = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          "accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        },
+      },
+      10000,
+    );
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type")?.split(";")[0]
+      ?.trim().toLowerCase() ?? "";
+    if (!["image/jpeg", "image/png", "image/webp"].includes(contentType)) {
+      return null;
+    }
+
+    const contentLength = Number.parseInt(
+      response.headers.get("content-length") ?? "",
+      10,
+    );
+    if (Number.isFinite(contentLength) && contentLength < 15_000) {
+      return null;
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.length < 15_000 || bytes.length > 8_000_000) {
+      return null;
+    }
+
+    const dimensions = imageDimensions(bytes, contentType);
+    if (!dimensions) {
+      return null;
+    }
+
+    const { width, height } = dimensions;
+    if (width < 480 || height < 320) {
+      return null;
+    }
+
+    const aspectRatio = width / height;
+    if (aspectRatio < 0.6 || aspectRatio > 3.2) {
+      return null;
+    }
+
+    return url;
+  } catch (_) {
+    return null;
+  }
+}
+
+function imageDimensions(
+  bytes: Uint8Array,
+  mimeType: string,
+): { width: number; height: number } | null {
+  switch (mimeType) {
+    case "image/png":
+      return pngDimensions(bytes);
+    case "image/jpeg":
+      return jpegDimensions(bytes);
+    case "image/webp":
+      return webpDimensions(bytes);
+    default:
+      return null;
+  }
+}
+
+function pngDimensions(
+  bytes: Uint8Array,
+): { width: number; height: number } | null {
+  if (bytes.length < 24) return null;
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+  for (let index = 0; index < signature.length; index += 1) {
+    if (bytes[index] !== signature[index]) return null;
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return {
+    width: view.getUint32(16),
+    height: view.getUint32(20),
+  };
+}
+
+function jpegDimensions(
+  bytes: Uint8Array,
+): { width: number; height: number } | null {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+
+  let offset = 2;
+  while (offset + 9 < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = bytes[offset + 1];
+    if (marker === 0xd9 || marker === 0xda) {
+      break;
+    }
+    const blockLength = (bytes[offset + 2] << 8) + bytes[offset + 3];
+    if (blockLength < 2 || offset + blockLength + 1 >= bytes.length) {
+      break;
+    }
+    if (
+      (marker >= 0xc0 && marker <= 0xc3) ||
+      (marker >= 0xc5 && marker <= 0xc7) ||
+      (marker >= 0xc9 && marker <= 0xcb) ||
+      (marker >= 0xcd && marker <= 0xcf)
+    ) {
+      const height = (bytes[offset + 5] << 8) + bytes[offset + 6];
+      const width = (bytes[offset + 7] << 8) + bytes[offset + 8];
+      return { width, height };
+    }
+    offset += blockLength + 2;
+  }
+
+  return null;
+}
+
+function webpDimensions(
+  bytes: Uint8Array,
+): { width: number; height: number } | null {
+  if (
+    bytes.length < 30 ||
+    readAscii(bytes, 0, 4) !== "RIFF" ||
+    readAscii(bytes, 8, 4) !== "WEBP"
+  ) {
+    return null;
+  }
+
+  const chunk = readAscii(bytes, 12, 4);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+  if (chunk === "VP8 ") {
+    if (bytes.length < 30) return null;
+    return {
+      width: view.getUint16(26, true) & 0x3fff,
+      height: view.getUint16(28, true) & 0x3fff,
+    };
+  }
+
+  if (chunk === "VP8L") {
+    if (bytes.length < 25) return null;
+    const bits = view.getUint32(21, true);
+    return {
+      width: (bits & 0x3fff) + 1,
+      height: ((bits >> 14) & 0x3fff) + 1,
+    };
+  }
+
+  if (chunk === "VP8X") {
+    if (bytes.length < 30) return null;
+    return {
+      width: 1 + bytes[24] + (bytes[25] << 8) + (bytes[26] << 16),
+      height: 1 + bytes[27] + (bytes[28] << 8) + (bytes[29] << 16),
+    };
+  }
+
+  return null;
+}
+
+function readAscii(bytes: Uint8Array, start: number, length: number): string {
+  return String.fromCharCode(...bytes.slice(start, start + length));
 }
 
 function extractJsonLdBlocks(html: string): unknown[] {
@@ -1940,28 +2238,4 @@ function parseIsoTime(value: string | null | undefined): number | null {
   }
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function decodeJwtRole(authHeader: string | null): string | null {
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const token = authHeader.substring("Bearer ".length).trim();
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-
-  try {
-    const payload = JSON.parse(decodeBase64Url(parts[1]));
-    return typeof payload.role === "string" ? payload.role : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-function decodeBase64Url(value: string): string {
-  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
-  const padded = normalized.padEnd(
-    normalized.length + ((4 - normalized.length % 4) % 4),
-    "=",
-  );
-  return atob(padded);
 }

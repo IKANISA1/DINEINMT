@@ -8,6 +8,7 @@ import {
   getErrorMessage,
   getFunctionEnv,
   HttpError,
+  menuImageBackfillEligibilityFilter,
   MenuItemRecord,
   processMenuItemImageGeneration,
   resolveInvocationActor,
@@ -22,6 +23,12 @@ Deno.serve(async (req) => {
     const env = getFunctionEnv();
     const body = await parseJsonBody(req);
     const actor = await resolveInvocationActor(req, env);
+    if (actor.kind === "cron") {
+      throw new HttpError(
+        403,
+        "Scheduled menu image generation is disabled. Trigger it manually.",
+      );
+    }
     const venueId =
       typeof body.venueId === "string" && body.venueId.trim().length > 0
         ? body.venueId.trim()
@@ -29,7 +36,7 @@ Deno.serve(async (req) => {
     const limit = normalizeLimit(body.limit);
     const forceRegenerate = body.forceRegenerate === true;
 
-    if (actor.kind !== "service" && actor.kind !== "cron" && !venueId) {
+    if (actor.kind !== "service" && !venueId) {
       throw new HttpError(
         400,
         "venueId is required when a venue owner triggers a backfill.",
@@ -46,7 +53,7 @@ Deno.serve(async (req) => {
     let query = adminClient
       .from("dinein_menu_items")
       .select(
-        "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
+        "id, venue_id, updated_at, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
       )
       .eq("image_locked", false)
       .order("id")
@@ -56,11 +63,7 @@ Deno.serve(async (req) => {
       query = query.eq("venue_id", venueId);
     }
 
-    query = forceRegenerate
-      ? query.or(
-        "image_url.is.null,image_status.eq.failed,image_source.eq.ai_gemini",
-      )
-      : query.or("image_url.is.null,image_status.eq.failed");
+    query = query.or(menuImageBackfillEligibilityFilter(forceRegenerate));
 
     const { data, error } = await query;
     if (error) {

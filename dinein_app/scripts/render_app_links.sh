@@ -9,8 +9,8 @@ well_known_dir=""
 flavor="mt"
 output_dir_overridden=false
 
-play_sha="${PLAY_APP_SIGNING_SHA256:-}"
-apple_team_id="${APPLE_TEAM_ID:-}"
+play_sha=""
+apple_team_id=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -51,6 +51,12 @@ case "$flavor" in
     exit 1
     ;;
 esac
+
+flavor_upper="$(printf '%s' "$flavor" | tr '[:lower:]' '[:upper:]')"
+play_sha_var="PLAY_APP_SIGNING_SHA256_${flavor_upper}"
+apple_team_var="APPLE_TEAM_ID_${flavor_upper}"
+play_sha="${!play_sha_var:-${PLAY_APP_SIGNING_SHA256:-}}"
+apple_team_id="${!apple_team_var:-${APPLE_TEAM_ID:-}}"
 
 if [[ -z "$play_sha" || -z "$apple_team_id" ]]; then
   cat <<'EOF'

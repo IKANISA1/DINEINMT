@@ -18,10 +18,13 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 project_dir="$(cd "${script_dir}/.." && pwd)"
 materialize_env_script="${project_dir}/scripts/materialize_release_env.sh"
+render_app_links_script="${project_dir}/scripts/render_app_links.sh"
 
 flavor="mt"
 env_file=""
 skip_checks=false
+rendered_app_links_dir=""
+well_known_source_dir=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -53,6 +56,8 @@ case "$flavor" in
     guest_host="dineinmtg.ikanisa.com"
     venue_host="dineinmtv.ikanisa.com"
     admin_host="dineinmta.ikanisa.com"
+    expected_android_package="com.dineinmalta.app"
+    expected_ios_bundle="com.dineinmalta.app"
     landing_source_dir="${project_dir}/../landing"
     ;;
   rw)
@@ -63,6 +68,8 @@ case "$flavor" in
     guest_host="dineinrwg.ikanisa.com"
     venue_host="dineinrwv.ikanisa.com"
     admin_host="dineinrwa.ikanisa.com"
+    expected_android_package="com.dineinrw.app"
+    expected_ios_bundle="com.dineinrw.app"
     landing_source_dir="${project_dir}/../landing-rw"
     ;;
   *)
@@ -71,6 +78,47 @@ case "$flavor" in
     exit 1
     ;;
 esac
+
+flavor_upper="$(printf '%s' "$flavor" | tr '[:lower:]' '[:upper:]')"
+
+cleanup() {
+  if [[ -n "${rendered_app_links_dir}" && -d "${rendered_app_links_dir}" ]]; then
+    rm -rf "${rendered_app_links_dir}"
+  fi
+}
+
+trap cleanup EXIT
+
+prepare_well_known_dir() {
+  local candidate_dir="${landing_source_dir}/.well-known"
+
+  if [[ -x "${render_app_links_script}" ]]; then
+    rendered_app_links_dir="$(mktemp -d)"
+    if "${render_app_links_script}" --flavor "${flavor}" --output-dir "${rendered_app_links_dir}" >/dev/null 2>&1; then
+      echo "✅ Rendered .well-known app-link artifacts for ${flavor}" >&2
+      printf '%s' "${rendered_app_links_dir}"
+      return
+    fi
+    rm -rf "${rendered_app_links_dir}"
+    rendered_app_links_dir=""
+  fi
+
+  if [[ ! -f "${candidate_dir}/assetlinks.json" || ! -f "${candidate_dir}/apple-app-site-association" ]]; then
+    echo "⛔ Missing .well-known app-link artifacts for ${flavor}." >&2
+    echo "Provide PLAY_APP_SIGNING_SHA256_${flavor_upper} and APPLE_TEAM_ID_${flavor_upper}," >&2
+    echo "or render the artifacts into ${candidate_dir} before building." >&2
+    exit 1
+  fi
+
+  if grep -q 'REPLACE_WITH_' "${candidate_dir}/assetlinks.json" "${candidate_dir}/apple-app-site-association"; then
+    echo "⛔ .well-known app-link artifacts for ${flavor} still contain placeholders." >&2
+    echo "Provide PLAY_APP_SIGNING_SHA256_${flavor_upper} and APPLE_TEAM_ID_${flavor_upper}," >&2
+    echo "or render the artifacts into ${candidate_dir} before building." >&2
+    exit 1
+  fi
+
+  printf '%s' "${candidate_dir}"
+}
 
 if [[ -z "$env_file" ]]; then
   env_file="${project_dir}/env/release.${flavor}.json"
@@ -122,6 +170,8 @@ echo "✅ Supabase credentials validated in ${env_file}"
 if [[ -z "${web_vapid_key}" ]]; then
   echo "⚠️  FCM_WEB_VAPID_KEY is missing in ${env_file}; venue web push notifications will remain disabled." >&2
 fi
+
+well_known_source_dir="$(prepare_well_known_dir)"
 
 cd "${project_dir}"
 
@@ -230,6 +280,10 @@ if [[ -d "${landing_source_dir}" ]]; then
     rm -rf "${build_output}/download"
     rsync -a "${landing_source_dir}/download/" "${build_output}/download/"
   fi
+  if [[ -n "${well_known_source_dir}" ]]; then
+    mkdir -p "${build_output}/.well-known"
+    rsync -a "${well_known_source_dir}/" "${build_output}/.well-known/"
+  fi
   echo "✅ Copied landing assets into build output"
 fi
 
@@ -284,6 +338,31 @@ fi
 
 if [[ ! -f "${build_output}/landing/index.html" ]]; then
   echo "⛔ Built web output is missing landing/index.html." >&2
+  exit 1
+fi
+
+if [[ ! -f "${build_output}/.well-known/assetlinks.json" ]]; then
+  echo "⛔ Built web output is missing .well-known/assetlinks.json." >&2
+  exit 1
+fi
+
+if [[ ! -f "${build_output}/.well-known/apple-app-site-association" ]]; then
+  echo "⛔ Built web output is missing .well-known/apple-app-site-association." >&2
+  exit 1
+fi
+
+if grep -q 'REPLACE_WITH_' "${build_output}/.well-known/assetlinks.json" "${build_output}/.well-known/apple-app-site-association"; then
+  echo "⛔ Built .well-known files still contain unresolved placeholders." >&2
+  exit 1
+fi
+
+if ! grep -q "${expected_android_package}" "${build_output}/.well-known/assetlinks.json"; then
+  echo "⛔ Built assetlinks.json is missing ${expected_android_package}." >&2
+  exit 1
+fi
+
+if ! grep -q "${expected_ios_bundle}" "${build_output}/.well-known/apple-app-site-association"; then
+  echo "⛔ Built apple-app-site-association is missing ${expected_ios_bundle}." >&2
   exit 1
 fi
 

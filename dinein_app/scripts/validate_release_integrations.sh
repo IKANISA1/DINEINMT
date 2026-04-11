@@ -6,10 +6,12 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 app_root="$(cd "$script_dir/.." && pwd)"
 materialize_env_script="$app_root/scripts/materialize_release_env.sh"
 icon_validation_script="$app_root/scripts/validate_icon_assets.py"
+render_app_links_script="$app_root/scripts/render_app_links.sh"
 flavor="mt"
 android_only=false
 well_known_dir=""
 well_known_dir_overridden=false
+rendered_well_known_dir=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -72,6 +74,25 @@ case "$flavor" in
     exit 1
     ;;
 esac
+
+cleanup() {
+  if [[ -n "$rendered_well_known_dir" && -d "$rendered_well_known_dir" ]]; then
+    rm -rf "$rendered_well_known_dir"
+  fi
+}
+
+trap cleanup EXIT
+
+if [[ "$well_known_dir_overridden" != "true" && -x "$render_app_links_script" ]]; then
+  rendered_well_known_dir="$(mktemp -d)"
+  if "$render_app_links_script" --flavor "$flavor" --output-dir "$rendered_well_known_dir" >/dev/null 2>&1; then
+    well_known_dir="$rendered_well_known_dir"
+    echo "Using rendered .well-known artifacts for flavor ${flavor}."
+  else
+    rm -rf "$rendered_well_known_dir"
+    rendered_well_known_dir=""
+  fi
+fi
 
 failures=0
 
@@ -328,10 +349,10 @@ if [[ "$android_only" != "true" ]]; then
       "<string>$expected_firebase_storage_bucket</string>" \
       "iOS Firebase storage bucket is missing or incorrect."
   fi
-  require_no_placeholder \
-    "$firebase_options" \
-    'REPLACE_WITH_ACTUAL_' \
-    'firebase_options.dart still contains placeholder values.'
+  if grep -Eq "apiKey: 'REPLACE_WITH_ACTUAL_|appId: 'REPLACE_WITH_ACTUAL_|projectId: 'REPLACE_WITH_ACTUAL_|storageBucket: 'REPLACE_WITH_ACTUAL_|messagingSenderId: 'REPLACE_WITH_ACTUAL_|measurementId: 'REPLACE_WITH_ACTUAL_'" "$firebase_options"; then
+    echo "FAIL: firebase_options.dart still contains placeholder Firebase values. ($firebase_options)"
+    failures=$((failures + 1))
+  fi
   require_contains \
     "$firebase_options" \
     "projectId: '$expected_firebase_project_id'" \

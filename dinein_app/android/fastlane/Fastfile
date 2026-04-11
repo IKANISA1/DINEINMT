@@ -6,7 +6,31 @@
 
 default_platform(:android)
 
-PLAY_STORE_KEY = File.join(Dir.pwd, "play-store-service-account.json")
+require "tempfile"
+
+def resolve_play_store_key!
+  path = ENV["PLAY_STORE_JSON_KEY_PATH"]
+  return path if path && File.exist?(path)
+
+  json = ENV["PLAY_STORE_JSON_KEY_JSON"]
+  if json && !json.strip.empty?
+    file = Tempfile.new(["play-store-service-account", ".json"])
+    file.write(json)
+    file.close
+    at_exit { file.unlink if File.exist?(file.path) }
+    return file.path
+  end
+
+  local_path = File.join(Dir.pwd, "play-store-service-account.local.json")
+  return local_path if File.exist?(local_path)
+
+  UI.user_error!(
+    "Missing Play Store service-account key. Set PLAY_STORE_JSON_KEY_PATH, " \
+    "PLAY_STORE_JSON_KEY_JSON, or create fastlane/play-store-service-account.local.json."
+  )
+end
+
+PLAY_STORE_KEY = resolve_play_store_key!
 
 platform :android do
 

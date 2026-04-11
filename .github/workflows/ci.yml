@@ -12,6 +12,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dinein_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Scan tracked files for committed secrets
+        run: bash scripts/scan_repo_secrets.sh
+
   flutter:
     runs-on: ubuntu-latest
     defaults:
@@ -50,6 +62,21 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
       - name: Validate release scripts syntax
         run: |
           bash -n scripts/materialize_release_env.sh
@@ -57,27 +84,59 @@ jobs:
           bash -n scripts/build_android_release.sh
           bash -n scripts/build_ios_release.sh
           bash -n scripts/render_app_links.sh
+          bash -n scripts/scan_repo_secrets.sh
           bash -n scripts/smoke_live_backend.sh
           bash -n scripts/validate_release_integrations.sh
           python3 -m py_compile scripts/stamp_pwa_bundle.py
           python3 -m py_compile scripts/serve_spa_build.py
           python3 -m py_compile scripts/assert_pwa_lighthouse.py
 
-      - name: Render app-link artifacts
+      - name: Validate release integrations
         env:
-          PLAY_APP_SIGNING_SHA256: AA:BB:CC:DD:EE:FF
+          PLAY_APP_SIGNING_SHA256: 11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00
           APPLE_TEAM_ID: ABCDE12345
           SUPABASE_URL_MT: https://mock-ci-mt.supabase.co
           SUPABASE_ANON_KEY_MT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mt.mock.signature
           SUPABASE_URL_RW: https://mock-ci-rw.supabase.co
           SUPABASE_ANON_KEY_RW: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.rw.mock.signature
+        run: ./scripts/validate_release_integrations.sh --flavor "${{ matrix.flavor }}"
+
+  android-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: mt
+            task: :app:lintMtRelease
+          - flavor: rw
+            task: :app:lintRwRelease
+    defaults:
+      run:
+        working-directory: dinein_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Run Android release lint
         run: |
-          tmp_dir="$(mktemp -d)"
-          ./scripts/render_app_links.sh --flavor "${{ matrix.flavor }}" --output-dir "${tmp_dir}"
-          ./scripts/validate_release_integrations.sh \
-            --flavor "${{ matrix.flavor }}" \
-            --android-only \
-            --well-known-dir "${tmp_dir}"
+          cd android
+          ./gradlew --no-daemon --console=plain "${{ matrix.task }}"
 
   backend-test:
     runs-on: ubuntu-latest
@@ -161,6 +220,9 @@ jobs:
         run: flutter pub get
 
       - name: Build web (mt flavor)
+        env:
+          PLAY_APP_SIGNING_SHA256: 11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00
+          APPLE_TEAM_ID: ABCDE12345
         run: |
           cat > env/release.mt.ci.json <<'JSON'
           {

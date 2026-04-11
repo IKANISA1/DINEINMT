@@ -14,6 +14,7 @@ import {
   createAdminClient as createMenuImageAdminClient,
   type FunctionEnv as MenuImageEnv,
   HttpError as MenuImageHttpError_,
+  menuImageBackfillEligibilityFilter,
   type MenuItemRecord,
   processMenuItemImageGeneration,
   type VenueRecord,
@@ -65,6 +66,7 @@ import {
   optionalNormalizedWhatsAppPhone,
   phoneNumbersMatch,
 } from "../_shared/phone.ts";
+import { verifySupabaseServiceRoleHeader } from "../_shared/signed-jwt.ts";
 
 // Re-export domain error types so index.ts can catch them
 export const MenuImageHttpError = MenuImageHttpError_;
@@ -210,10 +212,6 @@ function hasMatchingSecretHeader(req: Request, envName: string): boolean {
 
 function isVenueEnrichmentCronInvocation(req: Request): boolean {
   return hasMatchingSecretHeader(req, "VENUE_ENRICHMENT_CRON_SECRET");
-}
-
-function isVenueProfileImageCronInvocation(req: Request): boolean {
-  return hasMatchingSecretHeader(req, "VENUE_IMAGE_CRON_SECRET");
 }
 
 function getSigningSecret(primary: string, fallback?: string): string {
@@ -985,19 +983,10 @@ function bearerToken(req: Request): string | null {
   return token.length > 0 ? token : null;
 }
 
-function decodeJwtRole(authHeader: string | null): string | null {
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const token = authHeader.substring("Bearer ".length).trim();
-  const parts = token.split(".");
-  if (parts.length != 3) return null;
-
-  try {
-    const payload = asRecord(JSON.parse(base64UrlDecode(parts[1])));
-    return stringValue(payload.role) ?? null;
-  } catch {
-    return null;
-  }
+async function hasVerifiedServiceRoleRequest(req: Request): Promise<boolean> {
+  return await verifySupabaseServiceRoleHeader(
+    req.headers.get("Authorization"),
+  ) != null;
 }
 
 async function signedTokenClaims(
@@ -1396,7 +1385,7 @@ async function authorizeVenueMutation(
   venueId: string,
   venueSession: unknown,
 ): Promise<"admin" | "venue"> {
-  if (decodeJwtRole(req.headers.get("Authorization")) == "service_role") {
+  if (await hasVerifiedServiceRoleRequest(req)) {
     return "admin";
   }
 
@@ -1408,8 +1397,8 @@ async function authorizeVenueMutation(
   return "venue";
 }
 
-function isServiceRoleRequest(req: Request): boolean {
-  return decodeJwtRole(req.headers.get("Authorization")) == "service_role";
+async function isServiceRoleRequest(req: Request): Promise<boolean> {
+  return await hasVerifiedServiceRoleRequest(req);
 }
 
 async function venueNotificationSettingsSnapshot(
@@ -2475,7 +2464,7 @@ async function hasPrivateVenueAccess(
   venueId: string,
   venueSession: unknown,
 ): Promise<boolean> {
-  if (decodeJwtRole(req.headers.get("Authorization")) == "service_role") {
+  if (await hasVerifiedServiceRoleRequest(req)) {
     return true;
   }
 
@@ -2788,7 +2777,7 @@ async function loadMenuItemsForImageAudit(
   let query = supabase
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, updated_at, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
       { count: "exact" },
     )
     .order("updated_at", { ascending: false, nullsFirst: false })
@@ -2823,7 +2812,7 @@ async function loadMenuItemForImageGeneration(
   const { data, error } = await supabase
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, updated_at, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
     )
     .eq("venue_id", venueId)
     .order("sort_order", { ascending: true })
@@ -3350,7 +3339,7 @@ export async function handleUpdateVenue(
     body.venue_session,
   );
   const adminActorId = mode == "admin"
-    ? (decodeJwtRole(req.headers.get("Authorization")) == "service_role"
+    ? (await hasVerifiedServiceRoleRequest(req)
       ? "service_role"
       : await requireAdmin(supabase, req))
     : null;
@@ -4047,7 +4036,7 @@ export async function handleToggleMenuItemAvailability(
     venueId,
     body.venue_session,
   );
-  if (mode == "admin" && !isServiceRoleRequest(req)) {
+  if (mode == "admin" && !(await isServiceRoleRequest(req))) {
     throw new HttpError(
       403,
       "Admin cannot change venue-specific availability. Venue teams control this field.",
@@ -4085,7 +4074,7 @@ export async function handleCreateMenuItem(
     venueId,
     body.venue_session,
   );
-  if (mode == "admin" && !isServiceRoleRequest(req)) {
+  if (mode == "admin" && !(await isServiceRoleRequest(req))) {
     throw new HttpError(
       403,
       "Admin menu creation must use the centralized assignment flow.",
@@ -4167,7 +4156,7 @@ export async function handleDeleteMenuItem(
     venueId,
     body.venue_session,
   );
-  if (mode == "admin" && !isServiceRoleRequest(req)) {
+  if (mode == "admin" && !(await isServiceRoleRequest(req))) {
     throw new HttpError(
       403,
       "Admin deletion must use the centralized menu group flow.",
@@ -4199,7 +4188,7 @@ export async function handleSetMenuItemHighlights(
     venueId,
     body.venue_session,
   );
-  if (mode == "admin" && !isServiceRoleRequest(req)) {
+  if (mode == "admin" && !(await isServiceRoleRequest(req))) {
     throw new HttpError(
       403,
       "Admin cannot change venue-specific highlight ordering.",
@@ -4345,18 +4334,14 @@ export async function handleBackfillMenuImages(
   let query = imageClient
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, updated_at, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
     )
     .eq("venue_id", venueId)
     .eq("image_locked", false)
     .order("id", { ascending: true })
     .limit(limit);
 
-  query = forceRegenerate
-    ? query.or(
-      "image_url.is.null,image_status.eq.failed,image_source.eq.ai_gemini",
-    )
-    : query.or("image_url.is.null,image_status.eq.failed");
+  query = query.or(menuImageBackfillEligibilityFilter(forceRegenerate));
 
   const { data, error } = await query;
   if (error) {
@@ -4437,7 +4422,7 @@ export async function handleAuditMenuItemImages(
       venueId,
       body.venue_session,
     );
-  } else if (!isServiceRoleRequest(req)) {
+  } else if (!(await isServiceRoleRequest(req))) {
     await requireAdmin(supabase, req);
   }
 
@@ -4537,8 +4522,8 @@ export async function handleEnrichVenueProfile(
   body: JsonRecord,
 ): Promise<Response> {
   const venueId = requireString(body, "venueId", "venue_id");
-  const isPrivileged = decodeJwtRole(req.headers.get("Authorization")) ==
-      "service_role" || isVenueEnrichmentCronInvocation(req);
+  const isPrivileged = await hasVerifiedServiceRoleRequest(req) ||
+    isVenueEnrichmentCronInvocation(req);
   if (!isPrivileged) {
     await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
   }
@@ -4546,12 +4531,6 @@ export async function handleEnrichVenueProfile(
   const overwriteExisting = booleanValue(body.overwriteExisting) ?? false;
   const forcePlaceRefresh = booleanValue(body.forcePlaceRefresh) ?? false;
   const skipSearchGrounding = booleanValue(body.skipSearchGrounding) ?? false;
-  const generateProfileImage = booleanValue(
-    body.generateProfileImage ?? body.generate_profile_image,
-  ) ?? true;
-  const forceImageRegenerate = booleanValue(
-    body.forceImageRegenerate ?? body.force_image_regenerate,
-  ) ?? false;
   const enrichmentClient = supabase as unknown as ReturnType<
     typeof createVenueEnrichmentAdminClient
   >;
@@ -4565,35 +4544,7 @@ export async function handleEnrichVenueProfile(
     forcePlaceRefresh,
     skipSearchGrounding,
   });
-
-  let profileImageResult: JsonRecord | null = null;
-  let profileImageError: string | null = null;
-  try {
-    profileImageResult = await maybeGenerateVenueProfileImageAfterEnrichment(
-      supabase,
-      venueId,
-      {
-        generateProfileImage,
-        forceImageRegenerate,
-        forceGroundingRefresh: false,
-        skipSearchGrounding,
-      },
-    );
-  } catch (error) {
-    profileImageError = error instanceof Error ? error.message : String(error);
-  }
-
-  return ok({
-    ...(result as unknown as JsonRecord),
-    ...(profileImageResult == null ? {} : {
-      profile_image: profileImageResult,
-      profileImage: profileImageResult,
-    }),
-    ...(profileImageError == null ? {} : {
-      profile_image_error: profileImageError,
-      profileImageError,
-    }),
-  });
+  return ok(result as unknown as JsonRecord);
 }
 
 export async function handleBackfillVenueProfiles(
@@ -4603,8 +4554,7 @@ export async function handleBackfillVenueProfiles(
 ): Promise<Response> {
   const venueId = stringValue(body.venueId) ?? stringValue(body.venue_id) ??
     null;
-  const isServiceRole =
-    decodeJwtRole(req.headers.get("Authorization")) == "service_role";
+  const isServiceRole = await hasVerifiedServiceRoleRequest(req);
   const isCron = isVenueEnrichmentCronInvocation(req);
   if (venueId) {
     if (!isServiceRole && !isCron) {
@@ -4617,12 +4567,6 @@ export async function handleBackfillVenueProfiles(
   const overwriteExisting = booleanValue(body.overwriteExisting) ?? false;
   const forcePlaceRefresh = booleanValue(body.forcePlaceRefresh) ?? false;
   const skipSearchGrounding = booleanValue(body.skipSearchGrounding) ?? false;
-  const generateProfileImage = booleanValue(
-    body.generateProfileImage ?? body.generate_profile_image,
-  ) ?? true;
-  const forceImageRegenerate = booleanValue(
-    body.forceImageRegenerate ?? body.force_image_regenerate,
-  ) ?? false;
   const limit = normalizeVenueEnrichmentLimit(body.limit);
   const enrichmentClient = supabase as unknown as ReturnType<
     typeof createVenueEnrichmentAdminClient
@@ -4639,9 +4583,9 @@ export async function handleBackfillVenueProfiles(
   let enriched = 0;
   let skipped = 0;
   let failed = 0;
-  let imagesGenerated = 0;
-  let imagesSkipped = 0;
-  let imagesFailed = 0;
+  const imagesGenerated = 0;
+  const imagesSkipped = 0;
+  const imagesFailed = 0;
 
   for (const venue of venues) {
     try {
@@ -4653,45 +4597,7 @@ export async function handleBackfillVenueProfiles(
         forcePlaceRefresh,
         skipSearchGrounding,
       });
-      let profileImageResult: JsonRecord | null = null;
-      let profileImageError: string | null = null;
-      try {
-        profileImageResult =
-          await maybeGenerateVenueProfileImageAfterEnrichment(
-            supabase,
-            venue.id,
-            {
-              generateProfileImage,
-              forceImageRegenerate,
-              forceGroundingRefresh: false,
-              skipSearchGrounding,
-            },
-          );
-        if (profileImageResult == null) {
-          imagesSkipped += 1;
-        } else if (stringValue(profileImageResult.status) == "success") {
-          imagesGenerated += 1;
-        } else {
-          imagesSkipped += 1;
-        }
-      } catch (error) {
-        imagesFailed += 1;
-        profileImageError = error instanceof Error
-          ? error.message
-          : String(error);
-      }
-
-      results.push({
-        ...(result as unknown as JsonRecord),
-        ...(profileImageResult == null ? {} : {
-          profile_image: profileImageResult,
-          profileImage: profileImageResult,
-        }),
-        ...(profileImageError == null ? {} : {
-          profile_image_error: profileImageError,
-          profileImageError,
-        }),
-      });
+      results.push(result as unknown as JsonRecord);
       if (result.status == "success") {
         enriched += 1;
       } else {
@@ -4730,8 +4636,7 @@ export async function handleGenerateVenueProfileImage(
   body: JsonRecord,
 ): Promise<Response> {
   const venueId = requireString(body, "venueId", "venue_id");
-  const isPrivileged = decodeJwtRole(req.headers.get("Authorization")) ==
-      "service_role" || isVenueProfileImageCronInvocation(req);
+  const isPrivileged = await hasVerifiedServiceRoleRequest(req);
   if (!isPrivileged) {
     await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
   }
@@ -4769,14 +4674,12 @@ export async function handleBackfillVenueProfileImages(
 ): Promise<Response> {
   const venueId = stringValue(body.venueId) ?? stringValue(body.venue_id) ??
     null;
-  const isServiceRole =
-    decodeJwtRole(req.headers.get("Authorization")) == "service_role";
-  const isCron = isVenueProfileImageCronInvocation(req);
+  const isServiceRole = await hasVerifiedServiceRoleRequest(req);
   if (venueId) {
-    if (!isServiceRole && !isCron) {
+    if (!isServiceRole) {
       await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
     }
-  } else if (!isServiceRole && !isCron) {
+  } else if (!isServiceRole) {
     await requireAdmin(supabase, req);
   }
 
@@ -4899,54 +4802,6 @@ async function loadVenuesForVenueImageBackfill(
       venueNeedsProfileImageGeneration(venue, forceRegenerate)
     )
     .slice(0, limit);
-}
-
-async function maybeGenerateVenueProfileImageAfterEnrichment(
-  supabase: ReturnType<typeof adminClient>,
-  venueId: string,
-  options?: {
-    generateProfileImage?: boolean;
-    forceImageRegenerate?: boolean;
-    forceGroundingRefresh?: boolean;
-    skipSearchGrounding?: boolean;
-  },
-): Promise<JsonRecord | null> {
-  if (options?.generateProfileImage === false) {
-    return null;
-  }
-
-  const imageClient = supabase as unknown as ReturnType<
-    typeof createVenueProfileImageAdminClient
-  >;
-  const venue = await fetchVenueForEnrichment(
-    imageClient as unknown as ReturnType<
-      typeof createVenueEnrichmentAdminClient
-    >,
-    venueId,
-  );
-
-  if (
-    !shouldGenerateAiVenueProfileImage(venue) &&
-    !(options?.forceImageRegenerate ?? false)
-  ) {
-    return null;
-  }
-
-  const imageSource = stringValue(venue.image_source) ?? null;
-  const hasImage = Boolean(stringValue(venue.image_url));
-  const shouldForceRegenerate = (options?.forceImageRegenerate ?? false) ||
-    (hasImage && imageSource != "ai_gemini" && imageSource != "manual");
-
-  const result = await processVenueProfileImageGeneration({
-    adminClient: imageClient,
-    env: getVenueProfileImageEnv(),
-    venue,
-    forceRegenerate: shouldForceRegenerate,
-    forceGroundingRefresh: options?.forceGroundingRefresh ?? false,
-    skipSearchGrounding: options?.skipSearchGrounding ?? false,
-  });
-
-  return result as unknown as JsonRecord;
 }
 
 export async function handleSearchGoogleMaps(

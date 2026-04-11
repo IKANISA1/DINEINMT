@@ -33,9 +33,13 @@ For browser release builds (Cloudflare PWAs):
 
 ```bash
 # Malta (dinein-mt-pwa)
+PLAY_APP_SIGNING_SHA256_MT="AA:BB:..." \
+APPLE_TEAM_ID_MT="ABCDE12345" \
 ./scripts/build_web_release.sh --flavor mt
 
 # Rwanda (dinein-rw-pwa)
+PLAY_APP_SIGNING_SHA256_RW="AA:BB:..." \
+APPLE_TEAM_ID_RW="ABCDE12345" \
 ./scripts/build_web_release.sh --flavor rw
 ```
 
@@ -76,6 +80,13 @@ Create a real Android signing config before store upload:
 ```bash
 cp android/key.properties.example android/key.properties
 ```
+
+Google Play upload credentials are no longer stored in the repo. Fastlane now
+expects one of:
+
+- `PLAY_STORE_JSON_KEY_PATH`
+- `PLAY_STORE_JSON_KEY_JSON`
+- `android/fastlane/play-store-service-account.local.json` (gitignored)
 
 Provide runtime secrets through `--dart-define-from-file`:
 
@@ -152,14 +163,19 @@ artifacts to each domain's `.well-known/` directory before testing verified
 links on devices. Generate those files with:
 
 ```bash
-PLAY_APP_SIGNING_SHA256="AA:BB:..." \
-APPLE_TEAM_ID="ABCDE12345" \
+PLAY_APP_SIGNING_SHA256_MT="AA:BB:..." \
+APPLE_TEAM_ID_MT="ABCDE12345" \
 ./scripts/render_app_links.sh --flavor mt
 
-PLAY_APP_SIGNING_SHA256="AA:BB:..." \
-APPLE_TEAM_ID="ABCDE12345" \
+PLAY_APP_SIGNING_SHA256_RW="AA:BB:..." \
+APPLE_TEAM_ID_RW="ABCDE12345" \
 ./scripts/render_app_links.sh --flavor rw
 ```
+
+`build_web_release.sh` and `validate_release_integrations.sh` can render those
+artifacts automatically when the matching flavor-specific environment variables
+are present. The rendered `.well-known` files are generated at build/validation
+time and are no longer committed as static landing-page files.
 
 ## Supabase Backend
 

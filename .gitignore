@@ -28,6 +28,8 @@ build/
 dinein_app/env/*.json
 !dinein_app/env/*.example.json
 dinein_app/android/key.properties
+dinein_app/android/fastlane/play-store-service-account*.json
+!dinein_app/android/fastlane/play-store-service-account.example.json
 dinein_app/android/*.jks
 dinein_app/android/*.keystore
 

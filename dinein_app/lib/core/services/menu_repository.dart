@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -73,10 +72,7 @@ class MenuRepository {
   /// Fetch the admin menu review queue across all venues.
   Future<List<AdminMenuQueueEntry>> getAdminMenuQueue() async {
     final data =
-        await _invoke(
-              'get_admin_menu_queue',
-              useAdminSession: true,
-            )
+        await _invoke('get_admin_menu_queue', useAdminSession: true)
             as List<dynamic>;
     return data
         .map(
@@ -89,10 +85,7 @@ class MenuRepository {
 
   Future<List<AdminMenuCatalogEntry>> getAdminMenuCatalog() async {
     final data =
-        await _invoke(
-              'get_admin_menu_catalog',
-              useAdminSession: true,
-            )
+        await _invoke('get_admin_menu_catalog', useAdminSession: true)
             as List<dynamic>;
     return data
         .map(
@@ -188,12 +181,6 @@ class MenuRepository {
     );
     final created = MenuItem.fromJson(data as Map<String, dynamic>);
     await _mergeAndPersistLocalMenuItems(created.venueId, [created]);
-    if (created.needsGeneratedImage) {
-      unawaited(_queueMenuItemImageGenerationSilently(
-        created.id,
-        venueId: created.venueId,
-      ));
-    }
     return created;
   }
 
@@ -311,10 +298,12 @@ class MenuRepository {
   /// transferring full order payloads to the client.
   Future<Map<String, int>> getVenueItemPopularity(String venueId) async {
     try {
-      final response = await SupabaseConfig.client.rpc(
-        'get_venue_item_popularity',
-        params: {'p_venue_id': venueId},
-      ) as List<dynamic>;
+      final response =
+          await SupabaseConfig.client.rpc(
+                'get_venue_item_popularity',
+                params: {'p_venue_id': venueId},
+              )
+              as List<dynamic>;
 
       final popularity = <String, int>{};
       for (final row in response) {
@@ -330,17 +319,6 @@ class MenuRepository {
       // Gracefully degrade if the RPC function is not yet deployed.
       // Items will simply not show "Popular" badges until the migration runs.
       return const {};
-    }
-  }
-
-  Future<void> _queueMenuItemImageGenerationSilently(
-    String itemId, {
-    String? venueId,
-  }) async {
-    try {
-      await generateMenuItemImage(itemId, venueId: venueId);
-    } catch (_) {
-      // Background queue attempts should never block CRUD flows.
     }
   }
 

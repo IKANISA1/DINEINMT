@@ -5,12 +5,16 @@ import {
 
 import type { VenueRecord } from "./venue-enrichment.ts";
 import {
+  buildVenueImageVerificationPrompt,
   buildVenueLocalityCue,
   buildVenueProfileImagePrompt,
   countVenueReferenceImages,
   extractVenueReferenceImageUrls,
   hasGroundedVenueImageContext,
+  hasReadyVenueDeepResearch,
   isVenueProfileImageGenerationInFlight,
+  normalizeVenueDeepResearchStatus,
+  normalizeVenueImageVerificationVerdict,
   venueNeedsProfileImageGeneration,
 } from "./venue-profile-image.ts";
 
@@ -68,6 +72,20 @@ function makeVenue(overrides: Partial<VenueRecord> = {}): VenueRecord {
       "Upscale rooftop destination known for sunset drinks and panoramic city views.",
     search_sources: [{ uri: "https://example.com/review" }],
     search_queries: ["Skyline Lounge Malta"],
+    deep_research_status: "ready",
+    deep_research_summary:
+      "Public sources describe a limestone-fronted rooftop venue with harbour-facing terrace seating and polished evening lighting.",
+    deep_research_sources: ["https://example.com/research"],
+    deep_research_error: null,
+    deep_research_interaction_id: null,
+    deep_research_updated_at: "2026-03-21T10:01:00.000Z",
+    deep_research_attempts: 1,
+    deep_research_model: "deep-research-pro-preview-12-2025",
+    deep_research_last_observed_status: "completed",
+    deep_research_last_http_status: 200,
+    deep_research_last_polled_at: "2026-03-21T10:01:00.000Z",
+    deep_research_last_provider_error: null,
+    deep_research_debug: null,
     enrichment_status: "ready",
     enrichment_error: null,
     enrichment_attempts: 1,
@@ -79,12 +97,12 @@ function makeVenue(overrides: Partial<VenueRecord> = {}): VenueRecord {
   };
 }
 
-Deno.test("venueNeedsProfileImageGeneration respects manual and locked images", () => {
+Deno.test("venueNeedsProfileImageGeneration treats unknown-source images as regeneratable while preserving manual and locked images", () => {
   assertEquals(
     venueNeedsProfileImageGeneration(
       makeVenue({ image_url: "https://example.com/manual.jpg" }),
     ),
-    false,
+    true,
   );
   assertEquals(
     venueNeedsProfileImageGeneration(
@@ -112,6 +130,16 @@ Deno.test("venueNeedsProfileImageGeneration respects manual and locked images", 
         image_status: "ready",
       }),
       true,
+    ),
+    true,
+  );
+  assertEquals(
+    venueNeedsProfileImageGeneration(
+      makeVenue({
+        image_url: "https://example.com/discovered.jpg",
+        image_source: null,
+        image_status: "ready",
+      }),
     ),
     true,
   );
@@ -187,10 +215,15 @@ Deno.test("buildVenueProfileImagePrompt incorporates grounded venue cues", () =>
         },
       ],
     }),
-    { referenceImageCount: 1 },
+    {
+      referenceImageCount: 1,
+      deepResearchSummary:
+        "Public sources consistently describe a limestone-fronted rooftop bar with harbour-facing terrace seating.",
+    },
   );
 
   assertStringIncludes(prompt, 'Venue name: "Skyline Lounge"');
+  assertStringIncludes(prompt, "Prompt version: venue-profile-image-v3");
   assertStringIncludes(
     prompt,
     'Grounded Google Maps summary: "Rooftop bar with harbour views and elegant terrace seating."',
@@ -201,7 +234,90 @@ Deno.test("buildVenueProfileImagePrompt incorporates grounded venue cues", () =>
   );
   assertStringIncludes(prompt, "The venue must read as Malta");
   assertStringIncludes(prompt, "attached public venue reference image");
+  assertStringIncludes(
+    prompt,
+    'Deep research note: "Public sources consistently describe a limestone-fronted rooftop bar with harbour-facing terrace seating."',
+  );
   assertStringIncludes(prompt, "No plated dish close-up");
+  assertStringIncludes(
+    prompt,
+    "Prefer an accurate but modest scene over a dramatic but invented one.",
+  );
+  assertStringIncludes(
+    prompt,
+    "generic Mediterranean stock scenery for Malta",
+  );
+});
+
+Deno.test("buildVenueProfileImagePrompt avoids premium bias for grounded local bars", () => {
+  const prompt = buildVenueProfileImagePrompt(
+    makeVenue({
+      name: "H2O Lounge",
+      country: "RW",
+      category: "Bar",
+      google_primary_type: "lounge_bar",
+      google_place_summary: "Premium hospitality venue.",
+      google_review_summary: null,
+      search_summary: null,
+      description: null,
+      address: "KK 433 st, Kigali, Rwanda",
+      deep_research_summary:
+        "Affordable vibrant local club and bar with a main bar counter, performance stage, pool tables, and parking.",
+    }),
+    {
+      referenceImageCount: 4,
+      deepResearchSummary:
+        "Affordable vibrant local club and bar with a main bar counter, performance stage, pool tables, and parking.",
+    },
+  );
+
+  assertStringIncludes(
+    prompt,
+    "Show a venue-appropriate bar or lounge environment",
+  );
+  assertStringIncludes(
+    prompt,
+    "stage or pool-table area",
+  );
+});
+
+Deno.test("buildVenueImageVerificationPrompt includes deep research grounding", () => {
+  const prompt = buildVenueImageVerificationPrompt({
+    venue: makeVenue({
+      deep_research_summary:
+        "Affordable vibrant local club and bar with a performance stage and pool tables.",
+    }),
+    referenceImageCount: 3,
+    deepResearchSummary:
+      "Affordable vibrant local club and bar with a performance stage and pool tables.",
+  });
+
+  assertStringIncludes(
+    prompt,
+    "Deep research note: Affordable vibrant local club and bar with a performance stage and pool tables.",
+  );
+  assertStringIncludes(
+    prompt,
+    "Reject if readable signage text or logos are prominent.",
+  );
+});
+
+Deno.test("normalizeVenueImageVerificationVerdict fails closed on readable text and locality mismatches", () => {
+  const verdict = normalizeVenueImageVerificationVerdict({
+    matches: true,
+    hero_subject: "venue_scene",
+    locality_match: false,
+    readable_text_present: true,
+    issues: [],
+    reason: "Looks plausible overall.",
+  });
+
+  assertEquals(verdict.matches, false);
+  assertEquals(verdict.locality_match, false);
+  assertEquals(verdict.readable_text_present, true);
+  assertEquals(verdict.issues.includes("readable_text"), true);
+  assertEquals(verdict.issues.includes("locality_mismatch"), true);
+  assertStringIncludes(verdict.reason, "readable text or signage is present");
 });
 
 Deno.test("buildVenueLocalityCue distinguishes Rwanda from Malta", () => {
@@ -216,6 +332,35 @@ Deno.test("buildVenueLocalityCue distinguishes Rwanda from Malta", () => {
       makeVenue({ country: "MT", address: "Valletta Waterfront, Malta" }),
     ),
     "The venue must read as Malta",
+  );
+});
+
+Deno.test("normalizeVenueDeepResearchStatus maps interaction states to persisted states", () => {
+  assertEquals(normalizeVenueDeepResearchStatus("completed"), "ready");
+  assertEquals(normalizeVenueDeepResearchStatus("in_progress"), "in_progress");
+  assertEquals(normalizeVenueDeepResearchStatus("failed"), "failed");
+  assertEquals(normalizeVenueDeepResearchStatus("queued"), "in_progress");
+  assertEquals(normalizeVenueDeepResearchStatus(null), "pending");
+});
+
+Deno.test("hasReadyVenueDeepResearch requires fresh summary after enrichment", () => {
+  assertEquals(hasReadyVenueDeepResearch(makeVenue()), true);
+  assertEquals(
+    hasReadyVenueDeepResearch(
+      makeVenue({
+        deep_research_status: "ready",
+        deep_research_summary: null,
+      }),
+    ),
+    false,
+  );
+  assertEquals(
+    hasReadyVenueDeepResearch(
+      makeVenue({
+        deep_research_updated_at: "2026-03-21T09:59:00.000Z",
+      }),
+    ),
+    false,
   );
 });
 

@@ -1,1 +1,1 @@
-json_key_file("fastlane/play-store-service-account.json")
+json_key_file(ENV.fetch("PLAY_STORE_JSON_KEY_PATH", "fastlane/play-store-service-account.local.json"))

@@ -1,10 +1,16 @@
-import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
+import {
+  assertEquals,
+  assertStringIncludes,
+} from "https://deno.land/std@0.208.0/assert/mod.ts";
 
 import {
   auditRegenerationBlockedReason,
+  buildMenuImagePrompt,
   classifyMenuVisualKind,
   extractMenuImagePromptClass,
+  extractMenuImagePromptVersion,
   extractMenuImagePromptVisualKind,
+  isMenuImageGenerationInFlight,
   isMenuImagePromptCompatible,
   shouldRefreshMenuItemContext,
   shouldRegenerateAuditedMenuImage,
@@ -81,12 +87,14 @@ Deno.test(
 
 Deno.test("menu image prompt compatibility requires matching class and kind", () => {
   const drinkPrompt = `
+Prompt version: menu-image-v3
 This item is classified as: drinks
 Visual kind: spirits
 Resolved class: drinks
 `.trim();
 
   const foodPrompt = `
+Prompt version: menu-image-v3
 This item is classified as: food
 Visual kind: plated_food
 Resolved class: food
@@ -112,6 +120,7 @@ Resolved class: food
 
 Deno.test("menu image prompt compatibility accepts the production BEVERAGE / DRINK header", () => {
   const productionStylePrompt = `
+Prompt version: menu-image-v3
 This item is classified as: BEVERAGE / DRINK
 Visual kind: tea
 `;
@@ -122,6 +131,154 @@ Visual kind: tea
       visualKind: "tea",
     }),
     true,
+  );
+});
+
+Deno.test("menu image prompt compatibility rejects prompts without the current version marker", () => {
+  const legacyPrompt = `
+This item is classified as: drinks
+Visual kind: spirits
+`;
+
+  assertEquals(extractMenuImagePromptVersion(legacyPrompt), null);
+  assertEquals(
+    isMenuImagePromptCompatible(legacyPrompt, {
+      itemClass: "drinks",
+      visualKind: "spirits",
+    }),
+    false,
+  );
+});
+
+Deno.test("buildMenuImagePrompt emphasizes evidence boundaries over stock styling", () => {
+  const prompt = buildMenuImagePrompt(
+    {
+      id: "item-prompt-1",
+      venue_id: "venue-1",
+      updated_at: new Date().toISOString(),
+      name: "Ftira biż-żejt",
+      description: "Maltese bread with tomatoes, tuna, capers, and olive oil.",
+      category: "Sandwiches",
+      class: "food",
+      menu_context: null,
+      menu_context_status: "ready",
+      menu_context_error: null,
+      menu_context_model: null,
+      menu_context_attempts: 0,
+      menu_context_locked: false,
+      menu_context_updated_at: null,
+      image_url: null,
+      image_source: null,
+      image_status: "pending",
+      image_model: null,
+      image_prompt: null,
+      image_error: null,
+      image_attempts: 0,
+      image_locked: false,
+      image_storage_path: null,
+      tags: ["maltese"],
+    },
+    {
+      ...venue,
+      category: "Restaurants",
+      description: "Traditional Maltese restaurant.",
+    },
+    {
+      class: "food",
+      confidence: 0.91,
+      canonical_name: "Ftira biż-żejt",
+      canonical_category: "Maltese sandwich",
+      canonical_description:
+        "Maltese ring-shaped bread served with tomatoes, tuna, capers, and olive oil.",
+      visual_subject: "traditional Maltese ftira sandwich",
+      serving_style: "casual sandwich presentation",
+      visual_directions: ["show the bread and rustic filling clearly"],
+      visual_do_not: ["do not plate it like fine dining"],
+      keyword_signals: ["ftira", "maltese"],
+      source_queries: ["ftira biz-zejt"],
+      source_urls: ["https://example.com/ftira"],
+      research_summary: "Traditional Maltese sandwich.",
+    },
+    "food",
+    {
+      hasExistingImageReference: true,
+    },
+  );
+
+  assertStringIncludes(prompt, "Prompt version: menu-image-v3");
+  assertStringIncludes(prompt, "Use these sources in strict order of priority");
+  assertStringIncludes(
+    prompt,
+    "A current menu image is attached as a secondary reference.",
+  );
+  assertStringIncludes(
+    prompt,
+    "Do NOT upscale a humble, local, street-food, tavern, bar-snack, or everyday item into a fine-dining luxury plating",
+  );
+  assertStringIncludes(
+    prompt,
+    "No generic stock-photo styling, no unsupported luxury cues",
+  );
+});
+
+Deno.test("isMenuImageGenerationInFlight expires stale generating rows", () => {
+  assertEquals(
+    isMenuImageGenerationInFlight({
+      id: "item-stale-1",
+      venue_id: "venue-1",
+      updated_at: new Date().toISOString(),
+      name: "Negroni",
+      description: "Classic cocktail",
+      category: "Cocktails",
+      class: "drinks",
+      menu_context: null,
+      menu_context_status: "ready",
+      menu_context_error: null,
+      menu_context_model: null,
+      menu_context_attempts: 0,
+      menu_context_locked: false,
+      menu_context_updated_at: null,
+      image_url: null,
+      image_source: null,
+      image_status: "generating",
+      image_model: null,
+      image_prompt: null,
+      image_error: null,
+      image_attempts: 0,
+      image_locked: false,
+      image_storage_path: null,
+      tags: [],
+    }),
+    true,
+  );
+  assertEquals(
+    isMenuImageGenerationInFlight({
+      id: "item-stale-2",
+      venue_id: "venue-1",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      name: "Negroni",
+      description: "Classic cocktail",
+      category: "Cocktails",
+      class: "drinks",
+      menu_context: null,
+      menu_context_status: "ready",
+      menu_context_error: null,
+      menu_context_model: null,
+      menu_context_attempts: 0,
+      menu_context_locked: false,
+      menu_context_updated_at: null,
+      image_url: null,
+      image_source: null,
+      image_status: "generating",
+      image_model: null,
+      image_prompt: null,
+      image_error: null,
+      image_attempts: 0,
+      image_locked: false,
+      image_storage_path: null,
+      tags: [],
+    }),
+    false,
   );
 });
 
@@ -388,7 +545,8 @@ Deno.test("classifyMenuVisualKind keeps true tap beer in the draft branch", () =
         canonical_name: "Cisk Lager",
         canonical_category: "Beer",
         canonical_description: "A crisp lager poured from the tap.",
-        visual_subject: "a freshly poured draught lager with a stable white head",
+        visual_subject:
+          "a freshly poured draught lager with a stable white head",
         serving_style: "served on tap in a chilled pint glass",
         research_summary: "A classic draught lager.",
         source_queries: [],
@@ -549,7 +707,13 @@ Deno.test("classifyMenuVisualKind keeps small seasonal pours in the draft branch
         research_summary: "A refined small-pour seasonal beer.",
         source_queries: [],
         source_urls: [],
-        keyword_signals: ["beer", "craft beer", "seasonal", "half pint", "draught"],
+        keyword_signals: [
+          "beer",
+          "craft beer",
+          "seasonal",
+          "half pint",
+          "draught",
+        ],
         visual_directions: [],
         visual_do_not: [],
         class: "drinks",

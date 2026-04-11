@@ -11,7 +11,7 @@ import {
   getVenueProfileImageEnv,
   HttpError,
   processVenueProfileImageGeneration,
-  requireServiceOrCronInvocation,
+  requireServiceInvocation,
 } from "../_shared/venue-profile-image.ts";
 
 Deno.serve(async (req) => {
@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
 
   try {
     const env = getVenueProfileImageEnv();
-    requireServiceOrCronInvocation(req, env);
+    await requireServiceInvocation(req);
 
     const body = await parseJsonBody(req);
     const venueId = typeof body.venueId === "string" ? body.venueId.trim() : "";

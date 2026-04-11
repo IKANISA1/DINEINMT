@@ -8,6 +8,7 @@ set -euo pipefail
 PARTITION="${PARTITION:-all}"
 SLEEP_SEC="${SLEEP_SEC:-0.2}"
 PROGRESS_EVERY="${PROGRESS_EVERY:-10}"
+CURL_MAX_TIME_SEC="${CURL_MAX_TIME_SEC:-180}"
 FUNCTION_URL="${SUPABASE_URL%/}/functions/v1/generate-menu-item-image"
 
 case "$PARTITION" in
@@ -76,13 +77,21 @@ INDEX=0
 while IFS= read -r ID; do
   [ -z "$ID" ] && continue
   INDEX=$((INDEX + 1))
-  RESPONSE="$(
-    curl -sS "$FUNCTION_URL" \
+  if ! RESPONSE="$(
+    curl -sS --max-time "$CURL_MAX_TIME_SEC" "$FUNCTION_URL" \
       -H 'Content-Type: application/json' \
       -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
       -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
       --data "{\"itemId\":\"${ID}\"}"
-  )"
+  )"; then
+    FAILED=$((FAILED + 1))
+    printf 'error %s/%s %s curl_request_failed\n' \
+      "$INDEX" \
+      "$TOTAL" \
+      "$ID"
+    sleep "$SLEEP_SEC"
+    continue
+  fi
 
   if printf '%s' "$RESPONSE" | rg -q '"error"'; then
     FAILED=$((FAILED + 1))

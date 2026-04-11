@@ -30,6 +30,12 @@ Deno.serve(async (req) => {
 
     const adminClient = createAdminClient(env);
     const actor = await resolveInvocationActor(req, env);
+    if (actor.kind === "cron") {
+      throw new HttpError(
+        403,
+        "Scheduled menu image generation is disabled. Trigger it manually.",
+      );
+    }
     const item = await fetchMenuItem(adminClient, itemId);
     const venue = await fetchVenue(adminClient, item.venue_id);
 

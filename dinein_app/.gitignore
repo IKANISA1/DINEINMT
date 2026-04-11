@@ -47,5 +47,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 /android/.kotlin/
+/android/fastlane/play-store-service-account*.json
+!/android/fastlane/play-store-service-account.example.json
 test_output.txt
 tmp/

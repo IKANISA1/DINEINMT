@@ -119,15 +119,12 @@ android {
     }
 
     lint {
-        // Local/CI release packaging already has separate analyze/test gates.
-        // Skipping automatic release lint keeps bundle generation deterministic
-        // for store-upload artifacts while still allowing explicit lint runs.
-        checkReleaseBuilds = false
+        checkReleaseBuilds = true
     }
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 flutter {

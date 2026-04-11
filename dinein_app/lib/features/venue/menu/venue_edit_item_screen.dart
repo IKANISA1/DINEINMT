@@ -174,9 +174,8 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
     });
 
     try {
-      MenuItem? savedItem;
       if (existing == null) {
-        savedItem = await MenuRepository.instance.createMenuItem(
+        await MenuRepository.instance.createMenuItem(
           MenuItem(
             id: '',
             venueId: venue.id,
@@ -232,35 +231,6 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
         }
 
         await MenuRepository.instance.updateMenuItem(existing.id, updates);
-        savedItem = existing.copyWith(
-          name: name,
-          description: description,
-          price: price,
-          category: category,
-          itemClass: _selectedClass,
-          imageUrl: manualImageUrl,
-          imageSource: manualImageUrl != null
-              ? MenuItemImageSource.manual
-              : existing.imageSource,
-          imageStatus: manualImageUrl != null
-              ? MenuItemImageStatus.ready
-              : existing.imageStatus,
-          imageModel: manualImageUrl != null ? null : existing.imageModel,
-          imageError: manualImageUrl != null ? null : existing.imageError,
-          imageGeneratedAt: manualImageUrl != null
-              ? null
-              : existing.imageGeneratedAt,
-          imageLocked: manualImageUrl != null ? true : existing.imageLocked,
-          isAvailable: _isAvailable,
-          tags: _parseTags(),
-        );
-      }
-
-      if (existing != null && savedItem.needsGeneratedImage) {
-        unawaited(MenuRepository.instance.generateMenuItemImage(
-          savedItem.id,
-          venueId: venue.id,
-        ));
       }
 
       ref.invalidate(menuItemsProvider(venue.id));
@@ -280,8 +250,10 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
     if (_isUploadingImage) return;
     setState(() => _isUploadingImage = true);
     try {
-      final url = await ImageUploadService.instance
-          .pickAndUploadMenuItemImage(venue.id, existing.id);
+      final url = await ImageUploadService.instance.pickAndUploadMenuItemImage(
+        venue.id,
+        existing.id,
+      );
       if (url == null) {
         // User cancelled the picker
         return;
@@ -295,9 +267,9 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
       );
     } on ImageUploadException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -323,7 +295,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
           : _categoryController.text.trim(),
       itemClass: _selectedClass ?? existing.itemClass,
       helperText:
-          'Review the guest-facing details first so automatic image generation picks up the right menu information.',
+          'Review the guest-facing details first so manual image generation uses the right menu information.',
     );
     if (draft == null) return;
 
@@ -355,12 +327,12 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
               : 'Image generated for ${existing.name}.',
         'skipped' => switch (result.reason) {
           'image_locked' =>
-            '${existing.name} is protected from automatic changes.',
+            '${existing.name} is protected from generated image changes.',
           'manual_image_exists' =>
             '${existing.name} already uses a manual image.',
           'already_generating' =>
             'Image generation is already running for ${existing.name}.',
-          _ => 'No automatic image change was needed for ${existing.name}.',
+          _ => 'No generated image change was needed for ${existing.name}.',
         },
         _ => 'Image request completed for ${existing.name}.',
       };
@@ -760,8 +732,7 @@ class _ImagePanel extends StatelessWidget {
       MenuItemImageStatus.failed => cs.error,
       MenuItemImageStatus.pending => cs.primary,
     };
-    final isBusy =
-        isGeneratingImage || isUploadingImage || isUpdatingImageLock;
+    final isBusy = isGeneratingImage || isUploadingImage || isUpdatingImageLock;
 
     return ClayCard(
       child: Column(
@@ -853,9 +824,7 @@ class _ImagePanel extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       'Upload a photo or generate with AI.',
-                      style: tt.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -869,16 +838,16 @@ class _ImagePanel extends StatelessWidget {
                 onTap: isBusy
                     ? null
                     : hasExistingItem
-                        ? onUpload
-                        : () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Save the item first, then upload an image.',
-                                ),
-                              ),
-                            );
-                          },
+                    ? onUpload
+                    : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Save the item first, then upload an image.',
+                            ),
+                          ),
+                        );
+                      },
               ),
               const SizedBox(width: AppTheme.space2),
               // AI Generate icon button
@@ -891,16 +860,16 @@ class _ImagePanel extends StatelessWidget {
                 onTap: isBusy || usesManualImage
                     ? null
                     : hasExistingItem
-                        ? onGenerate
-                        : () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Save the item first, then generate an image.',
-                                ),
-                              ),
-                            );
-                          },
+                    ? onGenerate
+                    : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Save the item first, then generate an image.',
+                            ),
+                          ),
+                        );
+                      },
               ),
             ],
           ),
@@ -920,7 +889,7 @@ class _ImagePanel extends StatelessWidget {
               onChanged: isBusy ? null : onToggleLock,
               title: Text('Protect current image', style: tt.titleSmall),
               subtitle: Text(
-                'When enabled, automatic backfills will skip this item.',
+                'When enabled, generated-image requests will skip this item until you unlock it.',
                 style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               ),
             ),

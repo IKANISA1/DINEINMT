@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildGooglePlacePhotoUri } from "./google-places.ts";
+import { verifySupabaseServiceRoleHeader } from "./signed-jwt.ts";
 import {
   createVenueAdminClient,
   fetchVenueForEnrichment,
@@ -17,6 +18,7 @@ export interface VenueProfileImageEnv {
   geminiApiKey: string;
   googleMapsApiKey: string | null;
   venueImageModels: string[];
+  venueImageVerifierModels: string[];
   venueImageBucket: string;
   venueImageReferenceLimit: number;
   venueDeepResearchAgent: string | null;
@@ -53,6 +55,26 @@ interface GeminiImagePayload {
   model: string;
 }
 
+interface VenueImageVerificationPayload {
+  matches: boolean;
+  hero_subject:
+    | "venue_scene"
+    | "food_or_drink_product"
+    | "people"
+    | "text_or_signage"
+    | "unclear";
+  locality_match: boolean;
+  readable_text_present: boolean;
+  issues: string[];
+  reason: string;
+}
+
+interface VenueImageVerificationPromptOptions {
+  venue: VenueRecord;
+  referenceImageCount: number;
+  deepResearchSummary?: string | null;
+}
+
 interface VenueReferenceImagePayload {
   data: string;
   mimeType: string;
@@ -71,8 +93,43 @@ interface VenueDeepResearchResult {
   sourceUrls: string[];
 }
 
+interface VenueDeepResearchDiagnostics {
+  lastObservedStatus: string | null;
+  httpStatus: number | null;
+  lastPolledAt: string | null;
+  providerError: string | null;
+}
+
+type VenueDeepResearchStatus =
+  | "pending"
+  | "in_progress"
+  | "ready"
+  | "failed";
+
+interface VenueDeepResearchReadyResult extends VenueDeepResearchResult {
+  status: "ready";
+  diagnostics: VenueDeepResearchDiagnostics;
+}
+
+interface VenueDeepResearchPendingResult {
+  status: "pending";
+  reason: string;
+  diagnostics: VenueDeepResearchDiagnostics;
+}
+
+interface VenueDeepResearchFailedResult {
+  status: "failed";
+  error: string;
+  diagnostics: VenueDeepResearchDiagnostics;
+}
+
 const externalRequestTimeoutMs = 60000;
 const staleVenueImageWindowMs = 30 * 60 * 1000;
+const staleVenueDeepResearchWindowMs = 45 * 60 * 1000;
+const venueProfileImagePromptVersion = "venue-profile-image-v3";
+const defaultVenueDeepResearchAgent = "deep-research-pro-preview-12-2025";
+const defaultVenueDeepResearchMaxWaitMs = 60000;
+const venueDeepResearchInlinePollBudgetMs = 20000;
 
 export class HttpError extends Error {
   constructor(
@@ -89,6 +146,7 @@ export function getVenueProfileImageEnv(): VenueProfileImageEnv {
   const supabaseServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY")?.trim() ??
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ?? "";
   const geminiApiKey = Deno.env.get("GEMINI_API_KEY")?.trim() ?? "";
+  const googleMapsApiKey = Deno.env.get("GOOGLE_MAPS_API_KEY")?.trim() ?? "";
 
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new HttpError(
@@ -104,14 +162,28 @@ export function getVenueProfileImageEnv(): VenueProfileImageEnv {
     );
   }
 
+  if (!googleMapsApiKey) {
+    throw new HttpError(
+      500,
+      "Missing GOOGLE_MAPS_API_KEY for venue profile image generation.",
+    );
+  }
+
   return {
     supabaseUrl,
     supabaseServiceRoleKey,
     geminiApiKey,
-    googleMapsApiKey: Deno.env.get("GOOGLE_MAPS_API_KEY")?.trim() || null,
+    googleMapsApiKey,
     venueImageModels: (
       Deno.env.get("GEMINI_VENUE_IMAGE_MODELS") ??
         "gemini-2.5-flash-image"
+    )
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    venueImageVerifierModels: (
+      Deno.env.get("GEMINI_VENUE_IMAGE_VERIFIER_MODELS") ??
+        "gemini-2.5-flash,gemini-2.5-flash-lite"
     )
       .split(",")
       .map((value) => value.trim())
@@ -130,7 +202,7 @@ export function getVenueProfileImageEnv(): VenueProfileImageEnv {
     ),
     venueDeepResearchAgent:
       Deno.env.get("GEMINI_VENUE_DEEP_RESEARCH_AGENT")?.trim() ||
-      null,
+      defaultVenueDeepResearchAgent,
     venueDeepResearchPollMs: Math.max(
       1000,
       Number.parseInt(
@@ -139,11 +211,12 @@ export function getVenueProfileImageEnv(): VenueProfileImageEnv {
       ) || 5000,
     ),
     venueDeepResearchMaxWaitMs: Math.max(
-      0,
+      5000,
       Number.parseInt(
-        Deno.env.get("GEMINI_VENUE_DEEP_RESEARCH_MAX_WAIT_MS")?.trim() ?? "0",
+        Deno.env.get("GEMINI_VENUE_DEEP_RESEARCH_MAX_WAIT_MS")?.trim() ??
+          `${defaultVenueDeepResearchMaxWaitMs}`,
         10,
-      ) || 0,
+      ) || defaultVenueDeepResearchMaxWaitMs,
     ),
     cronSecret: Deno.env.get("VENUE_IMAGE_CRON_SECRET")?.trim() || null,
   };
@@ -158,20 +231,28 @@ export function createVenueProfileImageAdminClient(env: VenueProfileImageEnv) {
   });
 }
 
-export function requireServiceOrCronInvocation(
+export async function requireServiceOrCronInvocation(
   req: Request,
   env: VenueProfileImageEnv,
-) {
+): Promise<void> {
   const cronSecret = req.headers.get("x-cron-secret");
   if (env.cronSecret && cronSecret === env.cronSecret) {
     return;
   }
 
-  if (decodeJwtRole(req.headers.get("Authorization")) === "service_role") {
+  if (await verifySupabaseServiceRoleHeader(req.headers.get("Authorization"))) {
     return;
   }
 
   throw new HttpError(401, "Service role or cron secret required.");
+}
+
+export async function requireServiceInvocation(req: Request): Promise<void> {
+  if (await verifySupabaseServiceRoleHeader(req.headers.get("Authorization"))) {
+    return;
+  }
+
+  throw new HttpError(401, "Service role required.");
 }
 
 export function normalizeVenueProfileImageLimit(value: unknown): number {
@@ -184,16 +265,15 @@ export function venueNeedsProfileImageGeneration(
   forceRegenerate = false,
 ): boolean {
   if (venue.image_locked) return false;
+  if (normalizeVenueImageSource(venue.image_source) === "manual") return false;
 
   if (forceRegenerate) {
-    if (normalizeVenueImageSource(venue.image_source) === "manual") {
-      return false;
-    }
     return true;
   }
 
   if (hasVenueImage(venue)) {
-    return normalizeVenueImageStatus(venue.image_status) === "failed";
+    return normalizeVenueImageSource(venue.image_source) !== "ai_gemini" ||
+      normalizeVenueImageStatus(venue.image_status) === "failed";
   }
 
   return true;
@@ -218,12 +298,7 @@ export function hasGroundedVenueImageContext(
   venue: VenueRecord,
   skipSearchGrounding = false,
 ): boolean {
-  const hasMapsGrounding = [
-    venue.google_place_id,
-    venue.google_maps_uri,
-    venue.google_place_summary,
-  ].some(hasText) ||
-    hasListContent(venue.google_attributions);
+  const hasMapsGrounding = hasVenueMapsGrounding(venue);
 
   if (!hasMapsGrounding) {
     return false;
@@ -243,6 +318,14 @@ export function hasGroundedVenueImageContext(
   return hasDescriptiveGrounding;
 }
 
+function hasVenueMapsGrounding(venue: VenueRecord): boolean {
+  return [
+    venue.google_place_id,
+    venue.google_maps_uri,
+    venue.google_place_summary,
+  ].some(hasText) || hasListContent(venue.google_attributions);
+}
+
 export async function processVenueProfileImageGeneration(
   options: VenueProfileImageProcessOptions,
 ): Promise<VenueProfileImageProcessResult> {
@@ -258,6 +341,7 @@ export async function processVenueProfileImageGeneration(
   const hasExistingImage = hasVenueImage(venue);
   const imageSource = normalizeVenueImageSource(venue.image_source);
   const nextAttempt = (venue.image_attempts ?? 0) + 1;
+  const nowIso = () => new Date().toISOString();
 
   if (venue.image_locked) {
     return skippedVenueImageResult(venue, "image_locked");
@@ -277,17 +361,6 @@ export async function processVenueProfileImageGeneration(
     return skippedVenueImageResult(venue, "ai_image_exists");
   }
 
-  if (hasExistingImage && imageSource == null && !forceRegenerate) {
-    await normalizeExistingVenueImageState(adminClient, venue);
-    return skippedVenueImageResult(venue, "existing_image_exists");
-  }
-
-  await updateVenueImageState(adminClient, venue.id, {
-    image_status: "generating",
-    image_error: null,
-    updated_at: new Date().toISOString(),
-  });
-
   try {
     let groundedVenue = venue;
     const needsReferenceGrounding = countVenueReferenceImages(groundedVenue) ===
@@ -305,14 +378,43 @@ export async function processVenueProfileImageGeneration(
       );
     }
 
-    if (!hasGroundedVenueImageContext(groundedVenue, skipSearchGrounding)) {
+    if (!hasVenueMapsGrounding(groundedVenue)) {
       throw new HttpError(
         412,
-        skipSearchGrounding
-          ? "Grounded Google Maps venue data with descriptive venue context is required before generating a profile image."
-          : "Grounded Google Maps or Google Search descriptive venue context is required before generating a profile image.",
+        "Grounded Google Maps venue data is required before generating a profile image.",
       );
     }
+
+    const deepResearch = await ensureVenueDeepResearch({
+      adminClient,
+      env,
+      venue: groundedVenue,
+      forceRefresh: forceGroundingRefresh,
+    });
+    if (deepResearch.status === "pending") {
+      const pendingAt = nowIso();
+      await updateVenueImageState(adminClient, groundedVenue.id, {
+        image_status: "pending",
+        image_error: deepResearch.reason,
+        updated_at: pendingAt,
+      });
+      return {
+        status: "skipped",
+        venueId: groundedVenue.id,
+        imageStatus: "pending",
+        imageSource: normalizeVenueImageSource(groundedVenue.image_source),
+        imageUrl: groundedVenue.image_url,
+        storagePath: groundedVenue.image_storage_path,
+        model: groundedVenue.image_model,
+        reason: "deep_research_pending",
+      };
+    }
+
+    await updateVenueImageState(adminClient, groundedVenue.id, {
+      image_status: "generating",
+      image_error: null,
+      updated_at: nowIso(),
+    });
 
     const referenceImageUrls = extractVenueReferenceImageUrls(
       groundedVenue,
@@ -320,16 +422,20 @@ export async function processVenueProfileImageGeneration(
       env.googleMapsApiKey,
     );
     const referenceImages = await loadVenueReferenceImages(referenceImageUrls);
-    const deepResearch = await maybeRunVenueDeepResearch(env, groundedVenue);
     const prompt = buildVenueProfileImagePrompt(groundedVenue, {
       referenceImageCount: referenceImages.length,
-      deepResearchSummary: deepResearch?.summary ?? null,
+      deepResearchSummary: deepResearch.summary,
     });
     const generated = await generateGeminiVenueImage({
       apiKey: env.geminiApiKey,
       models: env.venueImageModels,
       prompt,
       referenceImages,
+      verification: {
+        models: env.venueImageVerifierModels,
+        venue: groundedVenue,
+        referenceImages,
+      },
     });
 
     const extension = extensionForMimeType(generated.mimeType);
@@ -373,8 +479,9 @@ export async function processVenueProfileImageGeneration(
       image_generated_at: new Date().toISOString(),
       image_error: null,
       image_attempts: nextAttempt,
+      image_locked: true,
       image_storage_path: storagePath,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     });
 
     return {
@@ -392,7 +499,7 @@ export async function processVenueProfileImageGeneration(
       image_status: "failed",
       image_error: message,
       image_attempts: nextAttempt,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     });
     throw error;
   }
@@ -434,10 +541,14 @@ export function buildVenueProfileImagePrompt(
       : "No reference images are attached, so rely strictly on the grounded venue facts and locality rules below.";
 
   return `
-Create a photorealistic venue profile hero image for a hospitality marketplace app.
+Create a photorealistic, production-safe venue profile hero image for a hospitality marketplace app.
+
+Prompt version: ${venueProfileImagePromptVersion}
 
 The image must represent the venue itself, not a food product shot.
 Use only the grounded venue facts and attached public reference images below. Do not invent amenities, views, architecture, decor, or regional context that are not supported by the grounded facts or visual references.
+Prefer an accurate but modest scene over a dramatic but invented one.
+Do not convert a casual or everyday venue into a luxury-resort stock image unless the grounded facts clearly support that.
 
 ═══ GROUNDED VENUE FACTS ═══
 Venue name: "${venue.name}"
@@ -455,11 +566,14 @@ Public review count: "${ratingCount}"
 - ${visualEvidenceCue}
 - ${referenceInstruction}
 ${deepResearchCue ? `- Deep research note: "${deepResearchCue}"` : ""}
+- Use venue context to stay faithful to the real space, materials, scale, and neighbourhood feel.
+- Avoid generic Mediterranean stock scenery for Malta and avoid generic East African skyline tropes for Rwanda unless the grounded references specifically support them.
 
 ═══ IMAGE GOAL ═══
 Generate the most relevant hero image for the venue profile based on the grounded facts above.
 Focus on the venue space, atmosphere, facade, or signature hospitality setting that best represents this specific venue.
 Do not make a dish, cocktail, coffee cup, or menu item the hero subject unless the grounded venue facts clearly describe a counter scene where it supports the venue environment.
+The result should feel venue-specific and locally believable, not interchangeable with an unrelated bar, restaurant, or hotel.
 
 ═══ COMPOSITION ═══
 - Landscape 16:9 composition optimized for a mobile profile cover image.
@@ -475,9 +589,133 @@ Do not make a dish, cocktail, coffee cup, or menu item the hero subject unless t
 - No plated dish close-up, isolated drink product shot, or kitchen prep scene as the main image.
 - Do not copy brand marks, signage lettering, or copyrighted artwork from the reference images.
 - Do not genericize the locale; the scene must read as the grounded venue country and setting.
-- No surreal interiors, fantasy architecture, neon cyberpunk styling, or exaggerated luxury cues not grounded in the venue facts.
+- No surreal interiors, fantasy architecture, neon cyberpunk styling, exaggerated luxury cues, or generic stock-scene polish not grounded in the venue facts.
 - No collage layout. One coherent scene only.
+  `.trim();
+}
+
+const venueImageVerificationSchema = {
+  type: "object",
+  properties: {
+    matches: { type: "boolean" },
+    hero_subject: {
+      type: "string",
+      enum: [
+        "venue_scene",
+        "food_or_drink_product",
+        "people",
+        "text_or_signage",
+        "unclear",
+      ],
+    },
+    locality_match: { type: "boolean" },
+    readable_text_present: { type: "boolean" },
+    issues: {
+      type: "array",
+      items: { type: "string" },
+    },
+    reason: { type: "string" },
+  },
+  required: [
+    "matches",
+    "hero_subject",
+    "locality_match",
+    "readable_text_present",
+    "issues",
+    "reason",
+  ],
+} as const;
+
+export function buildVenueImageVerificationPrompt(
+  args: VenueImageVerificationPromptOptions,
+): string {
+  const localityCue = buildVenueLocalityCue(args.venue);
+  const sceneDirection = buildVenueSceneDirection(args.venue);
+  const deepResearchCue = cleanPromptText(args.deepResearchSummary) || "";
+
+  return `
+You are reviewing a generated hospitality venue profile image for production.
+Return JSON only.
+
+Prompt version: ${venueProfileImagePromptVersion}
+Venue name: ${args.venue.name}
+Venue category: ${args.venue.category ?? ""}
+Venue Google Maps primary type: ${args.venue.google_primary_type ?? ""}
+Grounded venue summary: ${
+    cleanPromptText(args.venue.google_place_summary) ||
+    cleanPromptText(args.venue.search_summary) ||
+    cleanPromptText(args.venue.description) || ""
+  }
+Address hint: ${cleanPromptText(args.venue.address) || ""}
+Locality rule: ${localityCue}
+Scene target: ${sceneDirection.scene}
+
+Evaluation rules:
+- The first image after this prompt is the generated candidate.
+- ${
+    args.referenceImageCount > 0
+      ? `The next ${args.referenceImageCount} image(s) are grounded public venue references.`
+      : "No reference images are attached."
+  }
+- Accept only if the hero subject is a venue scene, facade, terrace, lobby, dining room, bar interior, or other hospitality environment.
+- Reject if the hero subject is a plated dish, isolated drink product, kitchen prep, or menu item close-up.
+- Reject if people are the hero subject.
+- Reject if readable signage text or logos are prominent.
+- Reject if the scene feels geographically inconsistent with the grounded locality.
+- Reject if the scene looks like a generic stock hotel/bar/restaurant image that is not specific to the grounded venue cues or references.
+- Reject if the scene adds unsupported grandeur, architecture, or decor not grounded in the supplied venue facts.
+${deepResearchCue ? `- Deep research note: ${deepResearchCue}` : ""}
+
+Set hero_subject to one of: venue_scene, food_or_drink_product, people, text_or_signage, unclear.
+issues should use short labels such as "wrong_subject", "people_hero", "readable_text", "locality_mismatch", "generic_stock_scene", "unsupported_grandeur", or "unclear_subject".
 `.trim();
+}
+
+export function normalizeVenueImageVerificationVerdict(
+  verdict: VenueImageVerificationPayload,
+): VenueImageVerificationPayload {
+  const issues = new Set(
+    verdict.issues.filter((entry) => entry.trim().length > 0).map((entry) =>
+      entry.trim()
+    ),
+  );
+  const hardFailures: string[] = [];
+
+  if (verdict.hero_subject !== "venue_scene") {
+    const issue = verdict.hero_subject === "text_or_signage"
+      ? "readable_text"
+      : verdict.hero_subject === "people"
+      ? "people_hero"
+      : verdict.hero_subject === "food_or_drink_product"
+      ? "wrong_subject"
+      : "unclear_subject";
+    issues.add(issue);
+    hardFailures.push(`hero subject is ${verdict.hero_subject}`);
+  }
+
+  if (!verdict.locality_match) {
+    issues.add("locality_mismatch");
+    hardFailures.push("locality does not match grounded venue context");
+  }
+
+  if (verdict.readable_text_present) {
+    issues.add("readable_text");
+    hardFailures.push("readable text or signage is present");
+  }
+
+  if (hardFailures.length === 0) {
+    return {
+      ...verdict,
+      issues: Array.from(issues).slice(0, 8),
+    };
+  }
+
+  return {
+    ...verdict,
+    matches: false,
+    issues: Array.from(issues).slice(0, 8),
+    reason: hardFailures.join("; "),
+  };
 }
 
 export function getErrorMessage(error: unknown): string {
@@ -521,77 +759,232 @@ export function buildVenueVisualEvidenceCue(venue: VenueRecord): string {
   return "No public venue reference image is attached, so lean on the grounded Google Maps and Google Search venue summaries without drifting into a generic hospitality stock scene.";
 }
 
-async function maybeRunVenueDeepResearch(
-  env: VenueProfileImageEnv,
-  venue: VenueRecord,
-): Promise<VenueDeepResearchResult | null> {
+async function ensureVenueDeepResearch(args: {
+  adminClient: ReturnType<typeof createVenueProfileImageAdminClient>;
+  env: VenueProfileImageEnv;
+  venue: VenueRecord;
+  forceRefresh?: boolean;
+}): Promise<VenueDeepResearchReadyResult | VenueDeepResearchPendingResult> {
+  const { adminClient, env, venue, forceRefresh = false } = args;
+  let deepResearchDebug = normalizeDeepResearchDebug(venue.deep_research_debug);
+  const recordEvent = (event: Json): Json => {
+    deepResearchDebug = appendVenueDeepResearchEvent(deepResearchDebug, event);
+    return deepResearchDebug;
+  };
+
   if (!env.venueDeepResearchAgent || env.venueDeepResearchMaxWaitMs <= 0) {
-    return null;
+    throw new HttpError(
+      500,
+      "Gemini deep research is disabled for venue profile image generation.",
+    );
   }
 
-  const createResponse = await fetchWithTimeout(
-    "https://generativelanguage.googleapis.com/v1beta/interactions",
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-goog-api-key": env.geminiApiKey,
+  if (hasReadyVenueDeepResearch(venue) && !forceRefresh) {
+    return {
+      status: "ready",
+      summary: venue.deep_research_summary!.trim(),
+      sourceUrls: normalizeDeepResearchSources(venue.deep_research_sources),
+      diagnostics: {
+        lastObservedStatus: venue.deep_research_last_observed_status ?? "ready",
+        httpStatus: venue.deep_research_last_http_status ?? null,
+        lastPolledAt: venue.deep_research_last_polled_at ??
+          venue.deep_research_updated_at ?? null,
+        providerError: venue.deep_research_last_provider_error ?? null,
       },
-      body: JSON.stringify({
-        agent: env.venueDeepResearchAgent,
-        background: true,
-        input: buildVenueDeepResearchPrompt(venue),
-      }),
-    },
-    Math.min(env.venueDeepResearchMaxWaitMs, 15000),
+    };
+  }
+
+  let interactionId = venue.deep_research_interaction_id?.trim() || null;
+  let interactionStatus = normalizeVenueDeepResearchStatus(
+    venue.deep_research_status,
+  );
+  const staleInteraction = Boolean(
+    interactionId &&
+      !forceRefresh &&
+      interactionStatus !== "failed" &&
+      !isVenueDeepResearchInFlight(venue),
   );
 
-  if (!createResponse.ok) {
-    return null;
+  if (staleInteraction) {
+    const staleAt = new Date().toISOString();
+    await updateVenueDeepResearchState(adminClient, venue.id, {
+      deep_research_status: "failed",
+      deep_research_error:
+        "Previous Gemini deep research interaction stalled without completion and was restarted.",
+      deep_research_last_observed_status:
+        venue.deep_research_last_observed_status ??
+          venue.deep_research_status ?? "in_progress",
+      deep_research_last_polled_at: staleAt,
+      deep_research_last_provider_error:
+        venue.deep_research_last_provider_error ?? null,
+      deep_research_debug: recordEvent({
+        timestamp: staleAt,
+        phase: "stale_restart",
+        outcome: "failed",
+        interaction_id: interactionId,
+        observed_status: venue.deep_research_last_observed_status ??
+          venue.deep_research_status ?? "in_progress",
+        provider_error:
+          "Previous Gemini deep research interaction stalled without completion and was restarted.",
+      }),
+    });
+    interactionId = null;
+    interactionStatus = "failed";
   }
 
-  let interaction = asRecord(await safeJson(createResponse));
-  const interactionId = stringOrNull(interaction.id);
-  if (!interactionId) {
-    return null;
+  if (
+    !interactionId ||
+    forceRefresh ||
+    interactionStatus === "failed"
+  ) {
+    let created;
+    try {
+      created = await createVenueDeepResearchInteraction(env, venue);
+    } catch (error) {
+      const diagnostics = extractVenueDeepResearchDiagnostics(error);
+      const failedAt = diagnostics.lastPolledAt ?? new Date().toISOString();
+      const message = diagnostics.providerError ?? getErrorMessage(error);
+      await updateVenueDeepResearchState(adminClient, venue.id, {
+        deep_research_status: "failed",
+        deep_research_error: message,
+        deep_research_last_observed_status: diagnostics.lastObservedStatus ??
+          "create_failed",
+        deep_research_last_http_status: diagnostics.httpStatus,
+        deep_research_last_polled_at: failedAt,
+        deep_research_last_provider_error: diagnostics.providerError,
+        deep_research_debug: recordEvent({
+          timestamp: failedAt,
+          phase: "create",
+          outcome: "failed",
+          observed_status: diagnostics.lastObservedStatus ?? "create_failed",
+          http_status: diagnostics.httpStatus,
+          provider_error: diagnostics.providerError ?? message,
+        }),
+      });
+      throw error;
+    }
+
+    interactionId = created.interactionId;
+    interactionStatus = created.status;
+    const createdAt = created.diagnostics.lastPolledAt ??
+      new Date().toISOString();
+    await updateVenueDeepResearchState(adminClient, venue.id, {
+      deep_research_status: interactionStatus,
+      deep_research_error: null,
+      deep_research_interaction_id: interactionId,
+      deep_research_attempts: (venue.deep_research_attempts ?? 0) + 1,
+      deep_research_model: env.venueDeepResearchAgent,
+      deep_research_updated_at: createdAt,
+      deep_research_last_observed_status:
+        created.diagnostics.lastObservedStatus ?? interactionStatus,
+      deep_research_last_http_status: created.diagnostics.httpStatus,
+      deep_research_last_polled_at: createdAt,
+      deep_research_last_provider_error: created.diagnostics.providerError,
+      deep_research_debug: recordEvent({
+        timestamp: createdAt,
+        phase: "create",
+        outcome: created.result ? "ready" : "started",
+        interaction_id: interactionId,
+        observed_status: created.diagnostics.lastObservedStatus ??
+          interactionStatus,
+        http_status: created.diagnostics.httpStatus,
+        provider_error: created.diagnostics.providerError,
+      }),
+    });
+
+    if (created.result) {
+      return await finalizeVenueDeepResearch(
+        adminClient,
+        venue.id,
+        env.venueDeepResearchAgent,
+        created.result,
+        deepResearchDebug,
+      );
+    }
   }
 
-  const deadline = Date.now() + env.venueDeepResearchMaxWaitMs;
-  while (Date.now() < deadline) {
-    const status = stringOrNull(interaction.status)?.toLowerCase() ?? "";
-    if (status === "completed") {
-      const report = extractInteractionText(interaction);
-      if (!report) return null;
-      return {
-        summary: summarizeDeepResearchReport(report),
-        sourceUrls: extractUrlsFromText(report),
-      };
-    }
-    if (status === "failed" || status === "cancelled") {
-      return null;
-    }
+  const polled = await pollVenueDeepResearchInteraction(
+    env,
+    interactionId,
+  );
 
-    await delay(env.venueDeepResearchPollMs);
-    const pollResponse = await fetchWithTimeout(
-      `https://generativelanguage.googleapis.com/v1beta/interactions/${
-        encodeURIComponent(interactionId)
-      }`,
-      {
-        method: "GET",
-        headers: {
-          "content-type": "application/json",
-          "x-goog-api-key": env.geminiApiKey,
-        },
-      },
-      Math.min(env.venueDeepResearchPollMs + 2000, 10000),
+  if (polled.status === "ready") {
+    return await finalizeVenueDeepResearch(
+      adminClient,
+      venue.id,
+      env.venueDeepResearchAgent,
+      polled,
+      recordEvent({
+        timestamp: polled.diagnostics.lastPolledAt ?? new Date().toISOString(),
+        phase: "poll",
+        outcome: "ready",
+        interaction_id: interactionId,
+        observed_status: polled.diagnostics.lastObservedStatus ?? "ready",
+        http_status: polled.diagnostics.httpStatus,
+        provider_error: polled.diagnostics.providerError,
+      }),
     );
-    if (!pollResponse.ok) {
-      return null;
-    }
-    interaction = asRecord(await safeJson(pollResponse));
   }
 
-  return null;
+  if (polled.status === "failed") {
+    const failedAt = polled.diagnostics.lastPolledAt ??
+      new Date().toISOString();
+    await updateVenueDeepResearchState(adminClient, venue.id, {
+      deep_research_status: "failed",
+      deep_research_error: polled.error,
+      deep_research_interaction_id: interactionId,
+      deep_research_model: env.venueDeepResearchAgent,
+      deep_research_updated_at: failedAt,
+      deep_research_last_observed_status:
+        polled.diagnostics.lastObservedStatus ?? "failed",
+      deep_research_last_http_status: polled.diagnostics.httpStatus,
+      deep_research_last_polled_at: failedAt,
+      deep_research_last_provider_error: polled.diagnostics.providerError,
+      deep_research_debug: recordEvent({
+        timestamp: failedAt,
+        phase: "poll",
+        outcome: "failed",
+        interaction_id: interactionId,
+        observed_status: polled.diagnostics.lastObservedStatus ?? "failed",
+        http_status: polled.diagnostics.httpStatus,
+        provider_error: polled.diagnostics.providerError ?? polled.error,
+      }),
+    });
+    throw new HttpError(
+      502,
+      `Gemini deep research failed: ${polled.error}`,
+    );
+  }
+
+  const pendingAt = polled.diagnostics.lastPolledAt ?? new Date().toISOString();
+  await updateVenueDeepResearchState(adminClient, venue.id, {
+    deep_research_status: "in_progress",
+    deep_research_error: null,
+    deep_research_interaction_id: interactionId,
+    deep_research_model: env.venueDeepResearchAgent,
+    deep_research_updated_at: pendingAt,
+    deep_research_last_observed_status: polled.diagnostics.lastObservedStatus ??
+      "in_progress",
+    deep_research_last_http_status: polled.diagnostics.httpStatus,
+    deep_research_last_polled_at: pendingAt,
+    deep_research_last_provider_error: polled.diagnostics.providerError,
+    deep_research_debug: recordEvent({
+      timestamp: pendingAt,
+      phase: "poll",
+      outcome: "pending",
+      interaction_id: interactionId,
+      observed_status: polled.diagnostics.lastObservedStatus ?? "in_progress",
+      http_status: polled.diagnostics.httpStatus,
+      provider_error: polled.diagnostics.providerError,
+    }),
+  });
+
+  return {
+    status: "pending",
+    reason:
+      "Gemini deep research is still running in the background for this venue. Retry the manual image generation shortly.",
+    diagnostics: polled.diagnostics,
+  };
 }
 
 function buildVenueDeepResearchPrompt(venue: VenueRecord): string {
@@ -610,11 +1003,24 @@ function buildVenueDeepResearchPrompt(venue: VenueRecord): string {
     `Google review summary: ${venue.google_review_summary ?? ""}`,
     `Google Maps URI: ${venue.google_maps_uri ?? ""}`,
     `Official website: ${venue.website_url ?? ""}`,
+    "",
+    "Return a concise factual report that prioritizes:",
+    "1. venue identity and positioning",
+    "2. facade, architecture, materials, terrace/interior layout, and lighting mood",
+    "3. neighbourhood or streetscape cues that matter visually",
+    "4. recurring visual details visible in public photos or place descriptions",
+    "5. any explicit reasons the venue should not be depicted as luxury, beachside, rooftop, hotel, or nightlife if those cues are not supported",
+    "",
+    "Include source URLs inline when possible.",
   ].join("\n");
 }
 
 function extractInteractionText(interaction: Json): string | null {
   const texts: string[] = [];
+  const directOutput = stringOrNull(asRecord(interaction.output).text);
+  if (directOutput) {
+    texts.push(directOutput);
+  }
   for (const output of asArray(interaction.outputs)) {
     const row = asRecord(output);
     const directText = stringOrNull(row.text);
@@ -633,6 +1039,279 @@ function extractInteractionText(interaction: Json): string | null {
 
   const combined = texts.join("\n\n").trim();
   return combined.length > 0 ? combined : null;
+}
+
+async function createVenueDeepResearchInteraction(
+  env: VenueProfileImageEnv,
+  venue: VenueRecord,
+): Promise<{
+  interactionId: string;
+  status: VenueDeepResearchStatus;
+  result?: VenueDeepResearchReadyResult;
+  diagnostics: VenueDeepResearchDiagnostics;
+}> {
+  const requestedAt = new Date().toISOString();
+  const createResponse = await fetchWithTimeout(
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": env.geminiApiKey,
+      },
+      body: JSON.stringify({
+        agent: env.venueDeepResearchAgent,
+        background: true,
+        store: true,
+        input: buildVenueDeepResearchPrompt(venue),
+      }),
+    },
+    20000,
+  );
+
+  if (!createResponse.ok) {
+    const providerError = await extractGeminiError(createResponse);
+    throw new HttpError(
+      502,
+      `Unable to start Gemini deep research: ${providerError}`,
+      {
+        deepResearch: {
+          lastObservedStatus: "create_failed",
+          httpStatus: createResponse.status,
+          lastPolledAt: requestedAt,
+          providerError,
+        },
+      },
+    );
+  }
+
+  const interaction = asRecord(await safeJson(createResponse));
+  const interactionId = stringOrNull(interaction.id);
+  if (!interactionId) {
+    throw new HttpError(
+      502,
+      "Gemini deep research did not return an interaction id.",
+      {
+        deepResearch: {
+          lastObservedStatus: stringOrNull(interaction.status) ??
+            "missing_interaction_id",
+          httpStatus: createResponse.status,
+          lastPolledAt: requestedAt,
+          providerError: extractInteractionError(interaction),
+        },
+      },
+    );
+  }
+
+  const result = finalizeDeepResearchInteraction(interaction, {
+    httpStatus: createResponse.status,
+    lastPolledAt: requestedAt,
+  });
+  return {
+    interactionId,
+    status: result?.status ?? "pending",
+    result: result?.status === "ready" ? result : undefined,
+    diagnostics: result?.diagnostics ?? {
+      lastObservedStatus: stringOrNull(interaction.status) ?? "pending",
+      httpStatus: createResponse.status,
+      lastPolledAt: requestedAt,
+      providerError: extractInteractionError(interaction),
+    },
+  };
+}
+
+async function pollVenueDeepResearchInteraction(
+  env: VenueProfileImageEnv,
+  interactionId: string,
+): Promise<
+  | VenueDeepResearchReadyResult
+  | VenueDeepResearchPendingResult
+  | VenueDeepResearchFailedResult
+> {
+  const deadline = Date.now() +
+    Math.min(
+      env.venueDeepResearchMaxWaitMs,
+      venueDeepResearchInlinePollBudgetMs,
+    );
+  let lastDiagnostics: VenueDeepResearchDiagnostics = {
+    lastObservedStatus: "in_progress",
+    httpStatus: null,
+    lastPolledAt: null,
+    providerError: null,
+  };
+
+  while (Date.now() < deadline) {
+    const pollAt = new Date().toISOString();
+    const pollResponse = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/interactions/${
+        encodeURIComponent(interactionId)
+      }`,
+      {
+        method: "GET",
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": env.geminiApiKey,
+        },
+      },
+      Math.min(env.venueDeepResearchPollMs + 5000, 15000),
+    );
+    if (!pollResponse.ok) {
+      const providerError = await extractGeminiError(pollResponse);
+      return {
+        status: "failed",
+        error: `Unable to poll Gemini deep research: ${providerError}`,
+        diagnostics: {
+          lastObservedStatus: "poll_failed",
+          httpStatus: pollResponse.status,
+          lastPolledAt: pollAt,
+          providerError,
+        },
+      };
+    }
+
+    const interaction = asRecord(await safeJson(pollResponse));
+    const result = finalizeDeepResearchInteraction(interaction, {
+      httpStatus: pollResponse.status,
+      lastPolledAt: pollAt,
+    });
+    lastDiagnostics = result?.diagnostics ?? {
+      lastObservedStatus: stringOrNull(interaction.status) ?? "in_progress",
+      httpStatus: pollResponse.status,
+      lastPolledAt: pollAt,
+      providerError: extractInteractionError(interaction),
+    };
+    if (result) {
+      return result;
+    }
+
+    await delay(env.venueDeepResearchPollMs);
+  }
+
+  return {
+    status: "pending",
+    reason:
+      "Gemini deep research is still running in the background for this venue. Retry the manual image generation shortly.",
+    diagnostics: {
+      ...lastDiagnostics,
+      lastPolledAt: new Date().toISOString(),
+    },
+  };
+}
+
+function finalizeDeepResearchInteraction(
+  interaction: Json,
+  baseDiagnostics: Partial<VenueDeepResearchDiagnostics> = {},
+):
+  | VenueDeepResearchReadyResult
+  | VenueDeepResearchPendingResult
+  | VenueDeepResearchFailedResult
+  | null {
+  const rawStatus = stringOrNull(interaction.status);
+  const status = normalizeVenueDeepResearchStatus(rawStatus);
+  const diagnostics: VenueDeepResearchDiagnostics = {
+    lastObservedStatus: rawStatus ?? baseDiagnostics.lastObservedStatus ?? null,
+    httpStatus: baseDiagnostics.httpStatus ?? null,
+    lastPolledAt: baseDiagnostics.lastPolledAt ?? new Date().toISOString(),
+    providerError: extractInteractionError(interaction) ??
+      baseDiagnostics.providerError ?? null,
+  };
+  if (status === "ready") {
+    const report = extractInteractionText(interaction);
+    if (!report) {
+      return {
+        status: "failed",
+        error: "Gemini deep research completed without a usable text report.",
+        diagnostics: {
+          ...diagnostics,
+          providerError:
+            "Gemini deep research completed without a usable text report.",
+        },
+      };
+    }
+    return {
+      status: "ready",
+      summary: summarizeDeepResearchReport(report),
+      sourceUrls: extractUrlsFromText(report),
+      diagnostics,
+    };
+  }
+
+  if (status === "failed") {
+    return {
+      status: "failed",
+      error: extractInteractionError(interaction) ??
+        "Gemini deep research failed without an error message.",
+      diagnostics,
+    };
+  }
+
+  if (status === "pending" || status === "in_progress") {
+    return {
+      status: "pending",
+      reason:
+        "Gemini deep research is still running in the background for this venue. Retry the manual image generation shortly.",
+      diagnostics,
+    };
+  }
+
+  return null;
+}
+
+async function finalizeVenueDeepResearch(
+  adminClient: ReturnType<typeof createVenueProfileImageAdminClient>,
+  venueId: string,
+  model: string,
+  result: VenueDeepResearchReadyResult,
+  deepResearchDebug?: Json,
+): Promise<VenueDeepResearchReadyResult> {
+  const finalizedAt = result.diagnostics.lastPolledAt ??
+    new Date().toISOString();
+  await updateVenueDeepResearchState(adminClient, venueId, {
+    deep_research_status: "ready",
+    deep_research_summary: result.summary,
+    deep_research_sources: result.sourceUrls,
+    deep_research_error: null,
+    deep_research_interaction_id: null,
+    deep_research_model: model,
+    deep_research_updated_at: finalizedAt,
+    deep_research_last_observed_status: result.diagnostics.lastObservedStatus ??
+      "ready",
+    deep_research_last_http_status: result.diagnostics.httpStatus,
+    deep_research_last_polled_at: finalizedAt,
+    deep_research_last_provider_error: null,
+    ...(deepResearchDebug ? { deep_research_debug: deepResearchDebug } : {}),
+  });
+
+  return result;
+}
+
+async function updateVenueDeepResearchState(
+  adminClient: ReturnType<typeof createVenueProfileImageAdminClient>,
+  venueId: string,
+  updates: Json,
+): Promise<void> {
+  const { error } = await adminClient
+    .from("dinein_venues")
+    .update(updates)
+    .eq("id", venueId);
+
+  if (error) {
+    throw new HttpError(
+      500,
+      `Unable to update the venue deep research state: ${error.message}`,
+      error,
+    );
+  }
+}
+
+function extractInteractionError(interaction: Json): string | null {
+  const direct = stringOrNull(interaction.error);
+  if (direct) return direct;
+
+  const nested = asRecord(interaction.error);
+  return stringOrNull(nested.message) ??
+    stringOrNull(nested.status) ??
+    stringOrNull(nested.code);
 }
 
 function summarizeDeepResearchReport(report: string): string {
@@ -702,11 +1381,17 @@ async function generateGeminiVenueImage({
   models,
   prompt,
   referenceImages,
+  verification,
 }: {
   apiKey: string;
   models: string[];
   prompt: string;
   referenceImages: VenueReferenceImagePayload[];
+  verification?: {
+    models: string[];
+    venue: VenueRecord;
+    referenceImages: VenueReferenceImagePayload[];
+  };
 }): Promise<GeminiImagePayload> {
   let lastError = "Gemini did not return a venue image.";
 
@@ -750,6 +1435,22 @@ async function generateGeminiVenueImage({
     const json = await response.json();
     const payload = extractInlineImage(json);
     if (payload) {
+      if (verification) {
+        const verdict = await verifyGeneratedVenueImage({
+          apiKey,
+          models: verification.models,
+          imageBytes: payload.bytes,
+          mimeType: payload.mimeType,
+          venue: verification.venue,
+          referenceImages: verification.referenceImages,
+        });
+        if (verdict && !verdict.matches) {
+          lastError =
+            `Model "${model}" generated an invalid venue image (${verdict.hero_subject}): ${verdict.reason}`;
+          continue;
+        }
+      }
+
       return {
         ...payload,
         model,
@@ -760,6 +1461,109 @@ async function generateGeminiVenueImage({
   }
 
   throw new HttpError(502, lastError);
+}
+
+async function verifyGeneratedVenueImage(args: {
+  apiKey: string;
+  models: string[];
+  imageBytes: Uint8Array;
+  mimeType: string;
+  venue: VenueRecord;
+  referenceImages: VenueReferenceImagePayload[];
+}): Promise<VenueImageVerificationPayload | null> {
+  const prompt = buildVenueImageVerificationPrompt({
+    venue: args.venue,
+    referenceImageCount: args.referenceImages.length,
+    deepResearchSummary: args.venue.deep_research_summary,
+  });
+  const parts = [
+    { text: prompt },
+    {
+      inlineData: {
+        mimeType: args.mimeType,
+        data: encodeBytesToBase64(args.imageBytes),
+      },
+    },
+    ...args.referenceImages.map((reference) => ({
+      inlineData: {
+        data: reference.data,
+        mimeType: reference.mimeType,
+      },
+    })),
+  ];
+
+  for (const model of args.models) {
+    const response = await fetchWithTimeout(
+      `https://generativelanguage.googleapis.com/v1beta/models/${
+        encodeURIComponent(model)
+      }:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": args.apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{
+            role: "user",
+            parts,
+          }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseJsonSchema: venueImageVerificationSchema,
+          },
+        }),
+      },
+      20000,
+    );
+
+    if (!response.ok) {
+      continue;
+    }
+
+    const body = asRecord(await response.json());
+    const candidate = asRecord(asArray(body.candidates)[0]);
+    const content = asRecord(candidate.content);
+    const text = stringOrNull(asRecord(asArray(content.parts)[0]).text);
+    const parsed = text ? parseJsonObjectText(text) : null;
+    if (!parsed) {
+      continue;
+    }
+
+    const heroSubject = stringOrNull(parsed.hero_subject);
+    const issues = Array.isArray(parsed.issues)
+      ? parsed.issues.filter((entry): entry is string =>
+        typeof entry === "string" && entry.trim().length > 0
+      ).map((entry) => entry.trim()).slice(0, 8)
+      : [];
+    if (
+      typeof parsed.matches !== "boolean" ||
+      !heroSubject ||
+      ![
+        "venue_scene",
+        "food_or_drink_product",
+        "people",
+        "text_or_signage",
+        "unclear",
+      ].includes(heroSubject) ||
+      typeof parsed.locality_match !== "boolean" ||
+      typeof parsed.readable_text_present !== "boolean"
+    ) {
+      continue;
+    }
+
+    return normalizeVenueImageVerificationVerdict({
+      matches: parsed.matches,
+      hero_subject:
+        heroSubject as VenueImageVerificationPayload["hero_subject"],
+      locality_match: parsed.locality_match,
+      readable_text_present: parsed.readable_text_present,
+      issues,
+      reason: stringOrNull(parsed.reason) || "No verification reason supplied.",
+    });
+  }
+
+  return null;
 }
 
 async function cleanupPreviousVenueImage(
@@ -819,18 +1623,31 @@ async function normalizeExistingVenueImageState(
   adminClient: ReturnType<typeof createVenueProfileImageAdminClient>,
   venue: VenueRecord,
 ): Promise<void> {
-  if (
-    normalizeVenueImageStatus(venue.image_status) === "ready" &&
-    !venue.image_error
-  ) {
+  const shouldLockGeneratedImage =
+    normalizeVenueImageSource(venue.image_source) === "ai_gemini" &&
+    venue.image_locked !== true;
+  const shouldNormalizeStatus =
+    normalizeVenueImageStatus(venue.image_status) !== "ready" ||
+    Boolean(venue.image_error);
+
+  if (!shouldNormalizeStatus && !shouldLockGeneratedImage) {
     return;
   }
 
-  await updateVenueImageState(adminClient, venue.id, {
-    image_status: "ready",
-    image_error: null,
+  const updates: Json = {
     updated_at: new Date().toISOString(),
-  });
+  };
+
+  if (shouldNormalizeStatus) {
+    updates.image_status = "ready";
+    updates.image_error = null;
+  }
+
+  if (shouldLockGeneratedImage) {
+    updates.image_locked = true;
+  }
+
+  await updateVenueImageState(adminClient, venue.id, updates);
 }
 
 function skippedVenueImageResult(
@@ -858,6 +1675,7 @@ function buildVenueSceneDirection(venue: VenueRecord): VenueSceneDirection {
       venue.google_review_summary,
       venue.search_summary,
       venue.description,
+      venue.deep_research_summary,
     ].filter(Boolean).join(" "),
   );
 
@@ -932,13 +1750,22 @@ function buildVenueSceneDirection(venue: VenueRecord): VenueSceneDirection {
       "wine bar",
     ])
   ) {
+    const barStyling = matchesAny(context, [
+        "stage",
+        "dj",
+        "live music",
+        "pool table",
+        "pool tables",
+        "billiards",
+      ])
+      ? "Emphasize the bar counter together with any grounded performance or recreation cues, such as a stage or pool-table area, rather than a single drink close-up."
+      : "Emphasize the bar counter, seating, shelving, or signature interior architecture rather than a single drink close-up.";
     return {
       scene:
-        "Show a premium bar or lounge environment with the venue space as the hero subject.",
+        "Show a venue-appropriate bar or lounge environment with the venue space as the hero subject.",
       lighting:
         "Use moody evening hospitality lighting with warm amber highlights and realistic low-light contrast.",
-      styling:
-        "Emphasize the bar counter, seating, shelving, or signature interior architecture rather than a single drink close-up.",
+      styling: barStyling,
       background:
         "Keep the background immersive and intimate, with depth and a believable nightlife atmosphere.",
     };
@@ -1143,6 +1970,25 @@ function normalizeVenueImageStatus(
   }
 }
 
+export function normalizeVenueDeepResearchStatus(
+  value: string | null,
+): VenueDeepResearchStatus {
+  switch ((value ?? "").trim().toLowerCase()) {
+    case "in_progress":
+    case "running":
+    case "queued":
+      return "in_progress";
+    case "completed":
+    case "ready":
+      return "ready";
+    case "failed":
+    case "cancelled":
+      return "failed";
+    default:
+      return "pending";
+  }
+}
+
 function normalizeVenueImageSource(
   value: string | null,
 ): "manual" | "ai_gemini" | null {
@@ -1157,6 +2003,104 @@ function normalizeVenueImageSource(
 
 function hasVenueImage(venue: VenueRecord): boolean {
   return hasText(venue.image_url);
+}
+
+export function hasReadyVenueDeepResearch(venue: VenueRecord): boolean {
+  if (!hasText(venue.deep_research_summary)) {
+    return false;
+  }
+
+  if (
+    normalizeVenueDeepResearchStatus(venue.deep_research_status) !== "ready"
+  ) {
+    return false;
+  }
+
+  const researchUpdatedAt = parseIsoTime(venue.deep_research_updated_at);
+  const enrichedAt = parseIsoTime(venue.last_enriched_at);
+  if (researchUpdatedAt == null) {
+    return false;
+  }
+  if (enrichedAt != null && researchUpdatedAt < enrichedAt) {
+    return false;
+  }
+
+  return true;
+}
+
+function isVenueDeepResearchInFlight(venue: VenueRecord): boolean {
+  const status = normalizeVenueDeepResearchStatus(venue.deep_research_status);
+  if (status !== "pending" && status !== "in_progress") {
+    return false;
+  }
+
+  const updatedAt = parseIsoTime(venue.deep_research_updated_at);
+  if (updatedAt == null) {
+    return hasText(venue.deep_research_interaction_id);
+  }
+
+  return Date.now() - updatedAt < staleVenueDeepResearchWindowMs;
+}
+
+function normalizeDeepResearchSources(value: unknown): string[] {
+  return asArray(value)
+    .map((entry) => {
+      if (typeof entry === "string") {
+        return entry.trim();
+      }
+      const row = asRecord(entry);
+      return stringOrNull(row.url) ?? stringOrNull(row.uri) ?? "";
+    })
+    .filter((entry) => entry.length > 0)
+    .slice(0, 12);
+}
+
+function normalizeDeepResearchDebug(value: unknown): Json {
+  const current = asRecord(value);
+  const events = asArray(current.events)
+    .map((entry) => asRecord(entry))
+    .filter((entry) => Object.keys(entry).length > 0)
+    .slice(-9);
+
+  return {
+    ...current,
+    events,
+  };
+}
+
+function appendVenueDeepResearchEvent(current: Json, event: Json): Json {
+  const events = asArray(current.events)
+    .map((entry) => asRecord(entry))
+    .filter((entry) => Object.keys(entry).length > 0)
+    .slice(-9);
+
+  return {
+    ...current,
+    last_event: event,
+    events: [...events, event],
+  };
+}
+
+function extractVenueDeepResearchDiagnostics(
+  error: unknown,
+): VenueDeepResearchDiagnostics {
+  const details = error instanceof HttpError ? asRecord(error.details) : {};
+  const deepResearch = asRecord(details.deepResearch);
+
+  const httpStatus = typeof deepResearch.httpStatus === "number" &&
+      Number.isFinite(deepResearch.httpStatus)
+    ? deepResearch.httpStatus
+    : null;
+
+  return {
+    lastObservedStatus: stringOrNull(deepResearch.lastObservedStatus) ??
+      "failed",
+    httpStatus,
+    lastPolledAt: stringOrNull(deepResearch.lastPolledAt) ??
+      new Date().toISOString(),
+    providerError: stringOrNull(deepResearch.providerError) ??
+      (error instanceof Error ? error.message : String(error)),
+  };
 }
 
 function hasText(value: string | null | undefined): boolean {
@@ -1178,30 +2122,6 @@ function cleanPromptText(value: string | null | undefined): string {
 
 function matchesAny(value: string, needles: string[]): boolean {
   return needles.some((needle) => value.includes(needle));
-}
-
-function decodeJwtRole(authHeader: string | null): string | null {
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const token = authHeader.substring("Bearer ".length).trim();
-  const parts = token.split(".");
-  if (parts.length != 3) return null;
-
-  try {
-    const payload = JSON.parse(decodeBase64Url(parts[1]));
-    return typeof payload.role === "string" ? payload.role : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-function decodeBase64Url(value: string): string {
-  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
-  const padded = normalized.padEnd(
-    normalized.length + ((4 - normalized.length % 4) % 4),
-    "=",
-  );
-  return atob(padded);
 }
 
 function extensionForMimeType(mimeType: string): string {
@@ -1267,6 +2187,27 @@ async function safeJson(response: Response): Promise<Json> {
   } catch (_) {
     return {};
   }
+}
+
+function parseJsonObjectText(value: string): Json | null {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+
+  const candidates = [
+    trimmed,
+    trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim(),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      return asRecord(parsed);
+    } catch (_) {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 function extractInlineImage(

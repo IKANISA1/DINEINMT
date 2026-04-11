@@ -14,6 +14,7 @@ import {
   parseMenuItemResearchProfile,
   resolveMenuItemClass,
 } from "./menu-item-context.ts";
+import { verifySupabaseServiceRoleHeader } from "./signed-jwt.ts";
 
 export interface FunctionEnv {
   supabaseUrl: string;
@@ -32,6 +33,7 @@ export type Json = Record<string, unknown>;
 export interface MenuItemRecord {
   id: string;
   venue_id: string;
+  updated_at?: string | null;
   name: string;
   description: string | null;
   category: string | null;
@@ -137,6 +139,17 @@ export interface MenuImageAuditResult {
   regenerationAttempted: boolean;
   regenerationResult: MenuImageProcessResult | null;
 }
+
+const staleMenuImageWindowMs = 30 * 60 * 1000;
+const menuImagePromptVersion = "menu-image-v3";
+const menuImageDarkCardPolicy = {
+  cardBackground: "#1A1C1E",
+  appBackground: "#121416",
+  primaryAccent: "#E1C28E",
+  secondaryAccent: "#A1D494",
+  tertiaryAccent: "#B9C6E9",
+  mood: "premium, dark, refined, modern luxury",
+} as const;
 
 export function shouldRegenerateAuditedMenuImage(
   issues: MenuImageAuditIssue[],
@@ -282,6 +295,12 @@ export function extractMenuImagePromptVisualKind(
     : null;
 }
 
+export function extractMenuImagePromptVersion(
+  prompt: string | null | undefined,
+): string | null {
+  return extractPromptLineValue(prompt, "Prompt version");
+}
+
 export function isMenuImagePromptCompatible(
   prompt: string | null | undefined,
   args: {
@@ -289,7 +308,8 @@ export function isMenuImagePromptCompatible(
     visualKind: MenuVisualKind;
   },
 ): boolean {
-  return extractMenuImagePromptClass(prompt) === args.itemClass &&
+  return extractMenuImagePromptVersion(prompt) === menuImagePromptVersion &&
+    extractMenuImagePromptClass(prompt) === args.itemClass &&
     extractMenuImagePromptVisualKind(prompt) === args.visualKind;
 }
 
@@ -388,8 +408,7 @@ export async function resolveInvocationActor(
   }
 
   const authHeader = req.headers.get("Authorization");
-  const serviceRole = decodeJwtRole(authHeader);
-  if (serviceRole === "service_role") {
+  if (await verifySupabaseServiceRoleHeader(authHeader)) {
     return { kind: "service" };
   }
 
@@ -410,6 +429,27 @@ export async function resolveInvocationActor(
   };
 }
 
+export function isMenuImageGenerationInFlight(item: MenuItemRecord): boolean {
+  if (item.image_status !== "generating") {
+    return false;
+  }
+
+  const updatedAt = parseIsoTime(item.updated_at);
+  if (updatedAt == null) {
+    return false;
+  }
+
+  return Date.now() - updatedAt < staleMenuImageWindowMs;
+}
+
+export function menuImageBackfillEligibilityFilter(
+  forceRegenerate: boolean,
+): string {
+  return forceRegenerate
+    ? "image_url.is.null,image_status.eq.failed,image_status.eq.generating,image_source.eq.ai_gemini"
+    : "image_url.is.null,image_status.eq.failed,image_status.eq.generating";
+}
+
 export async function fetchMenuItem(
   adminClient: ReturnType<typeof createAdminClient>,
   itemId: string,
@@ -417,7 +457,7 @@ export async function fetchMenuItem(
   const { data, error } = await adminClient
     .from("dinein_menu_items")
     .select(
-      "id, venue_id, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
+      "id, venue_id, updated_at, name, description, category, class, menu_context, menu_context_status, menu_context_error, menu_context_model, menu_context_attempts, menu_context_locked, menu_context_updated_at, image_url, image_source, image_status, image_model, image_prompt, image_error, image_attempts, image_locked, image_storage_path, tags",
     )
     .eq("id", itemId)
     .maybeSingle();
@@ -741,7 +781,7 @@ export async function processMenuItemImageGeneration(
     };
   }
 
-  if (!forceRegenerate && item.image_status === "generating") {
+  if (!forceRegenerate && isMenuImageGenerationInFlight(item)) {
     return {
       status: "skipped",
       itemId: item.id,
@@ -762,6 +802,13 @@ export async function processMenuItemImageGeneration(
     venue,
     forceRefresh: forceRegenerate,
   });
+  const existingImageReference = hasExistingImage
+    ? await loadExistingMenuImageReference({
+      adminClient,
+      env,
+      item,
+    })
+    : null;
 
   const visualKind = classifyMenuVisualKind(
     item,
@@ -774,6 +821,9 @@ export async function processMenuItemImageGeneration(
     venue,
     context.profile,
     context.itemClass,
+    {
+      hasExistingImageReference: existingImageReference != null,
+    },
   );
 
   if (
@@ -846,11 +896,13 @@ export async function processMenuItemImageGeneration(
       apiKey: env.geminiApiKey,
       models: env.geminiImageModels,
       prompt,
+      referenceImages: existingImageReference ? [existingImageReference] : [],
       verification: {
         models: env.menuImageVerifierModels,
         item,
         itemClass: context.itemClass,
         visualKind,
+        profile: context.profile,
       },
     });
 
@@ -893,6 +945,7 @@ export async function processMenuItemImageGeneration(
       image_generated_at: new Date().toISOString(),
       image_error: null,
       image_attempts: nextAttempt,
+      image_locked: true,
       image_storage_path: storagePath,
       updated_at: new Date().toISOString(),
     });
@@ -985,12 +1038,12 @@ export async function auditMenuItemImage(
         code: "image_prompt_metadata_stale",
         severity: "warning",
         message:
-          "The stored AI prompt metadata does not match the current item class or visual kind.",
+          "The stored AI prompt metadata does not match the current prompt version, item class, or visual kind.",
       });
     }
 
     try {
-      const payload = await downloadMenuItemImageForAudit({
+      const payload = await downloadMenuItemImageBytes({
         adminClient,
         env,
         item,
@@ -1004,6 +1057,7 @@ export async function auditMenuItemImage(
         item,
         itemClass: context.itemClass,
         visualKind,
+        profile: context.profile,
       });
 
       if (!verification) {
@@ -1018,7 +1072,11 @@ export async function auditMenuItemImage(
           code: "image_verification_mismatch",
           severity: "error",
           message:
-            `Verifier observed ${verification.observed_class}: ${verification.reason}`,
+            `Verifier observed ${verification.observed_subject} (${verification.observed_class}): ${verification.reason}${
+              verification.issues.length > 0
+                ? ` [${verification.issues.join(", ")}]`
+                : ""
+            }`,
         });
       }
     } catch (error) {
@@ -1177,6 +1235,7 @@ async function cloneReusableMenuImage({
     image_generated_at: new Date().toISOString(),
     image_error: null,
     image_attempts: nextAttempt,
+    image_locked: true,
     image_storage_path: storagePath,
     updated_at: new Date().toISOString(),
   });
@@ -1237,21 +1296,6 @@ export function getErrorMessage(error: unknown): string {
   }
 
   return String(error);
-}
-
-function decodeJwtRole(authHeader: string | null): string | null {
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  const token = authHeader.substring("Bearer ".length).trim();
-  const parts = token.split(".");
-  if (parts.length != 3) return null;
-
-  try {
-    const payload = JSON.parse(decodeBase64Url(parts[1]));
-    return typeof payload.role === "string" ? payload.role : null;
-  } catch (_) {
-    return null;
-  }
 }
 
 function decodeBase64Url(value: string): string {
@@ -1472,17 +1516,31 @@ async function normalizeExistingMenuImageState(
   adminClient: ReturnType<typeof createAdminClient>,
   item: MenuItemRecord,
 ): Promise<void> {
-  if (
-    normalizeImageStatus(item.image_status) === "ready" && !item.image_error
-  ) {
+  const shouldLockGeneratedImage =
+    normalizeImageSource(item.image_source) === "ai_gemini" &&
+    item.image_locked !== true;
+  const shouldNormalizeStatus =
+    normalizeImageStatus(item.image_status) !== "ready" ||
+    Boolean(item.image_error);
+
+  if (!shouldNormalizeStatus && !shouldLockGeneratedImage) {
     return;
   }
 
-  await updateGenerationState(adminClient, item.id, {
-    image_status: "ready",
-    image_error: null,
+  const updates: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
-  });
+  };
+
+  if (shouldNormalizeStatus) {
+    updates.image_status = "ready";
+    updates.image_error = null;
+  }
+
+  if (shouldLockGeneratedImage) {
+    updates.image_locked = true;
+  }
+
+  await updateGenerationState(adminClient, item.id, updates);
 }
 
 async function updateMenuContextState(
@@ -1531,11 +1589,14 @@ function normalizeCandidateObject(value: unknown): Json | null {
   return isRecord(value) ? (value as Json) : null;
 }
 
-function buildMenuImagePrompt(
+export function buildMenuImagePrompt(
   item: MenuItemRecord,
   venue: VenueRecord,
   profile: MenuItemResearchProfile | null,
   itemClass: MenuItemClass,
+  options: {
+    hasExistingImageReference?: boolean;
+  } = {},
 ): string {
   const venueCategory = venue.category?.trim() || "Restaurants";
   const itemCategory = item.category?.trim() || "menu item";
@@ -1573,9 +1634,33 @@ function buildMenuImagePrompt(
   const visualDoNot = resolvedProfile.visual_do_not.length > 0
     ? resolvedProfile.visual_do_not.map((entry) => `- ${entry}`).join("\n")
     : "- none";
+  const existingImageReferenceCue = options.hasExistingImageReference
+    ? `A current menu image is attached as a secondary reference.
+- Use it only as supporting evidence for plating, serving vessel, portioning, and presentation cues.
+- Never let the attached image override the item name, class, category, description, or grounded research profile.
+- If the attached image conflicts with the grounded text, follow the grounded text and ignore the conflicting image details.`
+    : "No current menu image is attached.";
 
   return `
-Create a photorealistic premium menu image for a luxury dark-mode hospitality mobile app.
+Create a photorealistic production-safe menu image for a dark hospitality mobile app.
+
+Prompt version: ${menuImagePromptVersion}
+
+═══ EVIDENCE HIERARCHY (DO NOT BREAK) ═══
+Use these sources in strict order of priority:
+1. Menu item name
+2. Menu item description and tags
+3. Canonical research profile below
+4. Venue context only for ambience, never for item substitution
+
+If the evidence is limited, keep the image simple and literal.
+Prefer an understated but accurate dish or drink over a dramatic but invented composition.
+Do NOT upscale a humble, local, street-food, tavern, bar-snack, or everyday item into a fine-dining luxury plating unless the grounded item text clearly supports that.
+Do NOT invent ingredients, garnishes, side dishes, glassware style, serving vessel, regional cues, or preparation details that are not supported by the grounded menu text or canonical profile.
+If the item is culturally specific, preserve that locality faithfully instead of replacing it with a generic international stock-photo version.
+
+═══ EXISTING MENU IMAGE REFERENCE ═══
+${existingImageReferenceCue}
 
 ═══ ITEM TYPE CLASSIFICATION (MOST CRITICAL RULE) ═══
 This item is classified as: ${typeLabel}
@@ -1621,21 +1706,24 @@ ${visualDoNot}
 Venue: ${venue.name}
 Venue type: ${venueCategory}
 Atmosphere: ${venueDescription}
+Use venue context only to shape lighting mood, background restraint, and hospitality atmosphere.
+The venue must never change what the item itself is.
 
 ═══ APP DESIGN SYSTEM (match this mood, do NOT render UI) ═══
 The image will appear inside a dark mobile menu card with these properties:
-- Card background: near-black (#1A1C1E)
-- App background: dark charcoal (#121416)
-- Primary accent: warm gold (#E1C28E)
-- Secondary accent: mint green (#A1D494)
-- Tertiary accent: soft lavender (#B9C6E9)
-- Overall mood: premium, dark, refined, modern luxury
+- Card background: near-black (${menuImageDarkCardPolicy.cardBackground})
+- App background: dark charcoal (${menuImageDarkCardPolicy.appBackground})
+- Primary accent: warm gold (${menuImageDarkCardPolicy.primaryAccent})
+- Secondary accent: mint green (${menuImageDarkCardPolicy.secondaryAccent})
+- Tertiary accent: soft lavender (${menuImageDarkCardPolicy.tertiaryAccent})
+- Overall mood: ${menuImageDarkCardPolicy.mood}
 
 The image must harmonize with this dark palette:
-- Background and edge tones should blend toward dark charcoal (#121416 to #1A1C1E).
+- Background and edge tones should blend toward dark charcoal (${menuImageDarkCardPolicy.appBackground} to ${menuImageDarkCardPolicy.cardBackground}).
 - Use dark vignetting or shallow depth of field so image edges dissolve into the card.
 - Avoid bright white, pure white, or high-contrast edges that would clash with the dark card.
 - Warm tones (amber, gold, copper) are preferred over cool blues or stark whites.
+- Keep the palette believable and appetizing, not glossy, neon, or over-processed.
 
 ═══ ART DIRECTION ═══
 Visual target: ${artDirection.visualTarget}
@@ -1647,6 +1735,7 @@ Visual target: ${artDirection.visualTarget}
 ${cuisineHint ? `- Cuisine styling: ${cuisineHint}` : ""}
 - Center the main subject. It must be immediately recognizable even at small thumbnail size.
 - Use realistic scale, believable texture, and credible hospitality presentation.
+- Make the hero subject feel like a real item served by this venue, not a generic stock-photo substitute.
 
 ═══ HARD EXCLUSIONS (never violate) ═══
 ${
@@ -1657,6 +1746,7 @@ ${
 - No text overlays, watermarks, logos, borders, price tags, menus, or collage layouts.
 - No people, hands, phones, cash, receipts, or table clutter.
 - No cartoon styling, surreal plating, AI artifacts, or oversaturated neon color.
+- No generic stock-photo styling, no unsupported luxury cues, and no theatrical garnish or prop styling unless the item text explicitly supports it.
 - No ingredients not mentioned in the description.
 - No chopsticks unless the cuisine is clearly Asian.
 - Do not add extra items — show ONE hero subject, not a table spread.
@@ -2391,9 +2481,16 @@ interface GeminiImagePayload {
   model: string;
 }
 
+interface MenuImageReferencePayload {
+  data: string;
+  mimeType: string;
+}
+
 export interface MenuImageVerificationPayload {
   matches: boolean;
   observed_class: "food" | "drinks" | "unclear";
+  observed_subject: string;
+  issues: string[];
   reason: string;
 }
 
@@ -2405,34 +2502,61 @@ const menuImageVerificationSchema = {
       type: "string",
       enum: ["food", "drinks", "unclear"],
     },
+    observed_subject: { type: "string" },
+    issues: {
+      type: "array",
+      items: { type: "string" },
+    },
     reason: { type: "string" },
   },
-  required: ["matches", "observed_class", "reason"],
+  required: [
+    "matches",
+    "observed_class",
+    "observed_subject",
+    "issues",
+    "reason",
+  ],
 } as const;
 
 function buildMenuImageVerificationPrompt(args: {
   item: MenuItemRecord;
   itemClass: MenuItemClass;
   visualKind: MenuVisualKind;
+  profile: MenuItemResearchProfile;
 }): string {
   const expectedSubject = args.itemClass === "drinks"
     ? "a beverage only"
     : "a plated dish or dessert only";
+  const visualDoNot = args.profile.visual_do_not.length > 0
+    ? args.profile.visual_do_not.map((entry) => `- ${entry}`).join("\n")
+    : "- none";
 
   return `
 You are reviewing a generated hospitality menu image for production.
 Return JSON only.
 
+Prompt version: ${menuImagePromptVersion}
 Expected class: ${args.itemClass}
 Expected visual kind: ${args.visualKind}
 Menu item: ${args.item.name}
 Category: ${args.item.category ?? ""}
 Description: ${args.item.description ?? ""}
+Canonical name: ${args.profile.canonical_name}
+Canonical description: ${args.profile.canonical_description}
+Visual subject: ${args.profile.visual_subject}
+Serving style: ${args.profile.serving_style}
+Forbidden details:
+${visualDoNot}
 
 Check only the hero subject in the image.
 - The hero subject must be ${expectedSubject}.
-- Mark matches=false if the image shows the opposite class, or if the hero subject is unclear.
-- Ignore style or quality. Grade only subject correctness.
+- Mark matches=false if the image shows the opposite class, if the hero subject is unclear, or if the image shows the wrong named menu item.
+- Mark matches=false if the hero subject contradicts the canonical description or forbidden details.
+- Mark matches=false if the image looks like a generic stock-photo substitute instead of the named item and grounded serving style.
+- Mark matches=false if the image adds unsupported luxury garnish, props, or presentation that are not grounded in the canonical item.
+- Ignore lighting and polish unless they obscure the subject itself.
+- observed_subject should name what the image most likely shows in one short phrase.
+- issues should list short machine-readable findings such as "wrong_class", "wrong_named_item", "unclear_subject", "forbidden_detail", "wrong_serving_style", "generic_stock_scene", or "overstyled_not_grounded".
 `.trim();
 }
 
@@ -2454,11 +2578,13 @@ async function verifyGeneratedMenuImage(args: {
   item: MenuItemRecord;
   itemClass: MenuItemClass;
   visualKind: MenuVisualKind;
+  profile: MenuItemResearchProfile;
 }): Promise<MenuImageVerificationPayload | null> {
   const prompt = buildMenuImageVerificationPrompt({
     item: args.item,
     itemClass: args.itemClass,
     visualKind: args.visualKind,
+    profile: args.profile,
   });
   const encodedImage = encodeBytesToBase64(args.imageBytes);
 
@@ -2511,10 +2637,19 @@ async function verifyGeneratedMenuImage(args: {
     const observedClass = typeof parsed.observed_class === "string"
       ? parsed.observed_class.trim()
       : null;
+    const observedSubject = typeof parsed.observed_subject === "string"
+      ? parsed.observed_subject.trim()
+      : "";
+    const issues = Array.isArray(parsed.issues)
+      ? parsed.issues.filter((entry): entry is string =>
+        typeof entry === "string" && entry.trim().length > 0
+      ).map((entry) => entry.trim()).slice(0, 8)
+      : [];
     if (
       typeof parsed.matches !== "boolean" ||
       !observedClass ||
-      !["food", "drinks", "unclear"].includes(observedClass)
+      !["food", "drinks", "unclear"].includes(observedClass) ||
+      observedSubject.length === 0
     ) {
       continue;
     }
@@ -2522,6 +2657,8 @@ async function verifyGeneratedMenuImage(args: {
     return {
       matches: parsed.matches,
       observed_class: observedClass as "food" | "drinks" | "unclear",
+      observed_subject: observedSubject,
+      issues,
       reason:
         typeof parsed.reason === "string" && parsed.reason.trim().length > 0
           ? parsed.reason.trim()
@@ -2532,7 +2669,7 @@ async function verifyGeneratedMenuImage(args: {
   return null;
 }
 
-async function downloadMenuItemImageForAudit(args: {
+async function downloadMenuItemImageBytes(args: {
   adminClient: ReturnType<typeof createAdminClient>;
   env: FunctionEnv;
   item: MenuItemRecord;
@@ -2577,6 +2714,27 @@ async function downloadMenuItemImageForAudit(args: {
   };
 }
 
+async function loadExistingMenuImageReference(args: {
+  adminClient: ReturnType<typeof createAdminClient>;
+  env: FunctionEnv;
+  item: MenuItemRecord;
+}): Promise<MenuImageReferencePayload | null> {
+  const imageUrl = args.item.image_url?.trim();
+  if (!imageUrl) {
+    return null;
+  }
+
+  try {
+    const payload = await downloadMenuItemImageBytes(args);
+    return {
+      data: encodeBytesToBase64(payload.bytes),
+      mimeType: payload.mimeType,
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
 function mimeTypeFromPath(value: string): string {
   const normalized = value.toLowerCase();
   if (normalized.endsWith(".png")) return "image/png";
@@ -2588,16 +2746,19 @@ async function generateGeminiImage({
   apiKey,
   models,
   prompt,
+  referenceImages,
   verification,
 }: {
   apiKey: string;
   models: string[];
   prompt: string;
+  referenceImages: MenuImageReferencePayload[];
   verification?: {
     models: string[];
     item: MenuItemRecord;
     itemClass: MenuItemClass;
     visualKind: MenuVisualKind;
+    profile: MenuItemResearchProfile;
   };
 }): Promise<GeminiImagePayload> {
   let lastError = "Gemini did not return an image.";
@@ -2615,6 +2776,12 @@ async function generateGeminiImage({
           contents: [
             {
               parts: [
+                ...referenceImages.map((reference) => ({
+                  inlineData: {
+                    data: reference.data,
+                    mimeType: reference.mimeType,
+                  },
+                })),
                 {
                   text: prompt,
                 },
@@ -2650,11 +2817,12 @@ async function generateGeminiImage({
         item: verification.item,
         itemClass: verification.itemClass,
         visualKind: verification.visualKind,
+        profile: verification.profile,
       });
 
       if (verdict && !verdict.matches) {
         lastError =
-          `Model "${model}" generated a ${verdict.observed_class} image for ${verification.itemClass}: ${verdict.reason}`;
+          `Model "${model}" generated ${verdict.observed_subject} (${verdict.observed_class}) for ${verification.itemClass}: ${verdict.reason}`;
         continue;
       }
     }
@@ -2714,6 +2882,14 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+function parseIsoTime(value: string | null | undefined): number | null {
+  if (!value || value.trim().length === 0) {
+    return null;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function isRecord(value: unknown): value is Json {

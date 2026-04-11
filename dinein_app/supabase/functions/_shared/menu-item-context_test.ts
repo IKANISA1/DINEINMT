@@ -56,3 +56,35 @@ Deno.test(
     assertStringIncludes(prompt, '"Bombay Sapphire"');
   },
 );
+
+Deno.test(
+  "buildMenuItemResearchPrompt requires evidence-bound descriptions",
+  () => {
+    const prompt = buildMenuItemResearchPrompt({
+      item: {
+        name: "Rolex",
+        category: "Street food",
+        description: "Chapati wrap",
+        tags: ["uganda"],
+        class: null,
+        menu_context: null,
+      },
+      venueName: "Kampala Corner",
+      venueCategory: "Restaurants",
+      venueDescription: "East African casual dining",
+    });
+
+    assertStringIncludes(
+      prompt,
+      "Do not invent ingredients, origin stories, cooking methods, garnishes, serving vessels, side dishes, or locality claims",
+    );
+    assertStringIncludes(
+      prompt,
+      "If the evidence is weak, stay close to the input wording and lower confidence",
+    );
+    assertStringIncludes(
+      prompt,
+      "Do not turn a simple or everyday item into an upscale or fusion reinterpretation.",
+    );
+  },
+);

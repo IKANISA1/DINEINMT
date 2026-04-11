@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
 
   try {
     const env = getVenueEnrichmentEnv();
-    requireServiceOrCronInvocation(req, env);
+    await requireServiceOrCronInvocation(req, env);
 
     const body = await parseJsonBody(req);
     const venueId = typeof body.venueId === "string" ? body.venueId.trim() : "";

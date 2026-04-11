@@ -1,18 +1,23 @@
 name: Cloudflare Pages
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - main
   workflow_dispatch:
 
 concurrency:
-  group: cloudflare-pages-${{ github.ref }}
+  group: cloudflare-pages-${{ github.event.workflow_run.head_sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
   deploy:
     name: Deploy ${{ matrix.project }}
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -27,15 +32,32 @@ jobs:
         working-directory: dinein_app
     permissions:
       contents: read
+    env:
+      SUPABASE_URL_MT: ${{ secrets.SUPABASE_URL_MT }}
+      SUPABASE_ANON_KEY_MT: ${{ secrets.SUPABASE_ANON_KEY_MT }}
+      SUPABASE_URL_RW: ${{ secrets.SUPABASE_URL_RW }}
+      SUPABASE_ANON_KEY_RW: ${{ secrets.SUPABASE_ANON_KEY_RW }}
+      PLAY_APP_SIGNING_SHA256_MT: ${{ secrets.PLAY_APP_SIGNING_SHA256_MT }}
+      PLAY_APP_SIGNING_SHA256_RW: ${{ secrets.PLAY_APP_SIGNING_SHA256_RW }}
+      APPLE_TEAM_ID_MT: ${{ secrets.APPLE_TEAM_ID_MT }}
+      APPLE_TEAM_ID_RW: ${{ secrets.APPLE_TEAM_ID_RW }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -45,22 +67,22 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
+      - name: Scan tracked files for committed secrets
+        run: bash scripts/scan_repo_secrets.sh
+
       - name: Materialize Malta release env
         if: matrix.flavor == 'mt'
-        env:
-          SUPABASE_URL_MT: ${{ secrets.SUPABASE_URL_MT }}
-          SUPABASE_ANON_KEY_MT: ${{ secrets.SUPABASE_ANON_KEY_MT }}
         run: ./scripts/materialize_release_env.sh --flavor mt --require-secrets
 
       - name: Materialize Rwanda release env
         if: matrix.flavor == 'rw'
-        env:
-          SUPABASE_URL_RW: ${{ secrets.SUPABASE_URL_RW }}
-          SUPABASE_ANON_KEY_RW: ${{ secrets.SUPABASE_ANON_KEY_RW }}
         run: ./scripts/materialize_release_env.sh --flavor rw --require-secrets
 
+      - name: Validate release integrations
+        run: ./scripts/validate_release_integrations.sh --flavor "${{ matrix.flavor }}"
+
       - name: Build web release
-        run: ./scripts/build_web_release.sh --flavor "${{ matrix.flavor }}" --skip-checks
+        run: ./scripts/build_web_release.sh --flavor "${{ matrix.flavor }}"
 
       - name: Deploy to Cloudflare Pages
         env:

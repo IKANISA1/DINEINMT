@@ -10,7 +10,7 @@ SLEEP_SEC="${SLEEP_SEC:-60}"
 OVERWRITE_EXISTING="${OVERWRITE_EXISTING:-false}"
 FORCE_PLACE_REFRESH="${FORCE_PLACE_REFRESH:-false}"
 SKIP_SEARCH_GROUNDING="${SKIP_SEARCH_GROUNDING:-false}"
-GENERATE_PROFILE_IMAGES="${GENERATE_PROFILE_IMAGES:-true}"
+GENERATE_PROFILE_IMAGES="${GENERATE_PROFILE_IMAGES:-false}"
 IMAGE_LIMIT="${IMAGE_LIMIT:-$LIMIT}"
 FORCE_IMAGE_REGENERATE="${FORCE_IMAGE_REGENERATE:-false}"
 IMAGE_SKIP_SEARCH_GROUNDING="${IMAGE_SKIP_SEARCH_GROUNDING:-$SKIP_SEARCH_GROUNDING}"
@@ -35,7 +35,7 @@ payload = {
     "overwriteExisting": os.environ.get("OVERWRITE_EXISTING", "false").lower() == "true",
     "forcePlaceRefresh": os.environ.get("FORCE_PLACE_REFRESH", "false").lower() == "true",
     "skipSearchGrounding": os.environ.get("SKIP_SEARCH_GROUNDING", "false").lower() == "true",
-    "generateProfileImage": os.environ.get("GENERATE_PROFILE_IMAGES", "true").lower() == "true",
+    "generateProfileImage": os.environ.get("GENERATE_PROFILE_IMAGES", "false").lower() == "true",
     "forceImageRegenerate": os.environ.get("FORCE_IMAGE_REGENERATE", "false").lower() == "true",
 }
 

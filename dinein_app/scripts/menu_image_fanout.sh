@@ -43,6 +43,7 @@ updated as (
     image_storage_path = source.image_storage_path,
     image_source = 'ai_gemini',
     image_status = 'ready',
+    image_locked = true,
     image_model = source.image_model,
     image_prompt = coalesce(target.image_prompt, source.image_prompt),
     image_generated_at = coalesce(target.image_generated_at, source.image_generated_at, now()),

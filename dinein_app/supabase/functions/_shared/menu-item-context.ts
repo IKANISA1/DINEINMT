@@ -588,6 +588,10 @@ CRITICAL RULES:
 - If the item is ambiguous, default to "food" unless the name or context clearly indicates a drink.
 - Keep the canonical description concise and factual.
 - Keep the visual subject specific enough for accurate image generation.
+- Do not invent ingredients, origin stories, cooking methods, garnishes, serving vessels, side dishes, or locality claims that are not supported by the menu text or grounded search evidence.
+- If the evidence is weak, stay close to the input wording and lower confidence instead of filling gaps with plausible-sounding details.
+- Preserve explicit local or branded identity in the item name when present.
+- Do not turn a simple or everyday item into an upscale or fusion reinterpretation.
 
 Input item:
 - Name: ${item.name ?? ""}
@@ -623,6 +627,7 @@ Guidance:
 - Keep food classes for dishes, desserts, snacks, starters, mains, and sides.
 - If the category or item text indicates whisky, whiskey, vodka, gin, rum, tequila, cognac, brandy, liqueur, beer, cider, wine, cocktail, mocktail, soda, juice, smoothie, milkshake, coffee, or tea, class must be "drinks".
 - Brand-only alcohol names such as "Red Label", "Black Label", "Blue Label", or "Bombay Sapphire" are still drinks.
+- Venue context may help with ambience or tie-breaking, but it must not rewrite the menu item itself.
 `.trim();
 }
 
