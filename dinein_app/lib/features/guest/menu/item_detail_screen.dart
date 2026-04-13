@@ -1,27 +1,23 @@
 import 'dart:async';
-import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:ui/theme/app_theme.dart';
-import 'package:ui/theme/app_colors.dart';
+
 import 'package:core_pkg/config/country_config_provider.dart';
 import 'package:db_pkg/models/models.dart';
-import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/providers/cart_provider.dart';
+import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/services/app_telemetry.dart';
+import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
+
 import 'menu_item_badges.dart';
 
-/// Full-page item detail screen — exact match of React ItemDetail.tsx.
-///
-/// 40vh hero image with gradient overlay, floating back/share/heart controls,
-/// item info card with allergen info, special requests textarea,
-/// quantity selector, fixed bottom "Add to Order" CTA.
+/// Full-page item detail screen.
 class ItemDetailScreen extends ConsumerStatefulWidget {
   final String itemId;
 
@@ -84,9 +80,14 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
         tableNumber: cart.tableNumber,
       );
     }
-    for (int i = 0; i < _quantity; i++) {
-      cartNotifier.addItem(item);
-    }
+
+    final note = _noteController.text.trim();
+    cartNotifier.addItem(
+      item,
+      note: note.isEmpty ? null : note,
+      quantity: _quantity,
+    );
+
     _trackGuestEvent(
       'menu_item_added',
       venueId: venue?.id ?? item.venueId,
@@ -94,21 +95,23 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
       details: {
         'source': 'item_detail',
         'quantity': _quantity,
-        'has_note': _noteController.text.trim().isNotEmpty,
+        'has_note': note.isNotEmpty,
       },
     );
+
     context.pop();
   }
 
   Future<void> _shareItem(MenuItem item) async {
     final config = ref.read(countryConfigProvider);
+    final country = ref.read(cartProvider).effectiveCountry;
     await SharePlus.instance.share(
       ShareParams(
         title: '${item.name} on DINEIN',
         text:
             'Check out ${item.name} on ${config.appTitle}.\n'
             '${item.description}\n'
-            'Price: ${ref.read(cartProvider).formatPrice(item.price)}',
+            'Price: ${country.formatPrice(item.price)}',
       ),
     );
   }
@@ -128,10 +131,6 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    final screenHeight = MediaQuery.of(context).size.height;
-
     final extra = GoRouterState.of(context).extra;
     final seededItem = extra is MenuItem ? extra : null;
     final itemAsync = seededItem == null
@@ -139,35 +138,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
         : AsyncValue<MenuItem?>.data(seededItem);
 
     return itemAsync.when(
-      loading: () => Scaffold(
-        body: ListView(
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.zero,
-          children: [
-            SkeletonLoader(width: double.infinity, height: screenHeight * 0.4, borderRadius: 0),
-            const SizedBox(height: 24),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: SkeletonLoader(width: 220, height: 24, borderRadius: 8),
-            ),
-            const SizedBox(height: 12),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: SkeletonLoader(width: 120, height: 20, borderRadius: 6),
-            ),
-            const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: SkeletonLoader(width: double.infinity, height: 60, borderRadius: 12),
-            ),
-            const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: SkeletonLoader(width: double.infinity, height: 100, borderRadius: 16),
-            ),
-          ],
-        ),
-      ),
+      loading: () => const Scaffold(body: _ItemDetailLoadingState()),
       error: (error, stackTrace) => Scaffold(
         body: Center(
           child: ErrorState(
@@ -180,34 +151,22 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
         if (item == null || !item.isAvailable) {
           return Scaffold(
             body: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    LucideIcons.alertCircle,
-                    size: 48,
-                    color: cs.onSurfaceVariant,
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Item not found', style: tt.headlineSmall),
-                  const SizedBox(height: 8),
-                  Text(
-                    'This item is no longer on the menu.',
-                    style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () {
-                      if (Navigator.of(context).canPop()) {
-                        context.pop();
-                      } else {
-                        context.goNamed(AppRouteNames.discover);
-                      }
-                    },
-                    child: const Text('Go Back'),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(AppTheme.space6),
+                child: GuestStatePanel(
+                  icon: LucideIcons.alertCircle,
+                  title: 'Item not found',
+                  subtitle: 'This item is no longer on the menu.',
+                  actionLabel: 'Back',
+                  onAction: () {
+                    if (Navigator.of(context).canPop()) {
+                      context.pop();
+                    } else {
+                      context.goNamed(AppRouteNames.discover);
+                    }
+                  },
+                  isError: true,
+                ),
               ),
             ),
           );
@@ -217,494 +176,264 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
         final venue = venueAsync.asData?.value;
         _trackItemViewed(item, venue);
         final cart = ref.watch(cartProvider);
+        final country = venue?.country ?? cart.effectiveCountry;
         final total = item.price * _quantity;
 
         return Scaffold(
-          body: Stack(
-            children: [
-              // ─── Scrollable content ───
-              SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          bottomNavigationBar: GuestStickyActionBar(
+            child: Row(
+              children: [
+                _QuantityStepper(
+                  quantity: _quantity,
+                  onDecrease: _quantity > 1
+                      ? () => setState(() => _quantity--)
+                      : null,
+                  onIncrease: () => setState(() => _quantity++),
+                ),
+                const SizedBox(width: AppTheme.space3),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => _handleAddToCart(item, venue),
+                    child: Text('Add ${country.formatPrice(total)}'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          body: SafeArea(
+            bottom: false,
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 120),
+              children: [
+                Stack(
                   children: [
-                    // ═══════════════════════════════════════
-                    //  HERO IMAGE (40vh)
-                    // ═══════════════════════════════════════
                     SizedBox(
-                      height: screenHeight * 0.40,
+                      height: 280,
                       width: double.infinity,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          // Image
-                          DineInImage(
-                            imageUrl: item.imageUrl,
-                            fit: BoxFit.cover,
-                            fallbackIcon: LucideIcons.chefHat,
-                            semanticLabel: '${item.name} photo',
+                      child: DineInImage(
+                        imageUrl: item.imageUrl,
+                        fit: BoxFit.cover,
+                        fallbackIcon: LucideIcons.chefHat,
+                        semanticLabel: '${item.name} photo',
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.08),
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.18),
+                            ],
                           ),
-                          // Gradient overlay
-                          Positioned.fill(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    cs.surface.withValues(alpha: 0.10),
-                                    cs.surface,
-                                  ],
-                                  stops: const [0.0, 0.6, 1.0],
-                                ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: AppTheme.space4,
+                      left: AppTheme.space4,
+                      right: AppTheme.space4,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _OverlayAction(
+                            icon: LucideIcons.chevronLeft,
+                            onTap: () => context.pop(),
+                            semanticLabel: 'Go back',
+                          ),
+                          Row(
+                            children: [
+                              _OverlayAction(
+                                icon: LucideIcons.share2,
+                                onTap: () => _shareItem(item),
+                                semanticLabel: 'Share item',
                               ),
-                            ),
+                              const SizedBox(width: AppTheme.space2),
+                              _OverlayAction(
+                                icon: _isSaved
+                                    ? LucideIcons.heart
+                                    : LucideIcons.heartOff,
+                                onTap: () => _toggleSavedItem(item),
+                                semanticLabel: _isSaved
+                                    ? 'Remove from saved'
+                                    : 'Save item',
+                                iconColor: _isSaved
+                                    ? Theme.of(context).colorScheme.primary
+                                    : null,
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-
-                    // ═══════════════════════════════════════
-                    //  ITEM INFO CARD (overlapping hero -48px)
-                    // ═══════════════════════════════════════
-                    Transform.translate(
-                      offset: const Offset(0, -48),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppTheme.space6,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.all(AppTheme.space8),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(32),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.05),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.20),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (item.guestDisplayTags.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    bottom: AppTheme.space4,
-                                  ),
-                                  child: MenuItemBadges(item: item),
-                                ),
-
-                              // Name + Price
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      item.name,
-                                      style: tt.headlineSmall?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -0.5,
-                                        height: 1.1,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppTheme.space4),
-                                  Text(
-                                    cart.formatPrice(item.price),
-                                    style: tt.headlineSmall?.copyWith(
-                                      color: cs.primary,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: -0.5,
-                                    ),
-                                  ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppTheme.space6,
+                    AppTheme.space5,
+                    AppTheme.space6,
+                    0,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 720),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          GuestSurfaceCard(
+                            highlighted: true,
+                            padding: const EdgeInsets.all(AppTheme.space5),
+                            borderRadius: 28,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (item.guestDisplayTags.isNotEmpty) ...[
+                                  MenuItemBadges(item: item),
+                                  const SizedBox(height: AppTheme.space4),
                                 ],
-                              ),
-
-                              const SizedBox(height: 12),
-
-                              // Description
-                              Text(
-                                item.description,
-                                style: tt.bodyMedium?.copyWith(
-                                  color: cs.onSurfaceVariant.withValues(
-                                    alpha: 0.80,
-                                  ),
-                                  height: 1.5,
-                                ),
-                              ),
-
-                              const SizedBox(height: AppTheme.space6),
-
-                              // Allergen Info Card
-                              Container(
-                                padding: const EdgeInsets.all(AppTheme.space4),
-                                decoration: BoxDecoration(
-                                  color: cs.surfaceContainerHigh,
-                                  borderRadius: BorderRadius.circular(
-                                    AppTheme.radiusMd,
-                                  ),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                  ),
-                                ),
-                                child: Row(
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: cs.primary.withValues(
-                                          alpha: 0.10,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Icon(
-                                        LucideIcons.info,
-                                        size: 16,
-                                        color: cs.primary,
+                                    Expanded(
+                                      child: Text(
+                                        item.name,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.headlineMedium,
                                       ),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'ALLERGENS',
-                                            style: TextStyle(
-                                              fontSize: 8,
-                                              fontWeight: FontWeight.w900,
-                                              letterSpacing: 2,
-                                              color: cs.onSurfaceVariant
-                                                  .withValues(alpha: 0.60),
-                                            ),
+                                    const SizedBox(width: AppTheme.space4),
+                                    Text(
+                                      country.formatPrice(item.price),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            fontWeight: FontWeight.w800,
                                           ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'Please inform staff of any allergies',
-                                            style: tt.bodySmall?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
-
-                    // ═══════════════════════════════════════
-                    //  SPECIAL REQUESTS
-                    // ═══════════════════════════════════════
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.space6,
-                      ),
-                      child: Transform.translate(
-                        offset: const Offset(0, -24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(left: 4),
-                              child: Text(
-                                'Special Requests',
-                                style: tt.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: AppTheme.space4),
-                            TextField(
-                              controller: _noteController,
-                              maxLines: 4,
-                              style: tt.bodyMedium,
-                              decoration: InputDecoration(
-                                hintText: 'E.g. No onions, extra spicy, etc.',
-                                hintStyle: tt.bodyMedium?.copyWith(
-                                  color: cs.onSurfaceVariant.withValues(
-                                    alpha: 0.40,
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: cs.surfaceContainerLow,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                  borderSide: BorderSide(
-                                    color: cs.primary.withValues(alpha: 0.50),
-                                  ),
-                                ),
-                                contentPadding: const EdgeInsets.all(20),
-                              ),
-                            ),
-
-                            const SizedBox(height: AppTheme.space8),
-
-                            // ═══════════════════════════════════════
-                            //  QUANTITY SELECTOR
-                            // ═══════════════════════════════════════
-                            Container(
-                              padding: const EdgeInsets.all(AppTheme.space4),
-                              decoration: BoxDecoration(
-                                color: cs.surfaceContainerLow,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 8),
-                                    child: Text(
-                                      'Quantity',
-                                      style: tt.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -0.3,
+                                const SizedBox(height: AppTheme.space3),
+                                Wrap(
+                                  spacing: AppTheme.space2,
+                                  runSpacing: AppTheme.space2,
+                                  children: [
+                                    GuestMetaPill(
+                                      label: item.category,
+                                      icon: LucideIcons.utensilsCrossed,
+                                    ),
+                                    if (venue != null)
+                                      GuestMetaPill(
+                                        label: venue.name,
+                                        icon: LucideIcons.store,
                                       ),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: cs.surfaceContainerHigh,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        // Minus
-                                        PressableScale(
-                                          onTap: _quantity > 1
-                                              ? () =>
-                                                    setState(() => _quantity--)
-                                              : null,
-                                          semanticLabel: 'Decrease quantity',
-                                          child: Container(
-                                            width: 40,
-                                            height: 40,
-                                            decoration: BoxDecoration(
-                                              color: cs.surface,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Icon(
-                                              LucideIcons.minus,
-                                              size: 20,
-                                              color: _quantity > 1
-                                                  ? cs.onSurfaceVariant
-                                                  : cs.onSurfaceVariant
-                                                        .withValues(
-                                                          alpha: 0.20,
-                                                        ),
-                                            ),
-                                          ),
-                                        ),
-
-                                        // Quantity display
-                                        SizedBox(
-                                          width: 48,
-                                          child: Text(
-                                            '$_quantity',
-                                            textAlign: TextAlign.center,
-                                            style: tt.titleLarge?.copyWith(
-                                              fontWeight: FontWeight.w900,
-                                            ),
-                                          ),
-                                        ),
-
-                                        // Plus
-                                        PressableScale(
-                                          onTap: () =>
-                                              setState(() => _quantity++),
-                                          semanticLabel: 'Increase quantity',
-                                          child: Container(
-                                            width: 40,
-                                            height: 40,
-                                            decoration: BoxDecoration(
-                                              color: cs.primary,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: cs.primary.withValues(
-                                                    alpha: 0.20,
-                                                  ),
-                                                  blurRadius: 12,
-                                                  offset: const Offset(0, 4),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Icon(
-                                              LucideIcons.plus,
-                                              size: 20,
-                                              color: cs.onPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Bottom padding for fixed CTA
-                    const SizedBox(height: 120),
-                  ],
-                ),
-              ),
-
-              // ═══════════════════════════════════════
-              //  FLOATING CONTROLS (top of hero)
-              // ═══════════════════════════════════════
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppTheme.space6,
-                      vertical: AppTheme.space4,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Back
-                        _FloatingControl(
-                          icon: LucideIcons.chevronLeft,
-                          onTap: () => context.pop(),
-                          semanticLabel: 'Go back',
-                        ),
-                        Row(
-                          children: [
-                            // Share
-                            _FloatingControl(
-                              icon: LucideIcons.share2,
-                              onTap: () => _shareItem(item),
-                              semanticLabel: 'Share item',
-                            ),
-                            const SizedBox(width: 12),
-                            // Heart
-                            _FloatingControl(
-                              icon: _isSaved
-                                  ? LucideIcons.heart
-                                  : LucideIcons.heartOff,
-                              iconColor: _isSaved ? AppColors.primary : null,
-                              onTap: () => _toggleSavedItem(item),
-                              semanticLabel: _isSaved ? 'Remove from saved' : 'Save item',
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // ═══════════════════════════════════════
-              //  FIXED BOTTOM CTA
-              // ═══════════════════════════════════════
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: ClipRect(
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                    child: Container(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppTheme.space6,
-                        AppTheme.space6,
-                        AppTheme.space6,
-                        32,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cs.surface.withValues(alpha: 0.80),
-                        border: Border(
-                          top: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.05),
-                          ),
-                        ),
-                      ),
-                      child: SafeArea(
-                        top: false,
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () => _handleAddToCart(item, venue),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: cs.primary,
-                              foregroundColor: cs.onPrimary,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 32,
-                                vertical: 18,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              elevation: 0,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
+                                  ],
+                                ),
+                                const SizedBox(height: AppTheme.space4),
                                 Text(
-                                  'Add to Order',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
+                                  item.description,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                        height: 1.5,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppTheme.space4),
+                          GuestSurfaceCard(
+                            padding: const EdgeInsets.all(AppTheme.space5),
+                            borderRadius: 24,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.primary
+                                        .withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(
+                                    LucideIcons.shieldAlert,
+                                    size: 18,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
                                   ),
                                 ),
-                                Text(
-                                  cart.formatPrice(total),
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -0.5,
+                                const SizedBox(width: AppTheme.space4),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Allergy notice',
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleSmall,
+                                      ),
+                                      const SizedBox(height: AppTheme.space2),
+                                      Text(
+                                        'Please tell staff about allergies before ordering.',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
+                          const SizedBox(height: AppTheme.space4),
+                          GuestSurfaceCard(
+                            padding: const EdgeInsets.all(AppTheme.space5),
+                            borderRadius: 24,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const GuestSectionHeader(
+                                  title: 'Notes',
+                                  subtitle: 'Optional request for this item.',
+                                ),
+                                const SizedBox(height: AppTheme.space4),
+                                TextField(
+                                  controller: _noteController,
+                                  maxLines: 3,
+                                  decoration: const InputDecoration(
+                                    hintText:
+                                        'No onions, extra spicy, sauce on the side…',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -712,18 +441,56 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
   }
 }
 
-// ─── Floating glass control button ───
-class _FloatingControl extends StatelessWidget {
+class _ItemDetailLoadingState extends StatelessWidget {
+  const _ItemDetailLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      children: const [
+        SkeletonLoader(width: double.infinity, height: 280, borderRadius: 0),
+        Padding(
+          padding: EdgeInsets.all(AppTheme.space6),
+          child: Column(
+            children: [
+              SkeletonLoader(
+                width: double.infinity,
+                height: 180,
+                borderRadius: 28,
+              ),
+              SizedBox(height: AppTheme.space4),
+              SkeletonLoader(
+                width: double.infinity,
+                height: 88,
+                borderRadius: 24,
+              ),
+              SizedBox(height: AppTheme.space4),
+              SkeletonLoader(
+                width: double.infinity,
+                height: 150,
+                borderRadius: 24,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OverlayAction extends StatelessWidget {
   final IconData icon;
-  final Color? iconColor;
   final VoidCallback onTap;
   final String semanticLabel;
+  final Color? iconColor;
 
-  const _FloatingControl({
+  const _OverlayAction({
     required this.icon,
-    this.iconColor,
     required this.onTap,
     required this.semanticLabel,
+    this.iconColor,
   });
 
   @override
@@ -731,20 +498,109 @@ class _FloatingControl extends StatelessWidget {
     return PressableScale(
       onTap: onTap,
       semanticLabel: semanticLabel,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.30),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-            ),
-            child: Icon(icon, size: 22, color: iconColor ?? Colors.white),
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(
+            color: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withValues(alpha: 0.72),
           ),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: iconColor ?? Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
+    );
+  }
+}
+
+class _QuantityStepper extends StatelessWidget {
+  final int quantity;
+  final VoidCallback? onDecrease;
+  final VoidCallback onIncrease;
+
+  const _QuantityStepper({
+    required this.quantity,
+    required this.onDecrease,
+    required this.onIncrease,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.72)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _StepperButton(icon: LucideIcons.minus, onTap: onDecrease),
+          SizedBox(
+            width: 44,
+            child: Text(
+              '$quantity',
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          _StepperButton(
+            icon: LucideIcons.plus,
+            onTap: onIncrease,
+            emphasized: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool emphasized;
+
+  const _StepperButton({
+    required this.icon,
+    required this.onTap,
+    this.emphasized = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDisabled = onTap == null;
+
+    return PressableScale(
+      onTap: onTap,
+      semanticLabel: 'Change quantity',
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: emphasized ? cs.primary : cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: emphasized
+              ? cs.onPrimary
+              : isDisabled
+              ? cs.onSurfaceVariant.withValues(alpha: 0.32)
+              : cs.onSurface,
         ),
       ),
     );

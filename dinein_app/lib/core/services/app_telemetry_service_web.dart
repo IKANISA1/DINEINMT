@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'app_telemetry_shared.dart';
 
 const _webGuestTelemetryEnabled = bool.fromEnvironment(
@@ -34,5 +36,20 @@ class AppTelemetryService {
       orderId: orderId,
       details: details,
     );
+  }
+
+  static Future<void> reportError(
+    Object error,
+    StackTrace stackTrace, {
+    required String context,
+    bool fatal = false,
+    Map<String, Object?> details = const {},
+  }) async {
+    final suffix = details.isEmpty ? '' : ' details=$details';
+    debugPrint(
+      '[telemetry:web] ${fatal ? 'fatal' : 'non-fatal'} error in $context: '
+      '$error$suffix',
+    );
+    debugPrintStack(stackTrace: stackTrace);
   }
 }

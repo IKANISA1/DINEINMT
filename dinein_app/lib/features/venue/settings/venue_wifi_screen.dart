@@ -149,68 +149,16 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
                     220,
                   ),
                   children: [
-                    Row(
-                      children: [
-                        PressableScale(
-                          onTap: () => context.pop(),
-                          child: Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: cs.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(
-                                AppTheme.radiusXl,
-                              ),
-                              border: Border.all(color: AppColors.white5),
-                            ),
-                            child: Icon(
-                              LucideIcons.chevronLeft,
-                              size: 24,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.space4),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Wifi Sharing',
-                              style: tt.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.6,
-                              ),
-                            ),
-                            const SizedBox(height: AppTheme.space1),
-                            Text(
-                              'VENUE MANAGEMENT',
-                              style: tt.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2.2,
-                                color: cs.onSurfaceVariant.withValues(
-                                  alpha: 0.72,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    AppPageHeader(
+                      title: 'Wi-Fi sharing',
+                      subtitle:
+                          'Share guest network details from one clean place.',
+                      onBack: () => context.pop(),
                     ),
                     const SizedBox(height: AppTheme.space6),
-                    Container(
+                    AppSurfaceCard(
                       padding: const EdgeInsets.all(AppTheme.space6),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(34),
-                        border: Border.all(color: AppColors.white5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.36),
-                            blurRadius: 32,
-                            offset: const Offset(0, 18),
-                          ),
-                        ],
-                      ),
+                      radius: 34,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -223,10 +171,9 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
                               ),
                               const SizedBox(width: AppTheme.space3),
                               Text(
-                                'NETWORK CONFIGURATION',
-                                style: tt.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 1.9,
+                                'Network configuration',
+                                style: tt.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
                                   color: AppColors.primary,
                                 ),
                               ),
@@ -290,11 +237,10 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
                         TextButton(
                           onPressed: _saving ? null : () => _clearWifi(venue),
                           child: Text(
-                            'CLEAR SAVED WIFI',
+                            'Clear saved Wi-Fi',
                             style: tt.labelSmall?.copyWith(
                               color: cs.error.withValues(alpha: 0.9),
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.8,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -340,11 +286,10 @@ class _VenueWifiScreenState extends ConsumerState<VenueWifiScreen> {
                                 ),
                               const SizedBox(width: AppTheme.space3),
                               Text(
-                                'SAVE WIFI SETTINGS',
+                                'Save Wi-Fi settings',
                                 style: tt.labelLarge?.copyWith(
                                   color: AppColors.onPrimary,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 3,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
@@ -392,9 +337,8 @@ class _WifiField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: tt.labelSmall?.copyWith(
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2,
+          style: tt.labelMedium?.copyWith(
+            fontWeight: FontWeight.w700,
             color: cs.onSurfaceVariant.withValues(alpha: 0.85),
           ),
         ),
@@ -403,7 +347,9 @@ class _WifiField extends StatelessWidget {
           decoration: BoxDecoration(
             color: cs.surfaceContainerHigh.withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-            border: Border.all(color: AppColors.white5),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
           child: TextField(
             controller: controller,
@@ -465,9 +411,8 @@ class _WifiDropdownField extends StatelessWidget {
       children: [
         Text(
           label,
-          style: tt.labelSmall?.copyWith(
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2,
+          style: tt.labelMedium?.copyWith(
+            fontWeight: FontWeight.w700,
             color: cs.onSurfaceVariant.withValues(alpha: 0.85),
           ),
         ),
@@ -477,7 +422,9 @@ class _WifiDropdownField extends StatelessWidget {
           decoration: BoxDecoration(
             color: cs.surfaceContainerHigh.withValues(alpha: 0.55),
             borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-            border: Border.all(color: AppColors.white5),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(

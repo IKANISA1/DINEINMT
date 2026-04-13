@@ -78,6 +78,7 @@ import {
   handleGetOrdersForUser,
   handleGetOrdersForVenue,
   handleIssueOrderRealtimeAccess,
+  handleMarkOrderPaid,
   handlePlaceOrder,
   handleUpdateOrderStatus,
 } from "./handlers/order.ts";
@@ -221,6 +222,8 @@ export async function handleAppRequest(req: Request): Promise<Response> {
           return await handleIssueOrderRealtimeAccess(supabase, req, body);
         case "update_order_status":
           return await handleUpdateOrderStatus(supabase, req, body);
+        case "mark_order_paid":
+          return await handleMarkOrderPaid(supabase, req, body);
         case "search_google_maps":
           return await handleSearchGoogleMaps(req, body);
         case "image_health":

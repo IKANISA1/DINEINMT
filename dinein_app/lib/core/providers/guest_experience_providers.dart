@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:db_pkg/models/guest_venue_feed.dart';
 import 'package:db_pkg/models/models.dart';
+import '../services/app_telemetry.dart';
 import '../services/venue_repository.dart';
 import 'menu_providers.dart';
 import 'venue_providers.dart';
@@ -74,7 +75,13 @@ final guestMenuBundleProvider =
         Venue? venue;
         try {
           venue = await ref.watch(venueByIdProvider(venueId).future);
-        } catch (_) {
+        } catch (error, stackTrace) {
+          await AppTelemetryService.reportError(
+            error,
+            stackTrace,
+            context: 'guest_menu_bundle.venue_lookup',
+            details: {'venueId': venueId},
+          );
           venue = null;
         }
 

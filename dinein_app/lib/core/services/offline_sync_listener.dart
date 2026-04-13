@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:ui/widgets/dinein_toast.dart';
 
+import 'app_telemetry.dart';
 import 'notification_inbox_service.dart';
 
 /// Listens for service worker `message` events to handle:
@@ -24,8 +27,15 @@ class OfflineSyncListener {
     try {
       _attachWebListener();
       debugPrint('[offline-sync-listener] Listening for SW messages.');
-    } catch (e) {
-      debugPrint('[offline-sync-listener] Init skipped: $e');
+    } catch (error, stackTrace) {
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'offline_sync_listener.init',
+        ),
+      );
+      debugPrint('[offline-sync-listener] Init skipped: $error');
     }
   }
 

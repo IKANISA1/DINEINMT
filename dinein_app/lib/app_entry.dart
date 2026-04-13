@@ -7,6 +7,8 @@ import 'package:core_pkg/config/country_runtime.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/router/url_strategy.dart';
 import 'package:dinein_app/core/router/web_entry_routing.dart';
+import 'package:dinein_app/core/infrastructure/app_telemetry_service.dart'
+    if (dart.library.js_interop) 'package:dinein_app/core/services/app_telemetry_service_web.dart';
 import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/core/services/pwa_install_service.dart';
 import 'package:dinein_app/features/guest/permissions/guest_location_permission_host.dart';
@@ -25,10 +27,26 @@ Future<void> bootApp(CountryConfig config) async {
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('FlutterError: ${details.exceptionAsString()}');
+    unawaited(
+      AppTelemetryService.reportError(
+        details.exception,
+        details.stack ?? StackTrace.current,
+        context: 'app_entry.flutter_error',
+        fatal: true,
+      ),
+    );
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('Uncaught platform error: $error\n$stack');
+    unawaited(
+      AppTelemetryService.reportError(
+        error,
+        stack,
+        context: 'app_entry.platform_dispatcher',
+        fatal: true,
+      ),
+    );
     return true;
   };
 
@@ -73,9 +91,9 @@ class DineInApp extends StatelessWidget {
     return MaterialApp.router(
       title: config.appTitle,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.dark,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.light,
+      themeMode: ThemeMode.light,
       routerConfig: appRouter,
       builder: (context, child) => OfflineBanner(
         child: GuestLocationPermissionHost(

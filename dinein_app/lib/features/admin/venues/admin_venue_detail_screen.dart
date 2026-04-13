@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:core_pkg/config/country_config.dart';
 import 'package:core_pkg/config/country_config_provider.dart';
 import 'package:core_pkg/constants/app_download_links.dart';
@@ -13,6 +12,7 @@ import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/admin_venue_asset_service.dart';
 import 'package:dinein_app/core/services/venue_repository.dart';
 import 'package:dinein_app/shared/widgets/branded_qr_tools.dart';
 import 'package:ui/theme/app_colors.dart';
@@ -58,7 +58,6 @@ class _AdminVenueDetailScreenState
   final _facebookCtrl = TextEditingController();
   final _tiktokCtrl = TextEditingController();
   final _promoMessageCtrl = TextEditingController();
-
 
   VenueStatus _status = VenueStatus.inactive;
   bool _orderingEnabled = false;
@@ -182,8 +181,12 @@ class _AdminVenueDetailScreenState
       'description': _descriptionCtrl.text.trim(),
       'address': _addressCtrl.text.trim(),
       'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-      'owner_whatsapp_number': _ownerWhatsAppCtrl.text.trim().isEmpty ? null : _ownerWhatsAppCtrl.text.trim(),
-      'owner_contact_phone': _ownerContactPhoneCtrl.text.trim().isEmpty ? null : _ownerContactPhoneCtrl.text.trim(),
+      'owner_whatsapp_number': _ownerWhatsAppCtrl.text.trim().isEmpty
+          ? null
+          : _ownerWhatsAppCtrl.text.trim(),
+      'owner_contact_phone': _ownerContactPhoneCtrl.text.trim().isEmpty
+          ? null
+          : _ownerContactPhoneCtrl.text.trim(),
       'image_url': _imageCtrl.text.trim().isEmpty
           ? null
           : _imageCtrl.text.trim(),
@@ -198,7 +201,9 @@ class _AdminVenueDetailScreenState
       'status': _status.dbValue,
       'ordering_enabled': _orderingEnabled,
       'is_promo_active': _isPromoActive,
-      'promo_message': _promoMessageCtrl.text.trim().isEmpty ? null : _promoMessageCtrl.text.trim(),
+      'promo_message': _promoMessageCtrl.text.trim().isEmpty
+          ? null
+          : _promoMessageCtrl.text.trim(),
       'country': config.country.code,
     };
 
@@ -232,32 +237,25 @@ class _AdminVenueDetailScreenState
 
   Future<void> _uploadProfileImage() async {
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.image);
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
       if (result == null || result.files.isEmpty) return;
-      
+
       final file = result.files.first;
-      if (file.bytes == null) {
-        _showSnack('Cannot read image data');
-        return;
-      }
 
       setState(() => _saving = true);
-      final ext = file.extension ?? 'png';
-      final fileName = 'venue_${DateTime.now().millisecondsSinceEpoch}.$ext';
-      
-      // We assume a 'venues' bucket exists. If it doesn't, this will throw.
-      final supabase = Supabase.instance.client;
-      await supabase.storage.from('venues').uploadBinary(
-            'images/$fileName',
-            file.bytes!,
-          );
-          
-      final url = supabase.storage.from('venues').getPublicUrl('images/$fileName');
+      final url = await AdminVenueAssetService.instance.uploadVenueProfileImage(
+        file,
+      );
       setState(() {
         _imageCtrl.text = url;
       });
       _showSnack('Image uploaded successfully.');
-    } catch (e) {
+    } on AdminVenueAssetUploadException catch (error) {
+      _showSnack(error.message);
+    } catch (_) {
       _showSnack('Image upload failed. Please try again later.');
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -269,28 +267,22 @@ class _AdminVenueDetailScreenState
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        withData: true,
       );
       if (result == null || result.files.isEmpty) return;
-      
+
       final file = result.files.first;
-      if (file.bytes == null) {
-        _showSnack('Cannot read file data');
-        return;
-      }
 
       setState(() => _saving = true);
-      final ext = file.extension ?? 'pdf';
-      final fileName = 'menu_${DateTime.now().millisecondsSinceEpoch}.$ext';
-      
-      final supabase = Supabase.instance.client;
-      await supabase.storage.from('venues').uploadBinary(
-            'menus/$fileName',
-            file.bytes!,
-          );
-          
+      await AdminVenueAssetService.instance.uploadMenuDocument(file);
+
       // Typically the backend triggers the OCR pipeline automatically via a webhook when a menu is uploaded.
-      _showSnack('Menu document uploaded. OCR pipeline will process this shortly.');
-    } catch (e) {
+      _showSnack(
+        'Menu document uploaded. OCR pipeline will process this shortly.',
+      );
+    } on AdminVenueAssetUploadException catch (error) {
+      _showSnack(error.message);
+    } catch (_) {
       _showSnack('Menu document upload failed. Please try again later.');
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -327,9 +319,9 @@ class _AdminVenueDetailScreenState
           borderRadius: BorderRadius.circular(AppTheme.radius3xl),
         ),
         title: Text(
-          'Delete Venue?',
+          'Delete venue?',
           style: tt.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w800,
             color: cs.error,
           ),
         ),
@@ -345,10 +337,9 @@ class _AdminVenueDetailScreenState
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
-              'CANCEL',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
+              'Cancel',
+              style: tt.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
                 color: cs.onSurfaceVariant,
               ),
             ),
@@ -359,10 +350,9 @@ class _AdminVenueDetailScreenState
               backgroundColor: cs.error.withValues(alpha: 0.10),
             ),
             child: Text(
-              'DELETE',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
+              'Delete',
+              style: tt.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
                 color: cs.error,
               ),
             ),
@@ -538,62 +528,29 @@ class _AdminVenueDetailScreenState
   // ── Header ──────────────────────────────────────────────────────────
 
   Widget _buildHeader(ColorScheme cs, TextTheme tt, Venue? venue) {
-    return Row(
-      children: [
-        PressableScale(
-          onTap: () {
-            if (Navigator.of(context).canPop()) {
-              context.pop();
-            } else {
-              context.goNamed(AppRouteNames.adminVenues);
-            }
-          },
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.white5),
+    return AppPageHeader(
+      title: widget.isCreate ? 'New venue' : 'Venue',
+      subtitle: widget.isCreate
+          ? 'Create and configure venue access.'
+          : 'Admin controls, discovery data, and operations.',
+      onBack: () {
+        if (Navigator.of(context).canPop()) {
+          context.pop();
+        } else {
+          context.goNamed(AppRouteNames.adminVenues);
+        }
+      },
+      trailing: venue == null
+          ? null
+          : StatusBadge(
+              label: venue.status.label,
+              color: venue.status == VenueStatus.active
+                  ? cs.secondary.withValues(alpha: 0.12)
+                  : cs.error.withValues(alpha: 0.12),
+              textColor: venue.status == VenueStatus.active
+                  ? cs.secondary
+                  : cs.error,
             ),
-            child: Icon(LucideIcons.chevronLeft, size: 22, color: cs.onSurface),
-          ),
-        ),
-        const SizedBox(width: AppTheme.space4),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.isCreate ? 'New Venue' : 'Venue Management',
-                style: tt.headlineLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              Text(
-                widget.isCreate ? 'CREATE ADMIN VENUE' : 'ADMIN · VENUE',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (venue != null)
-          StatusBadge(
-            label: venue.status.label,
-            color: venue.status == VenueStatus.active
-                ? cs.secondary.withValues(alpha: 0.12)
-                : cs.error.withValues(alpha: 0.12),
-            textColor: venue.status == VenueStatus.active
-                ? cs.secondary
-                : cs.error,
-          ),
-      ],
     );
   }
 
@@ -632,7 +589,7 @@ class _AdminVenueDetailScreenState
                   _nameCtrl.text.trim().isEmpty
                       ? 'Venue preview'
                       : _nameCtrl.text.trim(),
-                  style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                  style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -689,7 +646,7 @@ class _AdminVenueDetailScreenState
                     Text(
                       'Discovery Data',
                       style: tt.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -755,7 +712,7 @@ class _AdminVenueDetailScreenState
             children: [
               Expanded(
                 child: PremiumButton(
-                  label: _syncingProfile ? 'SYNCING...' : 'SYNC PROFILE DATA',
+                  label: _syncingProfile ? 'Syncing...' : 'Sync profile data',
                   icon: LucideIcons.sparkles,
                   onPressed: _syncingProfile
                       ? null
@@ -773,7 +730,9 @@ class _AdminVenueDetailScreenState
                     decoration: BoxDecoration(
                       color: cs.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                      border: Border.all(color: AppColors.white5),
+                      border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.72),
+                      ),
                     ),
                     child: Icon(
                       LucideIcons.mapPin,
@@ -860,7 +819,10 @@ class _AdminVenueDetailScreenState
               onTap: _uploadProfileImage,
               borderRadius: BorderRadius.circular(AppTheme.radiusMd),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(AppTheme.radiusMd),
@@ -871,16 +833,19 @@ class _AdminVenueDetailScreenState
           ],
         ),
 
-          Padding(
-            padding: const EdgeInsets.only(top: AppTheme.space2, bottom: AppTheme.space2),
-            child: Text(
-              'Payment destinations (MoMo / Revolut codes) are strictly managed by system integrations or venue owners directly and cannot be modified by site administrators.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                    fontStyle: FontStyle.italic,
-                  ),
+        Padding(
+          padding: const EdgeInsets.only(
+            top: AppTheme.space2,
+            bottom: AppTheme.space2,
+          ),
+          child: Text(
+            'Payment destinations (MoMo / Revolut codes) are strictly managed by system integrations or venue owners directly and cannot be modified by site administrators.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.error,
+              fontStyle: FontStyle.italic,
             ),
           ),
+        ),
       ],
     );
   }
@@ -894,8 +859,8 @@ class _AdminVenueDetailScreenState
         Text(
           'Upload menu documents (PDF, JPG) so the backend OCR pipeline can process their items automatically.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: AppTheme.space4),
         FilledButton.tonalIcon(
@@ -916,9 +881,9 @@ class _AdminVenueDetailScreenState
       children: [
         Text(
           'Highlight a special promo or announcement on the guest app home screen.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
         ),
         const SizedBox(height: AppTheme.space4),
         AdminVenueLabeledField(
@@ -933,9 +898,7 @@ class _AdminVenueDetailScreenState
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
             borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.05),
-            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
           child: Row(
             children: [
@@ -1005,8 +968,8 @@ class _AdminVenueDetailScreenState
         Text(
           'The Owner WhatsApp Number is required for venue operators to log in via WhatsApp OTP.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -1023,12 +986,10 @@ class _AdminVenueDetailScreenState
             AdminStatusDot(status: _status.dbValue),
             const SizedBox(width: AppTheme.space3),
             Text(
-              'CURRENT STATUS',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 3,
-                color: cs.onSurfaceVariant.withValues(alpha: 0.30),
+              'Current status',
+              style: tt.labelMedium?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -1066,9 +1027,7 @@ class _AdminVenueDetailScreenState
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
             borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.05),
-            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
           child: Row(
             children: [
@@ -1175,8 +1134,7 @@ class _AdminVenueDetailScreenState
           child: Text(
             'Danger Zone',
             style: tt.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
+              fontWeight: FontWeight.w800,
               color: cs.error,
             ),
           ),
@@ -1190,7 +1148,6 @@ class _AdminVenueDetailScreenState
               color: cs.error.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(AppTheme.radius3xl),
               border: Border.all(color: cs.error.withValues(alpha: 0.10)),
-              boxShadow: AppTheme.clayShadow,
             ),
             child: Row(
               children: [
@@ -1211,19 +1168,16 @@ class _AdminVenueDetailScreenState
                       Text(
                         'Delete Venue',
                         style: tt.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
+                          fontWeight: FontWeight.w800,
                           color: cs.error,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'IRREVERSIBLE ACTION',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 3,
+                        'Permanent action',
+                        style: tt.labelMedium?.copyWith(
                           color: cs.error,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -1422,5 +1376,4 @@ class _AdminVenueDetailScreenState
       ],
     );
   }
-
 }

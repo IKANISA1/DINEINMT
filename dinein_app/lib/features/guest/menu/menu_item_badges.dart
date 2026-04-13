@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:db_pkg/models/models.dart';
 import 'package:ui/theme/app_colors.dart';
-import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 class MenuItemBadges extends StatelessWidget {
   final MenuItem item;
@@ -36,34 +36,21 @@ class _MenuItemBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: tone.background,
-        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-        border: Border.all(color: tone.border),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          color: tone.foreground,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.9,
-        ),
-      ),
+    return AppPill(
+      label: label,
+      dense: true,
+      color: tone.background,
+      foregroundColor: tone.foreground,
     );
   }
 }
 
 class _MenuItemBadgeTone {
   final Color background;
-  final Color border;
   final Color foreground;
 
   const _MenuItemBadgeTone({
     required this.background,
-    required this.border,
     required this.foreground,
   });
 }
@@ -74,34 +61,29 @@ _MenuItemBadgeTone _toneForBadge(String label) {
   if (normalized == 'vegetarian' || normalized == 'vegan') {
     return _MenuItemBadgeTone(
       background: AppColors.secondary.withValues(alpha: 0.14),
-      border: AppColors.secondary.withValues(alpha: 0.26),
       foreground: AppColors.secondary,
     );
   }
   if (normalized == 'halal' || normalized == 'kosher') {
     return _MenuItemBadgeTone(
       background: AppColors.tertiary.withValues(alpha: 0.14),
-      border: AppColors.tertiary.withValues(alpha: 0.26),
       foreground: AppColors.tertiary,
     );
   }
   if (normalized.endsWith('-free') || normalized == 'gluten-free') {
     return _MenuItemBadgeTone(
       background: AppColors.warning.withValues(alpha: 0.14),
-      border: AppColors.warning.withValues(alpha: 0.22),
       foreground: AppColors.warning,
     );
   }
   if (normalized.startsWith('contains ') || normalized == 'spicy') {
     return _MenuItemBadgeTone(
       background: AppColors.error.withValues(alpha: 0.14),
-      border: AppColors.error.withValues(alpha: 0.22),
       foreground: AppColors.error,
     );
   }
   return _MenuItemBadgeTone(
     background: AppColors.surfaceContainerHigh,
-    border: AppColors.white10,
     foreground: AppColors.onSurfaceVariant,
   );
 }

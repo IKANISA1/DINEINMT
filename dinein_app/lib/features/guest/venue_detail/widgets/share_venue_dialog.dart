@@ -4,7 +4,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:db_pkg/models/models.dart';
-import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
@@ -12,12 +11,15 @@ class ShareVenueDialog extends StatefulWidget {
   final Venue venue;
   final Uri shareUri;
 
-  const ShareVenueDialog({super.key, required this.venue, required this.shareUri});
+  const ShareVenueDialog({
+    super.key,
+    required this.venue,
+    required this.shareUri,
+  });
 
   @override
   State<ShareVenueDialog> createState() => ShareVenueDialogState();
 }
-
 
 class ShareVenueDialogState extends State<ShareVenueDialog> {
   bool _copied = false;
@@ -54,14 +56,14 @@ class ShareVenueDialogState extends State<ShareVenueDialog> {
       child: Container(
         padding: const EdgeInsets.all(AppTheme.space8),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
+          color: cs.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(AppTheme.radius3xl),
-          border: Border.all(color: AppColors.white10),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.72)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.50),
-              blurRadius: 40,
-              offset: const Offset(0, 20),
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
@@ -85,10 +87,9 @@ class ShareVenueDialogState extends State<ShareVenueDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'SHARE VENUE',
+                        'Share venue',
                         style: tt.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.4,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -105,18 +106,9 @@ class ShareVenueDialogState extends State<ShareVenueDialog> {
                   onTap: () => Navigator.of(context).pop(),
                   semanticLabel: 'Close dialog',
                   minTouchTargetSize: const Size(44, 44),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.white5,
-                      borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                    ),
-                    child: Icon(
-                      LucideIcons.x,
-                      size: 18,
-                      color: cs.onSurfaceVariant,
-                    ),
+                  child: AppIconButton(
+                    icon: LucideIcons.x,
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -151,12 +143,9 @@ class ShareVenueDialogState extends State<ShareVenueDialog> {
             ),
             const SizedBox(height: 4),
             Text(
-              'SCAN TO OPEN ON DINEIN',
-              style: TextStyle(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.55),
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2.6,
+              'Scan to open',
+              style: tt.labelMedium?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.72),
               ),
             ),
             const SizedBox(height: AppTheme.space6),
@@ -168,10 +157,12 @@ class ShareVenueDialogState extends State<ShareVenueDialog> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   decoration: BoxDecoration(
-                    color: _copied ? cs.primary : AppColors.white5,
+                    color: _copied ? cs.primary : cs.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                     border: Border.all(
-                      color: _copied ? cs.primary : AppColors.white5,
+                      color: _copied
+                          ? cs.primary
+                          : cs.outlineVariant.withValues(alpha: 0.72),
                     ),
                   ),
                   child: Row(
@@ -184,12 +175,10 @@ class ShareVenueDialogState extends State<ShareVenueDialog> {
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        _copied ? 'COPIED!' : 'COPY LINK',
-                        style: TextStyle(
+                        _copied ? 'Copied' : 'Copy link',
+                        style: tt.labelLarge?.copyWith(
                           color: _copied ? cs.onPrimary : cs.onSurface,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.4,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -201,12 +190,10 @@ class ShareVenueDialogState extends State<ShareVenueDialog> {
             TextButton(
               onPressed: _shareLink,
               child: Text(
-                'SHARE LINK',
-                style: TextStyle(
+                'Share link',
+                style: tt.labelLarge?.copyWith(
                   color: cs.primary,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2.2,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -216,4 +203,3 @@ class ShareVenueDialogState extends State<ShareVenueDialog> {
     );
   }
 }
-

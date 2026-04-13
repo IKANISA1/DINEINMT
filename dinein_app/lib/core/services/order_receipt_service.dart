@@ -1,5 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'app_telemetry.dart';
+
 /// Persists guest order receipt tokens so unauthenticated order lookups can be
 /// authorized without exposing raw order IDs as public access credentials.
 class OrderReceiptService {
@@ -19,7 +21,13 @@ class OrderReceiptService {
       await _secureStorage
           .write(key: _keyForOrder(orderId), value: receiptToken.trim())
           .timeout(_secureStorageTimeout);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'order_receipt.save',
+        details: {'orderId': orderId},
+      );
       // If secure storage fails, we do not fall back to plain preferences.
     }
   }
@@ -32,7 +40,13 @@ class OrderReceiptService {
           .timeout(_secureStorageTimeout);
       if (value == null || value.trim().isEmpty) return null;
       return value.trim();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'order_receipt.read',
+        details: {'orderId': orderId},
+      );
       return null;
     }
   }
@@ -49,7 +63,12 @@ class OrderReceiptService {
               .toList()
             ..sort();
       return orderIds;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'order_receipt.read_all',
+      );
       return [];
     }
   }
@@ -60,7 +79,13 @@ class OrderReceiptService {
       await _secureStorage
           .delete(key: _keyForOrder(orderId))
           .timeout(_secureStorageTimeout);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'order_receipt.clear',
+        details: {'orderId': orderId},
+      );
       // Ignore secure storage cleanup failures.
     }
   }

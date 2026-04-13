@@ -319,17 +319,16 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
     required Widget body,
     required String? venueId,
   }) {
-    final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(title, style: tt.headlineMedium),
+        title: Text(title, style: tt.titleLarge),
         actions: [
           Padding(
             padding: const EdgeInsets.all(8),
-            child: IconButton(
-              icon: Icon(LucideIcons.hand, color: cs.primary),
-              onPressed: venueId == null
+            child: AppIconButton(
+              icon: LucideIcons.hand,
+              onTap: venueId == null
                   ? null
                   : () => WaveBottomSheet.show(context, venueId),
             ),
@@ -357,26 +356,26 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
             pinned: true,
             floating: true,
             snap: true,
-            toolbarHeight: 44,
+            toolbarHeight: 52,
             title: Text(
               venue?.name ?? cart.venueName ?? 'Menu',
               style: tt.titleLarge,
             ),
             actions: [
-              // Search icon — opens search sheet
-              IconButton(
-                icon: Icon(
-                  LucideIcons.search,
-                  color: _query.isNotEmpty ? cs.primary : cs.onSurfaceVariant,
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: AppIconButton(
+                  icon: LucideIcons.search,
+                  selected: _query.isNotEmpty,
+                  onTap: () => _showSearchSheet(context, cs, tt),
+                  semanticLabel: 'Search menu',
                 ),
-                onPressed: () => _showSearchSheet(context, cs, tt),
-                tooltip: 'Search menu',
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: IconButton(
-                  icon: Icon(LucideIcons.hand, color: cs.primary),
-                  onPressed: venue?.id == null
+                child: AppIconButton(
+                  icon: LucideIcons.hand,
+                  onTap: venue?.id == null
                       ? null
                       : () => WaveBottomSheet.show(context, venue!.id),
                 ),
@@ -393,7 +392,10 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                   if (_query.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
-                        AppTheme.space4, 0, AppTheme.space4, AppTheme.space2,
+                        AppTheme.space4,
+                        0,
+                        AppTheme.space4,
+                        AppTheme.space2,
                       ),
                       child: Align(
                         alignment: Alignment.centerLeft,
@@ -402,7 +404,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                           semanticLabel: 'Clear search',
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6,
+                              horizontal: 12,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color: cs.primary.withValues(alpha: 0.10),
@@ -416,7 +419,11 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(LucideIcons.search, size: 12, color: cs.primary),
+                                Icon(
+                                  LucideIcons.search,
+                                  size: 12,
+                                  color: cs.primary,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   '"$_query"',
@@ -426,7 +433,11 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                Icon(LucideIcons.x, size: 12, color: cs.primary),
+                                Icon(
+                                  LucideIcons.x,
+                                  size: 12,
+                                  color: cs.primary,
+                                ),
                               ],
                             ),
                           ),
@@ -458,23 +469,19 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                       labelColor: cs.primary,
                       unselectedLabelColor: cs.onSurfaceVariant,
                       labelStyle: tt.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
+                        fontWeight: FontWeight.w700,
                       ),
                       unselectedLabelStyle: tt.labelSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 10),
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 12),
                       indicatorSize: TabBarIndicatorSize.label,
                       indicatorColor: cs.primary,
                       indicatorWeight: 2,
                       dividerColor: Colors.transparent,
                       tabAlignment: TabAlignment.start,
                       tabs: categories
-                          .map((c) => Tab(
-                                text: c.toUpperCase(),
-                                height: 34,
-                              ))
+                          .map((c) => Tab(text: c, height: 36))
                           .toList(),
                     ),
                 ],
@@ -509,10 +516,10 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                       padding: const EdgeInsets.all(AppTheme.space6),
                       child: EmptyState(
                         icon: LucideIcons.search,
-                        title: 'No Menu Items Found',
+                        title: 'No items',
                         subtitle: _query.isEmpty
-                            ? 'This venue has no searchable items right now.'
-                            : 'Try a different item name, category, or keyword.',
+                            ? 'This menu is still empty.'
+                            : 'Try a different item or category.',
                       ),
                     ),
                   ),
@@ -535,10 +542,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
                         AppTheme.space4,
                       ),
                       child: Text(
-                        entry.category.toUpperCase(),
+                        entry.category,
                         style: tt.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w700,
                           color: cs.onSurfaceVariant,
                         ),
                       ),
@@ -586,89 +592,68 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
 
       // ─── Sticky Cart Pill ───
       bottomNavigationBar: cart.itemCount > 0
-          ? Container(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppTheme.space4,
-                    AppTheme.space2,
-                    AppTheme.space4,
-                    AppTheme.space3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: cs.surface,
-                    border: Border(
-                      top: BorderSide(
-                        color: cs.outlineVariant.withValues(alpha: 0.08),
+          ? AppBottomBar(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _trackGuestEvent(
+                        'cart_opened',
+                        venueId: venue?.id ?? cart.venueId,
+                        details: {
+                          'item_count': cart.itemCount,
+                          'cart_total': cart.total,
+                        },
+                      );
+                      context.pushNamed(AppRouteNames.cart);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                       ),
                     ),
-                  ),
-                  child: SafeArea(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _trackGuestEvent(
-                          'cart_opened',
-                          venueId: venue?.id ?? cart.venueId,
-                          details: {
-                            'item_count': cart.itemCount,
-                            'cart_total': cart.total,
-                          },
-                        );
-                        context.pushNamed(AppRouteNames.cart);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusFull,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.20),
-                                  borderRadius: BorderRadius.circular(
-                                    AppTheme.radiusFull,
-                                  ),
-                                ),
-                                child: Text(
-                                  '${cart.itemCount}',
-                                  style: TextStyle(
-                                    color: cs.onPrimary,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 12,
-                                  ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.20),
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusFull,
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'VIEW CART  •  ${cart.formatPrice(cart.total)}',
+                              child: Text(
+                                '${cart.itemCount}',
                                 style: TextStyle(
                                   color: cs.onPrimary,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w700,
                                   fontSize: 12,
-                                  letterSpacing: 2,
                                 ),
                               ),
-                            ],
-                          ),
-                          Icon(
-                            LucideIcons.chevronRight,
-                            size: 18,
-                            color: cs.onPrimary,
-                          ),
-                        ],
-                      ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Cart · ${cart.formatPrice(cart.total)}',
+                              style: tt.labelLarge?.copyWith(
+                                color: cs.onPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Icon(
+                          LucideIcons.chevronRight,
+                          size: 18,
+                          color: cs.onPrimary,
+                        ),
+                      ],
                     ),
                   ),
                 )
@@ -701,59 +686,26 @@ class _MenuScreenState extends ConsumerState<MenuScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 margin: const EdgeInsets.only(bottom: AppTheme.space5),
                 decoration: BoxDecoration(
                   color: cs.onSurface.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                  border: Border.all(
-                    color: cs.outlineVariant.withValues(alpha: 0.18),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.search, size: 18,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.85)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        autofocus: true,
-                        onChanged: _onSearchChanged,
-                        textInputAction: TextInputAction.search,
-                        onSubmitted: (_) => Navigator.pop(sheetContext),
-                        style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          filled: false,
-                          hintText: 'Search menu items...',
-                          hintStyle: tt.bodyLarge?.copyWith(
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.40),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_query.isNotEmpty)
-                      PressableScale(
-                        onTap: () {
-                          _clearSearch();
-                          Navigator.pop(sheetContext);
-                        },
-                        semanticLabel: 'Clear search',
-                        minTouchTargetSize: const Size(44, 44),
-                        child: Icon(LucideIcons.x, size: 18,
-                          color: cs.onSurfaceVariant),
-                      ),
-                  ],
-                ),
+              AppSearchBar(
+                controller: _searchController,
+                autofocus: true,
+                hintText: 'Search menu items',
+                onChanged: _onSearchChanged,
+                onSubmitted: (_) => Navigator.pop(sheetContext),
+                onClear: _query.isNotEmpty
+                    ? () {
+                        _clearSearch();
+                        Navigator.pop(sheetContext);
+                      }
+                    : null,
               ),
             ],
           ),
@@ -831,113 +783,101 @@ class _MenuItemCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return PressableScale(
+    return AppSurfaceCard(
       onTap: onTap,
       semanticLabel: 'View ${item.name}',
-      child: Container(
-        padding: const EdgeInsets.all(AppTheme.space5),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Item image with sold-out overlay
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: SizedBox(
+      padding: const EdgeInsets.all(AppTheme.space4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Item image with sold-out overlay
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: SizedBox(
+                  width: 96,
+                  height: 96,
+                  child: DineInImage(
+                    imageUrl: item.imageUrl,
                     width: 96,
                     height: 96,
-                    child: DineInImage(
-                      imageUrl: item.imageUrl,
-                      width: 96,
-                      height: 96,
-                      fit: BoxFit.cover,
-                      fallbackIcon: LucideIcons.chefHat,
-                      semanticLabel: '${item.name} photo',
+                    fit: BoxFit.cover,
+                    fallbackIcon: LucideIcons.chefHat,
+                    semanticLabel: '${item.name} photo',
+                  ),
+                ),
+              ),
+              if (!item.isAvailable)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.70),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Sold out',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                if (!item.isAvailable)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.70),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'SOLD OUT',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 3.2,
-                            color: Colors.white,
-                          ),
-                        ),
+            ],
+          ),
+          const SizedBox(width: AppTheme.space4),
+
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (item.guestDisplayTags.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: MenuItemBadges(item: item),
+                  ),
+
+                Text(item.name, style: tt.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  item.description,
+                  style: tt.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+
+                // Price + Stepper
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      country.formatPrice(item.price),
+                      style: tt.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
                       ),
                     ),
-                  ),
+                    _QuantityStepper(
+                      quantity: quantity,
+                      enabled: item.isAvailable,
+                      onAdd: onAdd,
+                      onRemove: onRemove,
+                    ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(width: AppTheme.space4),
-
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (item.guestDisplayTags.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: MenuItemBadges(item: item),
-                    ),
-
-                  Text(
-                    item.name,
-                    style: tt.titleLarge?.copyWith(
-                      letterSpacing: -0.5,
-                    ), // text-lg font-black
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.description,
-                    style: tt.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      height: 1.4,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Price + Stepper
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        country.formatPrice(item.price),
-                        style: tt.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: cs.primary,
-                        ),
-                      ),
-                      _QuantityStepper(
-                        quantity: quantity,
-                        enabled: item.isAvailable,
-                        onAdd: onAdd,
-                        onRemove: onRemove,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

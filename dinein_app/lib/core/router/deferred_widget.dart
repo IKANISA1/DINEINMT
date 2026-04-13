@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
 typedef LibraryLoader = Future<void> Function();
@@ -37,7 +40,14 @@ class _DeferredWidgetState extends State<DeferredWidget> {
           _error = false;
         });
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'deferred_widget.load_library',
+        ),
+      );
       if (mounted) {
         setState(() {
           _error = true;

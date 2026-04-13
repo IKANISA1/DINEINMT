@@ -85,6 +85,52 @@ enum PaymentMethod {
   }
 }
 
+/// Venue-facing payment settlement state for an order.
+enum PaymentStatus {
+  pending,
+  confirmed,
+  notRequired,
+  failed;
+
+  String get label {
+    return switch (this) {
+      PaymentStatus.pending => 'Pending',
+      PaymentStatus.confirmed => 'Paid',
+      PaymentStatus.notRequired => 'Pay at venue',
+      PaymentStatus.failed => 'Failed',
+    };
+  }
+
+  /// Database string value.
+  String get dbValue {
+    return switch (this) {
+      PaymentStatus.pending => 'pending',
+      PaymentStatus.confirmed => 'confirmed',
+      PaymentStatus.notRequired => 'not_required',
+      PaymentStatus.failed => 'failed',
+    };
+  }
+
+  static PaymentStatus fromString(String value) {
+    return switch (value) {
+      'confirmed' => PaymentStatus.confirmed,
+      'not_required' => PaymentStatus.notRequired,
+      'failed' => PaymentStatus.failed,
+      _ => PaymentStatus.pending,
+    };
+  }
+
+  static PaymentStatus forMethod(PaymentMethod method) {
+    return switch (method) {
+      PaymentMethod.cash => PaymentStatus.notRequired,
+      PaymentMethod.revolutLink ||
+      PaymentMethod.momoUssd => PaymentStatus.pending,
+    };
+  }
+
+  bool get isPaid => this == PaymentStatus.confirmed;
+}
+
 /// Supported countries.
 /// Country is auto-derived from venue context, never manually picked.
 enum Country {
@@ -134,7 +180,9 @@ enum Country {
           if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
           buffer.write(digits[i]);
         }
-        final formatted = rounded < 0 ? '-${buffer.toString()}' : buffer.toString();
+        final formatted = rounded < 0
+            ? '-${buffer.toString()}'
+            : buffer.toString();
         return 'RWF $formatted';
 
       case Country.mt:
@@ -150,10 +198,13 @@ enum Country {
           if (i > 0 && (absInt.length - i) % 3 == 0) buffer.write(',');
           buffer.write(absInt[i]);
         }
-        final formattedInt = intPart.startsWith('-') ? '-${buffer.toString()}' : buffer.toString();
+        final formattedInt = intPart.startsWith('-')
+            ? '-${buffer.toString()}'
+            : buffer.toString();
         return '€$formattedInt.$decPart';
     }
   }
+
   /// Format an amount with 2 decimal places for tabular/report alignment.
   ///
   /// Unlike [formatPrice], this always uses 2 decimal places regardless of
@@ -172,8 +223,9 @@ enum Country {
       if (i > 0 && (absInt.length - i) % 3 == 0) buffer.write(',');
       buffer.write(absInt[i]);
     }
-    final formattedInt =
-        intPart.startsWith('-') ? '-${buffer.toString()}' : buffer.toString();
+    final formattedInt = intPart.startsWith('-')
+        ? '-${buffer.toString()}'
+        : buffer.toString();
     return '${currencySymbol == '€' ? '€' : '$currencySymbol '}$formattedInt.$decPart';
   }
 

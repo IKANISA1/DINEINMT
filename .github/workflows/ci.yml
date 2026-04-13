@@ -48,6 +48,130 @@ jobs:
       - name: Run Flutter tests
         run: flutter test
 
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: flutter
+    defaults:
+      run:
+        working-directory: dinein_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Chrome + ChromeDriver
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-dependencies: true
+          install-chromedriver: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Start ChromeDriver
+        run: |
+          "${{ steps.setup-chrome.outputs.chromedriver-path }}" --port=4444 >/tmp/chromedriver.log 2>&1 &
+          until curl -fsS http://127.0.0.1:4444/status >/dev/null; do sleep 1; done
+
+      - name: Run integration smoke tests
+        run: |
+          flutter drive \
+            -d web-server \
+            --browser-name=chrome \
+            --driver=test_driver/integration_test.dart \
+            --target=integration_test/app_smoke_flow_test.dart \
+            --headless
+
+  android-release-artifacts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [mt, rw]
+    defaults:
+      run:
+        working-directory: dinein_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Android release artifacts
+        env:
+          CI_KEYSTORE_PATH: ${{ runner.temp }}/dinein-ci.keystore
+          ANDROID_KEYSTORE_PASSWORD: android
+          ANDROID_KEY_ALIAS: dinein
+          ANDROID_KEY_PASSWORD: android
+          SUPABASE_URL_MT: https://mock-ci-mt.supabase.co
+          SUPABASE_ANON_KEY_MT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mt.mock.signature
+          SUPABASE_URL_RW: https://mock-ci-rw.supabase.co
+          SUPABASE_ANON_KEY_RW: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.rw.mock.signature
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore "${CI_KEYSTORE_PATH}" \
+            -storepass "${ANDROID_KEYSTORE_PASSWORD}" \
+            -alias "${ANDROID_KEY_ALIAS}" \
+            -keypass "${ANDROID_KEY_PASSWORD}" \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=DineIn CI, OU=CI, O=DineIn, L=Test, S=Test, C=US"
+          export ANDROID_KEYSTORE_FILE="${CI_KEYSTORE_PATH}"
+          ./scripts/build_android_release.sh --flavor "${{ matrix.flavor }}" --skip-checks
+
+  ios-build-validate:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: [mt, rw]
+    defaults:
+      run:
+        working-directory: dinein_app
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Validate iOS release build
+        env:
+          COCOAPODS_DISABLE_STATS: true
+          SUPABASE_URL_MT: https://mock-ci-mt.supabase.co
+          SUPABASE_ANON_KEY_MT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mt.mock.signature
+          SUPABASE_URL_RW: https://mock-ci-rw.supabase.co
+          SUPABASE_ANON_KEY_RW: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.rw.mock.signature
+        run: ./scripts/build_ios_release.sh --flavor "${{ matrix.flavor }}" --skip-checks --no-codesign
+
 
   release-tooling:
     runs-on: ubuntu-latest

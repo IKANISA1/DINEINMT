@@ -88,51 +88,18 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Venues',
-                                  style: tt.displaySmall?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: -1,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
+                            child: const AppPageHeader(
+                              title: 'Venues',
+                              subtitle:
                                   'Manage venue details, guest links, and access QR.',
-                                  style: tt.bodyLarge?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
-                          PressableScale(
+                          AppIconButton(
+                            icon: LucideIcons.search,
+                            selected: _query.isNotEmpty,
+                            size: 44,
                             onTap: () => _showSearchSheet(context, cs, tt),
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: _query.isNotEmpty
-                                    ? cs.primary.withValues(alpha: 0.15)
-                                    : cs.surfaceContainerLow,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: _query.isNotEmpty
-                                      ? cs.primary.withValues(alpha: 0.3)
-                                      : Colors.white.withValues(alpha: 0.05),
-                                ),
-                              ),
-                              child: Icon(
-                                LucideIcons.search,
-                                size: 18,
-                                color: _query.isNotEmpty
-                                    ? cs.primary
-                                    : cs.onSurfaceVariant,
-                              ),
-                            ),
+                            semanticLabel: 'Search venues',
                           ),
                           const SizedBox(width: 8),
                           PremiumButton(
@@ -271,18 +238,17 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                         ),
                         child: DataTable(
                           headingTextStyle: tt.labelMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             color: cs.onSurfaceVariant,
-                            letterSpacing: 1.5,
                           ),
                           dataRowMinHeight: 72,
                           dataRowMaxHeight: 72,
                           columns: const [
-                            DataColumn(label: Text('VENUE')),
-                            DataColumn(label: Text('SLUG')),
-                            DataColumn(label: Text('STATUS')),
-                            DataColumn(label: Text('MODE')),
-                            DataColumn(label: Text('ACTIONS')),
+                            DataColumn(label: Text('Venue')),
+                            DataColumn(label: Text('Slug')),
+                            DataColumn(label: Text('Status')),
+                            DataColumn(label: Text('Mode')),
+                            DataColumn(label: Text('Actions')),
                           ],
                           rows: displayVenues.map((venue) {
                             final guestUri = buildVenueDeepLinkUri(
@@ -320,7 +286,6 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                                               fontWeight: FontWeight.w800,
                                             ),
                                           ),
-
                                         ],
                                       ),
                                     ],
@@ -510,67 +475,24 @@ class _AdminVenuesScreenState extends ConsumerState<AdminVenuesScreen> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.search,
-                      size: 20,
-                      color: cs.onSurface.withValues(alpha: 0.10),
-                    ),
-                    Expanded(
-                      child: StatefulBuilder(
-                        builder: (sheetContext, setSheetState) {
-                          return TextField(
-                            controller: _searchController,
-                            autofocus: true,
-                            onChanged: (v) {
-                              setState(() => _query = v.trim());
-                              setSheetState(() {});
-                            },
-                            textInputAction: TextInputAction.search,
-                            onSubmitted: (_) => Navigator.pop(sheetContext),
-                            style: tt.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
-                            decoration: InputDecoration(
-                              hintText:
-                                  'Search venues by name, slug, or address...',
-                              border: InputBorder.none,
-                              filled: false,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              hintStyle: tt.titleSmall?.copyWith(
-                                color: cs.onSurface.withValues(alpha: 0.12),
-                                fontWeight: FontWeight.w900,
-                              ),
-                              suffixIcon: _searchController.text.isNotEmpty
-                                  ? IconButton(
-                                      icon: Icon(LucideIcons.x, color: cs.onSurface.withValues(alpha: 0.50)),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        setState(() => _query = '');
-                                        setSheetState(() {});
-                                      },
-                                    )
-                                  : null,
-                            ),
-                          );
-                        }
-                      ),
-                    ),
-                  ],
-                ),
+              StatefulBuilder(
+                builder: (sheetContext, setSheetState) {
+                  return AppSearchBar(
+                    controller: _searchController,
+                    autofocus: true,
+                    hintText: 'Search by venue, slug, or address',
+                    onChanged: (v) {
+                      setState(() => _query = v.trim());
+                      setSheetState(() {});
+                    },
+                    onSubmitted: (_) => Navigator.pop(sheetContext),
+                    onClear: () {
+                      _searchController.clear();
+                      setState(() => _query = '');
+                      setSheetState(() {});
+                    },
+                  );
+                },
               ),
             ],
           ),
@@ -605,9 +527,8 @@ class _TabButton extends StatelessWidget {
           duration: const Duration(milliseconds: 300),
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: isActive ? cs.primary : Colors.transparent,
+            color: isActive ? cs.primaryContainer : Colors.transparent,
             borderRadius: BorderRadius.circular(40),
-            boxShadow: isActive ? AppTheme.clayShadow : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -615,8 +536,8 @@ class _TabButton extends StatelessWidget {
               Text(
                 label,
                 style: tt.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: isActive ? cs.onPrimary : cs.onSurface,
+                  fontWeight: FontWeight.w700,
+                  color: isActive ? cs.primary : cs.onSurface,
                 ),
               ),
               const SizedBox(width: 8),
@@ -624,15 +545,15 @@ class _TabButton extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: isActive
-                      ? cs.onPrimary.withValues(alpha: 0.15)
+                      ? cs.primary.withValues(alpha: 0.12)
                       : cs.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   '$count',
                   style: tt.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    color: isActive ? cs.onPrimary : cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                    color: isActive ? cs.primary : cs.onSurfaceVariant,
                   ),
                 ),
               ),

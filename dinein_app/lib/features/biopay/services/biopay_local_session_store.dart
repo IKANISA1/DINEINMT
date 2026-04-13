@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../../core/services/app_telemetry.dart';
 import '../models/biopay_models.dart';
 
 typedef BiopaySecureRead = Future<String?> Function(String key);
@@ -57,7 +59,15 @@ class BiopayLocalSessionStore {
       return BiopayLocalSession.fromJson(
         jsonDecode(raw) as Map<String, dynamic>,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'biopay_session.parse',
+          details: {'storageKey': storageKey},
+        ),
+      );
       return null;
     }
   }
@@ -65,7 +75,13 @@ class BiopayLocalSessionStore {
   static Future<String?> _defaultSecureRead(String key) async {
     try {
       return await _secureStorage.read(key: key).timeout(_secureStorageTimeout);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'biopay_session.read',
+        details: {'storageKey': key},
+      );
       return null;
     }
   }
@@ -76,7 +92,13 @@ class BiopayLocalSessionStore {
           .write(key: key, value: value)
           .timeout(_secureStorageTimeout);
       return true;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'biopay_session.write',
+        details: {'storageKey': key},
+      );
       return false;
     }
   }
@@ -84,7 +106,13 @@ class BiopayLocalSessionStore {
   static Future<void> _defaultSecureDelete(String key) async {
     try {
       await _secureStorage.delete(key: key).timeout(_secureStorageTimeout);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'biopay_session.delete',
+        details: {'storageKey': key},
+      );
       // Ignore secure storage cleanup failures in test environments.
     }
   }

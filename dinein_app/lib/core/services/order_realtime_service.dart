@@ -4,6 +4,8 @@ import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../infrastructure/app_telemetry_service.dart'
+    if (dart.library.js_interop) 'app_telemetry_service_web.dart';
 import 'order_repository.dart';
 import 'supabase_config.dart';
 
@@ -39,6 +41,14 @@ class OrderRealtimeService {
           controller.add(orders);
         }
       } catch (error, stackTrace) {
+        unawaited(
+          AppTelemetryService.reportError(
+            error,
+            stackTrace,
+            context: 'order_realtime.watch_venue_orders.emit',
+            details: {'venue_id': venueId},
+          ),
+        );
         if (!controller.isClosed) {
           if (lastGood.isNotEmpty) {
             controller.add(lastGood);
@@ -85,7 +95,15 @@ class OrderRealtimeService {
           await realtimeClient!.realtime.setAuth(currentToken);
           realtimeClient!.rest.setAuth(currentToken);
           scheduleRefresh(refreshed, refreshAccess);
-        } catch (_) {
+        } catch (error, stackTrace) {
+          unawaited(
+            AppTelemetryService.reportError(
+              error,
+              stackTrace,
+              context: 'order_realtime.watch_venue_orders.refresh_token',
+              details: {'venue_id': venueId},
+            ),
+          );
           startPolling();
         }
       });
@@ -157,7 +175,15 @@ class OrderRealtimeService {
           await emitOrders();
           try {
             await configureRealtime();
-          } catch (_) {
+          } catch (error, stackTrace) {
+            unawaited(
+              AppTelemetryService.reportError(
+                error,
+                stackTrace,
+                context: 'order_realtime.watch_venue_orders.configure',
+                details: {'venue_id': venueId},
+              ),
+            );
             startPolling();
           }
         }());
@@ -224,6 +250,14 @@ class OrderRealtimeService {
           await closeStream();
         }
       } catch (error, stackTrace) {
+        unawaited(
+          AppTelemetryService.reportError(
+            error,
+            stackTrace,
+            context: 'order_realtime.watch_order_status.emit',
+            details: {'order_id': orderId},
+          ),
+        );
         if (!controller.isClosed) {
           controller.addError(error, stackTrace);
         }
@@ -270,7 +304,15 @@ class OrderRealtimeService {
           await realtimeClient!.realtime.setAuth(currentToken);
           realtimeClient!.rest.setAuth(currentToken);
           scheduleRefresh(refreshed, refreshAccess);
-        } catch (_) {
+        } catch (error, stackTrace) {
+          unawaited(
+            AppTelemetryService.reportError(
+              error,
+              stackTrace,
+              context: 'order_realtime.watch_order_status.refresh_token',
+              details: {'order_id': orderId},
+            ),
+          );
           startPolling();
         }
       });
@@ -330,7 +372,15 @@ class OrderRealtimeService {
           }
           try {
             await configureRealtime();
-          } catch (_) {
+          } catch (error, stackTrace) {
+            unawaited(
+              AppTelemetryService.reportError(
+                error,
+                stackTrace,
+                context: 'order_realtime.watch_order_status.configure',
+                details: {'order_id': orderId},
+              ),
+            );
             startPolling();
           }
         }());

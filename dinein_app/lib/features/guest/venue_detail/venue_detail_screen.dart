@@ -23,8 +23,6 @@ import 'widgets/venue_hero_action.dart';
 import 'widgets/venue_menu_highlights.dart';
 import 'widgets/venue_wifi_sheet.dart';
 
-
-
 class VenueDetailScreen extends ConsumerStatefulWidget {
   final String slug;
   final String? tableNumber;
@@ -155,8 +153,6 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
     );
   }
 
-
-
   Future<void> _openMaps(Venue venue) async {
     final raw = venue.googleMapsUri?.trim();
     final uri = raw == null || raw.isEmpty ? null : Uri.tryParse(raw);
@@ -211,7 +207,11 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
             physics: const NeverScrollableScrollPhysics(),
             padding: EdgeInsets.zero,
             children: const [
-              SkeletonLoader(width: double.infinity, height: 280, borderRadius: 0),
+              SkeletonLoader(
+                width: double.infinity,
+                height: 280,
+                borderRadius: 0,
+              ),
               SizedBox(height: 24),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
@@ -225,12 +225,20 @@ class _VenueDetailScreenState extends ConsumerState<VenueDetailScreen> {
               SizedBox(height: 24),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
-                child: SkeletonLoader(width: double.infinity, height: 120, borderRadius: 20),
+                child: SkeletonLoader(
+                  width: double.infinity,
+                  height: 120,
+                  borderRadius: 20,
+                ),
               ),
               SizedBox(height: 16),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24),
-                child: SkeletonLoader(width: double.infinity, height: 80, borderRadius: 20),
+                child: SkeletonLoader(
+                  width: double.infinity,
+                  height: 80,
+                  borderRadius: 20,
+                ),
               ),
             ],
           ),
@@ -313,19 +321,25 @@ class _VenueDetailBody extends StatelessWidget {
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: MediaQuery.of(context).size.height * 0.45,
+            expandedHeight: MediaQuery.of(context).size.height * 0.38,
             pinned: true,
             stretch: true,
             backgroundColor: cs.surface,
             leadingWidth: 64,
             leading: Padding(
               padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
-              child: VenueHeroAction(icon: LucideIcons.chevronLeft, onTap: onBack),
+              child: VenueHeroAction(
+                icon: LucideIcons.chevronLeft,
+                onTap: onBack,
+              ),
             ),
             actions: [
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 8),
-                child: VenueHeroAction(icon: LucideIcons.share2, onTap: onShare),
+                child: VenueHeroAction(
+                  icon: LucideIcons.share2,
+                  onTap: onShare,
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 8, bottom: 8, right: 16),
@@ -363,51 +377,42 @@ class _VenueDetailBody extends StatelessWidget {
                     ),
                   ),
                   Positioned(
-                    left: 32,
-                    right: 32,
-                    bottom: 32,
+                    left: 24,
+                    right: 24,
+                    bottom: 24,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-
                         Text(
                           venue.name,
-                          style: tt.displayMedium?.copyWith(
+                          style: tt.displaySmall?.copyWith(
                             color: Colors.white,
-                            height: 0.95,
-                            letterSpacing: -2.0,
+                            height: 1,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Row(
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
-                            Icon(LucideIcons.star, size: 16, color: cs.primary),
-                            const SizedBox(width: 8),
-                            Text(
-                              venue.rating.toStringAsFixed(
+                            AppPill(
+                              label: venue.rating.toStringAsFixed(
                                 venue.rating.truncateToDouble() == venue.rating
                                     ? 0
                                     : 1,
                               ),
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.82),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2.2,
-                              ),
+                              icon: LucideIcons.star,
+                              color: Colors.white.withValues(alpha: 0.18),
+                              foregroundColor: Colors.white,
+                              dense: true,
                             ),
-                            if (venue.ratingCount > 0) ...[
-                              const SizedBox(width: 8),
-                              Text(
-                                '(${venue.ratingCount})',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.62),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.4,
-                                ),
+                            if (venue.ratingCount > 0)
+                              AppPill(
+                                label: '${venue.ratingCount} reviews',
+                                color: Colors.white.withValues(alpha: 0.14),
+                                foregroundColor: Colors.white,
+                                dense: true,
                               ),
-                            ],
                           ],
                         ),
                       ],
@@ -422,15 +427,14 @@ class _VenueDetailBody extends StatelessWidget {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 const SizedBox(height: AppTheme.space6),
-                if (venue.isPromoActive && venue.promoMessage?.isNotEmpty == true)
+                if (venue.isPromoActive &&
+                    venue.promoMessage?.isNotEmpty == true)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppTheme.space4),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: cs.secondary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                        border: Border.all(color: cs.secondary.withValues(alpha: 0.25)),
+                    child: AppSurfaceCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
                       child: Row(
                         children: [
@@ -449,6 +453,25 @@ class _VenueDetailBody extends StatelessWidget {
                       ),
                     ),
                   ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppTheme.space4),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      GuestMetaPill(
+                        label: venue.canAcceptGuestOrders
+                            ? 'Ordering'
+                            : venue.guestAvailabilityLabel,
+                        emphasized: venue.canAcceptGuestOrders,
+                      ),
+                      if (venue.priceLevelLabel != null)
+                        GuestMetaPill(label: venue.priceLevelLabel!),
+                      if (venue.hasWifi && !kIsWeb)
+                        const GuestMetaPill(label: 'Wi-Fi'),
+                    ],
+                  ),
+                ),
                 if (tableNumber != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppTheme.space4),
@@ -471,57 +494,28 @@ class _VenueDetailBody extends StatelessWidget {
                   onWifiTap: onWifiTap,
                 ),
                 const SizedBox(height: AppTheme.space6),
-                VenueMenuHighlights(
-                  venue: venue,
-                  onOpenMenu: onOpenMenu,
-                ),
+                VenueMenuHighlights(venue: venue, onOpenMenu: onOpenMenu),
                 const SizedBox(height: AppTheme.space6),
               ]),
             ),
           ),
         ],
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(
-          AppTheme.space4,
-          AppTheme.space2,
-          AppTheme.space4,
-          AppTheme.space4,
-        ),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          border: Border(
-            top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.08)),
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onOpenMenu,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+      bottomNavigationBar: AppBottomBar(
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: onOpenMenu,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Open menu',
+                  style: tt.labelLarge?.copyWith(color: cs.onPrimary),
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'VIEW MENU',
-                    style: TextStyle(
-                      color: cs.onPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 3,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Icon(LucideIcons.chevronRight, size: 18, color: cs.onPrimary),
-                ],
-              ),
+                const SizedBox(width: 10),
+                Icon(LucideIcons.chevronRight, size: 18, color: cs.onPrimary),
+              ],
             ),
           ),
         ),
@@ -529,4 +523,3 @@ class _VenueDetailBody extends StatelessWidget {
     );
   }
 }
-

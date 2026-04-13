@@ -99,6 +99,7 @@ class Order extends Equatable {
   final OrderStatus status;
   final DateTime createdAt;
   final PaymentMethod paymentMethod;
+  final PaymentStatus? _paymentStatus;
   final String? tableNumber;
   final String? specialRequests;
   final String? guestReceiptToken;
@@ -119,12 +120,17 @@ class Order extends Equatable {
     this.status = OrderStatus.placed,
     required this.createdAt,
     this.paymentMethod = PaymentMethod.cash,
+    PaymentStatus? paymentStatus,
     this.tableNumber,
     this.specialRequests,
     this.guestReceiptToken,
-  });
+  }) : _paymentStatus = paymentStatus;
 
   factory Order.fromJson(Map<String, dynamic> json) {
+    final paymentMethod = PaymentMethod.fromString(
+      json['payment_method'] as String? ?? 'cash',
+    );
+
     return Order(
       id: json['id'] as String,
       orderNumber:
@@ -145,8 +151,10 @@ class Order extends Equatable {
       total: (json['total'] as num).toDouble(),
       status: OrderStatus.fromString(json['status'] as String? ?? 'placed'),
       createdAt: DateTime.parse(json['created_at'] as String),
-      paymentMethod: PaymentMethod.fromString(
-        json['payment_method'] as String? ?? 'cash',
+      paymentMethod: paymentMethod,
+      paymentStatus: PaymentStatus.fromString(
+        json['payment_status'] as String? ??
+            PaymentStatus.forMethod(paymentMethod).dbValue,
       ),
       tableNumber: json['table_number'] as String?,
       specialRequests: json['special_requests'] as String?,
@@ -196,6 +204,9 @@ class Order extends Equatable {
   /// Currency symbol derived from the order venue country.
   String get currencySymbol => country.currencySymbol;
 
+  PaymentStatus get paymentStatus =>
+      _paymentStatus ?? PaymentStatus.forMethod(paymentMethod);
+
   /// Format an amount with the correct currency symbol and locale rules.
   String formatPrice(double amount) => country.formatPrice(amount);
 
@@ -209,6 +220,9 @@ class Order extends Equatable {
     total,
     status,
     createdAt,
+    paymentMethod,
+    paymentStatus,
+    tableNumber,
     specialRequests,
   ];
 }

@@ -28,14 +28,8 @@ class _StatCard extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     final trendColor = isUp ? AppColors.secondary : cs.error;
 
-    return Container(
+    return AppSurfaceCard(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
-      ),
       child: Row(
         children: [
           // Green circular icon
@@ -51,11 +45,9 @@ class _StatCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                  label,
+                  style: tt.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                     color: cs.onSurfaceVariant,
                   ),
                 ),
@@ -63,8 +55,7 @@ class _StatCard extends StatelessWidget {
                 Text(
                   value,
                   style: tt.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -90,7 +81,7 @@ class _StatCard extends StatelessWidget {
                   trend,
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w700,
                     color: trendColor,
                   ),
                 ),
@@ -122,13 +113,8 @@ class _CompactKpi extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Container(
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -144,20 +130,15 @@ class _CompactKpi extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.8,
+            style: tt.labelMedium?.copyWith(
+              fontWeight: FontWeight.w700,
               color: cs.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: tt.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-            ),
+            style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 2),
           Text(
@@ -244,7 +225,7 @@ class _ActiveWavesSummary extends ConsumerWidget {
                           style: TextStyle(
                             color: cs.onPrimary,
                             fontSize: 11,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -254,11 +235,9 @@ class _ActiveWavesSummary extends ConsumerWidget {
                 PressableScale(
                   onTap: () => context.pushNamed(AppRouteNames.venueWaves),
                   child: Text(
-                    'VIEW ALL',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+                    'View all',
+                    style: tt.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
                       color: cs.primary,
                     ),
                   ),
@@ -267,19 +246,10 @@ class _ActiveWavesSummary extends ConsumerWidget {
             ),
             const SizedBox(height: AppTheme.space4),
             if (waves.isEmpty)
-              Container(
-                width: double.infinity,
+              AppSurfaceCard(
                 padding: const EdgeInsets.symmetric(
                   vertical: AppTheme.space6,
                   horizontal: AppTheme.space4,
-                ),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                  boxShadow: AppTheme.clayShadow,
                 ),
                 child: Center(
                   child: Text(
@@ -354,7 +324,7 @@ class _DashboardWaveCardState extends ConsumerState<_DashboardWaveCard> {
                 widget.wave.tableNumber,
                 style: tt.titleMedium?.copyWith(
                   color: isUrgent ? cs.error : cs.onPrimaryContainer,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -389,7 +359,7 @@ class _DashboardWaveCardState extends ConsumerState<_DashboardWaveCard> {
             )
           else
             PremiumButton(
-              label: 'RESOLVE',
+              label: 'Resolve',
               isSmall: true,
               onPressed: _handleResolve,
             ),
@@ -433,14 +403,8 @@ class _OrderPreview extends StatelessWidget {
         AppRouteNames.venueOrderDetail,
         pathParameters: {AppRouteParams.id: order.id},
       ),
-      child: Container(
+      child: AppSurfaceCard(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          boxShadow: AppTheme.clayShadow,
-        ),
         child: Row(
           children: [
             // Order ID badge
@@ -474,32 +438,18 @@ class _OrderPreview extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     '${order.itemCount} ITEMS • ${order.formatPrice(order.total)}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
+                    style: tt.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                       color: cs.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            // Status badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: statusColor().withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                statusLabel(),
-                style: TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                  color: statusColor(),
-                ),
-              ),
+            StatusBadge(
+              label: statusLabel(),
+              color: statusColor().withValues(alpha: 0.15),
+              textColor: statusColor(),
             ),
           ],
         ),
@@ -530,38 +480,34 @@ class _QuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return PressableScale(
       onTap: onTap,
-      child: Container(
+      child: SizedBox(
         height: 120,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
+        child: AppSurfaceCard(
+          padding: const EdgeInsets.all(20),
           color: color,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          boxShadow: AppTheme.clayShadow,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 20, color: iconColor),
               ),
-              child: Icon(icon, size: 20, color: iconColor),
-            ),
-            const Spacer(),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 2,
-                color: textColor,
+              const Spacer(),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

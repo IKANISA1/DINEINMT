@@ -69,7 +69,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-          border: Border.all(color: AppColors.white5),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.72)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -77,7 +77,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
           children: [
             Text(
               'Filter Orders',
-              style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+              style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: AppTheme.space2),
             Text(
@@ -196,86 +196,30 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const Expanded(
+                  child: AppPageHeader(
+                    title: 'Orders',
+                    subtitle: 'Global feed, search, and live order health.',
+                  ),
+                ),
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          LucideIcons.shoppingBag,
-                          size: 20,
-                          color: cs.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'GLOBAL OPERATIONS',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 3,
-                            color: cs.primary.withValues(alpha: 0.70),
-                          ),
-                        ),
-                      ],
+                    AppIconButton(
+                      icon: LucideIcons.search,
+                      selected: _query.isNotEmpty,
+                      size: 44,
+                      onTap: () => _showSearchSheet(context, cs, tt),
+                      semanticLabel: 'Search orders',
                     ),
-                    const SizedBox(height: AppTheme.space2),
-                    Text(
-                      'Orders',
-                      style: tt.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -1.5,
-                      ),
+                    const SizedBox(width: 8),
+                    AppIconButton(
+                      icon: LucideIcons.filter,
+                      selected: _statusFilter != _AdminOrderFilter.all,
+                      size: 44,
+                      onTap: () => _openFilterSheet(context),
+                      semanticLabel: 'Filter orders',
                     ),
                   ],
-                ),
-                PressableScale(
-                  onTap: () => _showSearchSheet(context, cs, tt),
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: _query.isNotEmpty
-                          ? cs.primary.withValues(alpha: 0.15)
-                          : cs.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _query.isNotEmpty
-                            ? cs.primary.withValues(alpha: 0.3)
-                            : Colors.white.withValues(alpha: 0.05),
-                      ),
-                      boxShadow: AppTheme.clayShadow,
-                    ),
-                    child: Icon(
-                      LucideIcons.search,
-                      size: 24,
-                      color: _query.isNotEmpty
-                          ? cs.primary
-                          : cs.onSurfaceVariant.withValues(alpha: 0.60),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                PressableScale(
-                  onTap: () => _openFilterSheet(context),
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.05),
-                      ),
-                      boxShadow: AppTheme.clayShadow,
-                    ),
-                    child: Icon(
-                      LucideIcons.filter,
-                      size: 24,
-                      color: _statusFilter == _AdminOrderFilter.all
-                          ? cs.onSurfaceVariant.withValues(alpha: 0.60)
-                          : cs.primary,
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -302,7 +246,8 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                   semanticLabel: 'Clear search',
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6,
+                      horizontal: 12,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
                       color: cs.primary.withValues(alpha: 0.10),
@@ -404,10 +349,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
             ),
             child: Text(
               'Global Feed',
-              style: tt.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
-              ),
+              style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
           ),
         ),
@@ -452,78 +394,48 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusXl),
+        ),
       ),
       builder: (sheetContext) {
         return Padding(
           padding: EdgeInsets.fromLTRB(
-            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
             MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 margin: const EdgeInsets.only(bottom: AppTheme.space5),
                 decoration: BoxDecoration(
                   color: cs.onSurface.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(40),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                ),
-                child: Row(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 24),
-                      child: Icon(LucideIcons.search, size: 24, color: cs.onSurfaceVariant.withValues(alpha: 0.20)),
-                    ),
-                    Expanded(
-                      child: StatefulBuilder(
-                        builder: (sheetContext, setSheetState) {
-                          return TextField(
-                            controller: _searchController,
-                            autofocus: true,
-                            onChanged: (v) {
-                              setState(() => _query = v.trim());
-                              setSheetState(() {});
-                            },
-                            textInputAction: TextInputAction.search,
-                            onSubmitted: (_) => Navigator.pop(sheetContext),
-                            style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.5),
-                            decoration: InputDecoration(
-                              hintText: 'Search orders by ID or venue...',
-                              border: InputBorder.none,
-                              filled: false,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                              hintStyle: tt.titleLarge?.copyWith(
-                                color: cs.onSurfaceVariant.withValues(alpha: 0.10),
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.5,
-                              ),
-                              suffixIcon: _searchController.text.isNotEmpty
-                                  ? IconButton(
-                                      icon: Icon(LucideIcons.x, color: cs.onSurfaceVariant),
-                                      onPressed: () {
-                                        _searchController.clear();
-                                        setState(() => _query = '');
-                                        setSheetState(() {});
-                                      },
-                                    )
-                                  : null,
-                            ),
-                          );
-                        }
-                      ),
-                    ),
-                  ],
-                ),
+              StatefulBuilder(
+                builder: (sheetContext, setSheetState) {
+                  return AppSearchBar(
+                    controller: _searchController,
+                    autofocus: true,
+                    hintText: 'Search by order or venue',
+                    onChanged: (v) {
+                      setState(() => _query = v.trim());
+                      setSheetState(() {});
+                    },
+                    onSubmitted: (_) => Navigator.pop(sheetContext),
+                    onClear: () {
+                      _searchController.clear();
+                      setState(() => _query = '');
+                      setSheetState(() {});
+                    },
+                  );
+                },
               ),
             ],
           ),
@@ -551,32 +463,19 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.space6),
-      decoration: BoxDecoration(
-        color: isError
-            ? cs.error.withValues(alpha: 0.05)
-            : cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(40),
-        border: Border.all(
-          color: isError
-              ? cs.error.withValues(alpha: 0.10)
-              : Colors.white.withValues(alpha: 0.05),
-        ),
-        boxShadow: AppTheme.clayShadow,
-      ),
+    return AppSurfaceCard(
+      padding: const EdgeInsets.all(AppTheme.space5),
+      color: isError ? cs.error.withValues(alpha: 0.05) : null,
+      borderColor: isError ? cs.error.withValues(alpha: 0.10) : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label.toUpperCase(),
+            label,
             style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 3,
-              color: isError
-                  ? cs.error
-                  : cs.onSurfaceVariant.withValues(alpha: 0.50),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: isError ? cs.error : cs.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 6),
@@ -584,7 +483,7 @@ class _StatCard extends StatelessWidget {
             value,
             style: TextStyle(
               fontSize: 28,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               letterSpacing: -1,
               color: color,
             ),
@@ -626,18 +525,9 @@ class _OrderFeedCard extends StatelessWidget {
 
     return PressableScale(
       onTap: () {},
-      child: Container(
-        padding: const EdgeInsets.all(AppTheme.space8),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppTheme.radius3xl),
-          border: Border.all(
-            color: hasIssue
-                ? cs.error.withValues(alpha: 0.20)
-                : Colors.white.withValues(alpha: 0.05),
-          ),
-          boxShadow: AppTheme.clayShadow,
-        ),
+      child: AppSurfaceCard(
+        padding: const EdgeInsets.all(AppTheme.space6),
+        borderColor: hasIssue ? cs.error.withValues(alpha: 0.20) : null,
         child: Column(
           children: [
             // ─── Top Row: ID + Venue + Status ───
@@ -656,9 +546,9 @@ class _OrderFeedCard extends StatelessWidget {
                     child: Text(
                       '#${order.displayNumber}',
                       style: TextStyle(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         fontSize: 13,
-                        color: cs.onSurface.withValues(alpha: 0.30),
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -672,8 +562,7 @@ class _OrderFeedCard extends StatelessWidget {
                       Text(
                         order.venueName,
                         style: tt.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
+                          fontWeight: FontWeight.w700,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -682,14 +571,10 @@ class _OrderFeedCard extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            'TABLE ${order.tableNumber ?? '—'}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 3,
-                              color: cs.onSurfaceVariant.withValues(
-                                alpha: 0.50,
-                              ),
+                            'Table ${order.tableNumber ?? '—'}',
+                            style: tt.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                           Padding(
@@ -706,14 +591,10 @@ class _OrderFeedCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${order.itemCount} ITEMS',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 3,
-                              color: cs.onSurfaceVariant.withValues(
-                                alpha: 0.50,
-                              ),
+                            '${order.itemCount} items',
+                            style: tt.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -722,24 +603,10 @@ class _OrderFeedCard extends StatelessWidget {
                   ),
                 ),
                 // Status badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor().withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    order.status.label.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 3,
-                      color: statusColor(),
-                    ),
-                  ),
+                StatusBadge(
+                  label: order.status.label,
+                  color: statusColor().withValues(alpha: 0.10),
+                  textColor: statusColor(),
                 ),
               ],
             ),
@@ -766,12 +633,10 @@ class _OrderFeedCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      order.paymentMethod.label.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 3,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.50),
+                      order.paymentMethod.label,
+                      style: tt.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -787,12 +652,10 @@ class _OrderFeedCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      timeAgo(order.createdAt).toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 3,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.50),
+                      timeAgo(order.createdAt),
+                      style: tt.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -802,8 +665,7 @@ class _OrderFeedCard extends StatelessWidget {
                 Text(
                   order.formatPrice(order.total),
                   style: tt.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(width: AppTheme.space5),
@@ -852,11 +714,9 @@ class _OrderFeedCard extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'ACTION REQUIRED: ORDER CANCELLED',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 3,
+                        'Cancelled order requires review',
+                        style: tt.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
                           color: cs.error,
                         ),
                       ),

@@ -2,10 +2,21 @@
 
 set -euo pipefail
 
+invocation_dir="$(pwd -P)"
+script_path="${BASH_SOURCE[0]}"
+if [[ "$script_path" = /* ]]; then
+  script_abs_path="$script_path"
+else
+  script_abs_path="$(
+    cd "$invocation_dir/$(dirname "$script_path")" && pwd -P
+  )/$(basename "$script_path")"
+fi
+
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
 failures=0
+script_rel_path="${script_abs_path#"$repo_root"/}"
 
 report_matches() {
   local pattern="$1"
@@ -13,6 +24,9 @@ report_matches() {
   shift 2
   local matches=""
   matches="$(git grep -nI -E -e "$pattern" -- "$@" || true)"
+  if [[ -n "$matches" ]]; then
+    matches="$(printf '%s\n' "$matches" | grep -v "^${script_rel_path}:" || true)"
+  fi
   if [[ -n "$matches" ]]; then
     echo "FAIL: ${message}" >&2
     echo "$matches" >&2
@@ -38,6 +52,11 @@ report_matches \
 report_matches \
   'sbp_[0-9a-f]{40}' \
   'Committed Supabase personal access token detected.' \
+  ':!*.example*' ':!*.md'
+
+report_matches \
+  '"access_token":[[:space:]]*"eyJ[[:alnum:]_=-]+\.[[:alnum:]_=-]+\.[[:alnum:]_=-]+"' \
+  'Committed session JWT detected.' \
   ':!*.example*' ':!*.md'
 
 if (( failures > 0 )); then

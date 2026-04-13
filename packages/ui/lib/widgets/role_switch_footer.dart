@@ -125,7 +125,7 @@ class RoleSwitchFooter extends ConsumerWidget {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w800,
-              letterSpacing: 2,
+              letterSpacing: 0.4,
               color: Theme.of(
                 context,
               ).colorScheme.onSurfaceVariant.withValues(alpha: 0.40),

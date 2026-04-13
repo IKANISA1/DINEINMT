@@ -4,15 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:share_plus/share_plus.dart';
 
 import 'package:dinein_app/shared/widgets/pwa_install_banner.dart';
 
-import 'package:core_pkg/config/country_config.dart';
-import 'package:core_pkg/config/country_config_provider.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/services/discovery_location_service.dart';
-import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_layout.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
@@ -135,23 +131,34 @@ class _WideGuestShell extends StatelessWidget {
           children: [
             SizedBox(
               width: AppLayout.guestRailWidth(screenWidth),
-              child: AdaptiveGlassSurface(
+              child: Container(
                 decoration: BoxDecoration(
-                  color: cs.surface.withValues(alpha: 0.92),
-                  border: Border(right: BorderSide(color: AppColors.white5)),
+                  color: cs.surfaceContainerLow,
+                  border: Border(
+                    right: BorderSide(
+                      color: cs.outlineVariant.withValues(alpha: 0.72),
+                    ),
+                  ),
                 ),
                 child: SafeArea(
                   child: Column(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                         child: Row(
                           children: [
                             const BrandMark(
-                              size: 40,
+                              size: 36,
                               borderRadius: AppTheme.radiusFull,
-                              shadowBlur: 18,
-                              shadowOpacity: 0.28,
+                              shadowBlur: 12,
+                              shadowOpacity: 0.14,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'DineIn',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
                             ),
                           ],
                         ),
@@ -163,6 +170,7 @@ class _WideGuestShell extends StatelessWidget {
                               context.goNamed(_guestNavItems[index].routeName),
                           backgroundColor: Colors.transparent,
                           labelType: NavigationRailLabelType.all,
+                          indicatorColor: cs.primaryContainer,
                           destinations: [
                             for (final item in _guestNavItems)
                               NavigationRailDestination(
@@ -178,7 +186,6 @@ class _WideGuestShell extends StatelessWidget {
                 ),
               ),
             ),
-            VerticalDivider(width: 1, color: AppColors.white5),
             Expanded(
               child: Center(
                 child: ConstrainedBox(
@@ -219,16 +226,6 @@ class _TopAppBar extends ConsumerStatefulWidget {
 class _TopAppBarState extends ConsumerState<_TopAppBar> {
   bool _requestingLocation = false;
 
-  Future<void> _shareApp(CountryConfig config) async {
-    await SharePlus.instance.share(
-      ShareParams(
-        title: config.appTitle,
-        text:
-            'Discover venues on ${config.appTitle}.\nhttps://${config.siteHost}',
-      ),
-    );
-  }
-
   Future<void> _requestLocation() async {
     if (_requestingLocation) return;
     setState(() => _requestingLocation = true);
@@ -255,76 +252,74 @@ class _TopAppBarState extends ConsumerState<_TopAppBar> {
 
   @override
   Widget build(BuildContext context) {
-    final config = ref.watch(countryConfigProvider);
     final cs = Theme.of(context).colorScheme;
     final hasLocation =
         ref.watch(discoveryLocationProvider).asData?.value != null;
 
-    return AdaptiveGlassSurface(
-      decoration: BoxDecoration(
-        color: cs.surface.withValues(alpha: 0.88),
-        border: Border(bottom: BorderSide(color: AppColors.white5)),
+    return GlassHeader(
+      padding: const EdgeInsets.fromLTRB(
+        AppTheme.space4,
+        AppTheme.space3,
+        AppTheme.space4,
+        AppTheme.space2,
       ),
       child: SafeArea(
         bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTheme.space4,
-            vertical: AppTheme.space2,
-          ),
-          child: Row(
-            children: [
-              PressableScale(
-                onTap: () => context.goNamed(AppRouteNames.discover),
-                semanticLabel: 'Open guest portal',
-                child: const BrandMark(
-                  size: 34,
-                  borderRadius: AppTheme.radiusFull,
-                  shadowBlur: 14,
-                  shadowOpacity: 0.24,
+        child: Row(
+          children: [
+            PressableScale(
+              onTap: () => context.goNamed(AppRouteNames.discover),
+              semanticLabel: 'Open guest portal',
+              child: Row(
+                children: [
+                  const BrandMark(
+                    size: 32,
+                    borderRadius: AppTheme.radiusFull,
+                    shadowBlur: 10,
+                    shadowOpacity: 0.14,
+                  ),
+                  const SizedBox(width: 12),
+                  Text('DineIn', style: Theme.of(context).textTheme.titleLarge),
+                ],
+              ),
+            ),
+            const Spacer(),
+            if (_requestingLocation)
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.primary,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              // Location icon
-              _requestingLocation
-                  ? Padding(
-                      padding: const EdgeInsets.all(5),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: cs.primary,
-                        ),
-                      ),
-                    )
-                  : _AppBarIcon(
-                      icon: hasLocation
-                          ? LucideIcons.navigation
-                          : LucideIcons.mapPin,
-                      onTap: _requestLocation,
-                      isActive: hasLocation,
-                    ),
-              const SizedBox(width: 4),
-              // Search icon
+              )
+            else
               _AppBarIcon(
-                icon: LucideIcons.search,
-                onTap: () => context.goNamed(
-                  AppRouteNames.venuesBrowse,
-                  queryParameters: const {AppRouteParams.search: '1'},
-                ),
+                icon: hasLocation ? LucideIcons.navigation : LucideIcons.mapPin,
+                onTap: _requestLocation,
+                isActive: hasLocation,
               ),
-              const SizedBox(width: 4),
-              // Notifications
-              const NotificationBellButton(),
-              const SizedBox(width: 4),
-              // Share
-              _AppBarIcon(
-                icon: LucideIcons.share2,
-                onTap: () => _shareApp(config),
+            const SizedBox(width: 8),
+            _AppBarIcon(
+              icon: LucideIcons.search,
+              onTap: () => context.goNamed(
+                AppRouteNames.venuesBrowse,
+                queryParameters: const {AppRouteParams.search: '1'},
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            _AppBarIcon(
+              icon: LucideIcons.receipt,
+              onTap: () => context.goNamed(AppRouteNames.orderHistory),
+            ),
+            const SizedBox(width: 8),
+            const NotificationBellButton(),
+          ],
         ),
       ),
     );
@@ -344,31 +339,21 @@ class _AppBarIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Tooltip(
       message: _semanticLabel,
-      child: PressableScale(
-        onTap: () => onTap(),
+      child: AppIconButton(
+        icon: icon,
+        onTap: onTap,
+        selected: isActive,
         semanticLabel: _semanticLabel,
-        minTouchTargetSize: const Size(44, 44),
-        child: SizedBox(
-          width: 36,
-          height: 36,
-          child: Icon(
-            icon,
-            size: 22,
-            color: isActive ? cs.primary : cs.onSurfaceVariant,
-          ),
-        ),
       ),
     );
   }
 
   String get _semanticLabel {
     switch (icon) {
-      case LucideIcons.share2:
-        return 'Share the DineIn app';
+      case LucideIcons.receipt:
+        return 'Open order history';
       case LucideIcons.search:
         return 'Search venues';
       case LucideIcons.mapPin:
@@ -388,97 +373,67 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final radius = BorderRadius.circular(AppTheme.radiusXxl);
+    final tt = Theme.of(context).textTheme;
 
-    return ClipRRect(
-      borderRadius: radius,
-      child: AdaptiveGlassSurface(
-        decoration: BoxDecoration(
-          color: cs.surface.withValues(alpha: 0.92),
-          borderRadius: radius,
-          border: Border.all(color: AppColors.white5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTheme.space4,
-              vertical: 2,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(_guestNavItems.length, (index) {
-                final item = _guestNavItems[index];
-                final isActive = currentIndex == index;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.72)),
+        boxShadow: AppTheme.ambientShadow,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(AppTheme.space2),
+          child: Row(
+            children: List.generate(_guestNavItems.length, (index) {
+              final item = _guestNavItems[index];
+              final isActive = currentIndex == index;
 
-                return Expanded(
-                  child: PressableScale(
-                    onTap: () => context.goNamed(item.routeName),
-                    semanticLabel: 'Open ${item.label}',
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+              return Expanded(
+                child: PressableScale(
+                  onTap: () => context.goNamed(item.routeName),
+                  semanticLabel: 'Open ${item.label}',
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? cs.primaryContainer
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeOutCubic,
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: isActive ? cs.primary : Colors.transparent,
-                            borderRadius: BorderRadius.circular(
-                              AppTheme.radiusSm,
-                            ),
-                            boxShadow: isActive
-                                ? [
-                                    BoxShadow(
-                                      color: cs.primary.withValues(alpha: 0.28),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Icon(
-                            item.icon,
-                            size: 18,
-                            color: isActive
-                                ? cs.onPrimary
-                                : cs.onSurfaceVariant,
-                          ),
+                        Icon(
+                          item.icon,
+                          size: 18,
+                          color: isActive ? cs.primary : cs.onSurfaceVariant,
                         ),
-                        // Label visible only on selected tab
-                        AnimatedCrossFade(
-                          duration: const Duration(milliseconds: 200),
-                          crossFadeState: isActive
-                              ? CrossFadeState.showFirst
-                              : CrossFadeState.showSecond,
-                          firstChild: Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Text(
-                              item.label.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.2,
-                                color: cs.onSurface,
-                              ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            item.label,
+                            overflow: TextOverflow.ellipsis,
+                            style: tt.labelMedium?.copyWith(
+                              color: isActive
+                                  ? cs.onSurface
+                                  : cs.onSurfaceVariant,
                             ),
                           ),
-                          secondChild: const SizedBox(height: 2),
                         ),
                       ],
                     ),
                   ),
-                );
-              }),
-            ),
+                ),
+              );
+            }),
           ),
         ),
       ),

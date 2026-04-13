@@ -82,7 +82,12 @@ Future<Uint8List> buildVenueTableQrPdfBytes({
         margin: const pw.EdgeInsets.all(24),
         build: (_) => pw.Column(
           children: [
-            _buildPageRow(pageEntries.take(2).toList(), venue, brandImage, config),
+            _buildPageRow(
+              pageEntries.take(2).toList(),
+              venue,
+              brandImage,
+              config,
+            ),
             pw.SizedBox(height: 16),
             _buildPageRow(
               pageEntries.skip(2).take(2).toList(),
@@ -186,7 +191,7 @@ pw.Widget _buildQrCard(
                       color: gold,
                       fontSize: 9,
                       fontWeight: pw.FontWeight.bold,
-                      letterSpacing: 2.0,
+                      letterSpacing: 0.8,
                     ),
                   ),
                   pw.SizedBox(height: 4),
@@ -220,7 +225,7 @@ pw.Widget _buildQrCard(
                   color: gold,
                   fontSize: 10,
                   fontWeight: pw.FontWeight.bold,
-                  letterSpacing: 2.1,
+                  letterSpacing: 0.8,
                 ),
               ),
               pw.Spacer(),

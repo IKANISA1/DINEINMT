@@ -8,6 +8,7 @@ materialize_env_script="${project_dir}/scripts/materialize_release_env.sh"
 skip_checks=false
 flavor="mt"
 env_file=""
+no_codesign=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -22,6 +23,10 @@ while [[ $# -gt 0 ]]; do
     --env-file)
       env_file="${2:-}"
       shift 2
+      ;;
+    --no-codesign)
+      no_codesign=true
+      shift
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -48,6 +53,7 @@ entrypoint="lib/main_${flavor}.dart"
 scheme="$flavor"
 archive_path="build/ios/archive/Runner.xcarchive"
 ipa_path="build/ios/ipa"
+app_path="build/ios/iphoneos/Runner.app"
 
 require_file() {
   local path="$1"
@@ -84,12 +90,25 @@ echo "Using env file: ${env_file}"
   pod install
 )
 
-flutter build ipa \
-  --release \
-  --flavor "${scheme}" \
-  -t "${entrypoint}" \
-  --dart-define-from-file="${env_file}"
+if [[ "${no_codesign}" == "true" ]]; then
+  flutter build ios \
+    --release \
+    --flavor "${scheme}" \
+    -t "${entrypoint}" \
+    --dart-define-from-file="${env_file}" \
+    --no-codesign
+else
+  flutter build ipa \
+    --release \
+    --flavor "${scheme}" \
+    -t "${entrypoint}" \
+    --dart-define-from-file="${env_file}"
+fi
 
 echo
 echo "iOS release artifacts (${flavor})"
-ls -lh "${archive_path}" "${ipa_path}"
+if [[ "${no_codesign}" == "true" ]]; then
+  ls -lh "${app_path}"
+else
+  ls -lh "${archive_path}" "${ipa_path}"
+fi

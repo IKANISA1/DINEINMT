@@ -1,73 +1,56 @@
 import 'package:flutter/material.dart';
 
-/// DineIn LIGHT color tokens — daylight-optimized palette.
-///
-/// Maintains gold primary, mint secondary, lavender tertiary.
-/// Surfaces are warm off-white (not pure white) to reduce glare.
+import 'app_colors.dart';
+
+/// Light tokens are intentionally aligned with [AppColors] so the app can roll
+/// out a single, consistent minimalist language without divergent palettes.
 abstract final class AppColorsLight {
-  // ─── Primary Palette ───
-  static const primary = Color(0xFF8B7A3D);        // deeper gold for readability
-  static const onPrimary = Color(0xFFFFFBF0);
-  static const primaryContainer = Color(0xFFF5E6C0);
-  static const onPrimaryContainer = Color(0xFF402D06);
+  static const primary = AppColors.primary;
+  static const onPrimary = AppColors.onPrimary;
+  static const primaryContainer = AppColors.primaryContainer;
+  static const onPrimaryContainer = AppColors.onPrimaryContainer;
 
-  // ─── Secondary Palette ───
-  static const secondary = Color(0xFF3A7B2E);       // deeper mint
-  static const onSecondary = Color(0xFFFFFFFF);
-  static const secondaryContainer = Color(0xFFD5F0CE);
-  static const onSecondaryContainer = Color(0xFF0A3909);
+  static const secondary = AppColors.secondary;
+  static const onSecondary = AppColors.onSecondary;
+  static const secondaryContainer = AppColors.secondaryContainer;
+  static const onSecondaryContainer = AppColors.onSecondaryContainer;
 
-  // ─── Tertiary Palette ───
-  static const tertiary = Color(0xFF4B5E89);         // deeper lavender
-  static const onTertiary = Color(0xFFFFFFFF);
-  static const tertiaryContainer = Color(0xFFD9E1F5);
-  static const onTertiaryContainer = Color(0xFF23304B);
+  static const tertiary = AppColors.tertiary;
+  static const onTertiary = AppColors.onTertiary;
+  static const tertiaryContainer = AppColors.tertiaryContainer;
+  static const onTertiaryContainer = AppColors.onTertiaryContainer;
 
-  // ─── Error ───
-  static const error = Color(0xFFBA1A1A);
-  static const onError = Color(0xFFFFFFFF);
-  static const errorContainer = Color(0xFFFFDAD6);
-  static const onErrorContainer = Color(0xFF690005);
+  static const error = AppColors.error;
+  static const onError = AppColors.onError;
+  static const errorContainer = AppColors.errorContainer;
+  static const onErrorContainer = AppColors.onErrorContainer;
 
-  // ─── Surface System (Light) ───
-  static const surface = Color(0xFFF8F5F0);           // warm off-white
-  static const onSurface = Color(0xFF1C1B1F);
-  static const onSurfaceVariant = Color(0xFF5C5850);
+  static const surface = AppColors.surface;
+  static const onSurface = AppColors.onSurface;
+  static const onSurfaceVariant = AppColors.onSurfaceVariant;
 
-  // ─── Surface Container Hierarchy ───
-  static const surfaceContainerLowest = Color(0xFFFFFFFF);
-  static const surfaceContainerLow = Color(0xFFF3F0EB);
-  static const surfaceContainer = Color(0xFFEDE9E4);
-  static const surfaceContainerHigh = Color(0xFFE7E3DE);
-  static const surfaceContainerHighest = Color(0xFFE1DDD8);
+  static const surfaceContainerLowest = AppColors.surfaceContainerLowest;
+  static const surfaceContainerLow = AppColors.surfaceContainerLow;
+  static const surfaceContainer = AppColors.surfaceContainer;
+  static const surfaceContainerHigh = AppColors.surfaceContainerHigh;
+  static const surfaceContainerHighest = AppColors.surfaceContainerHighest;
 
-  // ─── Outline ───
-  static const outline = Color(0xFF857C72);
-  static const outlineVariant = Color(0xFFD0C7BC);
+  static const outline = AppColors.outline;
+  static const outlineVariant = AppColors.outlineVariant;
 
-  // ─── Inverse ───
-  static const inverseSurface = Color(0xFF323030);
-  static const inverseOnSurface = Color(0xFFF4F0EB);
-  static const inversePrimary = Color(0xFFE1C28E);
+  static const inverseSurface = AppColors.inverseSurface;
+  static const inverseOnSurface = AppColors.inverseOnSurface;
+  static const inversePrimary = AppColors.inversePrimary;
 
-  // ─── Semantic ───
-  static const success = Color(0xFF3A7B2E);          // same as secondary
-  static const warning = Color(0xFFA9820B);
-  static const info = Color(0xFF4B5E89);             // same as tertiary
+  static const success = AppColors.success;
+  static const warning = AppColors.warning;
+  static const info = AppColors.info;
 
-  // ─── Utility ───
-  /// Shadow color for light mode
-  static Color get shadow => onSurface.withValues(alpha: 0.06);
-
-  /// Ghost border: outlineVariant at 20% opacity
-  static Color get ghostBorder => outlineVariant.withValues(alpha: 0.30);
-
-  /// Overlay for modals and sheets in light mode
-  static Color get glassOverlay => surface.withValues(alpha: 0.80);
-
-  /// White replacements for light mode — used as subtle tints
-  static Color get white5 => const Color(0xFF000000).withValues(alpha: 0.04);
-  static Color get white10 => const Color(0xFF000000).withValues(alpha: 0.07);
-  static Color get white20 => const Color(0xFF000000).withValues(alpha: 0.10);
-  static Color get white40 => const Color(0xFF000000).withValues(alpha: 0.15);
+  static Color get shadow => AppColors.shadow;
+  static Color get ghostBorder => AppColors.ghostBorder;
+  static Color get glassOverlay => AppColors.glassOverlay;
+  static Color get white5 => AppColors.white5;
+  static Color get white10 => AppColors.white10;
+  static Color get white20 => AppColors.white20;
+  static Color get white40 => AppColors.white40;
 }

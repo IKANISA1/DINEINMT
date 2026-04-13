@@ -29,7 +29,7 @@ class AdminSettingsScreen extends StatelessWidget {
         title: Text(
           'Sign Out?',
           style: tt.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w900,
+            fontWeight: FontWeight.w700,
             color: cs.error,
           ),
         ),
@@ -44,10 +44,9 @@ class AdminSettingsScreen extends StatelessWidget {
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(
-              'CANCEL',
+              'Cancel',
               style: TextStyle(
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
+                fontWeight: FontWeight.w700,
                 color: cs.onSurfaceVariant,
               ),
             ),
@@ -58,12 +57,8 @@ class AdminSettingsScreen extends StatelessWidget {
               backgroundColor: cs.error.withValues(alpha: 0.10),
             ),
             child: Text(
-              'SIGN OUT',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-                color: cs.error,
-              ),
+              'Sign out',
+              style: TextStyle(fontWeight: FontWeight.w700, color: cs.error),
             ),
           ),
         ],
@@ -87,33 +82,14 @@ class AdminSettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppTheme.space6),
         children: [
-          // ─── Header ───
-          Text(
-            'Settings',
-            style: tt.displaySmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Global administrative profile and account controls.',
-            style: tt.bodyLarge?.copyWith(
-              color: cs.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
+          const AppPageHeader(
+            title: 'Settings',
+            subtitle: 'Console profile and account controls.',
           ),
           const SizedBox(height: AppTheme.space6),
 
-          // ─── Admin Account Info ───
-          Container(
+          AppSurfaceCard(
             padding: const EdgeInsets.all(AppTheme.space6),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-              boxShadow: AppTheme.clayShadow,
-            ),
             child: Row(
               children: [
                 Container(
@@ -123,7 +99,11 @@ class AdminSettingsScreen extends StatelessWidget {
                     color: cs.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                   ),
-                  child: Icon(LucideIcons.shieldCheck, size: 22, color: cs.primary),
+                  child: Icon(
+                    LucideIcons.shieldCheck,
+                    size: 22,
+                    color: cs.primary,
+                  ),
                 ),
                 const SizedBox(width: AppTheme.space5),
                 Expanded(
@@ -133,8 +113,7 @@ class AdminSettingsScreen extends StatelessWidget {
                       Text(
                         'Administrator Account',
                         style: tt.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -153,46 +132,28 @@ class AdminSettingsScreen extends StatelessWidget {
 
           const SizedBox(height: AppTheme.space6),
 
-          // ─── Logout ───
-          PressableScale(
+          AppListTileCard(
             onTap: () => _confirmLogout(context, cs, tt),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(AppTheme.space6),
-              decoration: BoxDecoration(
-                color: cs.error.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                border: Border.all(color: cs.error.withValues(alpha: 0.10)),
-                boxShadow: AppTheme.clayShadow,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(LucideIcons.logOut, size: 20, color: cs.error),
-                  const SizedBox(width: AppTheme.space3),
-                  Text(
-                    'Sign Out of Console',
-                    style: tt.titleMedium?.copyWith(
-                      color: cs.error,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
+            icon: LucideIcons.logOut,
+            iconColor: cs.error,
+            title: 'Sign out',
+            subtitle: 'End the current admin session.',
+            trailing: Text(
+              'Now',
+              style: tt.labelMedium?.copyWith(
+                color: cs.error,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
 
           const SizedBox(height: AppTheme.space8),
 
-          // ─── Footer ───
           Center(
             child: Text(
-              'DINEIN PWA v1.0.0',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-                color: cs.onSurfaceVariant.withValues(alpha: 0.30),
+              'DineIn PWA v1.0.0',
+              style: tt.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.72),
               ),
             ),
           ),

@@ -17,6 +17,7 @@ Map<String, dynamic> _orderJson({
   String venueName = 'Test Venue',
   String status = 'placed',
   String paymentMethod = 'cash',
+  String? paymentStatus,
   List<Map<String, dynamic>>? items,
 }) => {
   'id': id,
@@ -24,6 +25,7 @@ Map<String, dynamic> _orderJson({
   'venue_name': venueName,
   'status': status,
   'payment_method': paymentMethod,
+  'payment_status': ?paymentStatus,
   'items':
       items ??
       [
@@ -151,6 +153,7 @@ void main() {
         orders[0].items.single.imageUrl,
         'https://example.com/espresso.jpg',
       );
+      expect(orders[0].paymentStatus, PaymentStatus.notRequired);
     });
 
     test('passes venueId and pagination params', () async {
@@ -271,6 +274,26 @@ void main() {
       }
 
       expect(mock.callCount('update_order_status'), 3);
+    });
+  });
+
+  group('markOrderPaid', () {
+    test('sends correct action and payload', () async {
+      await AuthRepository.instance.saveVenueSession(
+        _activeVenueSession(
+          venueId: 'venue-1',
+          venueName: 'Updater',
+          whatsAppNumber: '+35677186193',
+          accessToken: 'paid-token',
+        ),
+      );
+      mock.registerResponse('mark_order_paid', null);
+
+      await repo.markOrderPaid('order-paid');
+
+      final inv = mock.lastInvocation('mark_order_paid')!;
+      expect(inv.payload?['orderId'], 'order-paid');
+      expect(inv.payload?['venue_session'], {'access_token': 'paid-token'});
     });
   });
 

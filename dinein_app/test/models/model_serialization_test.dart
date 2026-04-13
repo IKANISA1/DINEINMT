@@ -86,17 +86,20 @@ void main() {
       expect(venue.ownerWhatsAppNumber, '+35699994444');
     });
 
-    test('normalizeVenueCategoryLabel always returns fallback (category removed)', () {
-      // After category cleanup, all inputs return the fallback value.
-      expect(normalizeVenueCategoryLabel('hotel'), 'Restaurant');
-      expect(normalizeVenueCategoryLabel('Bar & Restaurant'), 'Restaurant');
-      expect(normalizeVenueCategoryLabel('bar'), 'Restaurant');
-      expect(normalizeVenueCategoryLabel('restaurant'), 'Restaurant');
-      expect(normalizeVenueCategoryLabel('seafood'), 'Restaurant');
-      expect(normalizeVenueCategoryLabel(null), 'Restaurant');
-      expect(normalizeVenueCategoryLabel(''), 'Restaurant');
-      expect(normalizeVenueCategoryLabel('  '), 'Restaurant');
-    });
+    test(
+      'normalizeVenueCategoryLabel always returns fallback (category removed)',
+      () {
+        // After category cleanup, all inputs return the fallback value.
+        expect(normalizeVenueCategoryLabel('hotel'), 'Restaurant');
+        expect(normalizeVenueCategoryLabel('Bar & Restaurant'), 'Restaurant');
+        expect(normalizeVenueCategoryLabel('bar'), 'Restaurant');
+        expect(normalizeVenueCategoryLabel('restaurant'), 'Restaurant');
+        expect(normalizeVenueCategoryLabel('seafood'), 'Restaurant');
+        expect(normalizeVenueCategoryLabel(null), 'Restaurant');
+        expect(normalizeVenueCategoryLabel(''), 'Restaurant');
+        expect(normalizeVenueCategoryLabel('  '), 'Restaurant');
+      },
+    );
 
     test('isOpen reflects active status', () {
       const active = Venue(
@@ -401,10 +404,7 @@ void main() {
       expect(item.isGuestHighlight, isTrue);
       expect(item.guestHighlightLabel, isNull);
       expect(item.dietaryBadges, ['Vegan', 'Halal']);
-      expect(
-        item.guestDisplayTags,
-        ['Vegan', 'Halal', 'Chef Pick'],
-      );
+      expect(item.guestDisplayTags, ['Vegan', 'Halal', 'Chef Pick']);
     });
 
     test('isPopular requires totalOrdered >= 10 threshold', () {
@@ -579,6 +579,7 @@ void main() {
         'status': 'received',
         'created_at': '2025-01-01T12:00:00Z',
         'payment_method': 'revolut_link',
+        'payment_status': 'confirmed',
         'table_number': '5',
         'special_requests': 'Extra napkins',
         'receipt_token': 'abc-123',
@@ -595,6 +596,7 @@ void main() {
       expect(order.userId, 'u1');
       expect(order.status, OrderStatus.received);
       expect(order.paymentMethod, PaymentMethod.revolutLink);
+      expect(order.paymentStatus, PaymentStatus.confirmed);
       expect(order.tableNumber, '5');
       expect(order.specialRequests, 'Extra napkins');
       expect(order.guestReceiptToken, 'abc-123');
@@ -641,6 +643,22 @@ void main() {
 
       expect(order.subtotal, 25.0);
       expect(order.serviceFee, 0.0);
+      expect(order.paymentStatus, PaymentStatus.notRequired);
+    });
+
+    test('paymentStatus derives from paymentMethod when omitted', () {
+      final order = Order.fromJson({
+        'id': 'ORD-004',
+        'venue_id': 'v1',
+        'venue_name': 'V',
+        'items': const [],
+        'total': 0.0,
+        'created_at': '2025-01-01T12:00:00Z',
+        'payment_method': 'revolut_link',
+      });
+
+      expect(order.paymentMethod, PaymentMethod.revolutLink);
+      expect(order.paymentStatus, PaymentStatus.pending);
     });
   });
 

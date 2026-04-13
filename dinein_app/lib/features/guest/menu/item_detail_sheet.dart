@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:core_pkg/constants/enums.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:ui/theme/app_theme.dart';
+
+import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
+import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
+
 import 'menu_item_badges.dart';
 
-/// Item detail bottom sheet — shown when tapping a menu item.
-/// Allows selecting quantity and viewing full description.
+/// Compact item detail bottom sheet for quick add flows.
 class ItemDetailSheet extends StatefulWidget {
   final MenuItem item;
   final int initialQuantity;
@@ -23,7 +23,6 @@ class ItemDetailSheet extends StatefulWidget {
     required this.country,
   });
 
-  /// Show the bottom sheet for a menu item.
   static Future<void> show(
     BuildContext context, {
     required MenuItem item,
@@ -59,9 +58,9 @@ class _ItemDetailSheetState extends State<ItemDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final item = widget.item;
 
     return Container(
       decoration: BoxDecoration(
@@ -71,191 +70,126 @@ class _ItemDetailSheetState extends State<ItemDetailSheet> {
         ),
       ),
       child: SafeArea(
+        top: false,
         child: Padding(
-          padding: const EdgeInsets.all(AppTheme.space6),
+          padding: const EdgeInsets.fromLTRB(
+            AppTheme.space6,
+            AppTheme.space3,
+            AppTheme.space6,
+            AppTheme.space6,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ─── Handle ───
               Center(
                 child: Container(
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: cs.outlineVariant.withValues(alpha: 0.20),
+                    color: cs.outlineVariant.withValues(alpha: 0.72),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              const SizedBox(height: AppTheme.space6),
-
-              // ─── Item Image ───
+              const SizedBox(height: AppTheme.space5),
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppTheme.radiusXl),
                 child: SizedBox(
                   width: double.infinity,
-                  height: 200,
+                  height: 180,
                   child: DineInImage(
                     imageUrl: item.imageUrl,
                     fit: BoxFit.cover,
                     fallbackIcon: LucideIcons.chefHat,
                   ),
                 ),
-              ).animate().fadeIn(duration: 400.ms),
-
-              const SizedBox(height: AppTheme.space6),
-
-              if (item.guestDisplayTags.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppTheme.space3),
-                  child: MenuItemBadges(item: item),
-                ),
-
-              // ─── Name + Price ───
+              ),
+              const SizedBox(height: AppTheme.space5),
+              if (item.guestDisplayTags.isNotEmpty) ...[
+                MenuItemBadges(item: item),
+                const SizedBox(height: AppTheme.space4),
+              ],
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(child: Text(item.name, style: tt.headlineMedium)),
+                  Expanded(child: Text(item.name, style: tt.headlineSmall)),
                   const SizedBox(width: AppTheme.space4),
                   Text(
                     widget.country.formatPrice(item.price),
-                    style: tt.headlineMedium?.copyWith(
+                    style: tt.titleLarge?.copyWith(
                       color: cs.primary,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
-
               const SizedBox(height: AppTheme.space3),
-
               Text(
                 item.description,
-                style: tt.bodyLarge?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  height: 1.5,
+                style: tt.bodyMedium?.copyWith(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.84),
                 ),
               ),
-
-              const SizedBox(height: AppTheme.space6),
-
-              // ─── Allergen Info ───
-              Container(
+              const SizedBox(height: AppTheme.space5),
+              GuestSurfaceCard(
                 padding: const EdgeInsets.all(AppTheme.space4),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                ),
+                borderRadius: 22,
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(LucideIcons.shieldAlert, size: 18, color: cs.tertiary),
-                    const SizedBox(width: 12),
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        LucideIcons.shieldAlert,
+                        size: 16,
+                        color: cs.primary,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.space3),
                     Expanded(
                       child: Text(
-                        'Please inform staff of any allergies before ordering.',
+                        'Tell staff about allergies before ordering.',
                         style: tt.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          height: 1.4,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.84),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(height: AppTheme.space6),
-
-              // ─── Special Requests ───
-              Text(
-                'SPECIAL REQUESTS',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppTheme.space2),
-              TextField(
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: 'Any special preferences or dietary needs...',
-                  filled: true,
-                  fillColor: cs.surfaceContainerLow,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                    borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.05),
-                    ),
+              const SizedBox(height: AppTheme.space5),
+              Row(
+                children: [
+                  _SheetStepper(
+                    quantity: _quantity,
+                    onDecrease: _quantity > 0
+                        ? () => setState(() => _quantity--)
+                        : null,
+                    onIncrease: () => setState(() => _quantity++),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                    borderSide: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.05),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: AppTheme.space8),
-
-              // ─── Quantity Selector ───
-              Container(
-                padding: const EdgeInsets.all(AppTheme.space4),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _StepperButton(
-                      icon: LucideIcons.minus,
-                      onTap: _quantity > 0
-                          ? () => setState(() => _quantity--)
+                  const SizedBox(width: AppTheme.space3),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: _quantity > 0
+                          ? () {
+                              widget.onQuantityChanged(_quantity);
+                              Navigator.of(context).pop();
+                            }
                           : null,
-                    ),
-                    SizedBox(
-                      width: 64,
                       child: Text(
-                        '$_quantity',
-                        textAlign: TextAlign.center,
-                        style: tt.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                        _quantity > 0
+                            ? 'Add ${widget.country.formatPrice(item.price * _quantity)}'
+                            : 'Select quantity',
                       ),
                     ),
-                    _StepperButton(
-                      icon: LucideIcons.plus,
-                      isPrimary: true,
-                      onTap: () => setState(() => _quantity++),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: AppTheme.space6),
-
-              // ─── Add to Cart CTA ───
-              SizedBox(
-                width: double.infinity,
-                child: PremiumButton(
-                  label: _quantity > 0
-                      ? 'ADD TO CART  •  ${widget.country.formatPrice(item.price * _quantity)}'
-                      : 'SELECT QUANTITY',
-                  onPressed: _quantity > 0
-                      ? () {
-                          widget.onQuantityChanged(_quantity);
-                          Navigator.of(context).pop();
-                        }
-                      : null,
-                  icon: _quantity > 0 ? LucideIcons.plus : null,
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -265,44 +199,81 @@ class _ItemDetailSheetState extends State<ItemDetailSheet> {
   }
 }
 
-class _StepperButton extends StatelessWidget {
-  final IconData icon;
-  final bool isPrimary;
-  final VoidCallback? onTap;
+class _SheetStepper extends StatelessWidget {
+  final int quantity;
+  final VoidCallback? onDecrease;
+  final VoidCallback onIncrease;
 
-  const _StepperButton({
-    required this.icon,
-    this.isPrimary = false,
-    this.onTap,
+  const _SheetStepper({
+    required this.quantity,
+    required this.onDecrease,
+    required this.onIncrease,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDisabled = onTap == null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.72)),
+      ),
+      child: Row(
+        children: [
+          _SheetStepperButton(icon: LucideIcons.minus, onTap: onDecrease),
+          SizedBox(
+            width: 40,
+            child: Text(
+              '$quantity',
+              textAlign: TextAlign.center,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          _SheetStepperButton(
+            icon: LucideIcons.plus,
+            onTap: onIncrease,
+            emphasized: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetStepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool emphasized;
+
+  const _SheetStepperButton({
+    required this.icon,
+    required this.onTap,
+    this.emphasized = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
 
     return PressableScale(
       onTap: onTap,
-      semanticLabel: 'Item action',
+      semanticLabel: 'Change quantity',
       child: Container(
-        width: 48,
-        height: 48,
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
-          color: isPrimary
-              ? cs.primary
-              : isDisabled
-              ? cs.surfaceContainerHigh.withValues(alpha: 0.50)
-              : cs.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          color: emphasized ? cs.primary : cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
           icon,
-          size: 20,
-          color: isPrimary
-              ? cs.onPrimary
-              : isDisabled
-              ? cs.onSurfaceVariant.withValues(alpha: 0.20)
-              : cs.onSurface,
+          size: 16,
+          color: emphasized ? cs.onPrimary : cs.onSurface,
         ),
       ),
     );

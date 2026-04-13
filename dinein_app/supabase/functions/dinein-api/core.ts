@@ -128,7 +128,7 @@ let firebaseMessagingAccessTokenCache:
   | null = null;
 let missingFirebaseMessagingConfigLogged = false;
 
-type JsonRecord = Record<string, unknown>;
+export type JsonRecord = Record<string, unknown>;
 type CountryCode = "MT" | "RW";
 type VenuePushNotificationPayload = {
   title: string;
@@ -281,7 +281,7 @@ export async function parseBody(req: Request): Promise<JsonRecord> {
   }
 }
 
-function normalizeCountryCode(
+export function normalizeCountryCode(
   value: unknown,
   fallback: CountryCode = "MT",
 ): CountryCode {
@@ -291,7 +291,7 @@ function normalizeCountryCode(
   return fallback;
 }
 
-function normalizeStringList(value: unknown): string[] {
+export function normalizeStringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
     .map((entry) => stringValue(entry))
@@ -307,20 +307,20 @@ function slugify(value: string): string {
     .replace(/-{2,}/g, "-");
 }
 
-function requestCountryCode(
+export function requestCountryCode(
   body: JsonRecord,
   fallback: CountryCode = "MT",
 ): CountryCode {
   return normalizeCountryCode(body.country ?? body.country_code, fallback);
 }
 
-function countryLabel(code: CountryCode): string {
+export function countryLabel(code: CountryCode): string {
   return code == "RW" ? "Rwanda" : "Malta";
 }
 
 // numberValue imported from ../_shared/env.ts
 
-function booleanValue(value: unknown): boolean | undefined {
+export function booleanValue(value: unknown): boolean | undefined {
   if (typeof value == "boolean") return value;
   if (typeof value == "string") {
     const normalized = value.trim().toLowerCase();
@@ -364,7 +364,7 @@ function clientIpAddress(req: Request): string | null {
     null;
 }
 
-function anonymousWaveRateLimitKey(
+export function anonymousWaveRateLimitKey(
   req: Request,
   venueId: string,
 ): string | null {
@@ -423,7 +423,7 @@ export function resetWaveRateLimitState(): void {
   anonymousWaveRateLimitBuckets.clear();
 }
 
-function googleMapsSearchRateLimitKey(req: Request): string | null {
+export function googleMapsSearchRateLimitKey(req: Request): string | null {
   const ip = clientIpAddress(req);
   if (!ip) return null;
 
@@ -478,23 +478,23 @@ export function resetGoogleMapsSearchRateLimitState(): void {
   googleMapsSearchRateLimitBuckets.clear();
 }
 
-function normalizeListLimit(value: unknown, max = 100): number | null {
+export function normalizeListLimit(value: unknown, max = 100): number | null {
   const raw = numberValue(value);
   if (raw == undefined) return null;
   return Math.min(max, Math.max(1, Math.trunc(raw)));
 }
 
-function normalizeListOffset(value: unknown): number {
+export function normalizeListOffset(value: unknown): number {
   const raw = numberValue(value);
   if (raw == undefined) return 0;
   return Math.max(0, Math.trunc(raw));
 }
 
-function roundCurrency(value: number): number {
+export function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-function normalizePushPlatform(value: unknown): string {
+export function normalizePushPlatform(value: unknown): string {
   const normalized = (stringValue(value) ?? "").trim().toLowerCase();
   if (!pushPlatforms.has(normalized)) {
     throw new HttpError(400, `Unsupported push platform: ${value}`);
@@ -502,7 +502,7 @@ function normalizePushPlatform(value: unknown): string {
   return normalized;
 }
 
-function sanitizePushToken(value: unknown): string {
+export function sanitizePushToken(value: unknown): string {
   const token = requireString({ value }, "value").trim();
   if (token.length < 32) {
     throw new HttpError(400, "Push token is invalid.");
@@ -653,7 +653,7 @@ function formatOrderTotal(value: unknown): string | null {
   return amount == undefined ? null : `EUR ${amount.toFixed(2)}`;
 }
 
-function buildNewOrderPushNotification(
+export function buildNewOrderPushNotification(
   order: JsonRecord,
 ): VenuePushNotificationPayload {
   const venueId = stringValue(order.venue_id);
@@ -681,7 +681,7 @@ function buildNewOrderPushNotification(
   };
 }
 
-function buildBellRequestPushNotification(
+export function buildBellRequestPushNotification(
   venue: JsonRecord,
   bellRequest: JsonRecord,
 ): VenuePushNotificationPayload {
@@ -983,7 +983,9 @@ function bearerToken(req: Request): string | null {
   return token.length > 0 ? token : null;
 }
 
-async function hasVerifiedServiceRoleRequest(req: Request): Promise<boolean> {
+export async function hasVerifiedServiceRoleRequest(
+  req: Request,
+): Promise<boolean> {
   return await verifySupabaseServiceRoleHeader(
     req.headers.get("Authorization"),
   ) != null;
@@ -1039,7 +1041,9 @@ async function adminSessionClaims(req: Request): Promise<JsonRecord | null> {
   });
 }
 
-async function venueSessionClaims(req: Request): Promise<JsonRecord | null> {
+export async function venueSessionClaims(
+  req: Request,
+): Promise<JsonRecord | null> {
   const token = bearerToken(req);
   if (!token) return null;
   return await signedTokenClaims(token, {
@@ -1050,7 +1054,7 @@ async function venueSessionClaims(req: Request): Promise<JsonRecord | null> {
   });
 }
 
-async function currentUser(req: Request) {
+export async function currentUser(req: Request) {
   if (!req.headers.get("Authorization")) {
     return null;
   }
@@ -1087,7 +1091,7 @@ async function signSupabaseScopedJwt(payload: JsonRecord): Promise<string> {
   return `${signingInput}.${signature}`;
 }
 
-async function issueScopedRealtimeAccessToken(
+export async function issueScopedRealtimeAccessToken(
   claims: JsonRecord,
 ): Promise<
   { access_token: string; expires_at: string; realtime_enabled: boolean }
@@ -1120,7 +1124,7 @@ async function issueScopedRealtimeAccessToken(
   };
 }
 
-async function isAdmin(
+export async function isAdmin(
   supabase: ReturnType<typeof adminClient>,
   userId?: string | null,
 ) {
@@ -1133,7 +1137,7 @@ async function isAdmin(
   }
 }
 
-async function adminUserId(
+export async function adminUserId(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
 ): Promise<string | null> {
@@ -1158,7 +1162,7 @@ async function adminUserId(
   return null;
 }
 
-async function requireAdmin(
+export async function requireAdmin(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
 ): Promise<string> {
@@ -1169,7 +1173,7 @@ async function requireAdmin(
   return userId;
 }
 
-async function requireSelfOrAdmin(
+export async function requireSelfOrAdmin(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
   userId: string,
@@ -1202,7 +1206,7 @@ function venuePhoneDefaultCountryCode(country?: string | null): string {
   return defaultCountryCode;
 }
 
-async function ensureUniqueVenueAccessPhone(
+export async function ensureUniqueVenueAccessPhone(
   supabase: ReturnType<typeof adminClient>,
   normalizedPhone: string,
   venueId: string,
@@ -1247,7 +1251,7 @@ async function ensureUniqueVenueAccessPhone(
   );
 }
 
-async function venueSnapshot(
+export async function venueSnapshot(
   supabase: ReturnType<typeof adminClient>,
   venueId: string,
 ): Promise<JsonRecord> {
@@ -1326,7 +1330,7 @@ async function verifyVenueToken(
   };
 }
 
-async function authorizeVenueSession(
+export async function authorizeVenueSession(
   req: Request,
   _supabase: ReturnType<typeof adminClient>,
   rawSession: unknown,
@@ -1379,7 +1383,7 @@ async function authorizeVenueSession(
   throw new HttpError(401, "Venue access token required.");
 }
 
-async function authorizeVenueMutation(
+export async function authorizeVenueMutation(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
   venueId: string,
@@ -1397,11 +1401,11 @@ async function authorizeVenueMutation(
   return "venue";
 }
 
-async function isServiceRoleRequest(req: Request): Promise<boolean> {
+export async function isServiceRoleRequest(req: Request): Promise<boolean> {
   return await hasVerifiedServiceRoleRequest(req);
 }
 
-async function venueNotificationSettingsSnapshot(
+export async function venueNotificationSettingsSnapshot(
   supabase: ReturnType<typeof adminClient>,
   venueId: string,
 ): Promise<JsonRecord> {
@@ -1425,7 +1429,7 @@ async function venueNotificationSettingsSnapshot(
   };
 }
 
-async function upsertVenueNotificationSettings(
+export async function upsertVenueNotificationSettings(
   supabase: ReturnType<typeof adminClient>,
   venueId: string,
   settingsInput: unknown,
@@ -1457,7 +1461,7 @@ async function upsertVenueNotificationSettings(
   };
 }
 
-async function syncVenuePushRegistrationFlags(
+export async function syncVenuePushRegistrationFlags(
   supabase: ReturnType<typeof adminClient>,
   venueId: string,
   notificationsEnabled: boolean,
@@ -1475,7 +1479,7 @@ async function syncVenuePushRegistrationFlags(
   }
 }
 
-async function resolveVenueNotificationContactPhone(
+export async function resolveVenueNotificationContactPhone(
   supabase: ReturnType<typeof adminClient>,
   venueId: string,
   body: JsonRecord,
@@ -1602,7 +1606,7 @@ async function prunePushRegistrations(
   }
 }
 
-async function dispatchVenueOperationalAlert(
+export async function dispatchVenueOperationalAlert(
   supabase: ReturnType<typeof adminClient>,
   venueId: string,
   payload: VenuePushNotificationPayload,
@@ -1664,7 +1668,7 @@ async function venueOwnerWhatsAppNumber(
   );
 }
 
-async function dispatchVenueWhatsAppAlert(
+export async function dispatchVenueWhatsAppAlert(
   supabase: ReturnType<typeof adminClient>,
   venueId: string,
   messageBody: string,
@@ -1705,7 +1709,7 @@ async function dispatchVenueWhatsAppAlert(
   }
 }
 
-async function menuItemVenueId(
+export async function menuItemVenueId(
   supabase: ReturnType<typeof adminClient>,
   itemId: string,
 ): Promise<string> {
@@ -1728,7 +1732,7 @@ async function menuItemVenueId(
   return venueId;
 }
 
-async function menuItemAdminSnapshot(
+export async function menuItemAdminSnapshot(
   supabase: ReturnType<typeof adminClient>,
   itemId: string,
 ): Promise<JsonRecord> {
@@ -1752,7 +1756,7 @@ async function menuItemAdminSnapshot(
   return asRecord(data);
 }
 
-async function adminManagedMenuGroupSeed(
+export async function adminManagedMenuGroupSeed(
   supabase: ReturnType<typeof adminClient>,
   groupId: string,
 ): Promise<JsonRecord> {
@@ -1778,7 +1782,7 @@ async function adminManagedMenuGroupSeed(
   return asRecord(data);
 }
 
-async function syncAdminManagedGroupSharedFields(
+export async function syncAdminManagedGroupSharedFields(
   supabase: ReturnType<typeof adminClient>,
   groupId: string,
   updates: JsonRecord,
@@ -1818,7 +1822,7 @@ async function syncAdminManagedGroupImageFields(
   await syncAdminManagedGroupSharedFields(supabase, groupId, updates);
 }
 
-async function ensureUniqueVenueSlug(
+export async function ensureUniqueVenueSlug(
   supabase: ReturnType<typeof adminClient>,
   input: string,
   excludeVenueId?: string,
@@ -1847,7 +1851,7 @@ async function ensureUniqueVenueSlug(
   throw new HttpError(500, "Could not generate a unique venue slug.");
 }
 
-async function resolveAdminAssignmentVenueIds(
+export async function resolveAdminAssignmentVenueIds(
   supabase: ReturnType<typeof adminClient>,
   body: JsonRecord,
 ): Promise<string[]> {
@@ -1898,7 +1902,7 @@ async function resolveAdminAssignmentVenueIds(
   return resolvedVenueIds;
 }
 
-function sanitizeAdminManagedMenuDraft(rawItem: unknown): JsonRecord {
+export function sanitizeAdminManagedMenuDraft(rawItem: unknown): JsonRecord {
   const item = asRecord(rawItem);
   const name = requireString(item, "name");
   const description = stringValue(item.description) ?? "";
@@ -1946,7 +1950,7 @@ function sanitizeAdminManagedMenuDraft(rawItem: unknown): JsonRecord {
   return sanitized;
 }
 
-function sanitizeAdminMenuUpdates(rawUpdates: unknown): JsonRecord {
+export function sanitizeAdminMenuUpdates(rawUpdates: unknown): JsonRecord {
   const updates = asRecord(rawUpdates);
   const forbiddenKeys = [
     "price",
@@ -2054,7 +2058,7 @@ async function orderVenueId(
   return venueId;
 }
 
-async function orderStatusSnapshot(
+export async function orderStatusSnapshot(
   supabase: ReturnType<typeof adminClient>,
   orderId: string,
 ): Promise<{ venueId: string; status: string }> {
@@ -2095,7 +2099,7 @@ function orderReceiptSecret(): string {
   return getEnv("DINEIN_ADMIN_SESSION_SECRET");
 }
 
-async function issueOrderReceiptToken(
+export async function issueOrderReceiptToken(
   orderId: string,
   venueId: string,
 ): Promise<string> {
@@ -2118,7 +2122,7 @@ async function issueOrderReceiptToken(
   return `${signingInput}.${signature}`;
 }
 
-async function verifyOrderReceiptToken(
+export async function verifyOrderReceiptToken(
   token: string,
   orderId: string,
 ): Promise<boolean> {
@@ -2138,7 +2142,7 @@ async function verifyOrderReceiptToken(
   return stringValue(claims?.sub) == orderId;
 }
 
-function sanitizeVenueUpdates(
+export function sanitizeVenueUpdates(
   rawUpdates: unknown,
   allowAdminFields: boolean,
 ): JsonRecord {
@@ -2316,7 +2320,7 @@ function sanitizeVenueUpdates(
   return sanitized;
 }
 
-function publicVenueListPayload(
+export function publicVenueListPayload(
   rawVenue: unknown,
   options?: { distanceKm?: number | null },
 ): JsonRecord {
@@ -2367,7 +2371,7 @@ function publicVenueDetailPayload(rawVenue: unknown): JsonRecord {
   };
 }
 
-function venueStatus(rawVenue: unknown): string {
+export function venueStatus(rawVenue: unknown): string {
   const status = stringValue(asRecord(rawVenue).status) ?? "inactive";
   return venueStatuses.has(status) ? status : "inactive";
 }
@@ -2376,11 +2380,11 @@ function venueOrderingEnabled(rawVenue: unknown): boolean {
   return booleanValue(asRecord(rawVenue).ordering_enabled) ?? false;
 }
 
-function venueSupportedPaymentMethods(rawVenue: unknown): string[] {
+export function venueSupportedPaymentMethods(rawVenue: unknown): string[] {
   return venueOrderingReadiness(rawVenue).supportedPaymentMethods;
 }
 
-function isGuestVisibleVenue(rawVenue: unknown): boolean {
+export function isGuestVisibleVenue(rawVenue: unknown): boolean {
   return publicVenueStatuses.has(venueStatus(rawVenue));
 }
 
@@ -2398,7 +2402,7 @@ function venueCoordinates(rawVenue: unknown): {
   };
 }
 
-function venueDistanceKm(
+export function venueDistanceKm(
   rawVenue: unknown,
   latitude: number,
   longitude: number,
@@ -2423,7 +2427,7 @@ function venueDistanceKm(
   return earthRadiusKm * c;
 }
 
-function venueMatchesQuery(rawVenue: unknown, query: string): boolean {
+export function venueMatchesQuery(rawVenue: unknown, query: string): boolean {
   const venue = asRecord(rawVenue);
   if (!query) return true;
   const haystack = [
@@ -2441,12 +2445,12 @@ function venueMatchesQuery(rawVenue: unknown, query: string): boolean {
   return haystack.includes(query);
 }
 
-function canVenueAcceptGuestOrders(rawVenue: unknown): boolean {
+export function canVenueAcceptGuestOrders(rawVenue: unknown): boolean {
   return venueOrderingEnabled(rawVenue) &&
     venueOrderingReadiness(rawVenue).ready;
 }
 
-function publicMenuItemPayload(
+export function publicMenuItemPayload(
   rawItem: unknown,
   { hidePrice = false }: { hidePrice?: boolean } = {},
 ): JsonRecord {
@@ -2458,7 +2462,7 @@ function publicMenuItemPayload(
   };
 }
 
-async function hasPrivateVenueAccess(
+export async function hasPrivateVenueAccess(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
   venueId: string,
@@ -2516,7 +2520,7 @@ function normalizeHighlightRank(
   return rounded;
 }
 
-function sanitizeMenuItemInsert(
+export function sanitizeMenuItemInsert(
   rawItem: unknown,
   venueId?: string,
 ): JsonRecord {
@@ -2610,7 +2614,7 @@ function sanitizeMenuItemInsert(
   return sanitized;
 }
 
-function sanitizeMenuItemUpdates(rawUpdates: unknown): JsonRecord {
+export function sanitizeMenuItemUpdates(rawUpdates: unknown): JsonRecord {
   const updates = asRecord(rawUpdates);
   const sanitized: JsonRecord = {};
 
@@ -2935,7 +2939,7 @@ export function sanitizeOrderInsert(
   };
 }
 
-async function uniqueOrderInsert(
+export async function uniqueOrderInsert(
   supabase: ReturnType<typeof adminClient>,
   order: JsonRecord,
 ): Promise<JsonRecord> {
@@ -2965,1314 +2969,6 @@ async function uniqueOrderInsert(
   );
 }
 
-export async function handleCreateProfile(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const userId = requireString(body, "userId", "user_id");
-  const callerId = await requireSelfOrAdmin(supabase, req, userId);
-  const callerIsAdmin = await isAdmin(supabase, callerId);
-
-  const { error } = await supabase.from("dinein_profiles").upsert({
-    id: userId,
-    display_name: stringValue(body.displayName) ??
-      stringValue(body.display_name) ?? null,
-    email: stringValue(body.email) ?? null,
-    role: callerIsAdmin ? (stringValue(body.role) ?? "customer") : "customer",
-  });
-
-  if (error) {
-    console.error("[dinein-api] create profile failed", error);
-    throw new HttpError(500, "Could not create the user profile.");
-  }
-
-  return ok(true, 201);
-}
-
-export async function handleGetUserRole(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const userId = requireString(body, "userId", "user_id");
-  await requireSelfOrAdmin(supabase, req, userId);
-
-  const { data, error } = await supabase
-    .from("dinein_profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[dinein-api] get user role failed", error);
-    throw new HttpError(500, "Could not load the user role.");
-  }
-
-  return ok(data?.role ?? null);
-}
-
-export async function handleTrackGuestEvent(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const eventName = requireString(body, "eventName", "event_name");
-  const sessionId = requireString(body, "sessionId", "session_id");
-  const user = await currentUser(req);
-
-  const insert: JsonRecord = {
-    country: requestCountryCode(body),
-    event_name: eventName,
-    session_id: sessionId,
-    route: stringValue(body.route) ?? null,
-    venue_id: stringValue(body.venueId ?? body.venue_id) ?? null,
-    menu_item_id: stringValue(body.menuItemId ?? body.menu_item_id) ?? null,
-    order_id: stringValue(body.orderId ?? body.order_id) ?? null,
-    user_id: user?.id ?? null,
-    user_agent: req.headers.get("user-agent") ?? null,
-    referrer: req.headers.get("referer") ?? null,
-    details: asRecord(body.details ?? body.metadata ?? body.properties),
-  };
-
-  const { error } = await supabase
-    .from("dinein_guest_analytics_events")
-    .insert(insert);
-
-  if (error) {
-    console.error("[dinein-api] track guest event failed", error);
-    // Guest analytics must never degrade the browse/order flow. Production can
-    // legitimately lag a migration on one region, so treat telemetry writes as
-    // best-effort and keep the client path clean.
-    return ok(false, 202);
-  }
-
-  return ok(true, 201);
-}
-
-export async function handleGetVenues(
-  supabase: ReturnType<typeof adminClient>,
-  body: JsonRecord,
-): Promise<Response> {
-  const countryCode = requestCountryCode(body);
-  const limit = normalizeListLimit(body.limit);
-  const offset = normalizeListOffset(body.offset);
-  const query = (stringValue(body.query) ?? "").toLowerCase();
-  const category = stringValue(body.category)?.toLowerCase();
-  const orderingOnly = booleanValue(body.ordering_only ?? body.orderingOnly) ??
-    false;
-  const includeSummary = booleanValue(
-    body.include_summary ?? body.includeSummary,
-  ) ?? false;
-  const latitude = numberValue(body.latitude ?? body.lat);
-  const longitude = numberValue(body.longitude ?? body.lng);
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("country", countryCode);
-
-  if (error) {
-    console.error("[dinein-api] get venues failed", error);
-    throw new HttpError(500, "Could not load venues.");
-  }
-
-  // Filter visibility in application code so the guest list works against
-  // both the current text-status schema and legacy deployments that still use
-  // enum-backed status values.
-  const venues = (data ?? [])
-    .filter((venue) => isGuestVisibleVenue(venue))
-    .filter((venue) => venueMatchesQuery(venue, query))
-    .filter((venue) => {
-      if (!category || category == "all") return true;
-      return (stringValue(asRecord(venue).category) ?? "").toLowerCase() ==
-        category;
-    })
-    .filter((venue) => !orderingOnly || canVenueAcceptGuestOrders(venue))
-    .sort((left, right) => {
-      if (latitude != null && longitude != null) {
-        const leftDistance = venueDistanceKm(left, latitude, longitude);
-        const rightDistance = venueDistanceKm(right, latitude, longitude);
-        if (leftDistance == null && rightDistance != null) return 1;
-        if (leftDistance != null && rightDistance == null) return -1;
-        if (leftDistance != null && rightDistance != null) {
-          const distanceCompare = leftDistance - rightDistance;
-          if (distanceCompare != 0) return distanceCompare;
-        }
-      }
-
-      const orderableCompare = Number(canVenueAcceptGuestOrders(right)) -
-        Number(canVenueAcceptGuestOrders(left));
-      if (orderableCompare != 0) return orderableCompare;
-
-      const ratingCompare = (numberValue(right.rating) ?? 0) -
-        (numberValue(left.rating) ?? 0);
-      if (ratingCompare != 0) return ratingCompare;
-
-      const ratingCountCompare = (numberValue(right.rating_count) ?? 0) -
-        (numberValue(left.rating_count) ?? 0);
-      if (ratingCountCompare != 0) return ratingCountCompare;
-
-      return (stringValue(left.name) ?? "").localeCompare(
-        stringValue(right.name) ?? "",
-      );
-    });
-  const visible = limit == null ? venues : venues.slice(offset, offset + limit);
-  const items = visible.map((venue) =>
-    publicVenueListPayload(venue, {
-      distanceKm: latitude != null && longitude != null
-        ? venueDistanceKm(venue, latitude, longitude)
-        : null,
-    })
-  );
-
-  if (includeSummary) {
-    const categories = [
-      ...new Set(
-        venues
-          .map((venue) => stringValue(asRecord(venue).category)?.trim() ?? "")
-          .filter((value) => value.length > 0),
-      ),
-    ]
-      .sort((left, right) => left.localeCompare(right))
-      .slice(0, 8);
-
-    return ok({
-      items,
-      categories,
-      total_count: venues.length,
-      has_more: limit != null ? offset + visible.length < venues.length : false,
-    });
-  }
-
-  return ok(items);
-}
-
-export async function handleGetAllVenues(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-  const countryCode = requestCountryCode(body);
-
-  const limit = normalizeListLimit(body.limit);
-  const offset = normalizeListOffset(body.offset);
-  let query = supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("country", countryCode)
-    .order("created_at", { ascending: false });
-  if (limit != null) {
-    query = query.range(offset, offset + limit - 1);
-  }
-  const { data, error } = await query;
-
-  if (error) {
-    console.error("[dinein-api] get all venues failed", error);
-    throw new HttpError(500, "Could not load venues.");
-  }
-
-  return ok(data ?? []);
-}
-
-export async function handleCreateVenue(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-
-  const venuePayload = asRecord(body.venue);
-  const payload = Object.keys(venuePayload).length == 0 ? body : venuePayload;
-  const updates = sanitizeVenueUpdates(payload, true);
-  const name = stringValue(updates.name);
-  if (!name) {
-    throw new HttpError(400, "Venue name is required.");
-  }
-
-  const slug = await ensureUniqueVenueSlug(
-    supabase,
-    stringValue(updates.slug) ?? name,
-  );
-
-  const insert: JsonRecord = {
-    name,
-    slug,
-    category: stringValue(updates.category) ?? "restaurant",
-    description: stringValue(updates.description) ?? "",
-    address: stringValue(updates.address) ?? "",
-    email: stringValue(updates.email) ?? null,
-    image_url: stringValue(updates.image_url) ?? null,
-    revolut_url: stringValue(updates.revolut_url) ?? null,
-    website_url: stringValue(updates.website_url) ?? null,
-    reservation_url: stringValue(updates.reservation_url) ?? null,
-    opening_hours: updates.opening_hours ?? null,
-    social_links: updates.social_links ?? {},
-    phone: stringValue(updates.phone) ?? null,
-    owner_whatsapp_number: stringValue(updates.owner_whatsapp_number) ?? null,
-    status: stringValue(updates.status) ?? "inactive",
-    ordering_enabled: booleanValue(updates.ordering_enabled) ?? false,
-    country: normalizeCountryCode(
-      updates.country ?? payload.country ?? payload.country_code,
-    ),
-    owner_id: stringValue(updates.owner_id) ?? null,
-    wifi_ssid: stringValue(updates.wifi_ssid) ?? null,
-    wifi_password: stringValue(updates.wifi_password) ?? null,
-    wifi_security: stringValue(updates.wifi_security) ?? null,
-    supported_payment_methods: Array.isArray(updates.supported_payment_methods)
-      ? updates.supported_payment_methods
-      : ["cash"],
-  };
-
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .insert(insert)
-    .select("*")
-    .single();
-
-  if (error) {
-    console.error("[dinein-api] create venue failed", error);
-    throw new HttpError(500, "Could not create the venue.");
-  }
-
-  return ok(data, 201);
-}
-
-export async function handleGetVenueBySlug(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const slug = requireString(body, "slug");
-  const countryCode = requestCountryCode(body);
-
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("country", countryCode)
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[dinein-api] get venue by slug failed", error);
-    throw new HttpError(500, "Could not load the venue.");
-  }
-
-  if (!data) {
-    return ok(null);
-  }
-
-  const venue = asRecord(data);
-  const venueId = stringValue(venue.id);
-  if (!venueId) {
-    return ok(null);
-  }
-
-  // Read-only: venue data is always accessible if the venue exists.
-  // Venue login is separate from public venue reads.
-  return ok(venue);
-}
-
-export async function handleGetVenueById(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  const countryCode = requestCountryCode(body);
-
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("country", countryCode)
-    .eq("id", venueId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[dinein-api] get venue by id failed", error);
-    throw new HttpError(500, "Could not load the venue.");
-  }
-
-  if (!data) {
-    return ok(null);
-  }
-
-  // Read-only: venue data is always accessible if the venue exists.
-  // Venue login is separate from public venue reads.
-  return ok(data);
-}
-
-export async function handleGetVenueForOwner(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const ownerId = requireString(body, "ownerId", "owner_id");
-  const countryCode = requestCountryCode(body);
-  await requireSelfOrAdmin(supabase, req, ownerId);
-
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("country", countryCode)
-    .eq("owner_id", ownerId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[dinein-api] get venue for owner failed", error);
-    throw new HttpError(500, "Could not load the venue.");
-  }
-
-  return ok(data ?? null);
-}
-
-export async function handleUpdateVenue(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  const mode = await authorizeVenueMutation(
-    supabase,
-    req,
-    venueId,
-    body.venue_session,
-  );
-  const adminActorId = mode == "admin"
-    ? (await hasVerifiedServiceRoleRequest(req)
-      ? "service_role"
-      : await requireAdmin(supabase, req))
-    : null;
-
-  const updates = sanitizeVenueUpdates(body.updates, mode == "admin");
-  if (mode == "venue") {
-    delete updates.phone;
-  }
-  if ("slug" in updates) {
-    updates.slug = await ensureUniqueVenueSlug(
-      supabase,
-      requireString(updates, "slug"),
-      venueId,
-    );
-  }
-  if (Object.keys(updates).length == 0) {
-    return ok(true);
-  }
-
-  const currentVenue = mode == "admin" || "status" in updates
-    ? await venueSnapshot(supabase, venueId)
-    : null;
-
-  if (mode == "admin") {
-    const persistedVenue = currentVenue ??
-      await venueSnapshot(supabase, venueId);
-    if ("owner_whatsapp_number" in updates) {
-      const nextAccessPhone = stringValue(updates.owner_whatsapp_number);
-      const previousAccessPhone = stringValue(
-        persistedVenue.owner_whatsapp_number,
-      );
-      const accessPhoneChanged = nextAccessPhone != previousAccessPhone;
-
-      if (nextAccessPhone && accessPhoneChanged) {
-        await ensureUniqueVenueAccessPhone(
-          supabase,
-          nextAccessPhone,
-          venueId,
-        );
-      }
-
-      updates.owner_whatsapp_number = nextAccessPhone;
-    }
-
-    const nextVenue = { ...persistedVenue, ...updates };
-    const readiness = venueOrderingReadiness(nextVenue);
-    const explicitEnable = updates.ordering_enabled === true;
-    const wasAlreadyEnabled = booleanValue(persistedVenue.ordering_enabled) ??
-      false;
-
-    // Only reject when the admin is NEWLY turning ordering ON (false → true).
-    // Re-submitting ordering_enabled=true on a venue that was already enabled
-    // should not block the entire save; the guard below will auto-disable if
-    // the venue is no longer ready.
-    if (explicitEnable && !wasAlreadyEnabled && !readiness.ready) {
-      throw new HttpError(
-        409,
-        "Venue is not ready to accept guest orders.",
-        {
-          code: "venue_not_order_ready",
-          readiness_reasons: readiness.reasons,
-        },
-      );
-    }
-
-    if (wasAlreadyEnabled && !readiness.ready) {
-      updates.ordering_enabled = false;
-    }
-  }
-
-  if (mode == "venue" && currentVenue != null && "status" in updates) {
-    const nextStatus = stringValue(updates.status) ?? venueStatus(currentVenue);
-    if (nextStatus != "active") {
-      updates.ordering_enabled = false;
-    } else {
-      const readiness = venueOrderingReadiness({
-        ...currentVenue,
-        ...updates,
-        status: "active",
-        ordering_enabled: true,
-      });
-      updates.ordering_enabled = readiness.ready;
-    }
-  }
-
-  const { data, error } = await supabase
-    .from("dinein_venues")
-    .update(updates)
-    .eq("id", venueId)
-    .select("*")
-    .maybeSingle();
-
-  if (error) {
-    console.error("[dinein-api] update venue failed", error);
-    if (error.code == "23505") {
-      throw new HttpError(
-        409,
-        "This WhatsApp number is already assigned to another venue.",
-        { code: "venue_access_phone_in_use" },
-      );
-    }
-    if (error.code == "23514") {
-      throw new HttpError(
-        409,
-        "Venue is not ready to accept guest orders.",
-        {
-          code: "venue_not_order_ready",
-          readiness_reasons: String(error.details ?? "")
-            .split(",")
-            .map((value) => value.trim())
-            .filter(Boolean),
-        },
-      );
-    }
-    throw new HttpError(500, "Could not update the venue.");
-  }
-
-  return ok(data ?? true);
-}
-
-export async function handleGetMenuItems(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  const { data: venueData, error: venueError } = await supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("id", venueId)
-    .maybeSingle();
-
-  if (venueError) {
-    console.error(
-      "[dinein-api] get menu items venue lookup failed",
-      venueError,
-    );
-    throw new HttpError(500, "Could not load the venue.");
-  }
-
-  const venue = asRecord(venueData);
-  if (!stringValue(venue.id)) {
-    throw new HttpError(404, "Venue not found.");
-  }
-
-  // Read-only: menu items are always accessible if the venue exists.
-  // Venue login is separate from public venue reads.
-  // Venue owners see all items; guests see only available items.
-  const canReadPrivate = await hasPrivateVenueAccess(
-    supabase,
-    req,
-    venueId,
-    body.venue_session,
-  ).catch(() => false);
-
-  const { data, error } = await supabase
-    .from("dinein_menu_items")
-    .select("*")
-    .eq("venue_id", venueId)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    console.error("[dinein-api] get menu items failed", error);
-    throw new HttpError(500, "Could not load menu items.");
-  }
-
-  const visibleItems = canReadPrivate
-    ? (data ?? [])
-    : (data ?? []).filter((item) =>
-      booleanValue(asRecord(item).is_available) ?? true
-    );
-  const hidePrice = !canReadPrivate && !canVenueAcceptGuestOrders(venue);
-  return ok(
-    visibleItems.map((item) => publicMenuItemPayload(item, { hidePrice })),
-  );
-}
-
-export async function handleGetMenuItemById(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const itemId = requireString(body, "itemId", "item_id", "id");
-  const { data, error } = await supabase
-    .from("dinein_menu_items")
-    .select("*")
-    .eq("id", itemId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[dinein-api] get menu item by id failed", error);
-    throw new HttpError(500, "Could not load menu item.");
-  }
-
-  const item = asRecord(data);
-  const venueId = stringValue(item.venue_id);
-  if (!venueId) {
-    throw new HttpError(404, "Menu item not found.");
-  }
-
-  const { data: venueData, error: venueError } = await supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("id", venueId)
-    .maybeSingle();
-
-  if (venueError) {
-    console.error(
-      "[dinein-api] get menu item by id venue lookup failed",
-      venueError,
-    );
-    throw new HttpError(500, "Could not load the venue.");
-  }
-
-  const venue = asRecord(venueData);
-  if (!stringValue(venue.id)) {
-    throw new HttpError(404, "Menu item not found.");
-  }
-
-  const canReadPrivate = await hasPrivateVenueAccess(
-    supabase,
-    req,
-    venueId,
-    body.venue_session,
-  );
-  if (!canReadPrivate && !isGuestVisibleVenue(venue)) {
-    throw new HttpError(404, "Menu item not found.");
-  }
-
-  const isAvailable = booleanValue(item.is_available) ?? true;
-  if (!canReadPrivate && !isAvailable) {
-    throw new HttpError(404, "Menu item not found.");
-  }
-
-  const hidePrice = !canReadPrivate && !canVenueAcceptGuestOrders(venue);
-  return ok(publicMenuItemPayload(item, { hidePrice }));
-}
-
-export async function handleGetAdminMenuQueue(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-
-  const { data, error } = await supabase
-    .from("dinein_menu_items")
-    .select(
-      "venue_id, category, is_available, image_status, menu_context_status, updated_at, venue:dinein_venues!inner(id, name, image_url, address, category, status)",
-    )
-    .or("admin_managed.is.false,admin_managed.is.null")
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    console.error("[dinein-api] get admin menu queue failed", error);
-    throw new HttpError(500, "Could not load the admin menu queue.");
-  }
-
-  type QueueAccumulator = {
-    venueId: string;
-    venueName: string;
-    venueImageUrl: string | null;
-    venueAddress: string;
-    venueCategory: string;
-    venueStatus: string;
-    totalItems: number;
-    availableItems: number;
-    pendingReviewCount: number;
-    failedReviewCount: number;
-    readyCount: number;
-    categories: Set<string>;
-    lastUpdatedAt: string | null;
-  };
-
-  const queue = new Map<string, QueueAccumulator>();
-
-  for (const rawRow of data ?? []) {
-    const row = asRecord(rawRow);
-    const venue = asRecord(row.venue);
-    const venueId = stringValue(row.venue_id) ?? stringValue(venue.id);
-    if (!venueId) continue;
-
-    const existing = queue.get(venueId) ?? {
-      venueId,
-      venueName: stringValue(venue.name) ?? "Venue",
-      venueImageUrl: stringValue(venue.image_url) ?? null,
-      venueAddress: stringValue(venue.address) ?? "",
-      venueCategory: stringValue(venue.category) ?? "",
-      venueStatus: stringValue(venue.status) ?? "active",
-      totalItems: 0,
-      availableItems: 0,
-      pendingReviewCount: 0,
-      failedReviewCount: 0,
-      readyCount: 0,
-      categories: new Set<string>(),
-      lastUpdatedAt: null,
-    };
-
-    existing.totalItems += 1;
-    if (booleanValue(row.is_available) ?? true) {
-      existing.availableItems += 1;
-    }
-
-    const reviewStatus = stringValue(row.menu_context_status) ??
-      (stringValue(row.image_status) == "ready" ? "ready" : "pending");
-    switch (reviewStatus) {
-      case "ready":
-        existing.readyCount += 1;
-        break;
-      case "failed":
-        existing.failedReviewCount += 1;
-        break;
-      default:
-        existing.pendingReviewCount += 1;
-        break;
-    }
-
-    const category = stringValue(row.category);
-    if (category) {
-      existing.categories.add(category);
-    }
-
-    const updatedAt = stringValue(row.updated_at);
-    if (
-      updatedAt &&
-      (!existing.lastUpdatedAt || updatedAt > existing.lastUpdatedAt)
-    ) {
-      existing.lastUpdatedAt = updatedAt;
-    }
-
-    queue.set(venueId, existing);
-  }
-
-  const items = Array.from(queue.values())
-    .map((entry) => ({
-      venue_id: entry.venueId,
-      venue_name: entry.venueName,
-      venue_image_url: entry.venueImageUrl,
-      venue_address: entry.venueAddress,
-      venue_category: entry.venueCategory,
-      venue_status: entry.venueStatus,
-      total_items: entry.totalItems,
-      available_items: entry.availableItems,
-      pending_review_count: entry.pendingReviewCount,
-      failed_review_count: entry.failedReviewCount,
-      ready_count: entry.readyCount,
-      category_count: entry.categories.size,
-      last_updated_at: entry.lastUpdatedAt,
-    }))
-    .sort((a, b) => {
-      const aNeedsReview = a.pending_review_count > 0 ||
-        a.failed_review_count > 0;
-      const bNeedsReview = b.pending_review_count > 0 ||
-        b.failed_review_count > 0;
-      if (aNeedsReview != bNeedsReview) {
-        return aNeedsReview ? -1 : 1;
-      }
-      return (b.last_updated_at ?? "").localeCompare(a.last_updated_at ?? "");
-    });
-
-  return ok(items);
-}
-
-export async function handleGetAdminMenuCatalog(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-
-  const { data, error } = await supabase
-    .from("dinein_menu_items")
-    .select(
-      "id, venue_id, admin_group_id, name, description, category, class, image_url, image_source, image_status, image_locked, tags, updated_at, venue:dinein_venues!inner(status)",
-    )
-    .eq("admin_managed", true)
-    .not("admin_group_id", "is", null)
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    console.error("[dinein-api] get admin menu catalog failed", error);
-    throw new HttpError(500, "Could not load the admin menu catalog.");
-  }
-
-  type CatalogAccumulator = {
-    groupId: string;
-    representativeItemId: string;
-    representativeVenueId: string;
-    name: string;
-    description: string;
-    category: string;
-    itemClass: string | null;
-    imageUrl: string | null;
-    imageSource: string | null;
-    imageStatus: string | null;
-    imageLocked: boolean;
-    tags: string[];
-    assignedVenueCount: number;
-    assignedActiveVenueCount: number;
-    lastUpdatedAt: string | null;
-  };
-
-  const catalog = new Map<string, CatalogAccumulator>();
-  for (const rawRow of data ?? []) {
-    const row = asRecord(rawRow);
-    const groupId = stringValue(row.admin_group_id);
-    if (!groupId) continue;
-    const venue = asRecord(row.venue);
-    const updatedAt = stringValue(row.updated_at) ?? null;
-    const existing = catalog.get(groupId);
-    if (!existing) {
-      catalog.set(groupId, {
-        groupId,
-        representativeItemId: stringValue(row.id) ?? "",
-        representativeVenueId: stringValue(row.venue_id) ?? "",
-        name: stringValue(row.name) ?? "",
-        description: stringValue(row.description) ?? "",
-        category: stringValue(row.category) ?? "Uncategorized",
-        itemClass: stringValue(row.class) ?? null,
-        imageUrl: stringValue(row.image_url) ?? null,
-        imageSource: stringValue(row.image_source) ?? null,
-        imageStatus: stringValue(row.image_status) ?? "pending",
-        imageLocked: booleanValue(row.image_locked) ?? false,
-        tags: normalizeStringList(row.tags),
-        assignedVenueCount: 1,
-        assignedActiveVenueCount: stringValue(venue.status) == "active" ? 1 : 0,
-        lastUpdatedAt: updatedAt,
-      });
-      continue;
-    }
-
-    existing.assignedVenueCount += 1;
-    if (stringValue(venue.status) == "active") {
-      existing.assignedActiveVenueCount += 1;
-    }
-    if (
-      updatedAt &&
-      (!existing.lastUpdatedAt ||
-        updatedAt.localeCompare(existing.lastUpdatedAt) > 0)
-    ) {
-      existing.representativeItemId = stringValue(row.id) ??
-        existing.representativeItemId;
-      existing.representativeVenueId = stringValue(row.venue_id) ??
-        existing.representativeVenueId;
-      existing.name = stringValue(row.name) ?? existing.name;
-      existing.description = stringValue(row.description) ??
-        existing.description;
-      existing.category = stringValue(row.category) ?? existing.category;
-      existing.itemClass = stringValue(row.class) ?? existing.itemClass;
-      existing.imageUrl = stringValue(row.image_url) ?? existing.imageUrl;
-      existing.imageSource = stringValue(row.image_source) ??
-        existing.imageSource;
-      existing.imageStatus = stringValue(row.image_status) ??
-        existing.imageStatus;
-      existing.imageLocked = booleanValue(row.image_locked) ??
-        existing.imageLocked;
-      existing.tags = normalizeStringList(row.tags);
-      existing.lastUpdatedAt = updatedAt;
-    }
-  }
-
-  return ok(
-    Array.from(catalog.values()).sort((left, right) =>
-      (right.lastUpdatedAt ?? "").localeCompare(left.lastUpdatedAt ?? "")
-    ).map((entry) => ({
-      group_id: entry.groupId,
-      representative_item_id: entry.representativeItemId,
-      representative_venue_id: entry.representativeVenueId,
-      name: entry.name,
-      description: entry.description,
-      category: entry.category,
-      class: entry.itemClass,
-      image_url: entry.imageUrl,
-      image_source: entry.imageSource,
-      image_status: entry.imageStatus,
-      image_locked: entry.imageLocked,
-      tags: entry.tags,
-      assigned_venue_count: entry.assignedVenueCount,
-      assigned_active_venue_count: entry.assignedActiveVenueCount,
-      last_updated_at: entry.lastUpdatedAt,
-    })),
-  );
-}
-
-export async function handleGetAdminMenuGroupAssignments(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-  const groupId = requireString(body, "groupId", "group_id");
-
-  const { data, error } = await supabase
-    .from("dinein_menu_items")
-    .select(
-      "id, admin_group_id, price, is_available, updated_at, venue:dinein_venues!inner(id, name, slug, status, ordering_enabled)",
-    )
-    .eq("admin_group_id", groupId)
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    console.error("[dinein-api] get admin menu assignments failed", error);
-    throw new HttpError(500, "Could not load menu assignments.");
-  }
-
-  return ok(
-    (data ?? []).map((row) => {
-      const record = asRecord(row);
-      const venue = asRecord(record.venue);
-      return {
-        item_id: stringValue(record.id) ?? "",
-        group_id: stringValue(record.admin_group_id) ?? groupId,
-        venue_id: stringValue(venue.id) ?? "",
-        venue_name: stringValue(venue.name) ?? "Venue",
-        venue_slug: stringValue(venue.slug) ?? "",
-        venue_status: stringValue(venue.status) ?? "active",
-        ordering_enabled: booleanValue(venue.ordering_enabled) ?? false,
-        price: numberValue(record.price) ?? 0,
-        is_available: booleanValue(record.is_available) ?? false,
-        updated_at: stringValue(record.updated_at) ?? null,
-      };
-    }),
-  );
-}
-
-export async function handleCreateAdminMenuGroups(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-
-  const rawItems = Array.isArray(body.items)
-    ? body.items
-    : (body.item ? [body.item] : []);
-  if (rawItems.length == 0) {
-    throw new HttpError(400, "At least one menu item is required.");
-  }
-
-  const venueIds = await resolveAdminAssignmentVenueIds(supabase, body);
-  const inserts: JsonRecord[] = [];
-  const groupIds: string[] = [];
-
-  for (const rawItem of rawItems) {
-    const draft = sanitizeAdminManagedMenuDraft(rawItem);
-    const groupId = crypto.randomUUID();
-    groupIds.push(groupId);
-    for (const venueId of venueIds) {
-      inserts.push({
-        venue_id: venueId,
-        admin_group_id: groupId,
-        admin_managed: true,
-        name: stringValue(draft.name) ?? "",
-        description: stringValue(draft.description) ?? "",
-        category: stringValue(draft.category) ?? "Uncategorized",
-        class: stringValue(draft.class) ?? null,
-        image_url: stringValue(draft.image_url) ?? null,
-        image_source: stringValue(draft.image_source) ?? null,
-        image_status: stringValue(draft.image_status) ?? "pending",
-        image_model: null,
-        image_prompt: null,
-        image_error: null,
-        image_generated_at: null,
-        image_locked: booleanValue(draft.image_locked) ?? false,
-        image_storage_path: null,
-        image_attempts: 0,
-        price: 0,
-        is_available: false,
-        tags: Array.isArray(draft.tags) ? draft.tags : [],
-      });
-    }
-  }
-
-  const { error } = await supabase.from("dinein_menu_items").insert(inserts);
-  if (error) {
-    console.error("[dinein-api] create admin menu groups failed", error);
-    throw new HttpError(500, "Could not create the admin menu items.");
-  }
-
-  return ok({
-    created_groups: groupIds.length,
-    assigned_venues: venueIds.length,
-    group_ids: groupIds,
-  }, 201);
-}
-
-export async function handleAssignAdminMenuGroup(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-  const groupId = requireString(body, "groupId", "group_id");
-  const venueIds = await resolveAdminAssignmentVenueIds(supabase, body);
-  const seed = await adminManagedMenuGroupSeed(supabase, groupId);
-
-  const { data: existingRows, error: existingError } = await supabase
-    .from("dinein_menu_items")
-    .select("venue_id")
-    .eq("admin_group_id", groupId)
-    .in("venue_id", venueIds);
-
-  if (existingError) {
-    console.error(
-      "[dinein-api] assign admin menu group lookup failed",
-      existingError,
-    );
-    throw new HttpError(500, "Could not validate existing menu assignments.");
-  }
-
-  const existingVenueIds = new Set(
-    (existingRows ?? [])
-      .map((row) => stringValue(asRecord(row).venue_id))
-      .filter((value): value is string => Boolean(value)),
-  );
-  const missingVenueIds = venueIds.filter((venueId) =>
-    !existingVenueIds.has(venueId)
-  );
-
-  if (missingVenueIds.length == 0) {
-    return ok({
-      group_id: groupId,
-      assigned_count: 0,
-      total_count: venueIds.length,
-    });
-  }
-
-  const inserts = missingVenueIds.map((venueId) => ({
-    venue_id: venueId,
-    admin_group_id: groupId,
-    admin_managed: true,
-    name: stringValue(seed.name) ?? "",
-    description: stringValue(seed.description) ?? "",
-    category: stringValue(seed.category) ?? "Uncategorized",
-    class: stringValue(seed.class) ?? null,
-    image_url: stringValue(seed.image_url) ?? null,
-    image_source: stringValue(seed.image_source) ?? null,
-    image_status: stringValue(seed.image_status) ?? "pending",
-    image_model: stringValue(seed.image_model) ?? null,
-    image_prompt: stringValue(seed.image_prompt) ?? null,
-    image_error: stringValue(seed.image_error) ?? null,
-    image_generated_at: stringValue(seed.image_generated_at) ?? null,
-    image_locked: booleanValue(seed.image_locked) ?? false,
-    image_storage_path: stringValue(seed.image_storage_path) ?? null,
-    image_attempts: numberValue(seed.image_attempts) ?? 0,
-    price: 0,
-    is_available: false,
-    tags: normalizeStringList(seed.tags),
-  }));
-
-  const { error } = await supabase.from("dinein_menu_items").insert(inserts);
-  if (error) {
-    console.error("[dinein-api] assign admin menu group failed", error);
-    throw new HttpError(500, "Could not assign the menu item to venues.");
-  }
-
-  return ok({
-    group_id: groupId,
-    assigned_count: missingVenueIds.length,
-    total_count: venueIds.length,
-  });
-}
-
-export async function handleDeleteAdminMenuGroup(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-  const groupId = requireString(body, "groupId", "group_id");
-
-  const { error } = await supabase
-    .from("dinein_menu_items")
-    .delete()
-    .eq("admin_group_id", groupId);
-
-  if (error) {
-    console.error("[dinein-api] delete admin menu group failed", error);
-    throw new HttpError(500, "Could not delete the admin menu item.");
-  }
-
-  return ok(true);
-}
-
-export async function handleToggleMenuItemAvailability(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const itemId = requireString(body, "itemId", "item_id");
-  const venueId = await menuItemVenueId(supabase, itemId);
-  const mode = await authorizeVenueMutation(
-    supabase,
-    req,
-    venueId,
-    body.venue_session,
-  );
-  if (mode == "admin" && !(await isServiceRoleRequest(req))) {
-    throw new HttpError(
-      403,
-      "Admin cannot change venue-specific availability. Venue teams control this field.",
-    );
-  }
-
-  const isAvailable = booleanValue(body.isAvailable);
-  if (isAvailable == undefined) {
-    throw new HttpError(400, "A valid availability flag is required.");
-  }
-
-  const { error } = await supabase
-    .from("dinein_menu_items")
-    .update({ is_available: isAvailable })
-    .eq("id", itemId);
-
-  if (error) {
-    console.error("[dinein-api] toggle menu item availability failed", error);
-    throw new HttpError(500, "Could not update item availability.");
-  }
-
-  return ok(true);
-}
-
-export async function handleCreateMenuItem(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const item = sanitizeMenuItemInsert(body.item);
-  const venueId = requireString(item, "venue_id");
-  const mode = await authorizeVenueMutation(
-    supabase,
-    req,
-    venueId,
-    body.venue_session,
-  );
-  if (mode == "admin" && !(await isServiceRoleRequest(req))) {
-    throw new HttpError(
-      403,
-      "Admin menu creation must use the centralized assignment flow.",
-    );
-  }
-
-  const { data, error } = await supabase
-    .from("dinein_menu_items")
-    .insert(item)
-    .select("*")
-    .single();
-
-  if (error) {
-    console.error("[dinein-api] create menu item failed", error);
-    throw new HttpError(500, "Could not create the menu item.");
-  }
-
-  return ok(data, 201);
-}
-
-export async function handleUpdateMenuItem(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const itemId = requireString(body, "itemId", "item_id");
-  const venueId = await menuItemVenueId(supabase, itemId);
-  const mode = await authorizeVenueMutation(
-    supabase,
-    req,
-    venueId,
-    body.venue_session,
-  );
-  const snapshot = mode == "admin"
-    ? await menuItemAdminSnapshot(supabase, itemId)
-    : null;
-
-  const updates = mode == "admin"
-    ? sanitizeAdminMenuUpdates(body.updates)
-    : sanitizeMenuItemUpdates(body.updates);
-  if (Object.keys(updates).length == 0) {
-    return ok(true);
-  }
-
-  if (mode == "admin") {
-    const groupId = stringValue(snapshot?.admin_group_id);
-    if (groupId) {
-      await syncAdminManagedGroupSharedFields(supabase, groupId, updates);
-      const refreshed = await adminManagedMenuGroupSeed(supabase, groupId);
-      return ok(refreshed);
-    }
-  }
-
-  const { data, error } = await supabase
-    .from("dinein_menu_items")
-    .update(updates)
-    .eq("id", itemId)
-    .select("*")
-    .maybeSingle();
-
-  if (error) {
-    console.error("[dinein-api] update menu item failed", error);
-    throw new HttpError(500, "Could not update the menu item.");
-  }
-
-  return ok(data ?? true);
-}
-
-export async function handleDeleteMenuItem(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const itemId = requireString(body, "itemId", "item_id");
-  const venueId = await menuItemVenueId(supabase, itemId);
-  const mode = await authorizeVenueMutation(
-    supabase,
-    req,
-    venueId,
-    body.venue_session,
-  );
-  if (mode == "admin" && !(await isServiceRoleRequest(req))) {
-    throw new HttpError(
-      403,
-      "Admin deletion must use the centralized menu group flow.",
-    );
-  }
-
-  const { error } = await supabase
-    .from("dinein_menu_items")
-    .delete()
-    .eq("id", itemId);
-
-  if (error) {
-    console.error("[dinein-api] delete menu item failed", error);
-    throw new HttpError(500, "Could not delete the menu item.");
-  }
-
-  return ok(true);
-}
-
-export async function handleSetMenuItemHighlights(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  const mode = await authorizeVenueMutation(
-    supabase,
-    req,
-    venueId,
-    body.venue_session,
-  );
-  if (mode == "admin" && !(await isServiceRoleRequest(req))) {
-    throw new HttpError(
-      403,
-      "Admin cannot change venue-specific highlight ordering.",
-    );
-  }
-
-  const rawItemIds = Array.isArray(body.itemIds)
-    ? body.itemIds
-    : Array.isArray(body.item_ids)
-    ? body.item_ids
-    : [];
-  const itemIds = rawItemIds
-    .map((value) => stringValue(value)?.trim() ?? "")
-    .filter(Boolean)
-    .filter((value, index, values) => values.indexOf(value) == index);
-
-  if (itemIds.length > 3) {
-    throw new HttpError(400, "You can select at most 3 highlighted items.");
-  }
-
-  if (itemIds.length > 0) {
-    const { data: existingItems, error: validateError } = await supabase
-      .from("dinein_menu_items")
-      .select("id")
-      .eq("venue_id", venueId)
-      .in("id", itemIds);
-
-    if (validateError) {
-      console.error(
-        "[dinein-api] validate menu item highlights failed",
-        validateError,
-      );
-      throw new HttpError(500, "Could not validate highlighted menu items.");
-    }
-
-    if ((existingItems ?? []).length != itemIds.length) {
-      throw new HttpError(
-        400,
-        "Highlighted items must belong to the current venue.",
-      );
-    }
-  }
-
-  const { error: clearError } = await supabase
-    .from("dinein_menu_items")
-    .update({ highlight_rank: null })
-    .eq("venue_id", venueId);
-
-  if (clearError) {
-    console.error("[dinein-api] clear menu item highlights failed", clearError);
-    throw new HttpError(500, "Could not reset highlighted menu items.");
-  }
-
-  for (const [index, itemId] of itemIds.entries()) {
-    const { error: updateError } = await supabase
-      .from("dinein_menu_items")
-      .update({ highlight_rank: index + 1 })
-      .eq("venue_id", venueId)
-      .eq("id", itemId);
-
-    if (updateError) {
-      console.error(
-        "[dinein-api] set menu item highlight failed",
-        updateError,
-      );
-      throw new HttpError(500, "Could not update highlighted menu items.");
-    }
-  }
-
-  const { data, error } = await supabase
-    .from("dinein_menu_items")
-    .select("*")
-    .eq("venue_id", venueId)
-    .order("highlight_rank", { ascending: true, nullsFirst: false })
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  if (error) {
-    console.error("[dinein-api] reload menu item highlights failed", error);
-    throw new HttpError(500, "Could not reload the updated menu items.");
-  }
-
-  return ok(data ?? []);
-}
 
 export async function handleGenerateMenuItemImage(
   supabase: ReturnType<typeof adminClient>,
@@ -4804,812 +3500,6 @@ async function loadVenuesForVenueImageBackfill(
     .slice(0, limit);
 }
 
-export async function handleSearchGoogleMaps(
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const query = requireString(body, "query").trim();
-  if (query.length < 2) {
-    return ok([]);
-  }
-
-  const geminiApiKey = optionalEnv("GEMINI_API_KEY");
-  if (!geminiApiKey) {
-    return ok([]);
-  }
-
-  const nowMs = Date.now();
-  const searchSubjectKey = googleMapsSearchRateLimitKey(req);
-  await assertRateLimit(
-    adminClient(),
-    searchSubjectKey,
-    GOOGLE_MAPS_SEARCH_RATE_LIMIT,
-    nowMs,
-  );
-  await recordRateLimit(
-    adminClient(),
-    searchSubjectKey,
-    GOOGLE_MAPS_SEARCH_RATE_LIMIT,
-    nowMs,
-  );
-
-  const country = countryLabel(requestCountryCode(body));
-  const models = (
-    Deno.env.get("GEMINI_VENUE_MODELS") ??
-      "gemini-2.5-flash,gemini-2.5-flash-lite"
-  ).split(",").map((value) => value.trim()).filter(Boolean);
-
-  const prompt = [
-    "You are searching for hospitality venues on Google Maps.",
-    "Use only grounded Google Maps results from the built-in googleMaps tool.",
-    "Never invent venues, ratings, phone numbers, or addresses.",
-    "",
-    `Search query: ${query}`,
-    `Country: ${country}`,
-    "",
-    "Return up to 5 venues as a JSON array.",
-    "Each venue should include name, address, category, rating, ratingCount, phone, website, placeId, and googleMapsUri when available.",
-    "Return only valid JSON.",
-  ].join("\n");
-
-  for (const model of models) {
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${
-          encodeURIComponent(model)
-        }:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-goog-api-key": geminiApiKey,
-          },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            tools: [{ googleMaps: {} }],
-          }),
-        },
-      );
-      if (!response.ok) {
-        continue;
-      }
-
-      const json = asRecord(await response.json());
-      const candidate = asRecord((json.candidates as unknown[] ?? [])[0]);
-      const content = asRecord(candidate.content);
-      const parts = (content.parts as unknown[] | undefined) ?? [];
-      const text = parts
-        .map((part) => stringValue(asRecord(part).text))
-        .filter((value): value is string => Boolean(value))
-        .join("\n")
-        .trim();
-      if (!text) {
-        continue;
-      }
-
-      const cleaned = text
-        .replace(/```(?:json)?\s*/gi, "")
-        .replace(/```/g, "")
-        .trim();
-      try {
-        const parsed = JSON.parse(cleaned);
-        if (Array.isArray(parsed)) {
-          return ok(parsed);
-        }
-        if (
-          parsed && typeof parsed == "object" && Array.isArray(parsed.results)
-        ) {
-          return ok(parsed.results);
-        }
-        return ok([parsed]);
-      } catch {
-        const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
-        if (arrayMatch) {
-          try {
-            return ok(JSON.parse(arrayMatch[0]));
-          } catch {
-            continue;
-          }
-        }
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return ok([]);
-}
-
-export async function handleGetVenueNotificationSettings(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-  return ok(await venueNotificationSettingsSnapshot(supabase, venueId));
-}
-
-export async function handleUpdateVenueNotificationSettings(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const settings = await upsertVenueNotificationSettings(
-    supabase,
-    venueId,
-    body.settings ?? body,
-  );
-  await syncVenuePushRegistrationFlags(
-    supabase,
-    venueId,
-    booleanValue(settings.order_push_enabled) ?? true,
-  );
-  return ok(settings);
-}
-
-export async function handleRegisterPushDevice(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const deviceKey = requireString(body, "deviceKey", "device_key");
-  const pushToken = sanitizePushToken(body.pushToken ?? body.push_token);
-  const platform = normalizePushPlatform(body.platform);
-  const settings = await venueNotificationSettingsSnapshot(supabase, venueId);
-  const notificationsEnabled =
-    booleanValue(body.notificationsEnabled ?? body.notifications_enabled) ??
-      (booleanValue(settings.order_push_enabled) ?? true);
-  const contactPhone = await resolveVenueNotificationContactPhone(
-    supabase,
-    venueId,
-    body,
-  );
-
-  const cleanupByToken = await supabase
-    .from("dinein_push_registrations")
-    .delete()
-    .eq("push_token", pushToken);
-  if (cleanupByToken.error) {
-    console.error(
-      "[dinein-api] push registration token cleanup failed",
-      cleanupByToken.error,
-    );
-    throw new HttpError(500, "Could not register the push device.");
-  }
-
-  const cleanupByDevice = await supabase
-    .from("dinein_push_registrations")
-    .delete()
-    .eq("device_key", deviceKey)
-    .neq("venue_id", venueId);
-  if (cleanupByDevice.error) {
-    console.error(
-      "[dinein-api] push registration device cleanup failed",
-      cleanupByDevice.error,
-    );
-    throw new HttpError(500, "Could not register the push device.");
-  }
-
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from("dinein_push_registrations")
-    .upsert(
-      {
-        venue_id: venueId,
-        contact_phone: contactPhone,
-        device_key: deviceKey,
-        push_token: pushToken,
-        platform,
-        provider: "fcm",
-        notifications_enabled: notificationsEnabled,
-        app_version: stringValue(body.appVersion) ??
-          stringValue(body.app_version) ??
-          null,
-        locale: stringValue(body.locale) ?? null,
-        time_zone: stringValue(body.timeZone) ??
-          stringValue(body.time_zone) ??
-          null,
-        last_seen_at: now,
-      },
-      { onConflict: "venue_id,device_key" },
-    )
-    .select(
-      "id, venue_id, device_key, push_token, platform, notifications_enabled, last_seen_at",
-    )
-    .single();
-
-  if (error) {
-    console.error("[dinein-api] register push device failed", error);
-    throw new HttpError(500, "Could not register the push device.");
-  }
-
-  return ok(asRecord(data));
-}
-
-export async function handleUnregisterPushDevice(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const deviceKey = stringValue(body.deviceKey) ?? stringValue(body.device_key);
-  const pushToken = stringValue(body.pushToken) ?? stringValue(body.push_token);
-  if (!deviceKey && !pushToken) {
-    throw new HttpError(
-      400,
-      "Device key or push token is required to unregister a push device.",
-    );
-  }
-
-  let query = supabase
-    .from("dinein_push_registrations")
-    .delete()
-    .eq("venue_id", venueId);
-  query = deviceKey ? query.eq("device_key", deviceKey) : query.eq(
-    "push_token",
-    pushToken!,
-  );
-
-  const { error } = await query;
-  if (error) {
-    console.error("[dinein-api] unregister push device failed", error);
-    throw new HttpError(500, "Could not unregister the push device.");
-  }
-
-  return ok(true);
-}
-
-async function bellRequestVenueId(
-  supabase: ReturnType<typeof adminClient>,
-  requestId: string,
-): Promise<string> {
-  const { data, error } = await supabase
-    .from("bell_requests")
-    .select("venue_id")
-    .eq("id", requestId)
-    .maybeSingle();
-  if (error) {
-    console.error("[dinein-api] bell request venue lookup failed", error);
-    throw new HttpError(500, "Could not load the bell request.");
-  }
-
-  const venueId = stringValue(asRecord(data ?? {}).venue_id);
-  if (!venueId) {
-    throw new HttpError(404, "Bell request not found.");
-  }
-  return venueId;
-}
-
-function bellRequestSchemaMismatch(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const record = error as Record<string, unknown>;
-  const text = [
-    record.code,
-    record.message,
-    record.details,
-    record.hint,
-  ].filter((value) => typeof value === "string" && value.length > 0).join(" ")
-    .toLowerCase();
-  return text.includes("bell_requests") &&
-    (text.includes("does not exist") ||
-      text.includes("schema cache") ||
-      text.includes("could not find the table") ||
-      text.includes("could not find the column"));
-}
-
-function bellRequestFailure(
-  error: unknown,
-  message: string,
-): HttpError {
-  if (bellRequestSchemaMismatch(error)) {
-    return new HttpError(
-      500,
-      "Bell requests are not configured correctly for this project.",
-      { code: "bell_requests_not_configured" },
-    );
-  }
-
-  return new HttpError(500, message);
-}
-
-export async function handleSendWave(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  const tableNumber = normalizeWaveTableNumber(
-    body.tableNumber ?? body.table_number,
-  );
-
-  // Verify the venue exists and is active before accepting a wave
-  const { data: venueCheck, error: venueCheckError } = await supabase
-    .from("dinein_venues")
-    .select("id, name, status")
-    .eq("id", venueId)
-    .maybeSingle();
-  if (venueCheckError) {
-    console.error("[dinein-api] wave venue check failed", venueCheckError);
-    throw new HttpError(500, "Could not verify the venue.");
-  }
-  if (!venueCheck || stringValue(asRecord(venueCheck).status) !== "active") {
-    throw new HttpError(409, "This venue is not accepting requests right now.");
-  }
-
-  const user = await currentUser(req);
-  const now = new Date();
-  const dedupeThreshold = new Date(now.getTime() - 30_000).toISOString();
-
-  const { data: existing, error: existingError } = await supabase
-    .from("bell_requests")
-    .select("*")
-    .eq("venue_id", venueId)
-    .eq("table_number", tableNumber)
-    .eq("status", "pending")
-    .gte("created_at", dedupeThreshold)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (existingError) {
-    console.error("[dinein-api] wave dedupe lookup failed", existingError);
-    throw bellRequestFailure(
-      existingError,
-      "Could not create the wave request.",
-    );
-  }
-  if (existing) {
-    return ok(existing, 200);
-  }
-
-  const waveRateLimitSubjectKey = user == null
-    ? anonymousWaveRateLimitKey(req, venueId)
-    : null;
-  await assertRateLimit(
-    supabase,
-    waveRateLimitSubjectKey,
-    WAVE_RATE_LIMIT,
-    now.getTime(),
-  );
-
-  const { data, error } = await supabase
-    .from("bell_requests")
-    .insert({
-      venue_id: venueId,
-      table_number: tableNumber,
-      user_id: user?.id ?? null,
-    })
-    .select("*")
-    .single();
-  if (error) {
-    console.error("[dinein-api] wave insert failed", error);
-    throw bellRequestFailure(error, "Could not create the wave request.");
-  }
-
-  await recordRateLimit(
-    supabase,
-    waveRateLimitSubjectKey,
-    WAVE_RATE_LIMIT,
-    now.getTime(),
-  );
-
-  try {
-    await dispatchVenueOperationalAlert(
-      supabase,
-      venueId,
-      buildBellRequestPushNotification(asRecord(venueCheck), asRecord(data)),
-    );
-  } catch (error) {
-    console.error("[dinein-api] bell request push dispatch failed", error);
-  }
-
-  return ok(data, 201);
-}
-
-export async function handleGetBellRequests(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  const status = stringValue(body.status);
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  let query = supabase
-    .from("bell_requests")
-    .select("*")
-    .eq("venue_id", venueId)
-    .order("created_at", { ascending: false });
-
-  if (status == "pending" || status == "resolved") {
-    query = query.eq("status", status);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error("[dinein-api] get bell requests failed", error);
-    throw bellRequestFailure(error, "Could not load bell requests.");
-  }
-
-  return ok(data ?? []);
-}
-
-export async function handleResolveBellRequest(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const requestId = requireString(body, "requestId", "request_id");
-  const venueId = await bellRequestVenueId(supabase, requestId);
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const { error } = await supabase
-    .from("bell_requests")
-    .update({
-      status: "resolved",
-      resolved_at: new Date().toISOString(),
-    })
-    .eq("id", requestId);
-  if (error) {
-    console.error("[dinein-api] resolve bell request failed", error);
-    throw bellRequestFailure(error, "Could not resolve the bell request.");
-  }
-
-  return ok(true);
-}
-
-export async function handlePlaceOrder(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const user = await currentUser(req);
-  const order = sanitizeOrderInsert(body.order, user?.id);
-  const venueId = requireString(order, "venue_id");
-  const requestedItems =
-    (order.items as SanitizedOrderItemInput[] | undefined) ??
-      [];
-
-  const { data: venueData, error: venueError } = await supabase
-    .from("dinein_venues")
-    .select("*")
-    .eq("id", venueId)
-    .maybeSingle();
-
-  if (venueError) {
-    console.error("[dinein-api] place order venue lookup failed", venueError);
-    throw new HttpError(500, "Could not load the venue.");
-  }
-
-  const venue = asRecord(venueData);
-  if (!stringValue(venue.id)) {
-    throw new HttpError(404, "Venue not found.");
-  }
-
-  if (!canVenueAcceptGuestOrders(venue)) {
-    throw new HttpError(
-      409,
-      "This venue is unavailable for guest ordering right now.",
-      { code: "venue_unavailable" },
-    );
-  }
-
-  if (
-    stringValue(order.payment_method) == "revolut_link" &&
-    !stringValue(venue.revolut_url)
-  ) {
-    throw new HttpError(
-      409,
-      "This venue has not configured Revolut payments yet.",
-      { code: "revolut_unavailable" },
-    );
-  }
-
-  const supportedPaymentMethods = venueSupportedPaymentMethods(venue);
-  if (
-    !supportedPaymentMethods.includes(stringValue(order.payment_method) ?? "")
-  ) {
-    throw new HttpError(
-      409,
-      "This venue does not support the selected payment method.",
-      {
-        code: "payment_method_unavailable",
-        supported_payment_methods: supportedPaymentMethods,
-      },
-    );
-  }
-
-  const uniqueItemIds = [
-    ...new Set(requestedItems.map((item) => item.menuItemId)),
-  ];
-  const { data: menuData, error: menuError } = await supabase
-    .from("dinein_menu_items")
-    .select("id, venue_id, name, description, image_url, price, is_available")
-    .eq("venue_id", venueId)
-    .in("id", uniqueItemIds);
-
-  if (menuError) {
-    console.error("[dinein-api] place order menu lookup failed", menuError);
-    throw new HttpError(500, "Could not validate the requested menu items.");
-  }
-
-  const menuById = new Map<string, JsonRecord>();
-  for (const item of (menuData ?? [])) {
-    const record = asRecord(item);
-    const itemId = stringValue(record.id);
-    if (itemId) {
-      menuById.set(itemId, record);
-    }
-  }
-
-  const normalizedItems = requestedItems.map((item) => {
-    const menuItem = menuById.get(item.menuItemId);
-    if (!menuItem) {
-      throw new HttpError(
-        400,
-        `Menu item "${item.menuItemId}" is not available for this venue.`,
-        { code: "menu_item_unavailable", menu_item_id: item.menuItemId },
-      );
-    }
-
-    if (booleanValue(menuItem.is_available) == false) {
-      throw new HttpError(
-        409,
-        `Menu item "${
-          stringValue(menuItem.name) ?? item.menuItemId
-        }" is sold out.`,
-        { code: "menu_item_sold_out", menu_item_id: item.menuItemId },
-      );
-    }
-
-    const price = numberValue(menuItem.price);
-    if (price == undefined) {
-      throw new HttpError(
-        500,
-        `Menu item "${item.menuItemId}" has an invalid price.`,
-      );
-    }
-
-    return {
-      menu_item_id: item.menuItemId,
-      name: stringValue(menuItem.name) ?? "Menu Item",
-      description: stringValue(menuItem.description) ?? "",
-      image_url: stringValue(menuItem.image_url) ?? null,
-      price: roundCurrency(price),
-      quantity: item.quantity,
-      note: item.note,
-    };
-  });
-
-  const subtotal = roundCurrency(
-    normalizedItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0,
-    ),
-  );
-  const serviceFee = roundCurrency(subtotal * 0.05);
-  const total = roundCurrency(subtotal + serviceFee);
-
-  const orderData = await uniqueOrderInsert(supabase, {
-    ...order,
-    items: normalizedItems,
-    subtotal,
-    service_fee: serviceFee,
-    total,
-    venue_name: stringValue(venue.name) ??
-      stringValue(order.venue_name) ??
-      "Venue",
-  });
-  const orderId = stringValue(orderData.id);
-  const receiptToken = orderId
-    ? await issueOrderReceiptToken(orderId, venueId)
-    : null;
-
-  try {
-    await dispatchVenueOperationalAlert(
-      supabase,
-      venueId,
-      buildNewOrderPushNotification(orderData),
-    );
-  } catch (error) {
-    console.error("[dinein-api] order push dispatch failed", error);
-  }
-
-  try {
-    await dispatchVenueWhatsAppAlert(
-      supabase,
-      venueId,
-      `New Order #${orderData.daily_sequence_number} received! Total: €${orderData.total}`,
-    );
-  } catch (error) {
-    console.error("[dinein-api] venue whatsapp alert dispatch failed", error);
-  }
-
-  return ok({
-    ...orderData,
-    venue_image_url: stringValue(venue.image_url) ?? null,
-    ...(receiptToken == null ? {} : { receipt_token: receiptToken }),
-  }, 201);
-}
-
-async function attachPresentationDataToOrders(
-  supabase: ReturnType<typeof adminClient>,
-  orders: unknown[],
-): Promise<JsonRecord[]> {
-  const normalizedOrders = orders.map((order) => asRecord(order));
-  const venueIds = [
-    ...new Set(
-      normalizedOrders
-        .map((order) => stringValue(order.venue_id))
-        .filter((value): value is string => Boolean(value)),
-    ),
-  ];
-  const menuItemIds = [
-    ...new Set(
-      normalizedOrders.flatMap((order) => {
-        if (!Array.isArray(order.items)) {
-          return [];
-        }
-        return order.items
-          .map((rawItem) => {
-            const item = asRecord(rawItem);
-            return stringValue(item.menu_item_id) ??
-              stringValue(item.menuItemId);
-          })
-          .filter((value): value is string => Boolean(value));
-      }),
-    ),
-  ];
-
-  if (venueIds.length == 0 && menuItemIds.length == 0) {
-    return normalizedOrders;
-  }
-
-  const imageByVenueId = new Map<string, string | null>();
-  if (venueIds.length > 0) {
-    const { data, error } = await supabase
-      .from("dinein_venues")
-      .select("id, image_url")
-      .in("id", venueIds);
-
-    if (error) {
-      console.error("[dinein-api] order venue image lookup failed", error);
-    } else {
-      for (const entry of (data ?? [])) {
-        const venue = asRecord(entry);
-        const venueId = stringValue(venue.id);
-        if (!venueId) continue;
-        imageByVenueId.set(venueId, stringValue(venue.image_url) ?? null);
-      }
-    }
-  }
-
-  const menuById = new Map<string, JsonRecord>();
-  if (menuItemIds.length > 0) {
-    const { data, error } = await supabase
-      .from("dinein_menu_items")
-      .select("id, name, description, image_url, price")
-      .in("id", menuItemIds);
-
-    if (error) {
-      console.error(
-        "[dinein-api] order item presentation lookup failed",
-        error,
-      );
-    } else {
-      for (const entry of (data ?? [])) {
-        const menuItem = asRecord(entry);
-        const menuItemId = stringValue(menuItem.id);
-        if (!menuItemId) continue;
-        menuById.set(menuItemId, menuItem);
-      }
-    }
-  }
-
-  return normalizedOrders.map((order) => {
-    const venueId = stringValue(order.venue_id);
-    const hydratedItems = Array.isArray(order.items)
-      ? order.items.map((rawItem) => {
-        const item = asRecord(rawItem);
-        const menuItemId = stringValue(item.menu_item_id) ??
-          stringValue(item.menuItemId);
-        const menuItem = menuItemId == null ? null : menuById.get(menuItemId);
-        if (menuItem == null) {
-          return item;
-        }
-
-        const existingDescription = stringValue(item.description) ??
-          stringValue(item.menu_item_description);
-        const normalizedDescription = existingDescription?.trim();
-        const existingImageUrl = stringValue(item.image_url) ??
-          stringValue(item.imageUrl) ??
-          stringValue(item.menu_item_image_url);
-        const normalizedImageUrl = existingImageUrl?.trim();
-        const existingName = stringValue(item.name)?.trim();
-
-        return {
-          ...item,
-          name: existingName != null && existingName.length > 0
-            ? existingName
-            : stringValue(menuItem.name) ?? "Menu Item",
-          description: normalizedDescription != null &&
-              normalizedDescription.length > 0
-            ? normalizedDescription
-            : stringValue(menuItem.description) ?? "",
-          image_url: normalizedImageUrl != null && normalizedImageUrl.length > 0
-            ? normalizedImageUrl
-            : stringValue(menuItem.image_url) ?? null,
-          price: numberValue(item.price) ??
-            numberValue(menuItem.price) ??
-            0,
-        };
-      })
-      : order.items;
-
-    return {
-      ...order,
-      venue_image_url: venueId == null
-        ? stringValue(order.venue_image_url) ?? null
-        : imageByVenueId.get(venueId) ??
-          stringValue(order.venue_image_url) ??
-          null,
-      items: hydratedItems,
-    };
-  });
-}
-
-export async function handleGetOrdersForVenue(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const { data, error } = await supabase
-    .from("dinein_orders")
-    .select("*")
-    .eq("venue_id", venueId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("[dinein-api] get orders for venue failed", error);
-    throw new HttpError(500, "Could not load venue orders.");
-  }
-
-  return ok(await attachPresentationDataToOrders(supabase, data ?? []));
-}
-
-export async function handleGetOrdersForUser(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const userId = requireString(body, "userId", "user_id");
-  await requireSelfOrAdmin(supabase, req, userId);
-
-  const { data, error } = await supabase
-    .from("dinein_orders")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("[dinein-api] get orders for user failed", error);
-    throw new HttpError(500, "Could not load the user's orders.");
-  }
-
-  return ok(await attachPresentationDataToOrders(supabase, data ?? []));
-}
-
 export async function handleImageHealth(
   supabase: ReturnType<typeof adminClient>,
   req: Request,
@@ -5652,830 +3542,4 @@ export async function handleImageHealth(
   return ok({ total, ready, pending, generating, failed });
 }
 
-export async function handleGetAllOrders(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-
-  const { data, error } = await supabase
-    .from("dinein_orders")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("[dinein-api] get all orders failed", error);
-    throw new HttpError(500, "Could not load orders.");
-  }
-
-  return ok(await attachPresentationDataToOrders(supabase, data ?? []));
-}
-
-export async function handleGetAdminDashboardKpis(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  await requireAdmin(supabase, req);
-
-  const tz = stringValue(body.timeZone) ?? "UTC";
-  // The client passes the start of today as an ISO string to handle timezone safely
-  const startOfDay = stringValue(body.startOfDay) ??
-    new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
-
-  const [ordersResp] = await Promise.all([
-    supabase.from("dinein_orders").select("total, created_at, status"),
-  ]);
-
-  const ordersData = ordersResp.data ?? [];
-  let revenue_today = 0;
-  let orders_today = 0;
-  let total_revenue = 0;
-  let cancelled_orders = 0;
-
-  for (const o of ordersData) {
-    const total = numberValue(o.total) ?? 0;
-    const createdAt = stringValue(o.created_at);
-    const status = stringValue(o.status);
-
-    total_revenue += total;
-    if (status === "cancelled") {
-      cancelled_orders++;
-    }
-
-    if (createdAt && createdAt >= startOfDay) {
-      orders_today++;
-      revenue_today += total;
-    }
-  }
-
-  return ok({
-    orders_today,
-    revenue_today: roundCurrency(revenue_today),
-    total_orders: ordersData.length,
-    total_revenue: roundCurrency(total_revenue),
-    cancelled_orders,
-  });
-}
-
-export async function handleGetOrderById(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const orderId = requireString(body, "orderId", "order_id");
-  const receiptToken = stringValue(body.receiptToken) ??
-    stringValue(body.receipt_token);
-
-  const { data, error } = await supabase
-    .from("dinein_orders")
-    .select("*")
-    .eq("id", orderId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[dinein-api] get order by id failed", error);
-    throw new HttpError(500, "Could not load the order.");
-  }
-
-  if (!data) {
-    return ok(null);
-  }
-
-  if (receiptToken && await verifyOrderReceiptToken(receiptToken, orderId)) {
-    return ok(
-      (await attachPresentationDataToOrders(supabase, [data]))[0] ?? data,
-    );
-  }
-
-  if (await adminUserId(supabase, req)) {
-    return ok(
-      (await attachPresentationDataToOrders(supabase, [data]))[0] ?? data,
-    );
-  }
-
-  const order = asRecord(data);
-  const user = await currentUser(req);
-  if (user && stringValue(order.user_id) == user.id) {
-    return ok(
-      (await attachPresentationDataToOrders(supabase, [data]))[0] ?? data,
-    );
-  }
-
-  const venueClaims = await venueSessionClaims(req);
-  if (
-    stringValue(venueClaims?.venue_id) != undefined &&
-    stringValue(venueClaims?.venue_id) == stringValue(order.venue_id)
-  ) {
-    return ok(
-      (await attachPresentationDataToOrders(supabase, [data]))[0] ?? data,
-    );
-  }
-
-  throw new HttpError(403, "You are not allowed to access this order.");
-}
-
-export async function handleIssueOrderRealtimeAccess(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const orderId = stringValue(body.orderId) ?? stringValue(body.order_id);
-  if (orderId) {
-    const receiptToken = stringValue(body.receiptToken) ??
-      stringValue(body.receipt_token);
-
-    const { data, error } = await supabase
-      .from("dinein_orders")
-      .select("id, venue_id, user_id")
-      .eq("id", orderId)
-      .maybeSingle();
-
-    if (error) {
-      console.error(
-        "[dinein-api] issue order realtime access lookup failed",
-        error,
-      );
-      throw new HttpError(500, "Could not load the order.");
-    }
-
-    if (!data) {
-      throw new HttpError(404, "Order not found.");
-    }
-
-    const order = asRecord(data);
-    const venueId = stringValue(order.venue_id);
-    const userId = stringValue(order.user_id);
-    const venueClaims = await venueSessionClaims(req);
-    const current = await currentUser(req);
-    const isAdmin = await adminUserId(supabase, req) != null;
-    const hasGuestReceipt = receiptToken != null &&
-      await verifyOrderReceiptToken(receiptToken, orderId);
-    const hasVenueAccess = venueId != null &&
-      stringValue(venueClaims?.venue_id) == venueId;
-    const hasUserAccess = current != null && userId == current.id;
-
-    if (!hasGuestReceipt && !hasVenueAccess && !hasUserAccess && !isAdmin) {
-      throw new HttpError(403, "You are not allowed to access this order.");
-    }
-
-    return ok(
-      await issueScopedRealtimeAccessToken({
-        aud: "dinein-order-realtime",
-        sub: orderId,
-        order_id: orderId,
-      }),
-    );
-  }
-
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueSession(req, supabase, body.venue_session, venueId);
-
-  return ok(
-    await issueScopedRealtimeAccessToken({
-      aud: "dinein-venue-realtime",
-      sub: venueId,
-      venue_id: venueId,
-    }),
-  );
-}
-
-export async function handleUpdateOrderStatus(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const orderId = requireString(body, "orderId", "order_id");
-  const status = requireString(body, "status");
-
-  if (!orderStatuses.has(status)) {
-    throw new HttpError(400, `Unsupported order status: ${status}`, {
-      code: "unsupported_order_status",
-    });
-  }
-
-  const order = await orderStatusSnapshot(supabase, orderId);
-  await authorizeVenueMutation(
-    supabase,
-    req,
-    order.venueId,
-    body.venue_session,
-  );
-  assertValidOrderStatusTransition(order.status, status);
-
-  if (order.status == status) {
-    return ok(true);
-  }
-
-  const { error } = await supabase
-    .from("dinein_orders")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", orderId);
-
-  if (error) {
-    console.error("[dinein-api] update order status failed", error);
-    throw new HttpError(500, "Could not update the order status.");
-  }
-
-  return ok(true);
-}
-
 // handleAppRequest + Deno.serve live in index.ts
-
-// ─── Manual Image Upload Handlers ──────────────────────────────────────────
-
-function decodeBase64Image(
-  base64Data: string,
-): { bytes: Uint8Array; contentType: string; ext: string } {
-  // Strip data URI prefix if present: data:image/png;base64,...
-  let raw = base64Data;
-  let detectedType = "image/jpeg";
-  const dataUriMatch = raw.match(
-    /^data:(image\/(?:png|jpeg|webp));base64,/i,
-  );
-  if (dataUriMatch) {
-    detectedType = dataUriMatch[1].toLowerCase();
-    raw = raw.slice(dataUriMatch[0].length);
-  }
-  const ext = detectedType === "image/png"
-    ? "png"
-    : detectedType === "image/webp"
-    ? "webp"
-    : "jpg";
-
-  // Decode base64 → Uint8Array (Deno built-in)
-  const binaryString = atob(raw);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return { bytes, contentType: detectedType, ext };
-}
-
-/**
- * Upload a venue cover/profile image.
- * Payload: { venueId, image_data (base64), venue_session }
- * Writes to venue-images/{venueId}/{timestamp}.{ext}
- * Updates dinein_venues.image_url + image_source = 'manual'
- */
-export async function handleUploadVenueImage(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const imageData = requireString(body, "image_data");
-  if (!imageData || imageData.length < 100) {
-    throw new HttpError(
-      400,
-      "image_data is required and must be a valid base64 image.",
-    );
-  }
-
-  // Enforce ~10MB base64 limit (~7.5MB decoded)
-  if (imageData.length > 14_000_000) {
-    throw new HttpError(413, "Image too large. Maximum 10MB.");
-  }
-
-  const { bytes, contentType, ext } = decodeBase64Image(imageData);
-  const timestamp = Date.now();
-  const storagePath = `${venueId}/${timestamp}.${ext}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("venue-images")
-    .upload(storagePath, bytes, {
-      contentType,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.error("[dinein-api] venue image upload failed", uploadError);
-    throw new HttpError(500, "Could not upload the venue image.");
-  }
-
-  // Build public URL
-  const { data: urlData } = supabase.storage
-    .from("venue-images")
-    .getPublicUrl(storagePath);
-  const publicUrl = urlData?.publicUrl;
-
-  if (!publicUrl) {
-    throw new HttpError(
-      500,
-      "Upload succeeded but could not resolve public URL.",
-    );
-  }
-
-  // Update venue record
-  const { error: dbError } = await supabase
-    .from("dinein_venues")
-    .update({
-      image_url: publicUrl,
-      image_source: "manual",
-      image_status: "ready",
-      image_storage_path: storagePath,
-      image_error: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", venueId);
-
-  if (dbError) {
-    console.error("[dinein-api] venue image DB update failed", dbError);
-    throw new HttpError(
-      500,
-      "Image uploaded but could not update venue record.",
-    );
-  }
-
-  return ok({ image_url: publicUrl, storage_path: storagePath });
-}
-
-/**
- * Upload a menu item image.
- * Payload: { venueId, itemId, image_data (base64), venue_session }
- * Writes to menu-images/{venueId}/{itemId}/{timestamp}.{ext}
- * Updates dinein_menu_items.image_url + image_source = 'manual'
- */
-export async function handleUploadMenuItemImage(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  const itemId = requireString(body, "itemId", "item_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const imageData = requireString(body, "image_data");
-  if (!imageData || imageData.length < 100) {
-    throw new HttpError(
-      400,
-      "image_data is required and must be a valid base64 image.",
-    );
-  }
-
-  if (imageData.length > 14_000_000) {
-    throw new HttpError(413, "Image too large. Maximum 10MB.");
-  }
-
-  const { bytes, contentType, ext } = decodeBase64Image(imageData);
-  const timestamp = Date.now();
-  const storagePath = `${venueId}/${itemId}/${timestamp}.${ext}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("menu-images")
-    .upload(storagePath, bytes, {
-      contentType,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.error("[dinein-api] menu item image upload failed", uploadError);
-    throw new HttpError(500, "Could not upload the menu item image.");
-  }
-
-  const { data: urlData } = supabase.storage
-    .from("menu-images")
-    .getPublicUrl(storagePath);
-  const publicUrl = urlData?.publicUrl;
-
-  if (!publicUrl) {
-    throw new HttpError(
-      500,
-      "Upload succeeded but could not resolve public URL.",
-    );
-  }
-
-  // Update menu item record
-  const { error: dbError } = await supabase
-    .from("dinein_menu_items")
-    .update({
-      image_url: publicUrl,
-      image_source: "manual",
-      image_status: "ready",
-      image_storage_path: storagePath,
-      image_error: null,
-      image_locked: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", itemId)
-    .eq("venue_id", venueId);
-
-  if (dbError) {
-    console.error("[dinein-api] menu item image DB update failed", dbError);
-    throw new HttpError(
-      500,
-      "Image uploaded but could not update menu item record.",
-    );
-  }
-
-  return ok({ image_url: publicUrl, storage_path: storagePath });
-}
-
-// ─── Menu Document Ingestion (Gemini AI) ──────────────────────────────────
-
-/** Supported MIME types for menu ingestion. */
-const menuIngestMimeTypes = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/pdf",
-  "text/plain",
-  "text/csv",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/msword",
-]);
-
-/** Check if a MIME type is multimodal-compatible with Gemini */
-function isGeminiMultimodalMime(mime: string): boolean {
-  return mime.startsWith("image/") || mime === "application/pdf";
-}
-
-/**
- * Build a structured prompt for Gemini to extract menu items from a document.
- */
-function buildMenuExtractionPrompt(
-  venueName: string,
-  countryCode: CountryCode,
-): string {
-  const currency = countryCode === "RW" ? "RWF" : "EUR";
-  const currencyHint = countryCode === "RW"
-    ? "Prices are in Rwandan Francs (RWF). Typical range: 500–50,000 RWF."
-    : "Prices are in Euros (EUR). Typical range: 2–50 EUR.";
-
-  return [
-    "You are a restaurant menu extraction specialist.",
-    `You are analyzing a menu document from "${venueName}" in ${
-      countryLabel(countryCode)
-    }.`,
-    "",
-    "TASK: Extract ALL menu items from this document into a structured JSON array.",
-    "",
-    "For each item, extract:",
-    '- "name": The dish/drink name (string, required)',
-    '- "description": Brief description if visible (string, default "")',
-    `- "price": Numeric price in ${currency} WITHOUT currency symbol (number, required)`,
-    '- "category": The menu section/category (string, e.g. "Starters", "Mains", "Drinks", "Desserts")',
-    '- "class": Either "food" or "drinks" based on the item type',
-    "",
-    `${currencyHint}`,
-    "",
-    "RULES:",
-    "1. Return ONLY a valid JSON array of objects. No markdown, no explanation.",
-    "2. If a price is not visible or unclear, set it to 0.",
-    "3. Normalize category names (capitalize first letter, group similar items).",
-    "4. For multi-size items (S/M/L), create ONE item with the most common/medium price.",
-    "5. Skip headers, footers, restaurant info — extract only menu items.",
-    "6. If the document contains NO menu items, return an empty array: []",
-    "7. Clean up OCR artifacts (fix common typos, normalize spacing).",
-    "",
-    "Example output:",
-    '[{"name":"Margherita Pizza","description":"Tomato, mozzarella, basil","price":12.50,"category":"Pizza","class":"food"}]',
-  ].join("\n");
-}
-
-/**
- * Ingest a menu document: upload file → Gemini AI → extract items → insert.
- *
- * Payload: { venueId, file_data (base64), file_name, mime_type, country, venue_session }
- */
-export async function handleIngestMenuDocument(
-  supabase: ReturnType<typeof adminClient>,
-  req: Request,
-  body: JsonRecord,
-): Promise<Response> {
-  const venueId = requireString(body, "venueId", "venue_id");
-  await authorizeVenueMutation(supabase, req, venueId, body.venue_session);
-
-  const fileData = requireString(body, "file_data");
-  const fileName = stringValue(body.file_name) ?? "menu";
-  const mimeType = (stringValue(body.mime_type) ?? "application/octet-stream")
-    .toLowerCase()
-    .trim();
-
-  // Validate MIME type
-  if (!menuIngestMimeTypes.has(mimeType)) {
-    throw new HttpError(
-      400,
-      `Unsupported file type: ${mimeType}. Supported: images, PDFs, Excel, CSV, Word documents.`,
-      { code: "unsupported_file_type" },
-    );
-  }
-
-  // Validate file size (base64 ~14MB = ~10MB decoded)
-  if (fileData.length > 14_000_000) {
-    throw new HttpError(413, "File too large. Maximum 10MB.");
-  }
-
-  // Get Gemini API key
-  const geminiApiKey = optionalEnv("GEMINI_API_KEY");
-  if (!geminiApiKey) {
-    throw new HttpError(
-      503,
-      "Menu ingestion is not available (API key not configured).",
-      { code: "gemini_not_configured" },
-    );
-  }
-
-  // Fetch venue info for context
-  const venue = await venueSnapshot(supabase, venueId);
-  const venueName = stringValue(venue.name) ?? "Restaurant";
-  const countryCode = normalizeCountryCode(
-    body.country ?? venue.country,
-    "MT",
-  );
-
-  // Build the Gemini models to try (with fallback)
-  const models = (
-    Deno.env.get("GEMINI_MENU_INGEST_MODELS") ??
-      "gemini-2.5-flash,gemini-2.5-flash-lite"
-  ).split(",").map((v) => v.trim()).filter(Boolean);
-
-  const prompt = buildMenuExtractionPrompt(venueName, countryCode);
-
-  // Build content parts based on file type
-  let contentParts: unknown[];
-
-  if (isGeminiMultimodalMime(mimeType)) {
-    // Multimodal: send file as inline data
-    let rawBase64 = fileData;
-    const dataUriMatch = rawBase64.match(
-      /^data:[^;]+;base64,/i,
-    );
-    if (dataUriMatch) {
-      rawBase64 = rawBase64.slice(dataUriMatch[0].length);
-    }
-
-    contentParts = [
-      { text: prompt },
-      {
-        inlineData: {
-          mimeType: mimeType,
-          data: rawBase64,
-        },
-      },
-    ];
-  } else {
-    // Text-based files (Excel, CSV, Word): decode and send as text
-    let rawBase64 = fileData;
-    const dataUriPrefixMatch = rawBase64.match(/^data:[^;]+;base64,/i);
-    if (dataUriPrefixMatch) {
-      rawBase64 = rawBase64.slice(dataUriPrefixMatch[0].length);
-    }
-
-    let textContent: string;
-    try {
-      const binaryString = atob(rawBase64);
-      const decoder = new TextDecoder("utf-8", { fatal: false });
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      textContent = decoder.decode(bytes);
-    } catch {
-      throw new HttpError(
-        400,
-        "Could not read the file contents. Ensure the file is not corrupted.",
-        { code: "file_read_error" },
-      );
-    }
-
-    // Truncate very long text to avoid token limits
-    const maxTextLength = 50_000;
-    if (textContent.length > maxTextLength) {
-      textContent = textContent.slice(0, maxTextLength);
-    }
-
-    contentParts = [
-      {
-        text: [
-          prompt,
-          "",
-          `--- FILE CONTENT (${fileName}) ---`,
-          textContent,
-          "--- END FILE CONTENT ---",
-        ].join("\n"),
-      },
-    ];
-  }
-
-  // Call Gemini API with model fallback
-  let extractedItems: JsonRecord[] | null = null;
-
-  for (const model of models) {
-    try {
-      console.log(
-        `[dinein-api] menu ingest: trying model ${model} for venue ${venueId}`,
-      );
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${
-          encodeURIComponent(model)
-        }:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-goog-api-key": geminiApiKey,
-          },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: contentParts }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 8192,
-            },
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        console.warn(
-          `[dinein-api] menu ingest: model ${model} returned ${response.status}`,
-        );
-        continue;
-      }
-
-      const json = asRecord(await response.json());
-      const candidate = asRecord((json.candidates as unknown[] ?? [])[0]);
-      const content = asRecord(candidate.content);
-      const parts = (content.parts as unknown[] | undefined) ?? [];
-      const text = parts
-        .map((part) => stringValue(asRecord(part).text))
-        .filter((value): value is string => Boolean(value))
-        .join("\n")
-        .trim();
-
-      if (!text) {
-        console.warn(
-          `[dinein-api] menu ingest: model ${model} returned empty text`,
-        );
-        continue;
-      }
-
-      // Parse JSON from response (strip markdown fences)
-      const cleaned = text
-        .replace(/```(?:json)?\s*/gi, "")
-        .replace(/```/g, "")
-        .trim();
-
-      try {
-        const parsed = JSON.parse(cleaned);
-        if (Array.isArray(parsed)) {
-          extractedItems = parsed.map((item) => asRecord(item));
-          break;
-        }
-        if (
-          parsed && typeof parsed === "object" && Array.isArray(parsed.items)
-        ) {
-          extractedItems = parsed.items.map((item: unknown) => asRecord(item));
-          break;
-        }
-        if (
-          parsed && typeof parsed === "object" &&
-          Array.isArray(parsed.menu_items)
-        ) {
-          extractedItems = parsed.menu_items.map((item: unknown) =>
-            asRecord(item)
-          );
-          break;
-        }
-      } catch {
-        // Try to find a JSON array in the text
-        const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
-        if (arrayMatch) {
-          try {
-            extractedItems = JSON.parse(arrayMatch[0]).map(
-              (item: unknown) => asRecord(item),
-            );
-            break;
-          } catch {
-            continue;
-          }
-        }
-      }
-    } catch (err) {
-      console.error(
-        `[dinein-api] menu ingest: model ${model} error`,
-        err,
-      );
-      continue;
-    }
-  }
-
-  if (!extractedItems || extractedItems.length === 0) {
-    return ok({
-      created_count: 0,
-      skipped_count: 0,
-      items: [],
-      message: "No menu items could be extracted from the uploaded document.",
-    });
-  }
-
-  // Fetch existing items for duplicate detection
-  const { data: existingItems } = await supabase
-    .from("dinein_menu_items")
-    .select("name, category")
-    .eq("venue_id", venueId);
-
-  const existingKeys = new Set(
-    (existingItems ?? []).map(
-      (item: { name: string; category: string }) =>
-        `${(item.name ?? "").toLowerCase().trim()}::${
-          (item.category ?? "").toLowerCase().trim()
-        }`,
-    ),
-  );
-
-  // Validate and prepare items for insertion
-  const validInserts: JsonRecord[] = [];
-  let skippedCount = 0;
-
-  for (const rawItem of extractedItems) {
-    const name = stringValue(rawItem.name)?.trim();
-    if (!name || name.length < 2) {
-      skippedCount++;
-      continue;
-    }
-
-    const category = stringValue(rawItem.category)?.trim() || "Uncategorized";
-    const duplicateKey = `${name.toLowerCase()}::${category.toLowerCase()}`;
-
-    if (existingKeys.has(duplicateKey)) {
-      skippedCount++;
-      continue;
-    }
-
-    // Mark as seen to avoid inserting duplicates from the same document
-    existingKeys.add(duplicateKey);
-
-    let price = numberValue(rawItem.price);
-    if (price == undefined || !Number.isFinite(price) || price < 0) {
-      price = 0;
-    }
-
-    const description = stringValue(rawItem.description)?.trim() ?? "";
-    const itemClass = normalizeMenuItemClass(rawItem.class) ??
-      inferMenuItemClass({
-        name,
-        category,
-        description,
-        tags: [],
-        class: null,
-      });
-
-    validInserts.push({
-      venue_id: venueId,
-      name,
-      description,
-      price,
-      category,
-      class: itemClass,
-      is_available: true,
-      image_status: "pending",
-      image_source: null,
-      image_url: null,
-      tags: [],
-    });
-  }
-
-  if (validInserts.length === 0) {
-    return ok({
-      created_count: 0,
-      skipped_count: skippedCount,
-      items: [],
-      message: skippedCount > 0
-        ? `All ${skippedCount} extracted items were duplicates or invalid.`
-        : "No valid menu items could be extracted.",
-    });
-  }
-
-  // Bulk insert
-  const { data: insertedData, error: insertError } = await supabase
-    .from("dinein_menu_items")
-    .insert(validInserts)
-    .select("*");
-
-  if (insertError) {
-    console.error("[dinein-api] menu ingest bulk insert failed", insertError);
-    throw new HttpError(500, "Could not create the extracted menu items.");
-  }
-
-  console.log(
-    `[dinein-api] menu ingest: created ${
-      insertedData?.length ?? 0
-    } items for venue ${venueId} (skipped ${skippedCount})`,
-  );
-
-  return ok(
-    {
-      created_count: insertedData?.length ?? 0,
-      skipped_count: skippedCount,
-      items: insertedData ?? [],
-      message: `Successfully imported ${insertedData?.length ?? 0} menu items.`,
-    },
-    201,
-  );
-}

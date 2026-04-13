@@ -146,59 +146,13 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ═══ BACK + HEADER ═══
-                          Row(
-                            children: [
-                              PressableScale(
-                                onTap: () => Navigator.of(context).pop(),
-                                child: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: cs.surfaceContainerLow,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.05,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    LucideIcons.chevronLeft,
-                                    size: 18,
-                                    color: cs.onSurface,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Item Report',
-                                      style: tt.headlineMedium?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -0.5,
-                                      ),
-                                    ),
-                                    Text(
-                                      'SALES PERFORMANCE ANALYSIS',
-                                      style: TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 2,
-                                        color: cs.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          AppPageHeader(
+                            title: 'Item report',
+                            subtitle: 'Sales performance by menu item.',
+                            onBack: () => Navigator.of(context).pop(),
                           ),
                           const SizedBox(height: AppTheme.space6),
 
-                          // ═══ STAT CARDS ═══
                           Row(
                             children: [
                               Expanded(
@@ -213,24 +167,15 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                                 child: _MiniStatCard(
                                   icon: LucideIcons.dollarSign,
                                   label: 'TOTAL REVENUE',
-                                  value:
-                                      country.formatPrice(totalRevenue),
+                                  value: country.formatPrice(totalRevenue),
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: AppTheme.space5),
 
-                          // ═══ TIME PERIOD TABS ═══
-                          Container(
+                          AppSurfaceCard(
                             padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: cs.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.05),
-                              ),
-                            ),
                             child: Row(
                               children: [
                                 _PeriodTab(
@@ -277,60 +222,22 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                           ),
                           const SizedBox(height: AppTheme.space4),
 
-                          // ═══ SEARCH ICON + SORT ═══
                           Row(
                             children: [
-                              // Search icon
-                              PressableScale(
+                              AppIconButton(
+                                icon: LucideIcons.search,
+                                selected: _searchQuery.isNotEmpty,
+                                size: 48,
                                 onTap: () => _showSearchSheet(context, cs, tt),
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: _searchQuery.isNotEmpty
-                                        ? cs.primary.withValues(alpha: 0.15)
-                                        : cs.surfaceContainerLow,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: _searchQuery.isNotEmpty
-                                          ? cs.primary.withValues(alpha: 0.3)
-                                          : Colors.white.withValues(alpha: 0.05),
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    LucideIcons.search,
-                                    size: 18,
-                                    color: _searchQuery.isNotEmpty
-                                        ? cs.primary
-                                        : cs.onSurfaceVariant,
-                                  ),
-                                ),
                               ),
                               const SizedBox(width: AppTheme.space3),
-                              // Sort toggle
-                              PressableScale(
+                              AppIconButton(
+                                icon: LucideIcons.arrowUpDown,
+                                size: 48,
                                 onTap: () => setState(
                                   () => _sortDir = _sortDir == _SortDir.desc
                                       ? _SortDir.asc
                                       : _SortDir.desc,
-                                ),
-                                child: Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: cs.surfaceContainerLow,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.05,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    LucideIcons.arrowUpDown,
-                                    size: 18,
-                                    color: cs.onSurfaceVariant,
-                                  ),
                                 ),
                               ),
                             ],
@@ -346,7 +253,8 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                               semanticLabel: 'Clear search',
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6,
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
                                   color: cs.primary.withValues(alpha: 0.10),
@@ -360,7 +268,11 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(LucideIcons.search, size: 12, color: cs.primary),
+                                    Icon(
+                                      LucideIcons.search,
+                                      size: 12,
+                                      color: cs.primary,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       '"$_searchQuery"',
@@ -370,7 +282,11 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 6),
-                                    Icon(LucideIcons.x, size: 12, color: cs.primary),
+                                    Icon(
+                                      LucideIcons.x,
+                                      size: 12,
+                                      color: cs.primary,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -418,12 +334,10 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                           Row(
                             children: [
                               Text(
-                                'ITEM PERFORMANCE',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 2,
+                                'Item performance',
+                                style: tt.labelMedium?.copyWith(
                                   color: cs.onSurfaceVariant,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               const Spacer(),
@@ -720,19 +634,24 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusXl),
+        ),
       ),
       builder: (sheetContext) {
         return Padding(
           padding: EdgeInsets.fromLTRB(
-            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
             MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 margin: const EdgeInsets.only(bottom: AppTheme.space5),
                 decoration: BoxDecoration(
                   color: cs.onSurface.withValues(alpha: 0.12),
@@ -743,7 +662,9 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
                 ),
                 child: TextField(
                   controller: _searchCtrl,
@@ -759,7 +680,11 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
                     ),
                     prefixIcon: Padding(
                       padding: const EdgeInsets.only(left: 16, right: 10),
-                      child: Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
+                      child: Icon(
+                        LucideIcons.search,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                     prefixIconConstraints: const BoxConstraints(minWidth: 0),
                     border: InputBorder.none,
@@ -774,4 +699,3 @@ class _VenueItemReportScreenState extends ConsumerState<VenueItemReportScreen> {
     );
   }
 }
-

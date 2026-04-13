@@ -84,69 +84,60 @@ class _VenueSettingsScreenState extends ConsumerState<VenueSettingsScreen> {
           ),
           children: [
             // ═══ HEADER ═══
-            Text(
-              'Settings',
-              style: tt.headlineLarge?.copyWith(
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
-              ),
-            ),
+            Text('Settings', style: tt.headlineLarge),
             const SizedBox(height: 2),
             Text(
-              'VENUE MANAGEMENT',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-                color: cs.onSurfaceVariant,
-              ),
+              'Venue tools',
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: AppTheme.space6),
 
             // ═══ OWNER PROFILE CARD ═══
-            PressableScale(
+            AppSurfaceCard(
                   onTap: () => context.pushNamed(AppRouteNames.venueProfile),
-                  child: Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(40),
-                      boxShadow: AppTheme.clayShadow,
-                    ),
-                    child: Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: SizedBox(
-                            width: 68,
-                            height: 68,
-                            child: DineInImage(
-                              imageUrl: managerImageUrl,
-                              fit: BoxFit.cover,
-                              fallbackIcon: LucideIcons.user,
-                            ),
+                  padding: const EdgeInsets.all(18),
+                  elevated: true,
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: SizedBox(
+                          width: 68,
+                          height: 68,
+                          child: DineInImage(
+                            imageUrl: managerImageUrl,
+                            fit: BoxFit.cover,
+                            fallbackIcon: LucideIcons.user,
                           ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            managerName,
-                            style: tt.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                              color: AppColors.onPrimary,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              managerName,
+                              style: tt.titleLarge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Profile and venue details',
+                              style: tt.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ),
-                        Icon(
-                          LucideIcons.chevronRight,
-                          size: 18,
-                          color: AppColors.onPrimary.withValues(alpha: 0.65),
-                        ),
-                      ],
-                    ),
+                      ),
+                      Icon(
+                        LucideIcons.chevronRight,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ],
                   ),
                 )
                 .animate()
@@ -155,13 +146,13 @@ class _VenueSettingsScreenState extends ConsumerState<VenueSettingsScreen> {
             const SizedBox(height: AppTheme.space8),
 
             // ═══ VENUE CONFIGURATION ═══
-            _SectionHeader(label: 'VENUE CONFIGURATION'),
+            _SectionHeader(label: 'Venue'),
             const SizedBox(height: AppTheme.space3),
             _SettingTile(
               icon: LucideIcons.mapPin,
               iconColor: cs.primary,
               title: 'Venue Profile',
-              subtitle: 'NAME, ADDRESS, AND CONTACT INFO',
+              subtitle: 'Name, address, contact',
               onTap: () => context.pushNamed(AppRouteNames.venueProfile),
             ),
 
@@ -169,40 +160,40 @@ class _VenueSettingsScreenState extends ConsumerState<VenueSettingsScreen> {
               icon: LucideIcons.qrCode,
               iconColor: cs.primary,
               title: 'Venue QR Codes',
-              subtitle: 'GUEST, APP, AND TABLE QR TOOLS',
+              subtitle: 'Guest and table codes',
               onTap: () => context.pushNamed(AppRouteNames.venueTableQr),
             ),
             _SettingTile(
               icon: LucideIcons.wifi,
               iconColor: cs.primary,
               title: 'WiFi Sharing',
-              subtitle: 'GUEST AUTO-CONNECT',
+              subtitle: 'Guest auto-connect',
               onTap: () => context.pushNamed(AppRouteNames.venueWifi),
             ),
             const SizedBox(height: AppTheme.space6),
 
             // ═══ PREFERENCES & SAFETY ═══
-            _SectionHeader(label: 'PREFERENCES & SAFETY'),
+            _SectionHeader(label: 'Preferences'),
             const SizedBox(height: AppTheme.space3),
             _SettingTile(
               icon: LucideIcons.bell,
               iconColor: AppColors.secondary,
               title: 'Notifications',
-              subtitle: 'PUSH, EMAIL, AND WHATSAPP',
+              subtitle: 'Push and alerts',
               onTap: () => context.pushNamed(AppRouteNames.venueNotifications),
             ),
             _SettingTile(
               icon: LucideIcons.languages,
               iconColor: AppColors.secondary,
               title: 'Language & Region',
-              subtitle: 'ENGLISH, EUR, CET',
+              subtitle: 'Language and region',
               onTap: () => context.pushNamed(AppRouteNames.venueLanguageRegion),
             ),
             _SettingTile(
               icon: LucideIcons.fileCheck,
               iconColor: AppColors.secondary,
               title: 'Legal & Policies',
-              subtitle: 'TERMS, PRIVACY, AND REFUNDS',
+              subtitle: 'Terms and privacy',
               onTap: () => context.pushNamed(AppRouteNames.venueLegal),
             ),
             const SizedBox(height: AppTheme.space8),
@@ -234,19 +225,13 @@ class _VenueSettingsScreenState extends ConsumerState<VenueSettingsScreen> {
                       Icon(LucideIcons.logOut, size: 18, color: cs.error),
                     const SizedBox(width: 10),
                     Text(
-                      'SIGN OUT',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 3,
-                        color: cs.error,
-                      ),
+                      'Sign out',
+                      style: tt.labelLarge?.copyWith(color: cs.error),
                     ),
                   ],
                 ),
               ),
             ),
-
           ],
         );
       },
@@ -266,13 +251,8 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(left: 4),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 3,
-          color: Theme.of(
-            context,
-          ).colorScheme.onSurfaceVariant.withValues(alpha: 0.50),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -296,64 +276,14 @@ class _SettingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: AppTheme.space2),
-      child: PressableScale(
+      child: AppListTileCard(
+        icon: icon,
+        iconColor: iconColor,
+        title: title,
+        subtitle: subtitle,
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-            boxShadow: AppTheme.clayShadow,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 18, color: iconColor),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: tt.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 2,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.50),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                LucideIcons.chevronRight,
-                size: 16,
-                color: cs.onSurfaceVariant.withValues(alpha: 0.40),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

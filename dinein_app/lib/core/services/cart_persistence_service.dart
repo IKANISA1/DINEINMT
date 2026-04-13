@@ -4,6 +4,8 @@ import 'package:core_pkg/constants/enums.dart';
 import 'package:dinein_app/core/providers/cart_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_telemetry.dart';
+
 /// Persists cart state to SharedPreferences (backed by localStorage on web).
 ///
 /// The cart is serialized as JSON and restored on app startup so that
@@ -54,7 +56,13 @@ class CartPersistenceService {
     try {
       final json = jsonDecode(raw) as Map<String, dynamic>;
       return _cartFromJson(json);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'cart_persistence.restore',
+        details: {'key': _key},
+      );
       // Corrupted data — wipe it
       await prefs.remove(_key);
       await prefs.remove(_timestampKey);

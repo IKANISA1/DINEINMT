@@ -162,8 +162,8 @@ class PermissionAccessDialog extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: GoogleFonts.publicSans(
                     fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.4,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.1,
                     color: Colors.white,
                     height: 1.05,
                   ),

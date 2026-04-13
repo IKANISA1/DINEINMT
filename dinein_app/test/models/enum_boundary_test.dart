@@ -97,6 +97,67 @@ void main() {
     });
   });
 
+  // ─── PaymentStatus ───
+
+  group('PaymentStatus', () {
+    test('has exactly 4 backend-supported values', () {
+      expect(PaymentStatus.values, hasLength(4));
+    });
+
+    test('fromString resolves known values', () {
+      expect(PaymentStatus.fromString('pending'), PaymentStatus.pending);
+      expect(PaymentStatus.fromString('confirmed'), PaymentStatus.confirmed);
+      expect(
+        PaymentStatus.fromString('not_required'),
+        PaymentStatus.notRequired,
+      );
+      expect(PaymentStatus.fromString('failed'), PaymentStatus.failed);
+    });
+
+    test('fromString falls back to pending for unknown', () {
+      expect(PaymentStatus.fromString('paid'), PaymentStatus.pending);
+      expect(PaymentStatus.fromString(''), PaymentStatus.pending);
+    });
+
+    test('dbValue round-trips through fromString', () {
+      for (final status in PaymentStatus.values) {
+        expect(PaymentStatus.fromString(status.dbValue), status);
+      }
+    });
+
+    test(
+      'forMethod maps cash to pay-at-venue and online methods to pending',
+      () {
+        expect(
+          PaymentStatus.forMethod(PaymentMethod.cash),
+          PaymentStatus.notRequired,
+        );
+        expect(
+          PaymentStatus.forMethod(PaymentMethod.revolutLink),
+          PaymentStatus.pending,
+        );
+        expect(
+          PaymentStatus.forMethod(PaymentMethod.momoUssd),
+          PaymentStatus.pending,
+        );
+      },
+    );
+
+    test('labels remain venue-friendly', () {
+      expect(PaymentStatus.pending.label, 'Pending');
+      expect(PaymentStatus.confirmed.label, 'Paid');
+      expect(PaymentStatus.notRequired.label, 'Pay at venue');
+      expect(PaymentStatus.failed.label, 'Failed');
+    });
+
+    test('isPaid is true only when confirmed', () {
+      expect(PaymentStatus.pending.isPaid, isFalse);
+      expect(PaymentStatus.confirmed.isPaid, isTrue);
+      expect(PaymentStatus.notRequired.isPaid, isFalse);
+      expect(PaymentStatus.failed.isPaid, isFalse);
+    });
+  });
+
   // ─── Country ───
 
   group('Country', () {

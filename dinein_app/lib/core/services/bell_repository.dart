@@ -1,5 +1,6 @@
 import 'package:db_pkg/models/bell_request.dart';
 import 'api_invoker.dart';
+import 'app_telemetry.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 
@@ -74,9 +75,19 @@ class BellRepository {
     WaveStatus? status,
   }) async* {
     var lastGood = <BellRequest>[];
+    var lastPollFailed = false;
     try {
       lastGood = await getBellRequests(venueId, status: status);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'bell.poll.initial',
+        details: {
+          'venueId': venueId,
+          if (status != null) 'status': status.dbValue,
+        },
+      );
       // Yield empty on first fetch failure — UI will show empty state.
     }
     yield lastGood;
@@ -85,7 +96,20 @@ class BellRepository {
     ) async {
       try {
         lastGood = await getBellRequests(venueId, status: status);
-      } catch (_) {
+        lastPollFailed = false;
+      } catch (error, stackTrace) {
+        if (!lastPollFailed) {
+          await AppTelemetryService.reportError(
+            error,
+            stackTrace,
+            context: 'bell.poll.recurring',
+            details: {
+              'venueId': venueId,
+              if (status != null) 'status': status.dbValue,
+            },
+          );
+        }
+        lastPollFailed = true;
         // On transient failure, return last successful result.
       }
       return lastGood;

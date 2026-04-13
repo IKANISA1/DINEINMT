@@ -48,6 +48,37 @@ class AppTelemetryService {
     }
   }
 
+  static Future<void> reportError(
+    Object error,
+    StackTrace stackTrace, {
+    required String context,
+    bool fatal = false,
+    Map<String, Object?> details = const {},
+  }) async {
+    if (!_enabled) {
+      _debugFallback(context, error, stackTrace, details: details, fatal: fatal);
+      return;
+    }
+
+    try {
+      await FirebaseCrashlytics.instance.recordError(
+        error,
+        stackTrace,
+        fatal: fatal,
+        reason: context,
+        information: _crashlyticsInformation(details),
+      );
+    } catch (telemetryError, telemetryStackTrace) {
+      _debugFallback(
+        '$context (telemetry fallback)',
+        telemetryError,
+        telemetryStackTrace,
+        details: {'original_error': error.toString(), ...details},
+        fatal: fatal,
+      );
+    }
+  }
+
   static Future<void> trackGuestEvent(
     String eventName, {
     String? route,
@@ -67,5 +98,30 @@ class AppTelemetryService {
       orderId: orderId,
       details: details,
     );
+  }
+
+  static Iterable<Object> _crashlyticsInformation(
+    Map<String, Object?> details,
+  ) sync* {
+    for (final entry in details.entries) {
+      final key = entry.key.trim();
+      if (key.isEmpty) continue;
+      yield '$key=${entry.value}';
+    }
+  }
+
+  static void _debugFallback(
+    String context,
+    Object error,
+    StackTrace stackTrace, {
+    required Map<String, Object?> details,
+    required bool fatal,
+  }) {
+    final suffix = details.isEmpty ? '' : ' details=$details';
+    debugPrint(
+      '[telemetry] ${fatal ? 'fatal' : 'non-fatal'} error in $context: '
+      '$error$suffix',
+    );
+    debugPrintStack(stackTrace: stackTrace);
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:db_pkg/models/models.dart';
+import '../services/app_telemetry.dart';
 import '../services/menu_repository.dart';
 
 /// Menu items for a given venue.
@@ -10,8 +11,17 @@ final menuItemsProvider = FutureProvider.family<List<MenuItem>, String>((
 ) async {
   try {
     return await MenuRepository.instance.getMenuItems(venueId);
-  } catch (_) {
+  } catch (error, stackTrace) {
     final localItems = await MenuRepository.instance.getLocalMenuItems(venueId);
+    await AppTelemetryService.reportError(
+      error,
+      stackTrace,
+      context: 'menu_provider.remote_lookup',
+      details: {
+        'venueId': venueId,
+        'usedLocalFallback': localItems.isNotEmpty,
+      },
+    );
     if (localItems.isNotEmpty) return localItems;
     rethrow;
   }
@@ -50,4 +60,3 @@ final menuItemByIdProvider = FutureProvider.family<MenuItem?, String>((
 ) async {
   return await MenuRepository.instance.getMenuItemById(itemId);
 });
-

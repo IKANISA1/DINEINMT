@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
+import '../services/app_telemetry.dart';
 import '../services/order_repository.dart';
 import '../services/order_realtime_service.dart';
 import '../services/order_receipt_service.dart';
@@ -17,6 +18,14 @@ final userOrdersProvider = FutureProvider<List<Order>>((ref) async {
     fetchTrackedOrderIds: OrderReceiptService.instance.getTrackedOrderIds,
     fetchOrderById: OrderRepository.instance.getOrderById,
     clearTrackedOrder: OrderReceiptService.instance.clearReceiptToken,
+    onTrackedOrderFailure: (orderId, error, stackTrace) {
+      return AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'order_history_loader.tracked_order',
+        details: {'orderId': orderId},
+      );
+    },
   );
 });
 

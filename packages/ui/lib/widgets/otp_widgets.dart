@@ -147,7 +147,9 @@ class CountryPhoneInput extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surfaceContainerLow,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.white5),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.72),
+            ),
             boxShadow: AppTheme.ambientShadow,
           ),
           child: Row(
@@ -184,7 +186,7 @@ class CountryPhoneInput extends StatelessWidget {
               border: Border.all(
                 color: controller.text.isNotEmpty
                     ? cs.primary.withValues(alpha: 0.5)
-                    : AppColors.white5,
+                    : cs.outlineVariant.withValues(alpha: 0.72),
                 width: controller.text.isNotEmpty ? 1.5 : 1,
               ),
               boxShadow: AppTheme.ambientShadow,

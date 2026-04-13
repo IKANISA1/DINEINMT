@@ -489,7 +489,7 @@ class _VenueEditItemScreenState extends ConsumerState<VenueEditItemScreen> {
                     Text(
                       widget.isEditing ? 'Edit Menu Item' : 'New Menu Item',
                       style: tt.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     Text(
@@ -818,7 +818,7 @@ class _ImagePanel extends StatelessWidget {
                     Text(
                       'Menu Image',
                       style: tt.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                     const SizedBox(height: 2),

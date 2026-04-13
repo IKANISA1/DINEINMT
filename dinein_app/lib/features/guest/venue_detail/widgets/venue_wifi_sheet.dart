@@ -59,7 +59,7 @@ void showVenueWifiSheet(BuildContext ctx, Venue venue) {
                       Text(
                         ssid,
                         style: tt.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -81,17 +81,17 @@ void showVenueWifiSheet(BuildContext ctx, Venue venue) {
               PressableScale(
                 semanticLabel: 'Copy WiFi password',
                 onTap: () {
-                    Clipboard.setData(ClipboardData(text: password));
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(
-                        content: const Text('WiFi password copied!'),
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                  Clipboard.setData(ClipboardData(text: password));
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: const Text('WiFi password copied!'),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    );
-                  },
+                    ),
+                  );
+                },
                 child: Container(
                   decoration: BoxDecoration(
                     color: cs.primaryContainer.withValues(alpha: 0.2),
@@ -111,12 +111,10 @@ void showVenueWifiSheet(BuildContext ctx, Venue venue) {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'TAP TO COPY PASSWORD',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 2,
+                                'Tap to copy password',
+                                style: tt.labelMedium?.copyWith(
                                   color: cs.primary,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -124,7 +122,7 @@ void showVenueWifiSheet(BuildContext ctx, Venue venue) {
                                 '•' * password.length.clamp(6, 20),
                                 style: tt.bodyLarge?.copyWith(
                                   fontWeight: FontWeight.w600,
-                                  letterSpacing: 3,
+                                  letterSpacing: 1.2,
                                 ),
                               ),
                             ],
@@ -177,12 +175,9 @@ void showVenueWifiSheet(BuildContext ctx, Venue venue) {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: Text(
-                    'OR SCAN',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 2,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                    'Or scan',
+                    style: tt.labelMedium?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.72),
                     ),
                   ),
                 ),
@@ -229,7 +224,6 @@ void showVenueWifiSheet(BuildContext ctx, Venue venue) {
   );
 }
 
-
 String buildVenueWifiQrData({
   required String ssid,
   required String password,
@@ -257,4 +251,3 @@ String buildVenueWifiQrData({
   buffer.write(';');
   return buffer.toString();
 }
-

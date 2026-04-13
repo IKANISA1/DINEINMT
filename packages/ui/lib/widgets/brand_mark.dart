@@ -90,7 +90,7 @@ class DineInLogoText extends StatelessWidget {
     return RichText(
       text: TextSpan(
         style: TextStyle(
-          fontWeight: FontWeight.w900,
+          fontWeight: FontWeight.w800,
           fontSize: fontSize,
           letterSpacing: letterSpacing,
           height: 1,

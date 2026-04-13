@@ -11,6 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
 import 'firebase_runtime_service.dart';
 import 'package:dinein_app/core/services/supabase_config.dart';
 import 'package:dinein_app/core/services/notification_inbox_service.dart';
@@ -125,6 +126,13 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications] Initialization skipped: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications.initialize',
+        ),
+      );
       _messagingAvailable = false;
       _initialized = false;
     } finally {
@@ -146,6 +154,14 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications] Venue sync failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications.handle_venue_session_updated',
+          details: {'venue_id': session.venueId},
+        ),
+      );
     }
   }
 
@@ -163,6 +179,14 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications] Preference sync failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications.handle_preferences_updated',
+          details: {'venue_id': session.venueId},
+        ),
+      );
     }
   }
 
@@ -181,6 +205,14 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications] Device unregister failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications.handle_venue_session_cleared',
+          details: {'venue_id': session.venueId},
+        ),
+      );
     }
   }
 
@@ -200,6 +232,14 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications] Token refresh sync failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications.handle_token_refresh',
+          details: {'venue_id': session.venueId},
+        ),
+      );
     }
   }
 
@@ -268,6 +308,13 @@ class AppNotificationService {
       _navigateFromNotificationData(decoded);
     } catch (error) {
       debugPrint('[notifications] Invalid tap payload: $error');
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          StackTrace.current,
+          context: 'notifications.invalid_tap_payload',
+        ),
+      );
     }
   }
 
@@ -287,6 +334,14 @@ class AppNotificationService {
       appRouter.go(resolvedRoute);
     } catch (error) {
       debugPrint('[notifications] Navigation failed: $error');
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          StackTrace.current,
+          context: 'notifications.navigate',
+          details: {'route': resolvedRoute},
+        ),
+      );
     }
   }
 
@@ -430,7 +485,15 @@ class AppNotificationService {
   static Future<String?> _tryReadSecureValue(String key) async {
     try {
       return await _secureStorage.read(key: key).timeout(_secureStorageTimeout);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications.secure_storage.read',
+          details: {'key': key},
+        ),
+      );
       return null;
     }
   }
@@ -440,8 +503,15 @@ class AppNotificationService {
       await _secureStorage
           .write(key: key, value: value)
           .timeout(_secureStorageTimeout);
-    } catch (_) {
-      // Ignore storage failures in test environments.
+    } catch (error, stackTrace) {
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications.secure_storage.write',
+          details: {'key': key},
+        ),
+      );
     }
   }
 

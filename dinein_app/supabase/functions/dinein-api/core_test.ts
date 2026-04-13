@@ -2,8 +2,8 @@ import { assertEquals } from "jsr:@std/assert@1";
 
 import {
   configuredAdminUserIdForSessionPhone,
-  handleTrackGuestEvent,
 } from "./core.ts";
+import { handleTrackGuestEvent } from "./handlers/telemetry.ts";
 
 function buildSupabaseStub(error: Record<string, unknown> | null) {
   return {

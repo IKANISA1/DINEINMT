@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:db_pkg/models/models.dart';
+import 'app_telemetry.dart';
 import 'supabase_config.dart';
 
 class WhatsAppOtpChallenge {
@@ -98,6 +99,12 @@ class WhatsAppOtpService {
     try {
       return await _sendRemote(normalizedPhone, appScope: appScope);
     } catch (error) {
+      await AppTelemetryService.reportError(
+        error,
+        StackTrace.current,
+        context: 'whatsapp_otp.send',
+        details: {'appScope': appScope},
+      );
       if (!_allowLocalMock || _shouldRethrowSendError(error)) rethrow;
     }
 
@@ -138,7 +145,13 @@ class WhatsAppOtpService {
         code: normalizedCode,
         appScope: appScope,
       );
-    } catch (_) {
+    } catch (error) {
+      await AppTelemetryService.reportError(
+        error,
+        StackTrace.current,
+        context: 'whatsapp_otp.verify',
+        details: {'appScope': appScope},
+      );
       if (!_allowLocalMock) rethrow;
     }
 
@@ -185,8 +198,14 @@ class WhatsAppOtpService {
             json['debugCode'] as String? ?? json['debug_code'] as String?,
         usesMock: false,
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (error is WhatsAppOtpException) rethrow;
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'whatsapp_otp.send_remote',
+        details: {'appScope': appScope},
+      );
       throw const WhatsAppOtpException(
         message: 'Could not send WhatsApp code right now.',
         reason: 'network_error',
@@ -267,8 +286,14 @@ class WhatsAppOtpService {
             ? null
             : VenueAccessSession.fromJson(venueSessionRaw),
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (error is WhatsAppOtpException) rethrow;
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'whatsapp_otp.verify_remote',
+        details: {'appScope': appScope},
+      );
       throw const WhatsAppOtpException(
         message: 'Could not verify the WhatsApp code right now.',
         reason: 'network_error',

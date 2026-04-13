@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:db_pkg/models/models.dart';
-import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
@@ -14,7 +13,8 @@ class VenueAboutSection extends StatelessWidget {
   final VoidCallback? onMaps;
   final VoidCallback? onWifiTap;
 
-  const VenueAboutSection({super.key, 
+  const VenueAboutSection({
+    super.key,
     required this.venue,
     required this.isExpanded,
     required this.onToggle,
@@ -31,14 +31,9 @@ class VenueAboutSection extends StatelessWidget {
         ? 'Venue details coming soon.'
         : venue.description.trim();
 
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.space8),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-        border: Border.all(color: AppColors.white5),
-        boxShadow: AppTheme.ambientShadow,
-      ),
+    return GuestSurfaceCard(
+      padding: const EdgeInsets.all(AppTheme.space5),
+      borderRadius: 24,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -47,24 +42,19 @@ class VenueAboutSection extends StatelessWidget {
             semanticLabel: 'Toggle about section',
             child: Row(
               children: [
-                Expanded(child: Text('About', style: tt.headlineMedium)),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 400),
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: isExpanded ? cs.primary : cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                Expanded(
+                  child: GuestSectionHeader(
+                    title: 'About',
+                    subtitle: venue.guestAvailabilityReason,
                   ),
-                  child: AnimatedRotation(
-                    duration: const Duration(milliseconds: 400),
-                    turns: isExpanded ? 0.5 : 0,
-                    child: Icon(
-                      LucideIcons.chevronDown,
-                      size: 20,
-                      color: isExpanded ? cs.onPrimary : cs.primary,
-                    ),
-                  ),
+                ),
+                AppIconButton(
+                  icon: LucideIcons.chevronDown,
+                  selected: isExpanded,
+                  onTap: onToggle,
+                  semanticLabel: 'Toggle about section',
+                  size: 36,
+                  iconSize: 16,
                 ),
               ],
             ),
@@ -88,7 +78,7 @@ class VenueAboutSection extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: tt.bodyLarge?.copyWith(
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.45),
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.74),
                   height: 1.6,
                 ),
               ),
@@ -103,12 +93,11 @@ class VenueAboutSection extends StatelessWidget {
                     height: 1.6,
                   ),
                 ),
-                const SizedBox(height: AppTheme.space4),
+                const SizedBox(height: AppTheme.space3),
                 Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-
                     if (venue.phone != null && venue.phone!.trim().isNotEmpty)
                       VenueDetailChip(
                         icon: LucideIcons.phone,
@@ -130,7 +119,7 @@ class VenueAboutSection extends StatelessWidget {
                     if (venue.hasWifi && !kIsWeb)
                       VenueDetailChip(
                         icon: LucideIcons.wifi,
-                        label: 'Connect to Wifi',
+                        label: 'Connect Wi-Fi',
                         onTap: onWifiTap,
                         isPrimary: true,
                       ),
@@ -145,14 +134,14 @@ class VenueAboutSection extends StatelessWidget {
   }
 }
 
-
 class VenueDetailChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
   final bool isPrimary;
 
-  const VenueDetailChip({super.key, 
+  const VenueDetailChip({
+    super.key,
     required this.icon,
     required this.label,
     this.onTap,
@@ -167,35 +156,26 @@ class VenueDetailChip extends StatelessWidget {
     final textColor = isPrimary ? cs.onPrimary : cs.onSurface;
 
     final content = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: isPrimary ? Colors.transparent : AppColors.white5,
+          color: isPrimary
+              ? Colors.transparent
+              : cs.outlineVariant.withValues(alpha: 0.72),
         ),
-        boxShadow: isPrimary
-            ? [
-                BoxShadow(
-                  color: cs.primary.withValues(alpha: 0.20),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ]
-            : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: foreground),
-          const SizedBox(width: 8),
+          Icon(icon, size: 14, color: foreground),
+          const SizedBox(width: 6),
           Text(
-            label.toUpperCase(),
-            style: TextStyle(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: textColor,
-              fontSize: 11,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -206,5 +186,3 @@ class VenueDetailChip extends StatelessWidget {
     return PressableScale(onTap: onTap, semanticLabel: label, child: content);
   }
 }
-
-

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -33,6 +34,8 @@ class DineinApiInvocation {
 class DineinApiService {
   DineinApiService._();
 
+  static const _edgeFunctionTimeout = Duration(seconds: 15);
+
   @visibleForTesting
   static DineinApiInvocation buildInvocation(
     String action, {
@@ -49,8 +52,10 @@ class DineinApiService {
     final bodyPayload = <String, dynamic>{
       'action': action,
       'country': CountryRuntime.config.country.code,
-      if (payload != null) ...payload,
     };
+    if (payload != null) {
+      bodyPayload.addAll(payload);
+    }
 
     if (useAdminSession) {
       if (adminAccessToken == null || adminAccessToken.isEmpty) {
@@ -59,6 +64,7 @@ class DineinApiService {
           action: action,
         );
       }
+      bodyPayload.remove('venue_session');
       headers['Authorization'] = 'Bearer $adminAccessToken';
       return DineinApiInvocation(headers: headers, body: bodyPayload);
     }
@@ -98,11 +104,13 @@ class DineinApiService {
     );
 
     try {
-      final response = await SupabaseConfig.client.functions.invoke(
-        'dinein-api',
-        headers: request.headers.isEmpty ? null : request.headers,
-        body: request.body,
-      );
+      final response = await SupabaseConfig.client.functions
+          .invoke(
+            'dinein-api',
+            headers: request.headers.isEmpty ? null : request.headers,
+            body: request.body,
+          )
+          .timeout(_edgeFunctionTimeout);
 
       final raw = response.data;
       if (raw is Map<String, dynamic>) {
@@ -121,6 +129,12 @@ class DineinApiService {
       return raw;
     } on DineinApiException {
       rethrow;
+    } on TimeoutException catch (e) {
+      throw DineinApiException(
+        'Request timed out. Please try again.',
+        action: action,
+        cause: e,
+      );
     } on SocketException catch (e) {
       throw DineinApiException(
         'No internet connection. Please check your network and try again.',

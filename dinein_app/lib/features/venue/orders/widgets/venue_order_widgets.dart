@@ -20,14 +20,8 @@ class _MiniStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    return Container(
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -46,10 +40,8 @@ class _MiniStatCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
+                  style: tt.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                     color: cs.primary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -60,10 +52,7 @@ class _MiniStatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: tt.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-            ),
+            style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -109,8 +98,7 @@ class _TabChip extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
+                fontWeight: FontWeight.w700,
                 color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
               ),
             ),
@@ -164,15 +152,9 @@ class _FilterPanel extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Container(
-      margin: const EdgeInsets.only(top: AppTheme.space4),
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
-      ),
+      radius: 24,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -210,11 +192,9 @@ class _FilterPanel extends StatelessWidget {
               Icon(LucideIcons.tag, size: 12, color: cs.onSurfaceVariant),
               const SizedBox(width: 6),
               Text(
-                'FILTER BY ITEM',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
+                'Filter by item',
+                style: tt.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
                   color: cs.onSurfaceVariant,
                 ),
               ),
@@ -319,8 +299,7 @@ class _FilterDropdown<T> extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5,
+                fontWeight: FontWeight.w700,
                 color: cs.onSurfaceVariant,
               ),
             ),
@@ -400,8 +379,7 @@ class _ExportButton extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
+                fontWeight: FontWeight.w700,
                 color: textColor,
               ),
             ),
@@ -417,10 +395,7 @@ class _OrderCard extends StatelessWidget {
   final Order order;
   final VoidCallback onAdvance;
 
-  const _OrderCard({
-    required this.order,
-    required this.onAdvance,
-  });
+  const _OrderCard({required this.order, required this.onAdvance});
 
   @override
   Widget build(BuildContext context) {
@@ -459,14 +434,8 @@ class _OrderCard extends StatelessWidget {
         AppRouteNames.venueOrderDetail,
         pathParameters: {AppRouteParams.id: order.id},
       ),
-      child: Container(
+      child: AppSurfaceCard(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          boxShadow: AppTheme.clayShadow,
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -475,11 +444,10 @@ class _OrderCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'ORDER #${order.displayNumber}',
+                  'Order #${order.displayNumber}',
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.w700,
                     color: cs.primary,
                   ),
                 ),
@@ -501,8 +469,7 @@ class _OrderCard extends StatelessWidget {
                         statusLabel(),
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
+                          fontWeight: FontWeight.w700,
                           color: statusColor(),
                         ),
                       ),
@@ -623,11 +590,9 @@ class _OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          timeAgo(order.createdAt).toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
+                          timeAgo(order.createdAt),
+                          style: tt.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
                             color: cs.onSurfaceVariant,
                           ),
                         ),
@@ -656,12 +621,11 @@ class _OrderCard extends StatelessWidget {
                           ),
                           child: Text(
                             order.status == OrderStatus.placed
-                                ? 'ACCEPT'
-                                : 'SERVED',
+                                ? 'Accept'
+                                : 'Served',
                             style: TextStyle(
                               fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.5,
+                              fontWeight: FontWeight.w700,
                               color: cs.onPrimary,
                             ),
                           ),

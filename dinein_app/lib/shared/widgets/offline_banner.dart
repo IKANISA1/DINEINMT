@@ -42,40 +42,52 @@ class OfflineBanner extends ConsumerWidget {
             decoration: const BoxDecoration(),
             child: Material(
               color: Colors.transparent,
-              child: Container(
-                width: double.infinity,
+              child: Padding(
                 padding: EdgeInsets.only(
                   top: MediaQuery.of(context).padding.top + AppTheme.space2,
-                  bottom: AppTheme.space2,
                   left: AppTheme.space4,
                   right: AppTheme.space4,
+                  bottom: AppTheme.space2,
                 ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .errorContainer
-                      .withValues(alpha: 0.9),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 14,
-                      color: Theme.of(context).colorScheme.onErrorContainer,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.space4,
+                      vertical: AppTheme.space2,
                     ),
-                    const SizedBox(width: AppTheme.space2),
-                    Text(
-                      'No internet connection',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onErrorContainer,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                          ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.errorContainer.withValues(alpha: 0.96),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.error.withValues(alpha: 0.18),
+                      ),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.wifi_off_rounded,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                        const SizedBox(width: AppTheme.space2),
+                        Text(
+                          'Offline',
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onErrorContainer,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),

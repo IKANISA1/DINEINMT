@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:db_pkg/models/models.dart';
 import 'api_invoker.dart';
+import 'app_telemetry.dart';
 import 'auth_repository.dart';
 import 'dinein_api_service.dart';
 import 'menu_image_generation_service.dart';
@@ -31,6 +32,12 @@ class MenuRepository {
     return {
       'venue_session': {'access_token': token},
     };
+  }
+
+  Map<String, dynamic> _mutationSessionPayload({
+    bool useAdminSession = false,
+  }) {
+    return useAdminSession ? const {} : _venueSessionPayload();
   }
 
   /// Fetch all menu items for a venue.
@@ -196,7 +203,7 @@ class MenuRepository {
       payload: {
         'itemId': itemId,
         'updates': updates,
-        ..._venueSessionPayload(),
+        ..._mutationSessionPayload(useAdminSession: useAdminSession),
       },
     );
     if (!useAdminSession && data is Map<String, dynamic>) {
@@ -281,7 +288,7 @@ class MenuRepository {
       payload: {
         'itemId': itemId,
         'updates': {'image_locked': imageLocked},
-        ..._venueSessionPayload(),
+        ..._mutationSessionPayload(useAdminSession: useAdminSession),
       },
     );
     if (useAdminSession) return;
@@ -315,7 +322,13 @@ class MenuRepository {
         }
       }
       return popularity;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'menu_repository.item_popularity',
+        details: {'venueId': venueId},
+      );
       // Gracefully degrade if the RPC function is not yet deployed.
       // Items will simply not show "Popular" badges until the migration runs.
       return const {};

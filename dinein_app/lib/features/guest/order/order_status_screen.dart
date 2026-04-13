@@ -34,17 +34,17 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
     final orderAsync = ref.watch(orderByIdProvider(widget.orderId));
 
     // Listen for status transitions → fire toast + inbox entry
-    ref.listen<AsyncValue<OrderStatus>>(
-      orderStreamProvider(widget.orderId),
-      (previous, next) {
-        final newStatus = next.value;
-        if (newStatus == null) return;
-        if (_lastKnownStatus != null && newStatus != _lastKnownStatus) {
-          _onStatusChanged(newStatus);
-        }
-        _lastKnownStatus = newStatus;
-      },
-    );
+    ref.listen<AsyncValue<OrderStatus>>(orderStreamProvider(widget.orderId), (
+      previous,
+      next,
+    ) {
+      final newStatus = next.value;
+      if (newStatus == null) return;
+      if (_lastKnownStatus != null && newStatus != _lastKnownStatus) {
+        _onStatusChanged(newStatus);
+      }
+      _lastKnownStatus = newStatus;
+    });
 
     return orderAsync.when(
       loading: () => Scaffold(
@@ -53,11 +53,23 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
           physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.all(24),
           children: const [
-            SkeletonLoader(width: double.infinity, height: 64, borderRadius: 16),
+            SkeletonLoader(
+              width: double.infinity,
+              height: 64,
+              borderRadius: 16,
+            ),
             SizedBox(height: 12),
-            SkeletonLoader(width: double.infinity, height: 48, borderRadius: 12),
+            SkeletonLoader(
+              width: double.infinity,
+              height: 48,
+              borderRadius: 12,
+            ),
             SizedBox(height: 16),
-            SkeletonLoader(width: double.infinity, height: 160, borderRadius: 20),
+            SkeletonLoader(
+              width: double.infinity,
+              height: 160,
+              borderRadius: 20,
+            ),
           ],
         ),
       ),
@@ -116,10 +128,16 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
                   vertical: AppTheme.space4,
                 ),
                 decoration: BoxDecoration(
-                  color: _statusColor(cs, currentStatus).withValues(alpha: 0.08),
+                  color: _statusColor(
+                    cs,
+                    currentStatus,
+                  ).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                   border: Border.all(
-                    color: _statusColor(cs, currentStatus).withValues(alpha: 0.20),
+                    color: _statusColor(
+                      cs,
+                      currentStatus,
+                    ).withValues(alpha: 0.20),
                   ),
                 ),
                 child: Row(
@@ -128,7 +146,10 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: _statusColor(cs, currentStatus).withValues(alpha: 0.15),
+                        color: _statusColor(
+                          cs,
+                          currentStatus,
+                        ).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -206,13 +227,7 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
               const SizedBox(height: AppTheme.space6),
 
               // ─── Items List ───
-              Text(
-                'ITEMS ORDERED',
-                style: tt.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  letterSpacing: 3,
-                ),
-              ),
+              Text('Items', style: tt.titleSmall),
               const SizedBox(height: AppTheme.space3),
               ClayCard(
                 child: Column(
@@ -245,7 +260,7 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
                         Text(
                           displayOrder.formatPrice(displayOrder.total),
                           style: tt.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w800,
                             color: cs.primary,
                           ),
                         ),
@@ -258,18 +273,13 @@ class _OrderStatusScreenState extends ConsumerState<OrderStatusScreen> {
           ),
 
           // ─── Bottom CTA ───
-          bottomNavigationBar: Container(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.space6,
-              AppTheme.space4,
-              AppTheme.space6,
-              AppTheme.space8,
-            ),
-            child: SafeArea(
-              child: PremiumButton(
-                label: 'BACK TO HOME',
-                isOutlined: true,
+          bottomNavigationBar: GuestStickyActionBar(
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
                 onPressed: () => context.goNamed(AppRouteNames.discover),
+                icon: const Icon(LucideIcons.home, size: 18),
+                label: const Text('Home'),
               ),
             ),
           ),
@@ -380,8 +390,8 @@ class _CompactProgressBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: currentStatus.stepIndex >= steps[i].$2.stepIndex
                       ? (currentStatus == steps[i].$2
-                          ? cs.primary
-                          : AppColors.secondary)
+                            ? cs.primary
+                            : AppColors.secondary)
                       : cs.surfaceContainerHigh,
                   shape: BoxShape.circle,
                   boxShadow: [
@@ -409,7 +419,7 @@ class _CompactProgressBar extends StatelessWidget {
                 style: tt.labelSmall?.copyWith(
                   fontSize: 9,
                   fontWeight: currentStatus == steps[i].$2
-                      ? FontWeight.w900
+                      ? FontWeight.w700
                       : FontWeight.w600,
                   color: currentStatus.stepIndex >= steps[i].$2.stepIndex
                       ? cs.onSurface
@@ -462,7 +472,7 @@ class _ItemRow extends StatelessWidget {
             '${item.quantity}',
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: cs.primary,
             ),
           ),
@@ -518,11 +528,7 @@ class _OrderDetailRow extends StatelessWidget {
         ),
         const SizedBox(width: 16),
         Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: tt.bodyMedium,
-          ),
+          child: Text(value, textAlign: TextAlign.right, style: tt.bodyMedium),
         ),
       ],
     );

@@ -41,14 +41,8 @@ class _MiniStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    return Container(
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -67,10 +61,8 @@ class _MiniStatCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.5,
+                  style: tt.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                     color: cs.primary,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -81,10 +73,7 @@ class _MiniStatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: tt.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.5,
-            ),
+            style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -129,8 +118,7 @@ class _PeriodTab extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
+                fontWeight: FontWeight.w700,
                 color: selected ? cs.onPrimary : cs.onSurfaceVariant,
               ),
             ),
@@ -163,8 +151,7 @@ class _ViewTab extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.5,
+              fontWeight: FontWeight.w700,
               color: selected ? cs.onSurface : cs.onSurfaceVariant,
             ),
           ),
@@ -219,8 +206,7 @@ class _ExportButton extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.5,
+                fontWeight: FontWeight.w700,
                 color: textColor,
               ),
             ),
@@ -254,14 +240,8 @@ class _ItemCard extends StatelessWidget {
     final trendPercent = (20.0 / rank).clamp(0.5, 25.0);
     final trendUp = rank <= 4;
 
-    return Container(
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
-      ),
       child: Row(
         children: [
           // Chart icon
@@ -294,10 +274,8 @@ class _ItemCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   stat.category,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
+                  style: tt.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                     color: cs.onSurfaceVariant,
                   ),
                 ),
@@ -361,7 +339,7 @@ class _ItemCard extends StatelessWidget {
                           '${trendPercent.toStringAsFixed(1)}%',
                           style: TextStyle(
                             fontSize: 9,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: trendUp ? cs.primary : cs.error,
                           ),
                         ),

@@ -133,6 +133,12 @@ class AppBootstrapService extends ChangeNotifier {
       notifyListeners();
       debugPrint('[bootstrap] initialization failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'bootstrap.initialize',
+        fatal: true,
+      );
     }
   }
 
@@ -167,6 +173,11 @@ class AppBootstrapService extends ChangeNotifier {
     } catch (error, stackTrace) {
       debugPrint('[bootstrap] $label failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'bootstrap.$label',
+      );
     }
   }
 

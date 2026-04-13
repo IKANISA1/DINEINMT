@@ -278,73 +278,33 @@ class _OrdersBody extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ═══ HEADER ═══
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Orders',
-                                style: tt.headlineLarge?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -0.5,
+                              const Expanded(
+                                child: AppPageHeader(
+                                  title: 'Orders',
+                                  subtitle:
+                                      'Search, filter, and export service activity.',
                                 ),
                               ),
                               Row(
                                 children: [
-                                  // Search icon
-                                  PressableScale(
-                                    onTap: () => _showSearchSheet(context, cs, tt),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: searchQuery.isNotEmpty
-                                            ? cs.primary.withValues(alpha: 0.15)
-                                            : cs.surfaceContainerLow,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: searchQuery.isNotEmpty
-                                              ? cs.primary.withValues(alpha: 0.3)
-                                              : Colors.white.withValues(alpha: 0.05),
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        LucideIcons.search,
-                                        size: 18,
-                                        color: searchQuery.isNotEmpty
-                                            ? cs.primary
-                                            : cs.onSurfaceVariant,
-                                      ),
-                                    ),
+                                  AppIconButton(
+                                    icon: LucideIcons.search,
+                                    selected: searchQuery.isNotEmpty,
+                                    size: 44,
+                                    onTap: () =>
+                                        _showSearchSheet(context, cs, tt),
+                                    semanticLabel: 'Search orders',
                                   ),
                                   const SizedBox(width: 8),
-                                  // Filter toggle
-                                  PressableScale(
+                                  AppIconButton(
+                                    icon: LucideIcons.slidersHorizontal,
+                                    selected: showFilterPanel,
+                                    size: 44,
                                     onTap: onToggleFilter,
-                                    child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
-                                      width: 44,
-                                      height: 44,
-                                      decoration: BoxDecoration(
-                                        color: showFilterPanel
-                                            ? cs.primary.withValues(alpha: 0.15)
-                                            : cs.surfaceContainerLow,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: showFilterPanel
-                                              ? cs.primary.withValues(alpha: 0.3)
-                                              : Colors.white.withValues(alpha: 0.05),
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        LucideIcons.slidersHorizontal,
-                                        size: 18,
-                                        color: showFilterPanel
-                                            ? cs.primary
-                                            : cs.onSurfaceVariant,
-                                      ),
-                                    ),
+                                    semanticLabel: 'Filter orders',
                                   ),
                                 ],
                               ),
@@ -367,8 +327,9 @@ class _OrdersBody extends ConsumerWidget {
                                 child: _MiniStatCard(
                                   icon: LucideIcons.dollarSign,
                                   label: 'REVENUE',
-                                  value:
-                                      country.formatPriceTabular(totalRevenue),
+                                  value: country.formatPriceTabular(
+                                    totalRevenue,
+                                  ),
                                 ),
                               ),
                             ],
@@ -430,7 +391,8 @@ class _OrdersBody extends ConsumerWidget {
                               semanticLabel: 'Clear search',
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6,
+                                  horizontal: 12,
+                                  vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
                                   color: cs.primary.withValues(alpha: 0.10),
@@ -444,7 +406,11 @@ class _OrdersBody extends ConsumerWidget {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(LucideIcons.search, size: 12, color: cs.primary),
+                                    Icon(
+                                      LucideIcons.search,
+                                      size: 12,
+                                      color: cs.primary,
+                                    ),
                                     const SizedBox(width: 6),
                                     Text(
                                       '"$searchQuery"',
@@ -454,7 +420,11 @@ class _OrdersBody extends ConsumerWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 6),
-                                    Icon(LucideIcons.x, size: 12, color: cs.primary),
+                                    Icon(
+                                      LucideIcons.x,
+                                      size: 12,
+                                      color: cs.primary,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -485,12 +455,10 @@ class _OrdersBody extends ConsumerWidget {
 
                           // ═══ RESULTS COUNT ═══
                           Text(
-                            '${filtered.length} ORDERS FOUND',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
+                            '${filtered.length} orders found',
+                            style: tt.labelMedium?.copyWith(
                               color: cs.onSurfaceVariant,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(height: AppTheme.space4),
@@ -717,14 +685,17 @@ class _OrdersBody extends ConsumerWidget {
       builder: (sheetContext) {
         return Padding(
           padding: EdgeInsets.fromLTRB(
-            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
             MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 margin: const EdgeInsets.only(bottom: AppTheme.space5),
                 decoration: BoxDecoration(
                   color: cs.onSurface.withValues(alpha: 0.12),
@@ -735,7 +706,9 @@ class _OrdersBody extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
                 ),
                 child: TextField(
                   controller: searchController,
@@ -751,7 +724,11 @@ class _OrdersBody extends ConsumerWidget {
                     ),
                     prefixIcon: Padding(
                       padding: const EdgeInsets.only(left: 16, right: 10),
-                      child: Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
+                      child: Icon(
+                        LucideIcons.search,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                     prefixIconConstraints: const BoxConstraints(minWidth: 0),
                     border: InputBorder.none,

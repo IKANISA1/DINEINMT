@@ -7,6 +7,7 @@ import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:db_pkg/models/models.dart';
 import '../../../core/providers/providers.dart';
+import 'package:dinein_app/core/services/dinein_api_service.dart';
 import 'package:dinein_app/core/services/order_repository.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
@@ -48,6 +49,20 @@ class VenueOrderDetailScreen extends ConsumerWidget {
     );
   }
 
+  bool _canMarkOrderPaid(Order order) {
+    return order.status != OrderStatus.cancelled && !order.paymentStatus.isPaid;
+  }
+
+  Color _paymentStatusColor(BuildContext context, PaymentStatus status) {
+    final cs = Theme.of(context).colorScheme;
+    return switch (status) {
+      PaymentStatus.pending => AppColors.warning,
+      PaymentStatus.confirmed => cs.primary,
+      PaymentStatus.notRequired => cs.onSurfaceVariant,
+      PaymentStatus.failed => cs.error,
+    };
+  }
+
   Widget _buildContent(
     BuildContext context,
     WidgetRef ref,
@@ -71,99 +86,30 @@ class VenueOrderDetailScreen extends ConsumerWidget {
               children: [
                 const SizedBox(height: AppTheme.space5),
 
-                // ─── Header ───
                 Row(
                   children: [
-                    PressableScale(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusLg,
-                          ),
-                          border: Border.all(color: AppColors.white5),
-                        ),
-                        child: const Icon(LucideIcons.chevronLeft, size: 24),
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.space4),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Order Details',
-                            style: tt.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          Text(
-                            'ORDER #${order.displayNumber}',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                              color: cs.primary,
-                            ),
-                          ),
-                        ],
+                      child: AppPageHeader(
+                        title: 'Order details',
+                        subtitle: 'Order #${order.displayNumber}',
+                        onBack: () => context.pop(),
                       ),
                     ),
-                    // Status badge with icon
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: order.status == OrderStatus.received
-                            ? AppColors.secondary.withValues(alpha: 0.10)
-                            : cs.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            order.status == OrderStatus.received
-                                ? LucideIcons.chefHat
-                                : LucideIcons.checkCircle2,
-                            size: 14,
-                            color: order.status == OrderStatus.received
-                                ? AppColors.secondary
-                                : cs.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            order.status.label.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                              color: order.status == OrderStatus.received
-                                  ? AppColors.secondary
-                                  : cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
+                    StatusBadge(
+                      label: order.status.label,
+                      color: order.status == OrderStatus.received
+                          ? AppColors.secondary.withValues(alpha: 0.10)
+                          : cs.surfaceContainerHigh,
+                      textColor: order.status == OrderStatus.received
+                          ? AppColors.secondary
+                          : cs.onSurfaceVariant,
                     ),
                   ],
                 ),
                 const SizedBox(height: AppTheme.space6),
 
-                // ─── Guest Info Section ───
-                Container(
+                AppSurfaceCard(
                   padding: const EdgeInsets.all(AppTheme.space5),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                    border: Border.all(color: AppColors.white5),
-                  ),
                   child: Row(
                     children: [
                       // Avatar
@@ -304,12 +250,10 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'SPECIAL REQUESTS',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 2,
+                                'Special request',
+                                style: tt.labelMedium?.copyWith(
                                   color: AppColors.warning,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -376,24 +320,137 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
+                      const SizedBox(height: AppTheme.space3),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Payment method',
+                            style: tt.bodyLarge?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            order.paymentMethod.label,
+                            style: tt.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppTheme.space3),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Payment status',
+                            style: tt.bodyLarge?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          Builder(
+                            builder: (context) {
+                              final accent = _paymentStatusColor(
+                                context,
+                                order.paymentStatus,
+                              );
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(
+                                    AppTheme.radiusFull,
+                                  ),
+                                ),
+                                child: Text(
+                                  order.paymentStatus.label,
+                                  style: tt.labelMedium?.copyWith(
+                                    color: accent,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      if (_canMarkOrderPaid(order)) ...[
+                        const SizedBox(height: AppTheme.space4),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: PressableScale(
+                            onTap: () async {
+                              try {
+                                await OrderRepository.instance.markOrderPaid(
+                                  order.id,
+                                );
+                                ref.invalidate(orderByIdProvider(orderId));
+                                ref.invalidate(
+                                  venueOrdersProvider(order.venueId),
+                                );
+                                DineInToast.instance.success(
+                                  'Order marked as paid',
+                                );
+                              } catch (e) {
+                                final message = e is DineinApiException
+                                    ? e.message
+                                    : 'Could not confirm payment. Please try again.';
+                                DineInToast.instance.error(message);
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppTheme.space4,
+                                vertical: AppTheme.space3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: cs.primary,
+                                borderRadius: BorderRadius.circular(
+                                  AppTheme.radiusLg,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.badgeCheck,
+                                    size: 16,
+                                    color: cs.onPrimary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Mark as Paid',
+                                    style: tt.labelLarge?.copyWith(
+                                      color: cs.onPrimary,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: AppTheme.space4),
                       Divider(color: AppColors.white10),
                       const SizedBox(height: AppTheme.space4),
-                      // Total
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             'Total',
                             style: tt.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           Text(
                             order.formatPrice(order.total),
                             style: TextStyle(
                               fontSize: 22,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w700,
                               color: cs.primary,
                             ),
                           ),
@@ -422,7 +479,11 @@ class VenueOrderDetailScreen extends ConsumerWidget {
               ),
               decoration: BoxDecoration(
                 color: cs.surface.withValues(alpha: 0.80),
-                border: Border(top: BorderSide(color: AppColors.white5)),
+                border: Border(
+                  top: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.72),
+                  ),
+                ),
               ),
               child: SafeArea(
                 top: false,
@@ -463,14 +524,16 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                               OrderStatus.cancelled,
                             );
                             ref.invalidate(orderByIdProvider(orderId));
+                            ref.invalidate(venueOrdersProvider(order.venueId));
                             DineInToast.instance.show(
                               message: 'Order cancelled',
                               type: ToastType.warning,
                             );
                           } catch (e) {
-                            DineInToast.instance.error(
-                              'Failed to cancel: $e',
-                            );
+                            final message = e is DineinApiException
+                                ? e.message
+                                : 'Failed to cancel the order. Please try again.';
+                            DineInToast.instance.error(message);
                           }
                         },
                         child: Container(
@@ -511,14 +574,16 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                               nextStatus,
                             );
                             ref.invalidate(orderByIdProvider(orderId));
+                            ref.invalidate(venueOrdersProvider(order.venueId));
                             final msg = nextStatus == OrderStatus.received
                                 ? 'Order marked as received'
                                 : 'Order marked as served';
                             DineInToast.instance.success(msg);
                           } catch (e) {
-                            DineInToast.instance.error(
-                              'Failed to update: $e',
-                            );
+                            final message = e is DineinApiException
+                                ? e.message
+                                : 'Failed to update the order. Please try again.';
+                            DineInToast.instance.error(message);
                           }
                         },
                         child: Container(
@@ -582,7 +647,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.white5),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.72)),
       ),
       child: Column(
         children: [
@@ -623,7 +688,7 @@ class VenueOrderDetailScreen extends ConsumerWidget {
                       child: Text(
                         '${item.quantity}x',
                         style: const TextStyle(
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                           fontSize: 12,
                         ),

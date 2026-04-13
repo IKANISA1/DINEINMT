@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:core_pkg/config/country_runtime.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
 
 class SupportContactService {
   SupportContactService._();
@@ -21,6 +22,9 @@ class SupportContactService {
   }) async {
     final resolvedWhatsAppNumber = whatsAppNumber ?? defaultWhatsAppNumber;
     final resolvedEmail = email ?? defaultSupportEmail;
+    Object? lastError;
+    StackTrace? lastStackTrace;
+    String? failedChannel;
 
     if (resolvedWhatsAppNumber.trim().isNotEmpty) {
       final appUri = Uri.parse('whatsapp://send?phone=$resolvedWhatsAppNumber');
@@ -32,7 +36,10 @@ class SupportContactService {
           mode: LaunchMode.externalApplication,
         );
         if (launched || !context.mounted) return;
-      } catch (_) {
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStackTrace = stackTrace;
+        failedChannel = 'whatsapp_app';
         if (!context.mounted) return;
       }
 
@@ -42,7 +49,10 @@ class SupportContactService {
           mode: LaunchMode.externalApplication,
         );
         if (launched || !context.mounted) return;
-      } catch (_) {
+      } catch (error, stackTrace) {
+        lastError = error;
+        lastStackTrace = stackTrace;
+        failedChannel = 'whatsapp_web';
         if (!context.mounted) return;
       }
     }
@@ -56,9 +66,27 @@ class SupportContactService {
         mode: LaunchMode.externalApplication,
       );
       if (launched || !context.mounted) return;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      lastError = error;
+      lastStackTrace = stackTrace;
+      failedChannel = 'mailto';
       if (!context.mounted) return;
     }
+
+    if (lastError != null && lastStackTrace != null) {
+      await AppTelemetryService.reportError(
+        lastError,
+        lastStackTrace,
+        context: 'support_contact.launch',
+        details: {
+          'channel': failedChannel,
+          'has_whatsapp_number': resolvedWhatsAppNumber.trim().isNotEmpty,
+          'has_email': resolvedEmail.trim().isNotEmpty,
+        },
+      );
+    }
+
+    if (!context.mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Could not open a support contact option.')),

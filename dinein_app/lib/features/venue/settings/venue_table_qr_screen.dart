@@ -117,58 +117,16 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
             120,
           ),
           children: [
-            Row(
-              children: [
-                PressableScale(
-                  onTap: () {
-                    if (Navigator.of(context).canPop()) {
-                      context.pop();
-                    } else {
-                      context.goNamed(AppRouteNames.venueSettings);
-                    }
-                  },
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.05),
-                      ),
-                    ),
-                    child: Icon(
-                      LucideIcons.chevronLeft,
-                      size: 22,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppTheme.space4),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Venue QR Codes',
-                        style: tt.headlineLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      Text(
-                        'VENUE MANAGEMENT',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            AppPageHeader(
+              title: 'Venue QR codes',
+              subtitle: 'Share direct menu, app, and table-entry links.',
+              onBack: () {
+                if (Navigator.of(context).canPop()) {
+                  context.pop();
+                } else {
+                  context.goNamed(AppRouteNames.venueSettings);
+                }
+              },
             ),
             const SizedBox(height: AppTheme.space5),
             Text(
@@ -252,7 +210,7 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
               },
             ),
             const SizedBox(height: AppTheme.space6),
-            ClayCard(
+            AppSurfaceCard(
               padding: const EdgeInsets.all(AppTheme.space5),
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -267,8 +225,7 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
                         Text(
                           'TABLE $_tableNumber',
                           style: tt.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.4,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: AppTheme.space4),
@@ -289,7 +246,7 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
                       Text(
                         'Table QR',
                         style: tt.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: AppTheme.space2),
@@ -301,10 +258,9 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
                       ),
                       const SizedBox(height: AppTheme.space5),
                       Text(
-                        'TABLE NUMBER',
-                        style: tt.labelSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.2,
+                        'Table number',
+                        style: tt.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                           color: cs.onSurfaceVariant,
                         ),
                       ),
@@ -330,7 +286,7 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: PremiumButton(
-                          label: 'SHARE TABLE QR',
+                          label: 'Share table QR',
                           icon: LucideIcons.share2,
                           isLoading: _sharing,
                           onPressed: _sharing
@@ -348,7 +304,7 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: PremiumButton(
-                          label: 'COPY TABLE URL',
+                          label: 'Copy table URL',
                           icon: LucideIcons.copy,
                           isOutlined: true,
                           onPressed: () => copyQrLink(
@@ -362,7 +318,7 @@ class _VenueTableQrScreenState extends ConsumerState<VenueTableQrScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: PremiumButton(
-                          label: 'OPEN TABLE URL',
+                          label: 'Open table URL',
                           icon: LucideIcons.externalLink,
                           isOutlined: true,
                           onPressed: () => openQrLink(
@@ -430,7 +386,7 @@ class _QrManagementCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return ClayCard(
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(AppTheme.space5),
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -445,7 +401,7 @@ class _QrManagementCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: AppTheme.space2),
               Text(
@@ -474,7 +430,7 @@ class _QrManagementCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: PremiumButton(
-                  label: 'SHARE QR',
+                  label: 'Share QR',
                   icon: LucideIcons.share2,
                   isLoading: isBusy,
                   onPressed: isBusy ? null : onShare,
@@ -484,7 +440,7 @@ class _QrManagementCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: PremiumButton(
-                  label: 'COPY URL',
+                  label: 'Copy URL',
                   icon: LucideIcons.copy,
                   isOutlined: true,
                   onPressed: onCopy,
@@ -494,7 +450,7 @@ class _QrManagementCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: PremiumButton(
-                  label: 'OPEN URL',
+                  label: 'Open URL',
                   icon: LucideIcons.externalLink,
                   isOutlined: true,
                   onPressed: onOpen,
@@ -553,7 +509,7 @@ class _TableNumberEditor extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.72)),
       ),
       child: Row(
         children: [
@@ -570,7 +526,7 @@ class _TableNumberEditor extends StatelessWidget {
               onChanged: onChanged,
               onEditingComplete: onEditingComplete,
               textAlign: TextAlign.center,
-              style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+              style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(

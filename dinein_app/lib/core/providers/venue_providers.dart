@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import 'package:core_pkg/config/country_runtime.dart';
 import 'package:db_pkg/models/models.dart';
 import '../services/auth_repository.dart';
+import '../services/app_telemetry.dart';
 import '../services/discovery_location_service.dart';
 import '../services/venue_repository.dart';
 import 'auth_providers.dart';
@@ -63,7 +64,13 @@ final currentVenueProvider = FutureProvider<Venue?>((ref) async {
           .getVenueById(venueSession.venueId)
           .timeout(_venueBootstrapTimeout);
       if (venue != null) return venue;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'venue_provider.current_venue_session_lookup',
+        details: {'venueId': venueSession.venueId},
+      );
       // Fall back to the persisted venue session below.
     }
 
@@ -86,7 +93,13 @@ final currentVenueProvider = FutureProvider<Venue?>((ref) async {
           .getVenueForOwner(user.id)
           .timeout(_venueBootstrapTimeout);
       if (venue != null) return venue;
-    } catch (_) {
+    } catch (error, stackTrace) {
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'venue_provider.owner_lookup',
+        details: {'userId': user.id},
+      );
       // Fall through to draft fallback below.
     }
   }

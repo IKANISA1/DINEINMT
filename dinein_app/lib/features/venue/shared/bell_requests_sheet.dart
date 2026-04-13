@@ -51,7 +51,11 @@ class BellRequestsSheet extends ConsumerWidget {
                   color: AppColors.secondary.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(LucideIcons.bellRing, size: 20, color: AppColors.secondary),
+                child: Icon(
+                  LucideIcons.bellRing,
+                  size: 20,
+                  color: AppColors.secondary,
+                ),
               ),
               const SizedBox(width: AppTheme.space4),
               Expanded(
@@ -87,7 +91,8 @@ class BellRequestsSheet extends ConsumerWidget {
                 ),
               ),
             ),
-            error: (err, _) => Center(child: Text('Error loading requests: $err')),
+            error: (err, _) =>
+                Center(child: Text('Error loading requests: $err')),
             data: (waves) {
               if (waves.isEmpty) {
                 return const EmptyState(
@@ -100,7 +105,8 @@ class BellRequestsSheet extends ConsumerWidget {
               return ListView.separated(
                 padding: const EdgeInsets.all(AppTheme.space6),
                 itemCount: waves.length,
-                separatorBuilder: (_, _) => const SizedBox(height: AppTheme.space4),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: AppTheme.space4),
                 itemBuilder: (context, index) {
                   final wave = waves[index];
                   return _WaveRequestCard(wave: wave);
@@ -167,7 +173,7 @@ class _WaveRequestCardState extends ConsumerState<_WaveRequestCard> {
                 widget.wave.tableNumber,
                 style: tt.titleLarge?.copyWith(
                   color: isUrgent ? cs.error : cs.onPrimaryContainer,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
@@ -202,7 +208,7 @@ class _WaveRequestCardState extends ConsumerState<_WaveRequestCard> {
             )
           else
             PremiumButton(
-              label: 'RESOLVE',
+              label: 'Resolve',
               isSmall: true,
               onPressed: _handleResolve,
             ),

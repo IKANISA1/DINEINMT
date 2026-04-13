@@ -182,67 +182,15 @@ class _VenueNotificationsScreenState
               120,
             ),
             children: [
-              // ─── Header ───
-              Row(
-                children: [
-                  PressableScale(
-                    onTap: () => context.pop(),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.05),
-                        ),
-                      ),
-                      child: Icon(
-                        LucideIcons.chevronLeft,
-                        size: 18,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Notifications',
-                        style: tt.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      Text(
-                        'VENUE MANAGEMENT',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              AppPageHeader(
+                title: 'Notifications',
+                subtitle:
+                    'Control push and WhatsApp updates for incoming orders.',
+                onBack: () => context.pop(),
               ),
               const SizedBox(height: AppTheme.space8),
 
-              // ─── Section: ORDER ALERTS ───
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Text(
-                  'ORDER ALERTS',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3,
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.50),
-                  ),
-                ),
-              ),
+              const AppSectionLabel(label: 'Order alerts'),
               const SizedBox(height: AppTheme.space3),
 
               // ─── New Order Push ───
@@ -252,9 +200,9 @@ class _VenueNotificationsScreenState
                     title: 'New Order Push',
                     subtitle: kIsWeb
                         ? pushAvailable
-                              ? 'INSTANT BROWSER NOTIFICATIONS'
-                              : 'AVAILABLE ON MOBILE APP ONLY'
-                        : 'INSTANT MOBILE NOTIFICATIONS',
+                              ? 'Instant browser notifications'
+                              : 'Available on the mobile app only'
+                        : 'Instant mobile notifications',
                     value: pushAvailable ? _orderPush : false,
                     onChanged: pushAvailable && canEditToggles
                         ? (v) => _persistSettings(
@@ -314,7 +262,7 @@ class _VenueNotificationsScreenState
                     icon: LucideIcons.phone,
                     iconColor: AppColors.secondary,
                     title: 'WhatsApp Updates',
-                    subtitle: 'RECEIVE ORDER SUMMARIES',
+                    subtitle: 'Receive order summaries',
                     value: _whatsAppUpdates,
                     onChanged: canEditToggles
                         ? (v) => _persistSettings(
@@ -359,14 +307,8 @@ class _ToggleTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Container(
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
-      ),
       child: Row(
         children: [
           Container(
@@ -390,11 +332,8 @@ class _ToggleTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2,
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.50),
+                  style: tt.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.72),
                   ),
                 ),
               ],

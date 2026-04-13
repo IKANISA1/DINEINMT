@@ -164,8 +164,9 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
     if (_uploadingCover) return;
     setState(() => _uploadingCover = true);
     try {
-      final url = await ImageUploadService.instance
-          .pickAndUploadVenueImage(venue.id);
+      final url = await ImageUploadService.instance.pickAndUploadVenueImage(
+        venue.id,
+      );
       if (url == null) {
         // User cancelled the picker
         return;
@@ -174,14 +175,14 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
       setState(() => _coverCtrl.text = url);
       ref.invalidate(currentVenueProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cover image uploaded.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cover image uploaded.')));
     } on ImageUploadException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -204,8 +205,7 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
     _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
       if (!mounted) return;
       try {
-        final results =
-            await GooglePlacesService.instance.autocomplete(value);
+        final results = await GooglePlacesService.instance.autocomplete(value);
         if (!mounted) return;
         setState(() {
           _addressSuggestions = results;
@@ -226,8 +226,9 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
 
     // Fetch full details to get precise formatted address
     try {
-      final details =
-          await GooglePlacesService.instance.getPlaceDetails(s.placeId);
+      final details = await GooglePlacesService.instance.getPlaceDetails(
+        s.placeId,
+      );
       if (details != null && mounted) {
         setState(() {
           if (details.formattedAddress.isNotEmpty) {
@@ -275,56 +276,17 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
                 170,
               ),
               children: [
-                Row(
-                  children: [
-                    PressableScale(
-                      onTap: () {
-                        if (Navigator.of(context).canPop()) {
-                          context.pop();
-                        } else {
-                          context.goNamed(AppRouteNames.venueSettings);
-                        }
-                      },
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.05),
-                          ),
-                        ),
-                        child: Icon(
-                          LucideIcons.chevronLeft,
-                          size: 22,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppTheme.space4),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Venue Profile',
-                          style: tt.headlineLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        Text(
-                          'VENUE MANAGEMENT',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                AppPageHeader(
+                  title: 'Venue profile',
+                  subtitle:
+                      'Core identity, contact details, and discovery data.',
+                  onBack: () {
+                    if (Navigator.of(context).canPop()) {
+                      context.pop();
+                    } else {
+                      context.goNamed(AppRouteNames.venueSettings);
+                    }
+                  },
                 ),
                 const SizedBox(height: AppTheme.space6),
                 ClipRRect(
@@ -382,12 +344,11 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
                               const SizedBox(width: AppTheme.space3),
                               Text(
                                 _uploadingCover
-                                    ? 'UPLOADING...'
-                                    : 'UPLOAD COVER',
+                                    ? 'Uploading...'
+                                    : 'Upload cover',
                                 style: tt.labelLarge?.copyWith(
                                   color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 2,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
@@ -398,16 +359,8 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
                   ),
                 ).animate().fadeIn(duration: 300.ms),
                 const SizedBox(height: AppTheme.space6),
-                Container(
+                AppSurfaceCard(
                   padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.05),
-                    ),
-                    boxShadow: AppTheme.clayShadow,
-                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -420,7 +373,7 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
                                 Text(
                                   'Discovery Data',
                                   style: tt.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w900,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
@@ -521,13 +474,12 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
                                 const SizedBox(width: 10),
                                 Text(
                                   _syncingProfile
-                                      ? 'SYNCING...'
-                                      : 'SYNC PROFILE DATA',
+                                      ? 'Syncing...'
+                                      : 'Sync profile data',
                                   style: TextStyle(
                                     color: AppColors.onPrimary,
                                     fontSize: 11,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 2.6,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
@@ -626,11 +578,10 @@ class _VenueProfileScreenState extends ConsumerState<VenueProfileScreen> {
                         ),
                       const SizedBox(width: 10),
                       Text(
-                        'SAVE CHANGES',
+                        'Save changes',
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 3,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.onPrimary,
                         ),
                       ),
@@ -668,14 +619,8 @@ class _ProfileField extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppTheme.space3),
-      child: Container(
+      child: AppSurfaceCard(
         padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          boxShadow: AppTheme.clayShadow,
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -689,10 +634,8 @@ class _ProfileField extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                  style: tt.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                     color: AppColors.primary.withValues(alpha: 0.85),
                   ),
                 ),
@@ -745,18 +688,11 @@ class _AddressAutocompleteField extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
+          AppSurfaceCard(
             padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: showSuggestions
-                    ? AppColors.primary.withValues(alpha: 0.30)
-                    : Colors.white.withValues(alpha: 0.05),
-              ),
-              boxShadow: AppTheme.clayShadow,
-            ),
+            borderColor: showSuggestions
+                ? AppColors.primary.withValues(alpha: 0.30)
+                : null,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -770,10 +706,8 @@ class _AddressAutocompleteField extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       'ADDRESS',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
+                      style: tt.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
                         color: AppColors.primary.withValues(alpha: 0.85),
                       ),
                     ),
@@ -789,13 +723,13 @@ class _AddressAutocompleteField extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'POWERED BY GOOGLE',
+                            'Google Places',
                             style: TextStyle(
-                              fontSize: 7,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.5,
-                              color:
-                                  cs.onSurfaceVariant.withValues(alpha: 0.35),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurfaceVariant.withValues(
+                                alpha: 0.35,
+                              ),
                             ),
                           ),
                         ],
@@ -886,8 +820,9 @@ class _AddressAutocompleteField extends StatelessWidget {
                               Icon(
                                 LucideIcons.arrowUpLeft,
                                 size: 14,
-                                color:
-                                    cs.onSurfaceVariant.withValues(alpha: 0.30),
+                                color: cs.onSurfaceVariant.withValues(
+                                  alpha: 0.30,
+                                ),
                               ),
                             ],
                           ),

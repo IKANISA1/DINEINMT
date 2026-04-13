@@ -77,4 +77,35 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('cart screen renders item note when present', (
+    WidgetTester tester,
+  ) async {
+    const state = CartState(
+      venueId: 'venue_1',
+      venueSlug: 'venue-1',
+      venueName: 'Venue 1',
+      items: [
+        CartItem(
+          menuItemId: 'item_1',
+          name: 'Burger',
+          description: 'Classic burger',
+          price: 12,
+          quantity: 1,
+          note: 'No onions',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [cartProvider.overrideWith(() => MockCartNotifier(state))],
+        child: const MaterialApp(home: Scaffold(body: CartScreen())),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Note: No onions'), findsOneWidget);
+  });
 }

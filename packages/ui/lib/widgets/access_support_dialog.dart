@@ -24,7 +24,7 @@ Future<void> showAccessSupportDialog(
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-          side: BorderSide(color: AppColors.white5),
+          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.72)),
         ),
         titlePadding: const EdgeInsets.fromLTRB(
           AppTheme.space6,

@@ -298,57 +298,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     if (cart.isEmpty) {
       return Scaffold(
         body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHigh,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      LucideIcons.shoppingBag,
-                      size: 48,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: AppTheme.space6),
-                  Text(
-                    'Your cart is empty',
-                    style: tt.headlineLarge,
-                  ), // text-3xl font-black
-                  const SizedBox(height: AppTheme.space4),
-                  Text(
-                    "Looks like you haven't added\nanything to your order yet.",
-                    textAlign: TextAlign.center,
-                    style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: AppTheme.space8),
-                  ElevatedButton(
-                    onPressed: () => context.goNamed(AppRouteNames.discover),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: cs.primary,
-                      foregroundColor: cs.onPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: Text(
-                      'Explore Venues',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          child: EmptyState(
+            icon: LucideIcons.shoppingBag,
+            title: 'Your cart is empty',
+            subtitle:
+                "Looks like you haven't added\nanything to your order yet.",
+            actionLabel: 'Browse venues',
+            onAction: () => context.goNamed(AppRouteNames.discover),
           ),
         ),
       );
@@ -365,34 +321,73 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         }
       },
       child: Scaffold(
+        bottomNavigationBar: GuestStickyActionBar(
+          child: AppSurfaceCard(
+            padding: const EdgeInsets.all(AppTheme.space4),
+            radius: AppTheme.radiusXl,
+            elevated: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total', style: tt.titleMedium),
+                    Text(
+                      cart.formatPrice(finalTotal),
+                      style: tt.headlineSmall?.copyWith(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppTheme.space3),
+                ..._buildPaymentButtons(
+                  cs: cs,
+                  orderingUnavailable: orderingUnavailable,
+                  supportsCash: supportsCash,
+                  supportsRevolut: supportsRevolut,
+                ),
+              ],
+            ),
+          ),
+        ),
         body: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.all(AppTheme.space8),
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.space8,
+              AppTheme.space8,
+              AppTheme.space8,
+              180,
+            ),
             children: [
               // ─── Header ───
               Row(
                 children: [
-                  PressableScale(
-                    semanticLabel: 'Go back',
+                  AppIconButton(
+                    icon: LucideIcons.chevronLeft,
                     onTap: () {
                       _syncDraftFields(clearError: false);
                       Navigator.of(context).pop();
                     },
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.05),
+                    semanticLabel: 'Go back',
+                    size: 44,
+                    iconSize: 18,
+                  ),
+                  const SizedBox(width: AppTheme.space4),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Cart', style: tt.headlineMedium),
+                      Text(
+                        '${cart.itemCount} items',
+                        style: tt.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
-                      child: Icon(LucideIcons.chevronLeft, size: 28),
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: AppTheme.space6),
-                  Text('Your Order', style: tt.displaySmall), // text-4xl = 36px
                 ],
               ),
 
@@ -403,12 +398,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 final idx = entry.key;
                 final item = entry.value;
                 final card = _CartItemCard(
-                  key: ValueKey('cart-item-${item.menuItemId}'),
+                  key: ValueKey('cart-item-${item.lineId}'),
                   item: item,
                   country: cart.effectiveCountry,
                   onUpdateQty: (newQty) =>
-                      cartNotifier.setQuantity(item.menuItemId, newQty),
-                  onRemove: () => cartNotifier.setQuantity(item.menuItemId, 0),
+                      cartNotifier.setQuantity(item.lineId, newQty),
+                  onRemove: () => cartNotifier.setQuantity(item.lineId, 0),
                 );
                 return Padding(
                   padding: const EdgeInsets.only(bottom: AppTheme.space6),
@@ -425,69 +420,69 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
               // ─── Compact Action Bar ───
               Row(
-                children: [
-                  // Table number icon
-                  Expanded(
-                    child: _CompactActionChip(
-                      key: _tableCardKey,
-                      icon: LucideIcons.hash,
-                      label: _tableController.text.trim().isEmpty
-                          ? 'Table #'
-                          : 'Table ${_tableController.text.trim()}',
-                      isError: _tableError,
-                      onTap: () => _showTableNumberSheet(context),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // Special requests icon
-                  Expanded(
-                    child: _CompactActionChip(
-                      icon: LucideIcons.messageSquare,
-                      label: _requestsController.text.trim().isEmpty
-                          ? 'Notes'
-                          : 'Notes ✓',
-                      iconColor: AppColors.secondary,
-                      onTap: () => _showSpecialRequestsSheet(context),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // Add more items
-                  Expanded(
-                    child: _CompactActionChip(
-                      icon: LucideIcons.plus,
-                      label: 'Add more',
-                      onTap: () {
-                        _syncDraftFields(clearError: false);
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                  ),
-                  if (orderingUnavailable) ...[
-                    const SizedBox(width: 10),
-                    // Validation warning icon
-                    Expanded(
-                      child: Tooltip(
-                        message: venue.guestAvailabilityReason,
+                    children: [
+                      // Table number icon
+                      Expanded(
                         child: _CompactActionChip(
-                          icon: LucideIcons.alertTriangle,
-                          label: 'Preview',
-                          iconColor: cs.error,
+                          key: _tableCardKey,
+                          icon: LucideIcons.hash,
+                          label: _tableController.text.trim().isEmpty
+                              ? 'Table'
+                              : 'Table ${_tableController.text.trim()}',
+                          isError: _tableError,
+                          onTap: () => _showTableNumberSheet(context),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Special requests icon
+                      Expanded(
+                        child: _CompactActionChip(
+                          icon: LucideIcons.messageSquare,
+                          label: _requestsController.text.trim().isEmpty
+                              ? 'Notes'
+                              : 'Notes ✓',
+                          iconColor: AppColors.secondary,
+                          onTap: () => _showSpecialRequestsSheet(context),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // Add more items
+                      Expanded(
+                        child: _CompactActionChip(
+                          icon: LucideIcons.plus,
+                          label: 'Add more',
                           onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  venue.guestAvailabilityReason,
-                                ),
-                                duration: const Duration(seconds: 3),
-                              ),
-                            );
+                            _syncDraftFields(clearError: false);
+                            Navigator.of(context).pop();
                           },
                         ),
                       ),
-                    ),
-                  ],
-                ],
-              )
+                      if (orderingUnavailable) ...[
+                        const SizedBox(width: 10),
+                        // Validation warning icon
+                        Expanded(
+                          child: Tooltip(
+                            message: venue.guestAvailabilityReason,
+                            child: _CompactActionChip(
+                              icon: LucideIcons.alertTriangle,
+                              label: 'Preview',
+                              iconColor: cs.error,
+                              onTap: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      venue.guestAvailabilityReason,
+                                    ),
+                                    duration: const Duration(seconds: 3),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
                   .animate(target: _tableError ? 1 : 0)
                   .shimmer(
                     duration: 400.ms,
@@ -502,8 +497,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
               const SizedBox(height: AppTheme.space6),
 
-
-
               // ─── Error message ───
               if (_error != null) ...[
                 Text(
@@ -513,56 +506,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ),
                 const SizedBox(height: AppTheme.space4),
               ],
-
-              // ─── Order Total Card ───
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.10),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.40),
-                      blurRadius: 30,
-                      offset: const Offset(0, 14),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Total row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Total',
-                          style: tt.titleMedium,
-                        ),
-                        Text(
-                          cart.formatPrice(finalTotal),
-                          style: tt.headlineMedium?.copyWith(
-                            color: cs.primary,
-                            letterSpacing: -1.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppTheme.space4),
-
-                    // ─── Payment Buttons (country-aware) ───
-                    ..._buildPaymentButtons(
-                      cs: cs,
-                      orderingUnavailable: orderingUnavailable,
-                      supportsCash: supportsCash,
-                      supportsRevolut: supportsRevolut,
-                    ),
-                  ],
-                ),
-              ),
 
               const SizedBox(height: AppTheme.space8),
             ],
@@ -584,14 +527,16 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ),
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(
-          24, 24, 24,
+          24,
+          24,
+          24,
           MediaQuery.of(ctx).viewInsets.bottom + 24,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Table Number', style: tt.titleLarge),
+            Text('Table', style: tt.titleLarge),
             const SizedBox(height: 16),
             TextField(
               controller: _tableController,
@@ -611,7 +556,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 Navigator.of(ctx).pop();
               },
               decoration: InputDecoration(
-                hintText: 'Enter your table number',
+                hintText: 'Enter table number',
                 hintStyle: tt.bodyLarge?.copyWith(
                   color: cs.onSurfaceVariant.withValues(alpha: 0.30),
                 ),
@@ -642,10 +587,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: const Text(
-                  'Done',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
+                child: const Text('Done'),
               ),
             ),
           ],
@@ -666,14 +608,16 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ),
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(
-          24, 24, 24,
+          24,
+          24,
+          24,
           MediaQuery.of(ctx).viewInsets.bottom + 24,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Special Requests', style: tt.titleLarge),
+            Text('Notes', style: tt.titleLarge),
             const SizedBox(height: 16),
             TextField(
               controller: _requestsController,
@@ -683,7 +627,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
               decoration: InputDecoration(
                 hintText:
-                    'Any allergies or preferences?\n(e.g. No onions, extra spicy)',
+                    'Allergies or preferences\nNo onions, extra spicy, etc.',
                 hintStyle: tt.bodyMedium?.copyWith(
                   color: cs.onSurfaceVariant.withValues(alpha: 0.30),
                 ),
@@ -713,10 +657,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: const Text(
-                  'Done',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
+                child: const Text('Done'),
               ),
             ),
           ],
@@ -768,8 +709,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           width: double.infinity,
           child: isPrimary
               ? ElevatedButton.icon(
-                  onPressed:
-                      _isPlacing || orderingUnavailable || !isEnabled
+                  onPressed: _isPlacing || orderingUnavailable || !isEnabled
                       ? null
                       : () => _placeOrder(method),
                   icon: Icon(icon, size: 18),
@@ -777,7 +717,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     method.label,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -791,8 +731,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   ),
                 )
               : OutlinedButton.icon(
-                  onPressed:
-                      _isPlacing || orderingUnavailable || !isEnabled
+                  onPressed: _isPlacing || orderingUnavailable || !isEnabled
                       ? null
                       : () => _placeOrder(method),
                   icon: Icon(icon, size: 18),
@@ -800,15 +739,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     method.label,
                     style: const TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: cs.onSurface,
                     side: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.10),
+                      color: cs.outlineVariant.withValues(alpha: 0.9),
                     ),
-                    backgroundColor: Colors.white.withValues(alpha: 0.05),
+                    backgroundColor: cs.surfaceContainerLowest,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
@@ -843,18 +782,12 @@ class _CartItemCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.space5),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(40),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.ambientShadow,
-      ),
+    return AppSurfaceCard(
+      padding: const EdgeInsets.all(AppTheme.space4),
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             child: SizedBox(
               width: 72,
               height: 72,
@@ -879,14 +812,7 @@ class _CartItemCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        item.name,
-                        style: tt.headlineSmall?.copyWith(
-                          letterSpacing: -0.5,
-                        ), // text-xl font-black
-                      ),
-                    ),
+                    Expanded(child: Text(item.name, style: tt.titleLarge)),
                     PressableScale(
                       onTap: onRemove,
                       semanticLabel: 'Remove ${item.name}',
@@ -920,6 +846,19 @@ class _CartItemCard extends StatelessWidget {
                     ),
                   ),
                 ],
+                if ((item.note ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Note: ${item.note!.trim()}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: tt.bodySmall?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
 
                 const SizedBox(height: 8),
 
@@ -932,8 +871,7 @@ class _CartItemCard extends StatelessWidget {
                       country.formatPrice(item.price),
                       style: tt.titleLarge?.copyWith(
                         color: cs.primary,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
 
@@ -944,7 +882,7 @@ class _CartItemCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: cs.surfaceContainerHigh,
+                        color: cs.surfaceContainer,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
@@ -969,7 +907,7 @@ class _CartItemCard extends StatelessWidget {
                               '${item.quantity}',
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -1031,7 +969,7 @@ class _CompactActionChip extends StatelessWidget {
           border: Border.all(
             color: isError
                 ? cs.error
-                : Colors.white.withValues(alpha: 0.05),
+                : cs.outlineVariant.withValues(alpha: 0.72),
           ),
         ),
         child: Row(
@@ -1041,9 +979,7 @@ class _CompactActionChip extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: isError
-                  ? cs.error
-                  : (iconColor ?? cs.primary),
+              color: isError ? cs.error : (iconColor ?? cs.primary),
             ),
             const SizedBox(width: 6),
             Flexible(

@@ -1,5 +1,6 @@
 import { assertEquals, assertRejects } from "jsr:@std/assert@1";
-import { handleGetOrdersForVenue, HttpError } from "./core.ts";
+import { HttpError } from "./core.ts";
+import { handleGetOrdersForVenue } from "./handlers/order.ts";
 
 function base64Url(value: string): string {
   return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(
@@ -9,11 +10,8 @@ function base64Url(value: string): string {
 }
 
 function serviceRoleRequest(): Request {
-  const token = [
-    base64Url(JSON.stringify({ alg: "HS256", typ: "JWT" })),
-    base64Url(JSON.stringify({ role: "service_role" })),
-    "signature",
-  ].join(".");
+  const token = "test-service-role-key";
+  Deno.env.set("SERVICE_ROLE_KEY", token);
 
   return new Request("https://example.com/functions/v1/dinein-api", {
     method: "POST",

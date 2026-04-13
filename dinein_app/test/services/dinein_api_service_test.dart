@@ -51,4 +51,22 @@ void main() {
       );
     },
   );
+
+  test(
+    'buildInvocation strips venue session payloads from admin requests',
+    () {
+      final request = DineinApiService.buildInvocation(
+        'update_venue',
+        useAdminSession: true,
+        adminAccessToken: 'admin-token',
+        payload: {
+          'venueId': 'venue-1',
+          'venue_session': {'access_token': 'venue-token'},
+        },
+      );
+
+      expect(request.headers['Authorization'], 'Bearer admin-token');
+      expect(request.body.containsKey('venue_session'), isFalse);
+    },
+  );
 }

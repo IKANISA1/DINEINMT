@@ -5,6 +5,7 @@ import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/infrastructure/firebase_runtime_service.dart';
 import 'package:dinein_app/core/router/app_router.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:dinein_app/core/services/app_telemetry.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -72,6 +73,13 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications:web] Initialization skipped: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications_web.initialize',
+        ),
+      );
       _messagingAvailable = false;
       _initialized = false;
     } finally {
@@ -93,6 +101,14 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications:web] Venue sync failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications_web.handle_venue_session_updated',
+          details: {'venue_id': session.venueId},
+        ),
+      );
     }
   }
 
@@ -110,6 +126,14 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications:web] Preference sync failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications_web.handle_preferences_updated',
+          details: {'venue_id': session.venueId},
+        ),
+      );
     }
   }
 
@@ -128,6 +152,14 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications:web] Device unregister failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications_web.handle_venue_session_cleared',
+          details: {'venue_id': session.venueId},
+        ),
+      );
     }
   }
 
@@ -146,6 +178,14 @@ class AppNotificationService {
     } catch (error, stackTrace) {
       debugPrint('[notifications:web] Token refresh sync failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'notifications_web.handle_token_refresh',
+          details: {'venue_id': session.venueId},
+        ),
+      );
     }
   }
 
@@ -219,6 +259,13 @@ class AppNotificationService {
       );
     } catch (error) {
       debugPrint('[notifications:web] Foreground notification skipped: $error');
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          StackTrace.current,
+          context: 'notifications_web.foreground_notification',
+        ),
+      );
     }
   }
 
@@ -365,6 +412,14 @@ class AppNotificationService {
     try {
       return await _secureStorage.read(key: key).timeout(_secureStorageTimeout);
     } catch (_) {
+      unawaited(
+        AppTelemetryService.reportError(
+          Exception('Web secure storage read failed'),
+          StackTrace.current,
+          context: 'notifications_web.secure_storage.read',
+          details: {'key': key},
+        ),
+      );
       return null;
     }
   }
@@ -375,7 +430,14 @@ class AppNotificationService {
           .write(key: key, value: value)
           .timeout(_secureStorageTimeout);
     } catch (_) {
-      // Ignore storage failures in test environments.
+      unawaited(
+        AppTelemetryService.reportError(
+          Exception('Web secure storage write failed'),
+          StackTrace.current,
+          context: 'notifications_web.secure_storage.write',
+          details: {'key': key},
+        ),
+      );
     }
   }
 
@@ -417,6 +479,14 @@ class AppNotificationService {
       appRouter.go(resolvedRoute);
     } catch (error) {
       debugPrint('[notifications:web] Navigation failed: $error');
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          StackTrace.current,
+          context: 'notifications_web.navigate',
+          details: {'route': resolvedRoute},
+        ),
+      );
     }
   }
 

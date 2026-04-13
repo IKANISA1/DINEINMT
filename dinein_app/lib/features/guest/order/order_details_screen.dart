@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:dinein_app/core/router/app_routes.dart';
-import 'package:ui/theme/app_colors.dart';
-import 'package:ui/theme/app_theme.dart';
+
+import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
+import 'package:dinein_app/core/router/app_routes.dart';
+import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
-/// Order details/receipt screen — shows venue, items, totals.
-/// Matches React OrderDetails.tsx.
+/// Order details / receipt screen.
 class OrderDetailsScreen extends ConsumerWidget {
   final String orderId;
 
@@ -19,511 +19,187 @@ class OrderDetailsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final orderAsync = ref.watch(orderByIdProvider(orderId));
 
     return Scaffold(
       body: orderAsync.when(
-        loading: () => SafeArea(
-          child: ListView(
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(24),
-            children: const [
-              SkeletonLoader(width: 160, height: 24, borderRadius: 8),
-              SizedBox(height: 8),
-              SkeletonLoader(width: 80, height: 12, borderRadius: 4),
-              SizedBox(height: 24),
-              SkeletonLoader(width: double.infinity, height: 140, borderRadius: 24),
-              SizedBox(height: 20),
-              SkeletonLoader(width: 60, height: 14, borderRadius: 6),
-              SizedBox(height: 16),
-              SkeletonLoader(width: double.infinity, height: 88, borderRadius: 20),
-              SizedBox(height: 12),
-              SkeletonLoader(width: double.infinity, height: 88, borderRadius: 20),
-              SizedBox(height: 24),
-              SkeletonLoader(width: double.infinity, height: 100, borderRadius: 24),
-            ],
-          ),
-        ),
+        loading: () => const SafeArea(child: _OrderDetailsLoadingState()),
         error: (err, _) => ErrorState(
           message: 'Could not load order details.',
           onRetry: () => ref.invalidate(orderByIdProvider(orderId)),
         ),
         data: (order) {
-          if (order == null) return _buildNotFound(context, cs, tt);
-          return _buildContent(context, cs, tt, order);
+          if (order == null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppTheme.space6),
+                child: GuestStatePanel(
+                  icon: LucideIcons.receipt,
+                  title: 'Order not found',
+                  subtitle: 'This receipt is unavailable right now.',
+                  actionLabel: 'Order history',
+                  onAction: () => context.goNamed(AppRouteNames.orderHistory),
+                ),
+              ),
+            );
+          }
+          return _OrderDetailsContent(order: order);
         },
       ),
     );
   }
+}
 
-  Widget _buildNotFound(BuildContext context, ColorScheme cs, TextTheme tt) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.space8),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                border: Border.all(color: AppColors.white5),
-              ),
-              child: Icon(
-                LucideIcons.shoppingBag,
-                size: 48,
-                color: cs.onSurfaceVariant.withValues(alpha: 0.30),
-              ),
-            ),
-            const SizedBox(height: AppTheme.space6),
-            Text('Order Not Found', style: tt.headlineMedium),
-            const SizedBox(height: AppTheme.space6),
-            ElevatedButton(
-              onPressed: () => context.goNamed(AppRouteNames.orderHistory),
-              child: const Text('BACK TO HISTORY'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+class _OrderDetailsContent extends StatelessWidget {
+  final Order order;
 
-  Widget _buildContent(
-    BuildContext context,
-    ColorScheme cs,
-    TextTheme tt,
-    Order order,
-  ) {
+  const _OrderDetailsContent({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     final finalTotal = order.total;
 
-    return CustomScrollView(
-      slivers: [
-        // ─── Header ───
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.space8,
-              AppTheme.space8,
-              AppTheme.space8,
-              0,
+    return SafeArea(
+      bottom: false,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppTheme.space6,
+          AppTheme.space5,
+          AppTheme.space6,
+          AppTheme.space8,
+        ),
+        children: [
+          Row(
+            children: [
+              AppIconButton(
+                icon: LucideIcons.chevronLeft,
+                onTap: () => context.pop(),
+                semanticLabel: 'Go back',
+              ),
+              const SizedBox(width: AppTheme.space4),
+              Expanded(child: Text('Receipt', style: tt.titleLarge)),
+            ],
+          ),
+          const SizedBox(height: AppTheme.space5),
+          GuestHeroCard(
+            eyebrow: 'Order #${order.displayNumber}',
+            title: order.venueName,
+            subtitle: 'Placed ${_formatDate(order.createdAt)}',
+            footer: Wrap(
+              spacing: AppTheme.space3,
+              runSpacing: AppTheme.space3,
+              children: [
+                GuestMetaPill(
+                  label: order.status.label,
+                  icon: _statusIcon(order.status),
+                  emphasized: true,
+                ),
+                GuestMetaPill(
+                  label: order.paymentMethod.label,
+                  icon: LucideIcons.wallet,
+                ),
+                if ((order.tableNumber ?? '').trim().isNotEmpty)
+                  GuestMetaPill(
+                    label: 'Table ${order.tableNumber!.trim()}',
+                    icon: LucideIcons.hash,
+                  ),
+              ],
             ),
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  PressableScale(
-                    onTap: () => context.pop(),
-                    semanticLabel: 'Go back',
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                        border: Border.all(color: AppColors.white5),
+          ),
+          const SizedBox(height: AppTheme.space5),
+          GuestSurfaceCard(
+            padding: const EdgeInsets.all(AppTheme.space5),
+            borderRadius: 24,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const GuestSectionHeader(
+                  title: 'Items',
+                  subtitle: 'Everything included in this order.',
+                ),
+                const SizedBox(height: AppTheme.space4),
+                ...order.items.indexed.expand((entry) {
+                  final index = entry.$1;
+                  final item = entry.$2;
+                  return [
+                    if (index > 0)
+                      Divider(
+                        color: cs.outlineVariant.withValues(alpha: 0.5),
+                        height: AppTheme.space6,
                       ),
-                      child: const Icon(LucideIcons.chevronLeft, size: 28),
+                    _ReceiptItemRow(order: order, item: item),
+                  ];
+                }),
+              ],
+            ),
+          ),
+          if ((order.specialRequests ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: AppTheme.space5),
+            GuestSurfaceCard(
+              padding: const EdgeInsets.all(AppTheme.space5),
+              borderRadius: 24,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Table notes', style: tt.titleSmall),
+                  const SizedBox(height: AppTheme.space2),
+                  Text(
+                    order.specialRequests!.trim(),
+                    style: tt.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.84),
                     ),
                   ),
-                  const SizedBox(width: AppTheme.space6),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Order Details',
-                        style: tt.headlineMedium?.copyWith(height: 1),
-                      ),
-                      Text(
-                        '#${order.displayNumber}',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 3,
-                          color: cs.primary,
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
-          ),
-        ),
-
-        // ─── Order Info Card ───
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(AppTheme.space8),
-            child: Container(
-              padding: const EdgeInsets.all(AppTheme.space6),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(AppTheme.radius3xl),
-                border: Border.all(color: AppColors.white5),
-                boxShadow: AppTheme.ambientShadow,
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'VENUE',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 3,
-                              color: cs.onSurfaceVariant.withValues(
-                                alpha: 0.60,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(order.venueName, style: tt.titleLarge),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: cs.secondary.withValues(alpha: 0.10),
-                          borderRadius: BorderRadius.circular(
-                            AppTheme.radiusMd,
-                          ),
-                          border: Border.all(
-                            color: cs.secondary.withValues(alpha: 0.20),
-                          ),
-                        ),
-                        child: Text(
-                          order.status.label.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
-                            color: cs.secondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppTheme.space6),
-                  Container(height: 1, color: AppColors.white5),
-                  const SizedBox(height: AppTheme.space6),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'DATE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 3,
-                                color: cs.onSurfaceVariant.withValues(
-                                  alpha: 0.60,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  LucideIcons.clock,
-                                  size: 16,
-                                  color: cs.onSurface.withValues(alpha: 0.40),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _formatDate(order.createdAt),
-                                  style: tt.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'PAYMENT',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 3,
-                                color: cs.onSurfaceVariant.withValues(
-                                  alpha: 0.60,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  LucideIcons.receipt,
-                                  size: 16,
-                                  color: cs.onSurface.withValues(alpha: 0.40),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  order.paymentMethod.label,
-                                  style: tt.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // ─── Items Header ───
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.space8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          ],
+          const SizedBox(height: AppTheme.space5),
+          GuestSurfaceCard(
+            highlighted: true,
+            padding: const EdgeInsets.all(AppTheme.space5),
+            borderRadius: 24,
+            child: Column(
               children: [
-                Text('Items', style: tt.titleLarge),
-                Text(
-                  '${order.itemCount} Items',
-                  style: tt.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.60),
-                  ),
+                _SummaryRow(
+                  label: 'Subtotal',
+                  value: order.formatPrice(order.subtotal),
+                ),
+                const SizedBox(height: AppTheme.space3),
+                _SummaryRow(
+                  label: 'Service fee',
+                  value: order.formatPrice(order.serviceFee),
+                ),
+                const SizedBox(height: AppTheme.space4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Total', style: tt.titleLarge),
+                    Text(
+                      order.formatPrice(finalTotal),
+                      style: tt.headlineSmall?.copyWith(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-        ),
-
-        // ─── Items List ───
-        SliverPadding(
-          padding: const EdgeInsets.all(AppTheme.space8),
-          sliver: SliverList.separated(
-            itemCount: order.items.length,
-            separatorBuilder: (context, index) =>
-                const SizedBox(height: AppTheme.space4),
-            itemBuilder: (context, index) {
-              final item = order.items[index];
-              return Container(
-                    padding: const EdgeInsets.all(AppTheme.space6),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                      border: Border.all(color: AppColors.white5),
-                      boxShadow: AppTheme.ambientShadow,
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(
-                                AppTheme.radiusLg,
-                              ),
-                              child: SizedBox(
-                                width: 72,
-                                height: 72,
-                                child: DineInImage(
-                                  imageUrl: item.imageUrl,
-                                  width: 72,
-                                  height: 72,
-                                  fit: BoxFit.cover,
-                                  fallbackIcon: LucideIcons.chefHat,
-                                  semanticLabel: '${item.name} photo',
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              right: 6,
-                              bottom: 6,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.72),
-                                  borderRadius: BorderRadius.circular(
-                                    AppTheme.radiusFull,
-                                  ),
-                                ),
-                                child: Text(
-                                  '${item.quantity}x',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: AppTheme.space5),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.name,
-                                style: tt.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 18,
-                                ),
-                              ),
-                              if (item.description.trim().isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  item.description.trim(),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: tt.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant.withValues(
-                                      alpha: 0.72,
-                                    ),
-                                    height: 1.3,
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 6),
-                              Text(
-                                order.formatPrice(item.price),
-                                style: tt.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant.withValues(
-                                    alpha: 0.60,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: AppTheme.space4),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              order.formatPrice(item.subtotal),
-                              style: tt.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 18,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${item.quantity} item${item.quantity == 1 ? '' : 's'}',
-                              style: tt.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant.withValues(
-                                  alpha: 0.60,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-            },
-          ),
-        ),
-
-        // ─── Total Card ───
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppTheme.space8,
-              0,
-              AppTheme.space8,
-              AppTheme.space8,
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(AppTheme.space4),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(AppTheme.radius3xl),
-                border: Border.all(color: AppColors.white10),
-                boxShadow: AppTheme.elevatedShadow,
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Subtotal',
-                        style: tt.titleMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                      Text(
-                        order.formatPrice(order.subtotal),
-                        style: tt.titleMedium,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppTheme.space3),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Service Fee (5%)',
-                        style: tt.titleMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                      Text(
-                        order.formatPrice(order.serviceFee),
-                        style: tt.titleMedium,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppTheme.space6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('Total', style: tt.titleLarge),
-                      Text(
-                        order.formatPrice(finalTotal),
-                        style: TextStyle(
-                          fontSize: 36,
-                          fontWeight: FontWeight.w900,
-                          color: cs.primary,
-                          letterSpacing: -2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  IconData _statusIcon(OrderStatus status) {
+    return switch (status) {
+      OrderStatus.placed => LucideIcons.clock3,
+      OrderStatus.received => LucideIcons.chefHat,
+      OrderStatus.served => LucideIcons.check,
+      OrderStatus.cancelled => LucideIcons.x,
+    };
   }
 
   String _formatDate(DateTime date) {
@@ -542,5 +218,138 @@ class OrderDetailsScreen extends ConsumerWidget {
       'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+}
+
+class _ReceiptItemRow extends StatelessWidget {
+  final Order order;
+  final OrderItem item;
+
+  const _ReceiptItemRow({required this.order, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          child: SizedBox(
+            width: 64,
+            height: 64,
+            child: DineInImage(
+              imageUrl: item.imageUrl,
+              fit: BoxFit.cover,
+              fallbackIcon: LucideIcons.chefHat,
+              semanticLabel: '${item.name} photo',
+            ),
+          ),
+        ),
+        const SizedBox(width: AppTheme.space4),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: Text(item.name, style: tt.titleSmall)),
+                  Text(
+                    order.formatPrice(item.subtotal),
+                    style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTheme.space2),
+              Wrap(
+                spacing: AppTheme.space2,
+                runSpacing: AppTheme.space2,
+                children: [
+                  GuestMetaPill(
+                    label:
+                        '${item.quantity} item${item.quantity == 1 ? '' : 's'}',
+                    icon: LucideIcons.hash,
+                  ),
+                  GuestMetaPill(
+                    label: order.formatPrice(item.price),
+                    icon: LucideIcons.wallet,
+                  ),
+                ],
+              ),
+              if (item.description.trim().isNotEmpty) ...[
+                const SizedBox(height: AppTheme.space2),
+                Text(
+                  item.description.trim(),
+                  style: tt.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.78),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if ((item.note ?? '').toString().trim().isNotEmpty) ...[
+                const SizedBox(height: AppTheme.space2),
+                Text(
+                  'Note: ${item.note.toString().trim()}',
+                  style: tt.bodySmall?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _SummaryRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: tt.bodyMedium?.copyWith(
+            color: cs.onSurfaceVariant.withValues(alpha: 0.84),
+          ),
+        ),
+        Text(value, style: tt.titleSmall),
+      ],
+    );
+  }
+}
+
+class _OrderDetailsLoadingState extends StatelessWidget {
+  const _OrderDetailsLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(AppTheme.space6),
+      children: const [
+        SkeletonLoader(width: 120, height: 40, borderRadius: 14),
+        SizedBox(height: AppTheme.space5),
+        SkeletonLoader(width: double.infinity, height: 180, borderRadius: 28),
+        SizedBox(height: AppTheme.space5),
+        SkeletonLoader(width: double.infinity, height: 220, borderRadius: 24),
+        SizedBox(height: AppTheme.space5),
+        SkeletonLoader(width: double.infinity, height: 120, borderRadius: 24),
+      ],
+    );
   }
 }

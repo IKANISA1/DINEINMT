@@ -127,12 +127,11 @@ class _WavesBodyState extends ConsumerState<_WavesBody> {
           unselectedLabelColor: cs.onSurfaceVariant,
           labelStyle: const TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2,
+            fontWeight: FontWeight.w700,
           ),
           tabs: const [
-            Tab(text: 'ACTIVE'),
-            Tab(text: 'RESOLVED'),
+            Tab(text: 'Active'),
+            Tab(text: 'Resolved'),
           ],
         ),
       ),
@@ -285,7 +284,7 @@ class _WaveCardState extends ConsumerState<_WaveCard> {
                   color: isPending
                       ? (isUrgent ? cs.error : cs.onPrimaryContainer)
                       : cs.onSurfaceVariant,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
@@ -327,7 +326,7 @@ class _WaveCardState extends ConsumerState<_WaveCard> {
                     ),
                   )
                 : PremiumButton(
-                    label: 'RESOLVE',
+                    label: 'Resolve',
                     isSmall: true,
                     onPressed: _handleResolve,
                   )
@@ -339,12 +338,10 @@ class _WaveCardState extends ConsumerState<_WaveCard> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'CLOSED',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
+                'Closed',
+                style: tt.labelMedium?.copyWith(
                   color: AppColors.secondary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),

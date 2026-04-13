@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/services/supabase_config.dart';
 import 'models/biopay_models.dart';
 import 'services/biopay_api_client.dart';
 import 'services/biopay_local_session_store.dart';
@@ -13,7 +13,7 @@ import 'services/match_cache.dart';
 // ─── Service providers ──────────────────────────────────────
 
 final biopayApiClientProvider = Provider<BiopayApiClient>((ref) {
-  return BiopayApiClient(Supabase.instance.client);
+  return BiopayApiClient(SupabaseConfig.client);
 });
 
 final biopayLocalSessionStoreProvider = Provider<BiopayLocalSessionStore>((

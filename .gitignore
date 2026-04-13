@@ -14,6 +14,7 @@ Thumbs.db
 # Node
 node_modules/
 dist/
+output/
 
 # Flutter / Dart
 .dart_tool/

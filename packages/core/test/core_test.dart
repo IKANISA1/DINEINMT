@@ -43,6 +43,37 @@ void main() {
     });
   });
 
+  group('PaymentStatus', () {
+    test('dbValue covers all supported backend values', () {
+      final dbValues = PaymentStatus.values.map((e) => e.dbValue).toSet();
+      expect(
+        dbValues,
+        containsAll(['pending', 'confirmed', 'not_required', 'failed']),
+      );
+    });
+
+    test('fromString round-trips correctly', () {
+      for (final status in PaymentStatus.values) {
+        expect(PaymentStatus.fromString(status.dbValue), status);
+      }
+    });
+
+    test('forMethod derives venue-facing defaults', () {
+      expect(
+        PaymentStatus.forMethod(PaymentMethod.cash),
+        PaymentStatus.notRequired,
+      );
+      expect(
+        PaymentStatus.forMethod(PaymentMethod.revolutLink),
+        PaymentStatus.pending,
+      );
+      expect(
+        PaymentStatus.forMethod(PaymentMethod.momoUssd),
+        PaymentStatus.pending,
+      );
+    });
+  });
+
   group('Country', () {
     test('only MT and RW exist', () {
       expect(Country.values.length, 2);

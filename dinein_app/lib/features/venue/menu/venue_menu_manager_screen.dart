@@ -96,8 +96,7 @@ class _VenueMenuManagerScreenState
     );
 
     try {
-      final result = await MenuIngestService.instance
-          .pickAndIngestMenuDocument(
+      final result = await MenuIngestService.instance.pickAndIngestMenuDocument(
         venue.id,
         country: venue.country.name.toUpperCase(),
       );
@@ -128,9 +127,11 @@ class _VenueMenuManagerScreenState
       } else {
         scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text(result.message.isNotEmpty
-                ? result.message
-                : 'No new items found in the document.'),
+            content: Text(
+              result.message.isNotEmpty
+                  ? result.message
+                  : 'No new items found in the document.',
+            ),
             duration: const Duration(seconds: 4),
           ),
         );
@@ -138,18 +139,12 @@ class _VenueMenuManagerScreenState
     } on MenuIngestException catch (e) {
       if (navigator.canPop()) navigator.pop();
       scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          backgroundColor: cs.error,
-        ),
+        SnackBar(content: Text(e.message), backgroundColor: cs.error),
       );
     } catch (e) {
       if (navigator.canPop()) navigator.pop();
       scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text('Import failed: $e'),
-          backgroundColor: cs.error,
-        ),
+        SnackBar(content: Text('Import failed: $e'), backgroundColor: cs.error),
       );
     }
   }
@@ -318,86 +313,41 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Menu',
-                          style: tt.headlineLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
+                        Expanded(
+                          child: AppPageHeader(
+                            title: 'Menu',
+                            subtitle: 'Items, visibility, and highlights.',
                           ),
                         ),
                         Row(
                           children: [
                             // Search icon
-                            PressableScale(
+                            AppIconButton(
+                              icon: LucideIcons.search,
+                              selected: widget.searchQuery.isNotEmpty,
                               onTap: () => _showSearchSheet(context, cs, tt),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: widget.searchQuery.isNotEmpty
-                                      ? cs.primary.withValues(alpha: 0.15)
-                                      : cs.surfaceContainerLow,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: widget.searchQuery.isNotEmpty
-                                        ? cs.primary.withValues(alpha: 0.3)
-                                        : Colors.white.withValues(alpha: 0.05),
-                                  ),
-                                ),
-                                child: Icon(
-                                  LucideIcons.search,
-                                  size: 18,
-                                  color: widget.searchQuery.isNotEmpty
-                                      ? cs.primary
-                                      : cs.onSurfaceVariant,
-                                ),
-                              ),
+                              semanticLabel: 'Search menu',
+                              color: widget.searchQuery.isNotEmpty
+                                  ? cs.primary
+                                  : cs.onSurfaceVariant,
                             ),
                             const SizedBox(width: 8),
                             // Import menu button
-                            PressableScale(
+                            AppIconButton(
+                              icon: LucideIcons.fileUp,
                               onTap: widget.onImportMenu,
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: cs.surfaceContainerLow,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: AppColors.primary.withValues(alpha: 0.30),
-                                  ),
-                                ),
-                                child: Icon(
-                                  LucideIcons.fileUp,
-                                  size: 18,
-                                  color: AppColors.primary,
-                                ),
-                              ),
+                              semanticLabel: 'Import menu',
+                              color: AppColors.primary,
                             ),
                             const SizedBox(width: 8),
                             // Add item button
-                            PressableScale(
+                            AppIconButton(
+                              icon: LucideIcons.plus,
                               onTap: widget.onAddItem,
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: cs.primary,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: cs.primary.withValues(alpha: 0.25),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: const Icon(
-                                  LucideIcons.plus,
-                                  size: 22,
-                                  color: Colors.white,
-                                ),
-                              ),
+                              semanticLabel: 'Add item',
+                              selected: true,
+                              color: cs.primary,
+                              iconSize: 20,
                             ),
                           ],
                         ),
@@ -415,7 +365,8 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                         semanticLabel: 'Clear search',
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6,
+                            horizontal: 12,
+                            vertical: 6,
                           ),
                           decoration: BoxDecoration(
                             color: cs.primary.withValues(alpha: 0.10),
@@ -429,7 +380,11 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(LucideIcons.search, size: 12, color: cs.primary),
+                              Icon(
+                                LucideIcons.search,
+                                size: 12,
+                                color: cs.primary,
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 '"${widget.searchQuery}"',
@@ -452,20 +407,9 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                       onTap: widget.onToggleTagFilter,
                       child: Row(
                         children: [
-                          Icon(
-                            LucideIcons.tag,
-                            size: 14,
-                            color: cs.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'FILTER BY TAGS',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                              color: cs.onSurfaceVariant,
-                            ),
+                          const AppSectionLabel(
+                            label: 'Filter by tags',
+                            icon: LucideIcons.tag,
                           ),
                           const Spacer(),
                           AnimatedRotation(
@@ -528,14 +472,12 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                                           ),
                                         ),
                                         child: Text(
-                                          tag.toUpperCase(),
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.5,
+                                          tag,
+                                          style: tt.labelMedium?.copyWith(
                                             color: active
                                                 ? cs.onPrimary
                                                 : cs.onSurfaceVariant,
+                                            fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ),
@@ -552,16 +494,9 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                         padding: const EdgeInsets.only(top: AppTheme.space4),
                         child: Row(
                           children: [
-                            Icon(LucideIcons.star, size: 14, color: cs.primary),
-                            const SizedBox(width: 8),
-                            Text(
-                              'GUEST HIGHLIGHTS',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 2,
-                                color: cs.primary,
-                              ),
+                            const AppSectionLabel(
+                              label: 'Guest highlights',
+                              icon: LucideIcons.star,
                             ),
                             const SizedBox(width: 12),
                             if (_isSavingHighlights)
@@ -570,7 +505,9 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                                 height: 12,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    cs.primary,
+                                  ),
                                 ),
                               )
                             else
@@ -580,7 +517,9 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                                   child: Row(
                                     children: selectedHighlights.map((item) {
                                       return Padding(
-                                        padding: const EdgeInsets.only(right: 8),
+                                        padding: const EdgeInsets.only(
+                                          right: 8,
+                                        ),
                                         child: Text(
                                           '#${item.highlightRank} ${item.name}',
                                           style: tt.bodySmall?.copyWith(
@@ -676,19 +615,24 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
       isScrollControlled: true,
       backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppTheme.radiusXl),
+        ),
       ),
       builder: (sheetContext) {
         return Padding(
           padding: EdgeInsets.fromLTRB(
-            AppTheme.space6, AppTheme.space6, AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
             MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 margin: const EdgeInsets.only(bottom: AppTheme.space5),
                 decoration: BoxDecoration(
                   color: cs.onSurface.withValues(alpha: 0.12),
@@ -699,7 +643,9 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
                 ),
                 child: TextField(
                   controller: widget.searchCtrl,
@@ -715,7 +661,11 @@ class _MenuBodyState extends ConsumerState<_MenuBody> {
                     ),
                     prefixIcon: Padding(
                       padding: const EdgeInsets.only(left: 16, right: 10),
-                      child: Icon(LucideIcons.search, size: 18, color: cs.onSurfaceVariant),
+                      child: Icon(
+                        LucideIcons.search,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                     prefixIconConstraints: const BoxConstraints(minWidth: 0),
                     border: InputBorder.none,
@@ -758,14 +708,8 @@ class _MenuItemCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Container(
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -877,12 +821,10 @@ class _MenuItemCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      item.isAvailable ? 'IN STOCK' : 'OUT OF STOCK',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.5,
+                      item.isAvailable ? 'In stock' : 'Out of stock',
+                      style: tt.labelMedium?.copyWith(
                         color: item.isAvailable ? cs.primary : cs.error,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -908,7 +850,7 @@ class _MenuItemCard extends StatelessWidget {
                             style: TextStyle(
                               color: cs.primary,
                               fontSize: 14,
-                              fontWeight: FontWeight.w900,
+                              fontWeight: FontWeight.w800,
                             ),
                           )
                         : Icon(
@@ -974,12 +916,10 @@ class _TagChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 8,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1,
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: cs.onSurfaceVariant,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -1082,7 +1022,7 @@ class _ImportProgressSheet extends StatelessWidget {
           Text(
             'Extracting Menu Items',
             style: tt.titleLarge?.copyWith(
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               color: cs.onSurface,
             ),
           ),

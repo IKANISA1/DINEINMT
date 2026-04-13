@@ -38,7 +38,8 @@ class _VenueLanguageRegionScreenState
     return Scaffold(
       body: venueAsync.when(
         loading: () => const Center(
-            child: SkeletonLoader(width: double.infinity, height: 200)),
+          child: SkeletonLoader(width: double.infinity, height: 200),
+        ),
         error: (_, _) => ErrorState(
           message: 'Could not load venue.',
           onRetry: () => ref.invalidate(currentVenueProvider),
@@ -54,155 +55,109 @@ class _VenueLanguageRegionScreenState
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(
-                AppTheme.space6, AppTheme.space6, AppTheme.space6, 120),
+              AppTheme.space6,
+              AppTheme.space6,
+              AppTheme.space6,
+              120,
+            ),
             children: [
-              // ─── Header ───
-              Row(
-                children: [
-                  PressableScale(
-                    onTap: () => context.pop(),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.05)),
-                      ),
-                      child: Icon(LucideIcons.chevronLeft,
-                          size: 18, color: cs.onSurface),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Language & Region',
-                          style: tt.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5)),
-                      Text('VENUE MANAGEMENT',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
-                            color: cs.onSurfaceVariant,
-                          )),
-                    ],
-                  ),
-                ],
+              AppPageHeader(
+                title: 'Language & region',
+                subtitle: 'Regional formatting and language preferences.',
+                onBack: () => context.pop(),
               ),
               const SizedBox(height: AppTheme.space8),
 
-              // ─── Section: DISPLAY LANGUAGE ───
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Text('DISPLAY LANGUAGE',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 3,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.50),
-                    )),
-              ),
+              const AppSectionLabel(label: 'Display language'),
               const SizedBox(height: AppTheme.space4),
 
               // ─── Language Chips (2×2 grid) ───
               Wrap(
-                spacing: AppTheme.space3,
-                runSpacing: AppTheme.space3,
-                children: _languages.map((lang) {
-                  final selected = lang == _selectedLanguage;
-                  return PressableScale(
-                    onTap: () => setState(() => _selectedLanguage = lang),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: (MediaQuery.of(context).size.width -
-                              AppTheme.space6 * 2 -
-                              AppTheme.space3) /
-                          2,
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 16, horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppColors.secondary.withValues(alpha: 0.25)
-                            : cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: selected
-                              ? AppColors.secondary.withValues(alpha: 0.40)
-                              : Colors.white.withValues(alpha: 0.05),
-                        ),
-                        boxShadow: AppTheme.clayShadow,
-                      ),
-                      child: Center(
-                        child: Text(lang,
-                            style: tt.titleSmall?.copyWith(
-                              fontWeight:
-                                  selected ? FontWeight.w800 : FontWeight.w600,
+                    spacing: AppTheme.space3,
+                    runSpacing: AppTheme.space3,
+                    children: _languages.map((lang) {
+                      final selected = lang == _selectedLanguage;
+                      return PressableScale(
+                        onTap: () => setState(() => _selectedLanguage = lang),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width:
+                              (MediaQuery.of(context).size.width -
+                                  AppTheme.space6 * 2 -
+                                  AppTheme.space3) /
+                              2,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 20,
+                          ),
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppColors.secondary.withValues(alpha: 0.25)
+                                : cs.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
                               color: selected
-                                  ? cs.onSurface
-                                  : cs.onSurfaceVariant,
-                            )),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              )
+                                  ? AppColors.secondary.withValues(alpha: 0.40)
+                                  : Colors.white.withValues(alpha: 0.05),
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              lang,
+                              style: tt.titleSmall?.copyWith(
+                                fontWeight: selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                color: selected
+                                    ? cs.onSurface
+                                    : cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  )
                   .animate()
                   .fadeIn(duration: 300.ms)
                   .slideY(begin: 0.05, end: 0, duration: 300.ms),
 
               const SizedBox(height: AppTheme.space8),
 
-              // ─── Section: REGIONAL SETTINGS ───
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Text('REGIONAL SETTINGS',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 3,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.50),
-                    )),
-              ),
+              const AppSectionLabel(label: 'Regional settings'),
               const SizedBox(height: AppTheme.space3),
 
               _RegionalTile(
-                icon: LucideIcons.creditCard,
-                iconColor: cs.primary,
-                label: 'CURRENCY',
-                value: 'EUR (€)',
-              )
+                    icon: LucideIcons.creditCard,
+                    iconColor: cs.primary,
+                    label: 'CURRENCY',
+                    value: 'EUR (€)',
+                  )
                   .animate()
                   .fadeIn(duration: 300.ms, delay: 100.ms)
-                  .slideY(
-                      begin: 0.05, end: 0, duration: 300.ms, delay: 100.ms),
+                  .slideY(begin: 0.05, end: 0, duration: 300.ms, delay: 100.ms),
               const SizedBox(height: AppTheme.space2),
 
               _RegionalTile(
-                icon: LucideIcons.clock,
-                iconColor: AppColors.secondary,
-                label: 'TIMEZONE',
-                value: 'CET (Valletta)',
-              )
+                    icon: LucideIcons.clock,
+                    iconColor: AppColors.secondary,
+                    label: 'TIMEZONE',
+                    value: 'CET (Valletta)',
+                  )
                   .animate()
                   .fadeIn(duration: 300.ms, delay: 200.ms)
-                  .slideY(
-                      begin: 0.05, end: 0, duration: 300.ms, delay: 200.ms),
+                  .slideY(begin: 0.05, end: 0, duration: 300.ms, delay: 200.ms),
               const SizedBox(height: AppTheme.space2),
 
               _RegionalTile(
-                icon: LucideIcons.clock4,
-                iconColor: AppColors.secondary.withValues(alpha: 0.70),
-                label: 'DATE FORMAT',
-                value: 'DD/MM/YYYY',
-              )
+                    icon: LucideIcons.clock4,
+                    iconColor: AppColors.secondary.withValues(alpha: 0.70),
+                    label: 'DATE FORMAT',
+                    value: 'DD/MM/YYYY',
+                  )
                   .animate()
                   .fadeIn(duration: 300.ms, delay: 300.ms)
-                  .slideY(
-                      begin: 0.05, end: 0, duration: 300.ms, delay: 300.ms),
+                  .slideY(begin: 0.05, end: 0, duration: 300.ms, delay: 300.ms),
             ],
           );
         },
@@ -231,14 +186,8 @@ class _RegionalTile extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return Container(
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: AppTheme.clayShadow,
-      ),
       child: Row(
         children: [
           Container(
@@ -252,19 +201,21 @@ class _RegionalTile extends StatelessWidget {
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Text(label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.50),
-                )),
-          ),
-          Text(value,
-              style: tt.titleSmall?.copyWith(
+            child: Text(
+              label,
+              style: tt.labelMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: cs.onSurface,
-              )),
+                color: cs.onSurfaceVariant.withValues(alpha: 0.72),
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: tt.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
+            ),
+          ),
         ],
       ),
     );

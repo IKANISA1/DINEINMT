@@ -166,6 +166,14 @@ class OrderRepository {
       },
     );
   }
+
+  /// Confirm that an order has been paid (venue owner action).
+  Future<void> markOrderPaid(String orderId) async {
+    await _invoke(
+      'mark_order_paid',
+      payload: {'orderId': orderId, ...await _venueSessionPayload()},
+    );
+  }
 }
 
 class OrderRealtimeAccessToken {

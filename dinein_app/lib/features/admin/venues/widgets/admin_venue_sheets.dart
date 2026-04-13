@@ -5,10 +5,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:core_pkg/config/country_config.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/services/venue_repository.dart';
-import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
-
 
 /// Static methods for admin venue bottom sheets.
 ///
@@ -22,8 +20,11 @@ abstract final class AdminVenueSheets {
     required CountryConfig config,
     required TextEditingController phoneCtrl,
     required VoidCallback onCachesInvalidated,
-    required Future<void> Function(String venueId, Map<String, dynamic> updates)?
-        onUpdateVenueOverride,
+    required Future<void> Function(
+      String venueId,
+      Map<String, dynamic> updates,
+    )?
+    onUpdateVenueOverride,
   }) async {
     final expectedPhoneLength = config.localPhoneLength;
     final controller = TextEditingController(
@@ -118,7 +119,9 @@ abstract final class AdminVenueSheets {
                 decoration: BoxDecoration(
                   color: cs.surface,
                   borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                  border: Border.all(color: AppColors.white5),
+                  border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.72),
+                  ),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -150,10 +153,10 @@ abstract final class AdminVenueSheets {
                       width: double.infinity,
                       child: PremiumButton(
                         label: isSaving
-                            ? 'SAVING...'
+                            ? 'Saving...'
                             : localPhone.isEmpty && hadExistingAccessNumber
-                            ? 'CLEAR WHATSAPP NUMBER'
-                            : 'SAVE WHATSAPP NUMBER',
+                            ? 'Clear WhatsApp number'
+                            : 'Save WhatsApp number',
                         icon: LucideIcons.messageCircle,
                         onPressed: canSave ? save : null,
                       ),
@@ -187,9 +190,7 @@ abstract final class AdminVenueSheets {
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           decoration: BoxDecoration(
             color: cs.surface,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -205,7 +206,7 @@ abstract final class AdminVenueSheets {
               ),
               Text(
                 title,
-                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+                style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
@@ -230,7 +231,7 @@ abstract final class AdminVenueSheets {
               ),
               const SizedBox(height: 20),
               PremiumButton(
-                label: 'COPY URL',
+                label: 'Copy URL',
                 icon: LucideIcons.copy,
                 isOutlined: true,
                 onPressed: () => onCopyLink(title, uri),
@@ -241,5 +242,4 @@ abstract final class AdminVenueSheets {
       ),
     );
   }
-
 }

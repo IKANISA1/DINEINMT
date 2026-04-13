@@ -369,11 +369,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
         // Title
         Center(
           child: Text(
-            'ADMIN',
+            'Admin',
             style: tt.labelSmall?.copyWith(
               color: cs.primary,
-              letterSpacing: 4,
               fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -382,7 +382,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           child: Text(
             'Secure Access',
             style: tt.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               fontSize: 28,
             ),
           ),
@@ -406,11 +406,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
 
         // "WHATSAPP NUMBER" label
         Text(
-          'WHATSAPP NUMBER',
+          'WhatsApp number',
           style: tt.labelSmall?.copyWith(
             color: cs.onSurfaceVariant,
-            letterSpacing: 2.5,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             fontSize: 12,
           ),
         ),
@@ -481,11 +480,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
         // Title
         Center(
           child: Text(
-            'VERIFY',
+            'Verify',
             style: tt.labelSmall?.copyWith(
               color: cs.secondary,
-              letterSpacing: 4,
               fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -494,7 +493,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           child: Text(
             'Enter Code',
             style: tt.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               fontSize: 28,
             ),
           ),
@@ -592,7 +591,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
           decoration: BoxDecoration(
             color: cs.surfaceContainerLow,
             borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-            border: Border.all(color: AppColors.white5),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.72),
+            ),
           ),
           child: const Icon(LucideIcons.chevronLeft, size: 24),
         ),

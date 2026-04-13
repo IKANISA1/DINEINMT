@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
+
+import 'package:dinein_app/core/services/app_telemetry.dart';
 
 /// Web implementation — accesses `window.__dineinDeferredInstallPrompt`.
 
@@ -16,7 +19,14 @@ bool hasDeferredPrompt() {
     }
     final prompt = _window.getProperty('__dineinDeferredInstallPrompt'.toJS);
     return prompt != null && prompt.isA<JSObject>();
-  } catch (_) {
+  } catch (error, stackTrace) {
+    unawaited(
+      AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'pwa_install_web.has_deferred_prompt',
+      ),
+    );
     return false;
   }
 }
@@ -32,8 +42,14 @@ void triggerInstallPrompt() {
     if (prompt != null && prompt.isA<JSObject>()) {
       (prompt as JSObject).callMethod('prompt'.toJS);
     }
-  } catch (_) {
-    // Silently fail — prompt may have been spent or dismissed
+  } catch (error, stackTrace) {
+    unawaited(
+      AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'pwa_install_web.trigger_install_prompt',
+      ),
+    );
   }
 }
 
@@ -46,7 +62,16 @@ void setAppBadge(int count) {
         navObj.callMethod('setAppBadge'.toJS, count.toJS);
       }
     }
-  } catch (_) {}
+  } catch (error, stackTrace) {
+    unawaited(
+      AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'pwa_install_web.set_app_badge',
+        details: {'count': count},
+      ),
+    );
+  }
 }
 
 void clearAppBadge() {
@@ -58,5 +83,13 @@ void clearAppBadge() {
         navObj.callMethod('clearAppBadge'.toJS);
       }
     }
-  } catch (_) {}
+  } catch (error, stackTrace) {
+    unawaited(
+      AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'pwa_install_web.clear_app_badge',
+      ),
+    );
+  }
 }

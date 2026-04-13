@@ -455,11 +455,9 @@ class _VenueTopBar extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          'VENUE MANAGER',
+                          'Venue manager',
                           style: TextStyle(
-                            fontSize: 8,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2.5,
+                            fontSize: 10,
                             color: AppColors.secondary,
                           ),
                         ),
@@ -561,7 +559,7 @@ class _VenueTopBar extends ConsumerWidget {
                               : 'V',
                           style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.w700,
                             color: cs.primary,
                           ),
                         ),
@@ -588,96 +586,61 @@ class _VenueBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final radius = BorderRadius.circular(AppTheme.radiusXxl);
+    return AppSurfaceCard(
+      radius: AppTheme.radiusXxl,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: SafeArea(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(_venueNavItems.length, (i) {
+            final item = _venueNavItems[i];
+            final isActive = currentIndex == i;
 
-    return ClipRRect(
-      borderRadius: radius,
-      child: AdaptiveGlassSurface(
-        decoration: BoxDecoration(
-          color: cs.surface.withValues(alpha: 0.60),
-          borderRadius: radius,
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.14),
-              blurRadius: 24,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(_venueNavItems.length, (i) {
-                final item = _venueNavItems[i];
-                final isActive = currentIndex == i;
-
-                return PressableScale(
-                  onTap: () => context.goNamed(item.routeName),
-                  semanticLabel: 'Open ${item.label}',
-                  child: SizedBox(
-                    width: 56,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutCubic,
-                          padding: const EdgeInsets.all(8),
-                          transform: Matrix4.translationValues(
-                            0,
-                            isActive ? -2 : 0,
-                            0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? AppColors.secondary
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: isActive
-                                ? [
-                                    BoxShadow(
-                                      color: AppColors.secondary.withValues(
-                                        alpha: 0.20,
-                                      ),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ]
-                                : [],
-                          ),
-                          child: Icon(
-                            item.icon,
-                            size: 20,
-                            color: isActive
-                                ? Colors.white
-                                : cs.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        AnimatedOpacity(
-                          duration: const Duration(milliseconds: 300),
-                          opacity: isActive ? 1.0 : 0.4,
-                          child: Text(
-                            item.label.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 8,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.2,
-                              color: cs.onSurface,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
+            return PressableScale(
+              onTap: () => context.goNamed(item.routeName),
+              semanticLabel: 'Open ${item.label}',
+              child: SizedBox(
+                width: 64,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      width: 44,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? AppColors.secondaryContainer
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                      ),
+                      child: Icon(
+                        item.icon,
+                        size: 20,
+                        color: isActive
+                            ? AppColors.secondary
+                            : cs.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                );
-              }),
-            ),
-          ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.label,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: isActive
+                            ? FontWeight.w700
+                            : FontWeight.w600,
+                        color: isActive
+                            ? AppColors.secondary
+                            : cs.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );

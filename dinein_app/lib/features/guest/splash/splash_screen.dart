@@ -7,9 +7,8 @@ import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/router/web_entry_routing.dart';
 import 'package:dinein_app/core/services/app_bootstrap_service.dart';
 import 'package:dinein_app/core/services/auth_repository.dart';
-import 'package:ui/widgets/brand_mark.dart';
-
-const _splashWordmarkGold = Color(0xFF624A1F);
+import 'package:ui/theme/app_theme.dart';
+import 'package:ui/widgets/shared_widgets.dart';
 
 /// DineIn startup screen — minimal brand mark + spinner.
 class SplashScreen extends StatefulWidget {
@@ -24,66 +23,73 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const DineInLogoText(
-              fontSize: 72,
-              dineColor: _splashWordmarkGold,
-              inColor: Colors.white,
-              letterSpacing: -2,
-            ),
-            const SizedBox(height: 48),
-            AnimatedBuilder(
-              animation: AppBootstrapService.instance,
-              builder: (context, _) {
-                final bootstrap = AppBootstrapService.instance;
-                final statusLabel = bootstrap.hasError
-                    ? 'COULD NOT CONNECT'
-                    : 'LOADING…';
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(AppTheme.space6),
+            child: AppSurfaceCard(
+              radius: AppTheme.radiusXxl,
+              padding: const EdgeInsets.all(AppTheme.space8),
+              elevated: true,
+              child: AnimatedBuilder(
+                animation: AppBootstrapService.instance,
+                builder: (context, _) {
+                  final bootstrap = AppBootstrapService.instance;
 
-                if (bootstrap.isReady) {
-                  final stateUri = _currentSplashUri(context);
-                  final target = _resolveSplashTarget(stateUri);
-                  _scheduleExitFromSplash(target);
-                }
+                  if (bootstrap.isReady) {
+                    final stateUri = _currentSplashUri(context);
+                    final target = _resolveSplashTarget(stateUri);
+                    _scheduleExitFromSplash(target);
+                  }
 
-                return Column(
-                  children: [
-                    if (bootstrap.hasError) ...[
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const DineInLogoText(
+                        fontSize: 52,
+                        dineColor: Color(0xFF75663A),
+                        inColor: Color(0xFF181611),
+                        letterSpacing: -1.4,
+                      ),
+                      const SizedBox(height: AppTheme.space2),
                       Text(
-                        statusLabel,
-                        style: TextStyle(
-                          color: Colors.red.shade200,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.8,
+                        bootstrap.hasError
+                            ? 'Could not connect right now.'
+                            : 'Preparing your table-side experience.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.84),
                         ),
                       ),
-                      const SizedBox(height: 18),
-                      FilledButton(
-                        onPressed: () => bootstrap.retry(),
-                        child: const Text('Retry'),
-                      ),
-                    ] else
-                      SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white.withValues(alpha: 0.50),
+                      const SizedBox(height: AppTheme.space6),
+                      if (bootstrap.hasError) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: () => bootstrap.retry(),
+                            child: const Text('Retry'),
+                          ),
                         ),
-                      ),
-                  ],
-                );
-              },
+                      ] else
+                        SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );

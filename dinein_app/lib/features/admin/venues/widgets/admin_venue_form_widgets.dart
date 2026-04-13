@@ -6,7 +6,7 @@ import 'package:ui/theme/app_colors.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 import 'package:dinein_app/shared/widgets/branded_qr_tools.dart';
 
-/// Reusable section card with an uppercased title label.
+/// Reusable section card for admin venue forms.
 class AdminVenueSectionCard extends StatelessWidget {
   final String title;
   final List<Widget> children;
@@ -22,17 +22,16 @@ class AdminVenueSectionCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
-    return ClayCard(
+    return AppSurfaceCard(
       padding: const EdgeInsets.all(AppTheme.space5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title.toUpperCase(),
-            style: tt.labelSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2.2,
-              color: cs.primary,
+            title,
+            style: tt.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: cs.onSurface,
             ),
           ),
           const SizedBox(height: AppTheme.space4),
@@ -133,10 +132,9 @@ class AdminVenueLinkAccessRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label.toUpperCase(),
+                  label,
                   style: tt.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.8,
+                    fontWeight: FontWeight.w700,
                     color: cs.onSurfaceVariant,
                   ),
                 ),
@@ -228,8 +226,7 @@ class AdminVenueQrPreviewCard extends StatelessWidget {
               label,
               textAlign: TextAlign.center,
               style: tt.labelSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.8,
+                fontWeight: FontWeight.w700,
                 color: cs.onSurface,
               ),
             ),
@@ -239,8 +236,6 @@ class AdminVenueQrPreviewCard extends StatelessWidget {
     );
   }
 }
-
-
 
 /// Animated status indicator dot.
 class AdminStatusDot extends StatelessWidget {
@@ -321,7 +316,7 @@ class AdminStatusButton extends StatelessWidget {
                     blurRadius: 32,
                   ),
                 ]
-              : AppTheme.clayShadow,
+              : AppTheme.ambientShadow,
         ),
         child: Row(
           children: [
@@ -344,18 +339,16 @@ class AdminStatusButton extends StatelessWidget {
                   Text(
                     label,
                     style: tt.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
+                      fontWeight: FontWeight.w700,
                       color: textColor,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    subtitle.toUpperCase(),
+                    subtitle,
                     style: TextStyle(
                       fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+                      fontWeight: FontWeight.w600,
                       color: textColor.withValues(alpha: 0.60),
                     ),
                   ),

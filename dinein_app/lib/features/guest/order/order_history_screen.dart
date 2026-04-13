@@ -9,7 +9,6 @@ import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
-import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
 import 'package:ui/widgets/shared_widgets.dart';
 
@@ -20,11 +19,11 @@ class OrderHistoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ordersAsync = ref.watch(userOrdersProvider);
 
-    return CustomScrollView(
-      slivers: [
-        const SliverToBoxAdapter(child: _OrderHistoryHeader()),
-        ordersAsync.when(
-          loading: () => const SliverPadding(
+    return ordersAsync.when(
+      loading: () => const CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(child: _OrderHistoryHeader()),
+          SliverPadding(
             padding: EdgeInsets.fromLTRB(
               AppTheme.space6,
               0,
@@ -33,14 +32,19 @@ class OrderHistoryScreen extends ConsumerWidget {
             ),
             sliver: _OrderHistorySkeletonList(),
           ),
-          error: (error, stackTrace) => SliverFillRemaining(
+        ],
+      ),
+      error: (error, stackTrace) => CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(child: _OrderHistoryHeader()),
+          SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppTheme.space6,
                 0,
                 AppTheme.space6,
-                    AppTheme.space8,
+                AppTheme.space8,
               ),
               child: ErrorState(
                 message: 'Could not load order history.',
@@ -48,23 +52,42 @@ class OrderHistoryScreen extends ConsumerWidget {
               ),
             ),
           ),
-          data: (orders) {
-            if (orders.isEmpty) {
-              return const SliverFillRemaining(
-                hasScrollBody: false,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    AppTheme.space6,
-                    0,
-                    AppTheme.space6,
-                        AppTheme.space8,
-                  ),
-                  child: _EmptyOrderHistoryState(),
+        ],
+      ),
+      data: (orders) => CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(child: _OrderHistoryHeader()),
+          if (orders.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppTheme.space6,
+                  0,
+                  AppTheme.space6,
+                  AppTheme.space8,
                 ),
-              );
-            }
-
-            return SliverPadding(
+                child: _EmptyOrderHistoryState(
+                  onBrowseVenues: () => context.goNamed(AppRouteNames.discover),
+                ),
+              ),
+            )
+          else ...[
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  AppTheme.space6,
+                  0,
+                  AppTheme.space6,
+                  AppTheme.space4,
+                ),
+                child: GuestSectionHeader(
+                  title: 'Recent',
+                  subtitle: 'Open any order for live status.',
+                ),
+              ),
+            ),
+            SliverPadding(
               padding: const EdgeInsets.fromLTRB(
                 AppTheme.space6,
                 0,
@@ -74,22 +97,22 @@ class OrderHistoryScreen extends ConsumerWidget {
               sliver: SliverList.separated(
                 itemCount: orders.length,
                 separatorBuilder: (_, _) =>
-                    const SizedBox(height: AppTheme.space5),
+                    const SizedBox(height: AppTheme.space4),
                 itemBuilder: (context, index) {
                   final order = orders[index];
                   return _OrderHistoryCard(
-                        order: order,
-                        onTap: () => context.pushNamed(
-                          AppRouteNames.orderStatus,
-                          pathParameters: {AppRouteParams.id: order.id},
-                        ),
-                      );
+                    order: order,
+                    onTap: () => context.pushNamed(
+                      AppRouteNames.orderStatus,
+                      pathParameters: {AppRouteParams.id: order.id},
+                    ),
+                  );
                 },
               ),
-            );
-          },
-        ),
-      ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -99,46 +122,29 @@ class _OrderHistoryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppTheme.space6,
         AppTheme.space6,
         AppTheme.space6,
-        AppTheme.space4,
+        AppTheme.space5,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text.rich(
-            TextSpan(
-              style: tt.displayMedium?.copyWith(
-                height: 0.86,
-                letterSpacing: -2.2,
-              ),
-              children: [
-                const TextSpan(text: 'ORDER\n'),
-                TextSpan(
-                  text: 'HISTORY',
-                  style: TextStyle(color: cs.primary),
-                ),
-              ],
+      child: GuestHeroCard(
+        eyebrow: 'Your orders',
+        title: 'Track every table visit',
+        subtitle: 'Past and active orders in one place.',
+        footer: Wrap(
+          spacing: AppTheme.space3,
+          runSpacing: AppTheme.space3,
+          children: const [
+            GuestMetaPill(
+              label: 'Live status',
+              icon: LucideIcons.clock3,
+              emphasized: true,
             ),
-          ),
-          const SizedBox(height: AppTheme.space4),
-          SizedBox(
-            width: 280,
-            child: Text(
-              'Every table moment, receipt, and order progress in one place.',
-              style: tt.bodyLarge?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.55),
-                height: 1.45,
-              ),
-            ),
-          ),
-        ],
+            GuestMetaPill(label: 'Receipts', icon: Icons.receipt_long_rounded),
+          ],
+        ),
       ),
     );
   }
@@ -152,103 +158,27 @@ class _OrderHistorySkeletonList extends StatelessWidget {
     return SliverList(
       delegate: SliverChildBuilderDelegate((context, index) {
         return const Padding(
-          padding: EdgeInsets.only(bottom: AppTheme.space5),
-          child: SkeletonLoader(width: double.infinity, height: 168),
+          padding: EdgeInsets.only(bottom: AppTheme.space4),
+          child: SkeletonLoader(width: double.infinity, height: 140),
         );
-      }, childCount: 3),
+      }, childCount: 4),
     );
   }
 }
 
 class _EmptyOrderHistoryState extends StatelessWidget {
-  const _EmptyOrderHistoryState();
+  final VoidCallback onBrowseVenues;
+
+  const _EmptyOrderHistoryState({required this.onBrowseVenues});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return Center(
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppTheme.space8),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppTheme.radius3xl),
-          border: Border.all(color: AppColors.white5),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-              ),
-              child: Icon(
-                LucideIcons.receipt,
-                size: 44,
-                color: cs.onSurfaceVariant.withValues(alpha: 0.25),
-              ),
-            ),
-            const SizedBox(height: AppTheme.space6),
-            Text('No orders yet', style: tt.headlineMedium),
-            const SizedBox(height: AppTheme.space3),
-            Text(
-              'Your table orders and receipts will appear here after your first visit.',
-              textAlign: TextAlign.center,
-              style: tt.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.55),
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: AppTheme.space8),
-            PressableScale(
-              onTap: () => context.goNamed(AppRouteNames.discover),
-              semanticLabel: 'Discover venues',
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.space8,
-                  vertical: AppTheme.space5,
-                ),
-                decoration: BoxDecoration(
-                  color: cs.primary,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                  boxShadow: [
-                    BoxShadow(
-                      color: cs.primary.withValues(alpha: 0.24),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'DISCOVER VENUES',
-                      style: TextStyle(
-                        color: cs.onPrimary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2.4,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Icon(
-                      LucideIcons.chevronRight,
-                      size: 18,
-                      color: cs.onPrimary,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return GuestStatePanel(
+      icon: LucideIcons.receipt,
+      title: 'No orders yet',
+      subtitle: 'Your past table orders will show up here.',
+      actionLabel: 'Browse venues',
+      onAction: onBrowseVenues,
     );
   }
 }
@@ -266,136 +196,101 @@ class _OrderHistoryCard extends StatelessWidget {
     final itemNames = order.items.take(2).map((item) => item.name).join(', ');
     final moreCount = order.items.length - 2;
 
-    return PressableScale(
+    return GuestSurfaceCard(
       onTap: onTap,
-      semanticLabel: 'View order ${order.displayNumber}',
-      child: Container(
-        padding: const EdgeInsets.all(AppTheme.space5),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-          border: Border.all(color: AppColors.white5),
-          boxShadow: AppTheme.ambientShadow,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-              child: SizedBox(
-                width: 104,
-                height: 136,
-                child: DineInImage(
-                  imageUrl: order.venueImageUrl,
-                  fit: BoxFit.cover,
-                  fallbackIcon: LucideIcons.store,
-                  semanticLabel: '${order.venueName} photo',
+      padding: const EdgeInsets.all(AppTheme.space4),
+      borderRadius: 24,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            child: SizedBox(
+              width: 88,
+              height: 88,
+              child: DineInImage(
+                imageUrl: order.venueImageUrl,
+                fit: BoxFit.cover,
+                fallbackIcon: LucideIcons.store,
+                semanticLabel: '${order.venueName} photo',
+              ),
+            ),
+          ),
+          const SizedBox(width: AppTheme.space4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        order.venueName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.titleLarge,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.space3),
+                    _OrderStatusPill(order: order),
+                  ],
                 ),
-              ),
-            ),
-            const SizedBox(width: AppTheme.space5),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '#${order.displayNumber}',
-                          style: TextStyle(
-                            color: cs.primary,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2.6,
-                          ),
-                        ),
-                      ),
-                      _OrderStatusPill(order: order),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    order.venueName,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: tt.headlineSmall?.copyWith(
-                      letterSpacing: -0.8,
-                      height: 1,
+                const SizedBox(height: AppTheme.space3),
+                Wrap(
+                  spacing: AppTheme.space2,
+                  runSpacing: AppTheme.space2,
+                  children: [
+                    GuestMetaPill(
+                      label: '#${order.displayNumber}',
+                      icon: Icons.receipt_long_rounded,
+                      emphasized: true,
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    moreCount > 0
-                        ? '$itemNames +$moreCount more'
-                        : itemNames.isEmpty
-                        ? '${order.itemCount} items'
-                        : itemNames,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: tt.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.60),
-                      height: 1.4,
+                    GuestMetaPill(
+                      label: _formatDate(order.createdAt),
+                      icon: LucideIcons.clock3,
                     ),
+                    GuestMetaPill(
+                      label: '${order.itemCount} items',
+                      icon: LucideIcons.utensilsCrossed,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppTheme.space3),
+                Text(
+                  moreCount > 0
+                      ? '$itemNames +$moreCount more'
+                      : itemNames.isEmpty
+                      ? '${order.itemCount} items'
+                      : itemNames,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: tt.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.84),
                   ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Icon(
-                              LucideIcons.clock3,
-                              size: 14,
-                              color: cs.onSurfaceVariant.withValues(alpha: 0.48),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                _formatDate(order.createdAt),
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: cs.onSurfaceVariant.withValues(
-                                    alpha: 0.48,
-                                  ),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                ),
+                const SizedBox(height: AppTheme.space3),
+                Row(
+                  children: [
+                    Text(
+                      order.formatPrice(order.total),
+                      style: tt.titleMedium?.copyWith(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w800,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        order.formatPrice(order.total),
-                        style: tt.titleMedium?.copyWith(
-                          color: cs.primary,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      LucideIcons.chevronRight,
+                      size: 18,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: AppTheme.space3),
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              ),
-              child: Icon(
-                LucideIcons.chevronRight,
-                size: 18,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -408,26 +303,27 @@ class _OrderStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final statusColor = switch (order.status) {
-      OrderStatus.placed => Theme.of(context).colorScheme.tertiary,
-      OrderStatus.received => Theme.of(context).colorScheme.primary,
-      OrderStatus.served => AppColors.secondary,
-      OrderStatus.cancelled => Theme.of(context).colorScheme.error,
+      OrderStatus.placed => cs.tertiary,
+      OrderStatus.received => cs.primary,
+      OrderStatus.served => cs.secondary,
+      OrderStatus.cancelled => cs.error,
     };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: statusColor.withValues(alpha: 0.12),
+        color: statusColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+        border: Border.all(color: statusColor.withValues(alpha: 0.18)),
       ),
       child: Text(
-        order.status.label.toUpperCase(),
-        style: TextStyle(
+        order.status.label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
           color: statusColor,
-          fontSize: 8,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 2.4,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0,
         ),
       ),
     );

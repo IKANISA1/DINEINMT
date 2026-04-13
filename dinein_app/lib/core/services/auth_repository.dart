@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:db_pkg/models/models.dart';
 import '../services/api_invoker.dart';
 import '../infrastructure/app_notification_service.dart'
     if (dart.library.js_interop) 'app_notification_service_web.dart';
+import '../infrastructure/app_telemetry_service.dart'
+    if (dart.library.js_interop) 'app_telemetry_service_web.dart';
 import '../services/dinein_api_service.dart';
 import '../services/supabase_config.dart';
 
 /// Repository for authentication via Supabase Auth.
-class AuthRepository {
+class AuthRepository extends ChangeNotifier {
   final ApiInvoker _invoke;
 
   AuthRepository._() : _invoke = DineinApiService.invoke;
@@ -58,8 +61,13 @@ class AuthRepository {
     if (client != null) {
       try {
         await client.auth.signOut();
-      } catch (_) {
+      } catch (error, stackTrace) {
         // Custom OTP sessions do not depend on a Supabase auth session.
+        await AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'auth.sign_out',
+        );
       }
     }
     await clearVenueSession();
@@ -130,6 +138,7 @@ class AuthRepository {
     final raw = await _readSessionValue(_venueSessionKey);
     if (raw == null || raw.isEmpty) {
       _venueSession = null;
+      notifyListeners();
       return;
     }
 
@@ -140,13 +149,20 @@ class AuthRepository {
       if (session.isExpired) {
         _venueSession = null;
         await _deleteSessionValue(_venueSessionKey);
+        notifyListeners();
         return;
       }
       _venueSession = session;
-    } catch (_) {
+    } catch (error, stackTrace) {
       _venueSession = null;
       await _deleteSessionValue(_venueSessionKey);
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'auth.restore_venue_session',
+      );
     }
+    notifyListeners();
   }
 
   /// Restore persisted admin session during app bootstrap.
@@ -154,6 +170,7 @@ class AuthRepository {
     final raw = await _readSessionValue(_adminSessionKey);
     if (raw == null || raw.isEmpty) {
       _adminSession = null;
+      notifyListeners();
       return;
     }
 
@@ -164,19 +181,27 @@ class AuthRepository {
       if (session.isExpired) {
         _adminSession = null;
         await _deleteSessionValue(_adminSessionKey);
+        notifyListeners();
         return;
       }
       _adminSession = session;
-    } catch (_) {
+    } catch (error, stackTrace) {
       _adminSession = null;
       await _deleteSessionValue(_adminSessionKey);
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'auth.restore_admin_session',
+      );
     }
+    notifyListeners();
   }
 
   /// Persist a venue-owner session after OTP verification.
   Future<void> saveVenueSession(VenueAccessSession session) async {
     _venueSession = session;
     await _writeSessionValue(_venueSessionKey, jsonEncode(session.toJson()));
+    notifyListeners();
     unawaited(_syncVenueSessionNotifications(session));
   }
 
@@ -184,6 +209,7 @@ class AuthRepository {
   Future<void> saveAdminSession(AdminAccessSession session) async {
     _adminSession = session;
     await _writeSessionValue(_adminSessionKey, jsonEncode(session.toJson()));
+    notifyListeners();
   }
 
   /// Clear the venue-owner session only.
@@ -191,6 +217,7 @@ class AuthRepository {
     final session = _venueSession;
     _venueSession = null;
     await _deleteSessionValue(_venueSessionKey);
+    notifyListeners();
     if (session != null) {
       unawaited(_clearVenueSessionNotifications(session));
     }
@@ -201,8 +228,13 @@ class AuthRepository {
   ) async {
     try {
       await AppNotificationService.handleVenueSessionUpdated(session);
-    } catch (_) {
+    } catch (error, stackTrace) {
       // Notification setup is best-effort and must not break auth persistence.
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'auth.sync_venue_notifications',
+      );
     }
   }
 
@@ -211,8 +243,13 @@ class AuthRepository {
   ) async {
     try {
       await AppNotificationService.handleVenueSessionCleared(session);
-    } catch (_) {
+    } catch (error, stackTrace) {
       // Notification teardown is best-effort and must not break auth cleanup.
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'auth.clear_venue_notifications',
+      );
     }
   }
 
@@ -220,12 +257,21 @@ class AuthRepository {
   Future<void> clearAdminSession() async {
     _adminSession = null;
     await _deleteSessionValue(_adminSessionKey);
+    notifyListeners();
   }
 
   Future<String?> _readSessionValue(String key) async {
     try {
       return await _secureStorage.read(key: key).timeout(_secureStorageTimeout);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'auth.secure_storage.read',
+          details: {'key': key},
+        ),
+      );
       return null;
     }
   }
@@ -235,16 +281,28 @@ class AuthRepository {
       await _secureStorage
           .write(key: key, value: value)
           .timeout(_secureStorageTimeout);
-    } catch (_) {
+    } catch (error, stackTrace) {
       // If secure storage fails, we do not fall back to plain preferences.
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'auth.secure_storage.write',
+        details: {'key': key},
+      );
     }
   }
 
   Future<void> _deleteSessionValue(String key) async {
     try {
       await _secureStorage.delete(key: key).timeout(_secureStorageTimeout);
-    } catch (_) {
+    } catch (error, stackTrace) {
       // Ignore secure storage cleanup failures.
+      await AppTelemetryService.reportError(
+        error,
+        stackTrace,
+        context: 'auth.secure_storage.delete',
+        details: {'key': key},
+      );
     }
   }
 

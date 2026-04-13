@@ -51,7 +51,8 @@ class VenueLegalScreen extends ConsumerWidget {
     return Scaffold(
       body: venueAsync.when(
         loading: () => const Center(
-            child: SkeletonLoader(width: double.infinity, height: 200)),
+          child: SkeletonLoader(width: double.infinity, height: 200),
+        ),
         error: (_, _) => ErrorState(
           message: 'Could not load venue.',
           onRetry: () => ref.invalidate(currentVenueProvider),
@@ -67,44 +68,16 @@ class VenueLegalScreen extends ConsumerWidget {
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(
-                AppTheme.space6, AppTheme.space6, AppTheme.space6, 120),
+              AppTheme.space6,
+              AppTheme.space6,
+              AppTheme.space6,
+              120,
+            ),
             children: [
-              // ─── Header ───
-              Row(
-                children: [
-                  PressableScale(
-                    onTap: () => context.pop(),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.05)),
-                      ),
-                      child: Icon(LucideIcons.chevronLeft,
-                          size: 18, color: cs.onSurface),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Legal & Policies',
-                          style: tt.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.5)),
-                      Text('VENUE MANAGEMENT',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
-                            color: cs.onSurfaceVariant,
-                          )),
-                    ],
-                  ),
-                ],
+              AppPageHeader(
+                title: 'Legal & policies',
+                subtitle: 'Open the current policy documents for this venue.',
+                onBack: () => context.pop(),
               ),
               const SizedBox(height: AppTheme.space6),
 
@@ -121,66 +94,71 @@ class VenueLegalScreen extends ConsumerWidget {
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: AppTheme.space3),
-                  child: PressableScale(
-                    onTap: () => _openPolicy(policy.url),
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.05)),
-                        boxShadow: AppTheme.clayShadow,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: iconColor.withValues(alpha: 0.12),
-                              shape: BoxShape.circle,
+                  child:
+                      PressableScale(
+                            onTap: () => _openPolicy(policy.url),
+                            child: AppSurfaceCard(
+                              padding: const EdgeInsets.all(18),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: iconColor.withValues(alpha: 0.12),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      policy.icon,
+                                      size: 18,
+                                      color: iconColor,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          policy.title,
+                                          style: tt.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          policy.updatedLabel,
+                                          style: tt.bodySmall?.copyWith(
+                                            color: cs.onSurfaceVariant
+                                                .withValues(alpha: 0.72),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    LucideIcons.externalLink,
+                                    size: 16,
+                                    color: cs.onSurfaceVariant.withValues(
+                                      alpha: 0.40,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: Icon(policy.icon,
-                                size: 18, color: iconColor),
+                          )
+                          .animate()
+                          .fadeIn(
+                            duration: 300.ms,
+                            delay: Duration(milliseconds: i * 100),
+                          )
+                          .slideY(
+                            begin: 0.05,
+                            end: 0,
+                            duration: 300.ms,
+                            delay: Duration(milliseconds: i * 100),
                           ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(policy.title,
-                                    style: tt.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 2),
-                                Text(policy.updatedLabel,
-                                    style: TextStyle(
-                                      fontSize: 8,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 2,
-                                      color: cs.onSurfaceVariant
-                                          .withValues(alpha: 0.50),
-                                    )),
-                              ],
-                            ),
-                          ),
-                          Icon(LucideIcons.externalLink,
-                              size: 16,
-                              color: cs.onSurfaceVariant
-                                  .withValues(alpha: 0.40)),
-                        ],
-                      ),
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(
-                          duration: 300.ms,
-                          delay: Duration(milliseconds: i * 100))
-                      .slideY(
-                          begin: 0.05,
-                          end: 0,
-                          duration: 300.ms,
-                          delay: Duration(milliseconds: i * 100)),
                 );
               }),
             ],

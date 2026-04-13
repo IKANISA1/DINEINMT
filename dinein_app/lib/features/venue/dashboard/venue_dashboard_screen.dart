@@ -86,10 +86,11 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
   }
 
   String _formattedToday() {
-    return DateFormat('MMMM d, yyyy').format(DateTime.now()).toUpperCase();
+    return DateFormat('MMMM d, yyyy').format(DateTime.now());
   }
 
-  String _formatPrice(double amount) => widget.venue.country.formatPriceTabular(amount);
+  String _formatPrice(double amount) =>
+      widget.venue.country.formatPriceTabular(amount);
 
   Future<void> _toggleActivation() async {
     if (_isTogglingActivation) return;
@@ -122,104 +123,28 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ═══ HEADER ═══
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Dashboard',
-                    style: tt.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        LucideIcons.calendar,
-                        size: 12,
-                        color: cs.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _formattedToday(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 2,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              Expanded(
+                child: AppPageHeader(
+                  title: 'Dashboard',
+                  subtitle: _formattedToday(),
+                ),
               ),
               Row(
                 children: [
-                  // LIVE / OFF badge
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: (_isActive ? AppColors.secondary : cs.error)
-                          .withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: (_isActive ? AppColors.secondary : cs.error)
-                            .withValues(alpha: 0.20),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: _isActive ? AppColors.secondary : cs.error,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _isActive ? 'LIVE' : 'OFF',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2,
-                            color: _isActive ? AppColors.secondary : cs.error,
-                          ),
-                        ),
-                      ],
-                    ),
+                  StatusBadge(
+                    label: _isActive ? 'Live' : 'Paused',
+                    color: (_isActive ? AppColors.secondary : cs.error)
+                        .withValues(alpha: 0.10),
+                    textColor: _isActive ? AppColors.secondary : cs.error,
                   ),
                   const SizedBox(width: 8),
-                  // Chart icon
-                  PressableScale(
+                  AppIconButton(
+                    icon: LucideIcons.barChart3,
                     onTap: () => context.goNamed(AppRouteNames.venueOrders),
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.05),
-                        ),
-                      ),
-                      child: Icon(
-                        LucideIcons.barChart3,
-                        size: 18,
-                        color: cs.primary,
-                      ),
-                    ),
+                    semanticLabel: 'Open orders',
                   ),
                 ],
               ),
@@ -227,17 +152,11 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
           ),
           const SizedBox(height: AppTheme.space6),
 
-          // ═══ VENUE ACTIVATION TOGGLE ═══
           PressableScale(
             onTap: _toggleActivation,
-            child: Container(
+            child: AppSurfaceCard(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                boxShadow: AppTheme.elevatedShadow,
-              ),
+              elevated: true,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -253,10 +172,8 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                       const SizedBox(height: 2),
                       Text(
                         _isActive ? 'ACCEPTING ORDERS' : 'ORDERING DISABLED',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
+                        style: tt.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
                           color: cs.onSurfaceVariant,
                         ),
                       ),
@@ -333,8 +250,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                   Expanded(
                     child: _CompactKpi(
                       label: 'REVENUE',
-                      value:
-                          _formatPrice(totalRevenue),
+                      value: _formatPrice(totalRevenue),
                       sub: '${todayOrders.length} today',
                       color: cs.primary,
                     ),
@@ -377,12 +293,10 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               PressableScale(
                 onTap: () => context.goNamed(AppRouteNames.venueOrders),
                 child: Text(
-                  'VIEW ALL',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                  'View all',
+                  style: tt.labelLarge?.copyWith(
                     color: cs.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -424,12 +338,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                     padding: EdgeInsets.only(
                       bottom: idx < recent.length - 1 ? AppTheme.space3 : 0,
                     ),
-                    child: RepaintBoundary(
-                      child:
-                        _OrderPreview(
-                              order: order,
-                            ),
-                    ),
+                    child: RepaintBoundary(child: _OrderPreview(order: order)),
                   );
                 }).toList(),
               );
@@ -451,7 +360,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               Expanded(
                 child: _QuickAction(
                   icon: LucideIcons.shoppingBag,
-                  label: 'MANAGE MENU',
+                  label: 'Manage menu',
                   color: cs.surfaceContainerLow,
                   iconColor: cs.primary,
                   textColor: cs.onSurface,
@@ -462,7 +371,7 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               Expanded(
                 child: _QuickAction(
                   icon: LucideIcons.plusCircle,
-                  label: 'ADD MENU',
+                  label: 'Add item',
                   color: AppColors.secondary.withValues(alpha: 0.20),
                   iconColor: cs.onSurface,
                   textColor: cs.onSurface,
@@ -491,26 +400,18 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
               PressableScale(
                 onTap: () => context.pushNamed(AppRouteNames.venueItemReport),
                 child: Text(
-                  'FULL REPORT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
+                  'Full report',
+                  style: tt.labelLarge?.copyWith(
                     color: cs.primary,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: AppTheme.space4),
-          Container(
+          AppSurfaceCard(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-              boxShadow: AppTheme.clayShadow,
-            ),
             child: ordersAsync.when(
               loading: () =>
                   const SkeletonLoader(width: double.infinity, height: 80),
@@ -593,12 +494,10 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '${item.totalOrders} ORDERS',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1.5,
+                                    '${item.totalOrders} orders',
+                                    style: tt.labelMedium?.copyWith(
                                       color: cs.onSurfaceVariant,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ],
@@ -616,11 +515,9 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
                                 const SizedBox(height: 2),
                                 Text(
                                   '$revenuePct%',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1,
+                                  style: tt.labelMedium?.copyWith(
                                     color: cs.onSurfaceVariant,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
@@ -641,4 +538,3 @@ class _DashboardBodyState extends ConsumerState<_DashboardBody> {
     );
   }
 }
-

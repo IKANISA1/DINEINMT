@@ -110,6 +110,13 @@ class PwaInstallService {
       return true;
     } catch (e) {
       debugPrint('[pwa-install] Error: $e');
+      unawaited(
+        AppTelemetryService.reportError(
+          e,
+          StackTrace.current,
+          context: 'pwa_install.prompt',
+        ),
+      );
       return false;
     }
   }
@@ -133,8 +140,15 @@ class PwaInstallService {
     if (!kIsWeb) return;
     try {
       _isInstallable = platform.hasDeferredPrompt();
-    } catch (_) {
+    } catch (error, stackTrace) {
       _isInstallable = false;
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'pwa_install.check_installable',
+        ),
+      );
     }
   }
 
@@ -147,6 +161,15 @@ class PwaInstallService {
       } else {
         platform.clearAppBadge();
       }
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      unawaited(
+        AppTelemetryService.reportError(
+          error,
+          stackTrace,
+          context: 'pwa_install.badge_update',
+          details: {'count': count},
+        ),
+      );
+    }
   }
 }

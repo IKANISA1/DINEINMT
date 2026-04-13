@@ -22,6 +22,12 @@ class VenueRepository {
     };
   }
 
+  Map<String, dynamic> _mutationSessionPayload({
+    bool useAdminSession = false,
+  }) {
+    return useAdminSession ? const {} : _venueSessionPayload();
+  }
+
   /// Fetch guest-visible venues.
   ///
   /// Used for direct venue listing and fallback browse surfaces.
@@ -144,7 +150,7 @@ class VenueRepository {
       payload: {
         'venueId': id,
         'updates': _normalizeVenueUpdates(updates),
-        ..._venueSessionPayload(),
+        ..._mutationSessionPayload(),
       },
     );
   }
@@ -159,7 +165,7 @@ class VenueRepository {
       payload: {
         'venueId': venueId,
         'updates': _normalizeVenueUpdates(updates),
-        ..._venueSessionPayload(),
+        ..._mutationSessionPayload(useAdminSession: true),
       },
     );
   }
@@ -179,7 +185,7 @@ class VenueRepository {
         'overwriteExisting': overwriteExisting,
         'forcePlaceRefresh': forcePlaceRefresh,
         'skipSearchGrounding': skipSearchGrounding,
-        ..._venueSessionPayload(),
+        ..._mutationSessionPayload(useAdminSession: useAdminSession),
       },
     );
     return (data as Map<String, dynamic>?) ?? const {};

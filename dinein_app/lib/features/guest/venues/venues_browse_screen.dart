@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -12,9 +11,7 @@ import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/core/router/app_routes.dart';
 import 'package:dinein_app/core/services/app_telemetry.dart';
 import 'package:dinein_app/core/services/discovery_location_service.dart';
-import 'package:ui/theme/app_colors.dart';
 import 'package:ui/theme/app_theme.dart';
-
 import 'package:ui/widgets/shared_widgets.dart';
 
 const _venueFilters = ['All', 'Ordering'];
@@ -32,6 +29,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
   static const _pageSize = 18;
 
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   Timer? _queryDebounce;
   List<String> _selectedFilters = const ['All'];
   String _query = '';
@@ -53,7 +51,8 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
       _searchIntentHandled = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _triggerRouteSearch();
+        GoRouter.of(context).replaceNamed(AppRouteNames.venuesBrowse);
+        _searchFocusNode.requestFocus();
       });
       return;
     }
@@ -67,6 +66,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
   void dispose() {
     _queryDebounce?.cancel();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -156,20 +156,6 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
     );
   }
 
-  void _triggerRouteSearch() {
-    GoRouter.of(context).replaceNamed(AppRouteNames.venuesBrowse);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _showVenueSearchSheet(
-        context: context,
-        cs: Theme.of(context).colorScheme,
-        tt: Theme.of(context).textTheme,
-        searchController: _searchController,
-        onSearchChanged: _onSearchChanged,
-      );
-    });
-  }
-
   Future<void> _requestLocation() async {
     if (_requestingLocation) return;
     _trackGuestEvent(
@@ -208,7 +194,6 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
 
   GuestVenueQuery _buildGuestVenueQuery(DiscoveryCoordinates? location) {
     final selected = _selectedFilters;
-
     return GuestVenueQuery(
       limit: _resultLimit,
       query: _query.isEmpty ? null : _query,
@@ -216,10 +201,6 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
       latitude: location?.latitude,
       longitude: location?.longitude,
     );
-  }
-
-  List<Venue> _applyClientFilters(List<Venue> venues) {
-    return venues.toList(growable: false);
   }
 
   @override
@@ -233,7 +214,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
     final currentFeed = feedAsync.asData?.value;
     _lastFeed = currentFeed ?? _lastFeed;
     final feed = currentFeed ?? _lastFeed;
-    final venues = _applyClientFilters(feed?.items ?? const []);
+    final venues = feed?.items ?? const <Venue>[];
 
     if (!_trackedBrowseView &&
         currentFeed != null &&
@@ -250,7 +231,6 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
 
     return _VenuesBody(
       venues: venues,
-      filterOptions: _venueFilters,
       totalCount: feed?.totalCount ?? venues.length,
       query: _query,
       isLoading: feedAsync.isLoading,
@@ -270,6 +250,7 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
             }
           : null,
       searchController: _searchController,
+      searchFocusNode: _searchFocusNode,
       discoveryLocation: discoveryLocation,
       requestingLocation: _requestingLocation,
       selectedFilters: _selectedFilters,
@@ -291,87 +272,8 @@ class _VenuesBrowseScreenState extends ConsumerState<VenuesBrowseScreen> {
   }
 }
 
-void _showVenueSearchSheet({
-  required BuildContext context,
-  required ColorScheme cs,
-  required TextTheme tt,
-  required TextEditingController searchController,
-  required ValueChanged<String> onSearchChanged,
-}) {
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: cs.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(
-        top: Radius.circular(AppTheme.radiusXl),
-      ),
-    ),
-    builder: (sheetContext) {
-      return Padding(
-        padding: EdgeInsets.fromLTRB(
-          AppTheme.space6,
-          AppTheme.space6,
-          AppTheme.space6,
-          MediaQuery.of(sheetContext).viewInsets.bottom + AppTheme.space6,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: AppTheme.space5),
-              decoration: BoxDecoration(
-                color: cs.onSurface.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainer,
-                borderRadius: BorderRadius.circular(AppTheme.radiusXl),
-                border: Border.all(color: AppColors.white5),
-              ),
-              child: Row(
-                children: [
-                  Icon(LucideIcons.search, size: 20, color: AppColors.white10),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: searchController,
-                      autofocus: true,
-                      onChanged: onSearchChanged,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: (_) => Navigator.pop(sheetContext),
-                      style: tt.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        filled: false,
-                        hintText: 'Search venues...',
-                        hintStyle: tt.bodyLarge?.copyWith(
-                          color: AppColors.white10,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
 class _VenuesBody extends StatelessWidget {
   final List<Venue> venues;
-  final List<String> filterOptions;
   final int totalCount;
   final String query;
   final bool isLoading;
@@ -379,6 +281,7 @@ class _VenuesBody extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback? onLoadMore;
   final TextEditingController searchController;
+  final FocusNode searchFocusNode;
   final DiscoveryCoordinates? discoveryLocation;
   final bool requestingLocation;
   final List<String> selectedFilters;
@@ -390,7 +293,6 @@ class _VenuesBody extends StatelessWidget {
 
   const _VenuesBody({
     required this.venues,
-    required this.filterOptions,
     required this.totalCount,
     required this.query,
     required this.isLoading,
@@ -398,6 +300,7 @@ class _VenuesBody extends StatelessWidget {
     required this.onRetry,
     required this.onLoadMore,
     required this.searchController,
+    required this.searchFocusNode,
     required this.discoveryLocation,
     required this.requestingLocation,
     required this.selectedFilters,
@@ -410,118 +313,110 @@ class _VenuesBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
     final screenWidth = MediaQuery.of(context).size.width;
-    final useGrid = screenWidth >= 1100;
+    final useGrid = screenWidth >= 1180;
     final crossAxisCount = screenWidth >= 1480 ? 3 : 2;
 
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(
+            AppTheme.space6,
+            AppTheme.space6,
+            AppTheme.space6,
+            0,
+          ),
+          sliver: SliverToBoxAdapter(
+            child: _BrowseHero(
+              query: query,
+              totalCount: totalCount,
+              visibleCount: venues.length,
+              searchController: searchController,
+              searchFocusNode: searchFocusNode,
+              selectedFilters: selectedFilters,
+              hasLocation: discoveryLocation != null,
+              requestingLocation: requestingLocation,
+              onSearchChanged: onSearchChanged,
+              onUseMyLocation: onUseMyLocation,
+              onFilterSelected: onFilterSelected,
+              onResetFilters: onResetFilters,
+            ),
+          ),
+        ),
+        if (isLoading)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.only(top: AppTheme.space4),
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+          ),
+        if (loadError != null && venues.isEmpty)
+          SliverPadding(
             padding: const EdgeInsets.fromLTRB(
               AppTheme.space6,
               AppTheme.space6,
               AppTheme.space6,
               0,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text.rich(
-                  TextSpan(
-                    style: tt.displayMedium?.copyWith(
-                      height: 0.86,
-                      letterSpacing: -2.2,
-                    ),
-                    children: [
-                      const TextSpan(text: 'EXPLORE\n'),
-                      TextSpan(
-                        text: 'VENUES',
-                        style: TextStyle(color: cs.primary),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppTheme.space4),
-                SizedBox(
-                  width: 280,
-                  child: Text(
-                    'Discover the finest establishments curated for your taste.',
-                    style: tt.bodyLarge?.copyWith(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.55),
-                      height: 1.45,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (isLoading)
-          const SliverToBoxAdapter(
-            child: LinearProgressIndicator(minHeight: 2),
-          ),
-        if (loadError != null && venues.isEmpty)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppTheme.space6,
-                AppTheme.space8,
-                AppTheme.space6,
-                0,
-              ),
-              child: ErrorState(
-                message: 'Failed to load venues.',
-                onRetry: onRetry,
+            sliver: SliverToBoxAdapter(
+              child: GuestStatePanel(
+                icon: Icons.signal_wifi_connected_no_internet_4_rounded,
+                title: 'Failed to load venues',
+                subtitle: 'Try again in a moment.',
+                actionLabel: 'Retry',
+                onAction: onRetry,
+                isError: true,
               ),
             ),
           ),
-        const SliverToBoxAdapter(child: SizedBox(height: AppTheme.space6)),
+        const SliverToBoxAdapter(child: SizedBox(height: AppTheme.space8)),
         if (isLoading && venues.isEmpty)
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppTheme.space6),
-              child: _VenueBrowseLoadingState(),
-            ),
+          const SliverPadding(
+            padding: EdgeInsets.symmetric(horizontal: AppTheme.space6),
+            sliver: SliverToBoxAdapter(child: _VenueBrowseLoadingState()),
           )
         else
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppTheme.space6,
-                0,
-                AppTheme.space6,
-                AppTheme.space4,
-              ),
-              child: Text(
-                '${venues.length} of $totalCount venues',
-                style: tt.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.66),
-                ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+            sliver: SliverToBoxAdapter(
+              child: GuestSectionHeader(
+                title: query.isEmpty ? 'All venues' : 'Search results',
+                subtitle: '${venues.length} of $totalCount visible',
               ),
             ),
           ),
         if (!isLoading && venues.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: _EmptyVenuesState(onResetFilters: onResetFilters),
+          SliverPadding(
+            padding: const EdgeInsets.all(AppTheme.space6),
+            sliver: SliverFillRemaining(
+              hasScrollBody: false,
+              child: GuestStatePanel(
+                icon: Icons.search_off_rounded,
+                title: 'No venues found',
+                subtitle: 'Try a different search or clear your filters.',
+                actionLabel: 'Reset',
+                onAction: onResetFilters,
+              ),
+            ),
           )
         else if (useGrid)
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.space6,
+              AppTheme.space4,
+              AppTheme.space6,
+              0,
+            ),
             sliver: SliverGrid(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
-                mainAxisSpacing: AppTheme.space8,
+                mainAxisSpacing: AppTheme.space6,
                 crossAxisSpacing: AppTheme.space6,
-                childAspectRatio: 0.66,
+                childAspectRatio: 0.82,
               ),
               delegate: SliverChildBuilderDelegate((context, index) {
                 final venue = venues[index];
-                final card = _VenueCard(
+                return _VenueCard(
                   venue: venue,
                   distanceLabel: _distanceLabelForVenue(
                     venue,
@@ -529,20 +424,24 @@ class _VenuesBody extends StatelessWidget {
                   ),
                   onTap: () => onOpenVenue(venue),
                 );
-                return card;
               }, childCount: venues.length),
             ),
           )
         else
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: AppTheme.space6),
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.space6,
+              AppTheme.space4,
+              AppTheme.space6,
+              0,
+            ),
             sliver: SliverList.separated(
               itemCount: venues.length,
               separatorBuilder: (_, _) =>
-                  const SizedBox(height: AppTheme.space8),
+                  const SizedBox(height: AppTheme.space4),
               itemBuilder: (context, index) {
                 final venue = venues[index];
-                final card = _VenueCard(
+                return _VenueCard(
                   venue: venue,
                   distanceLabel: _distanceLabelForVenue(
                     venue,
@@ -550,22 +449,21 @@ class _VenuesBody extends StatelessWidget {
                   ),
                   onTap: () => onOpenVenue(venue),
                 );
-                return card;
               },
             ),
           ),
         if (onLoadMore != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppTheme.space6,
-                AppTheme.space8,
-                AppTheme.space6,
-                0,
-              ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppTheme.space6,
+              AppTheme.space8,
+              AppTheme.space6,
+              0,
+            ),
+            sliver: SliverToBoxAdapter(
               child: Center(
                 child: PremiumButton(
-                  label: 'LOAD MORE ($totalCount)',
+                  label: 'LOAD MORE',
                   onPressed: onLoadMore,
                   isOutlined: true,
                   isSmall: true,
@@ -579,6 +477,106 @@ class _VenuesBody extends StatelessWidget {
   }
 }
 
+class _BrowseHero extends StatelessWidget {
+  final String query;
+  final int totalCount;
+  final int visibleCount;
+  final TextEditingController searchController;
+  final FocusNode searchFocusNode;
+  final List<String> selectedFilters;
+  final bool hasLocation;
+  final bool requestingLocation;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onUseMyLocation;
+  final ValueChanged<String> onFilterSelected;
+  final VoidCallback onResetFilters;
+
+  const _BrowseHero({
+    required this.query,
+    required this.totalCount,
+    required this.visibleCount,
+    required this.searchController,
+    required this.searchFocusNode,
+    required this.selectedFilters,
+    required this.hasLocation,
+    required this.requestingLocation,
+    required this.onSearchChanged,
+    required this.onUseMyLocation,
+    required this.onFilterSelected,
+    required this.onResetFilters,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GuestHeroCard(
+      eyebrow: 'Venues',
+      title: 'Browse with less noise.',
+      subtitle:
+          'Search faster, filter earlier, and surface what matters first.',
+      footer: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GuestSearchField(
+            controller: searchController,
+            focusNode: searchFocusNode,
+            onChanged: onSearchChanged,
+            hintText: 'Search venues...',
+            trailing: query.isEmpty
+                ? null
+                : PressableScale(
+                    onTap: onResetFilters,
+                    semanticLabel: 'Clear search and filters',
+                    minTouchTargetSize: const Size(32, 32),
+                    child: const Icon(Icons.close_rounded, size: 18),
+                  ),
+          ),
+          const SizedBox(height: AppTheme.space4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final filter in _venueFilters)
+                GuestFilterPill(
+                  label: filter,
+                  selected: selectedFilters.contains(filter),
+                  onTap: () => onFilterSelected(filter),
+                ),
+              GuestFilterPill(
+                label: hasLocation
+                    ? (requestingLocation ? 'Refreshing' : 'Nearby on')
+                    : (requestingLocation ? 'Locating' : 'Use location'),
+                selected: hasLocation,
+                onTap: onUseMyLocation,
+                icon: LucideIcons.mapPin,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.space4),
+          Row(
+            children: [
+              Expanded(
+                child: GuestMetricTile(
+                  icon: Icons.storefront_rounded,
+                  value: '$visibleCount',
+                  label: 'Visible',
+                ),
+              ),
+              const SizedBox(width: AppTheme.space3),
+              Expanded(
+                child: GuestMetricTile(
+                  icon: Icons.layers_outlined,
+                  value: '$totalCount',
+                  label: 'Total',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _VenueBrowseLoadingState extends StatelessWidget {
   const _VenueBrowseLoadingState();
 
@@ -586,9 +584,9 @@ class _VenueBrowseLoadingState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: const [
-        SkeletonLoader(width: double.infinity, height: 240, borderRadius: 24),
+        SkeletonLoader(width: double.infinity, height: 260, borderRadius: 28),
         SizedBox(height: AppTheme.space6),
-        SkeletonLoader(width: double.infinity, height: 240, borderRadius: 24),
+        SkeletonLoader(width: double.infinity, height: 260, borderRadius: 28),
       ],
     );
   }
@@ -609,21 +607,20 @@ class _VenueCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final locality = venue.addressLocality;
 
-    return PressableScale(
+    return GuestSurfaceCard(
       onTap: onTap,
-      semanticLabel: 'View ${venue.name}',
+      padding: EdgeInsets.zero,
+      borderRadius: 28,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AspectRatio(
-            aspectRatio: 4 / 5,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-                border: Border.all(color: AppColors.white5),
-                boxShadow: AppTheme.ambientShadow,
-              ),
-              clipBehavior: Clip.antiAlias,
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            child: SizedBox(
+              height: 188,
+              width: double.infinity,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -631,123 +628,15 @@ class _VenueCard extends StatelessWidget {
                     imageUrl: venue.imageUrl,
                     fit: BoxFit.cover,
                     fallbackIcon: LucideIcons.store,
-                  ),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withValues(alpha: 0.08),
-                            Colors.black.withValues(alpha: 0.24),
-                            Colors.black.withValues(alpha: 0.92),
-                          ],
-                          stops: const [0.0, 0.45, 1.0],
-                        ),
-                      ),
-                    ),
+                    semanticLabel: '${venue.name} photo',
                   ),
                   Positioned(
-                    top: 24,
-                    right: 24,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.42),
-                        borderRadius: BorderRadius.circular(
-                          AppTheme.radiusFull,
-                        ),
-                        border: Border.all(color: AppColors.white10),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(LucideIcons.star, size: 12, color: cs.primary),
-                          const SizedBox(width: 6),
-                          Text(
-                            _ratingLabel(venue),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 32,
-                    right: 32,
-                    bottom: 32,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          venue.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: tt.headlineMedium?.copyWith(
-                            color: Colors.white,
-                            letterSpacing: -1.2,
-                            height: 0.96,
-                          ),
-                        ),
-                        if (venue.isPromoActive &&
-                            venue.promoMessage?.isNotEmpty == true)
-                          Container(
-                            margin: const EdgeInsets.only(top: 10),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: cs.secondary.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(
-                                AppTheme.radiusMd,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  LucideIcons.tag,
-                                  size: 12,
-                                  color: cs.onSecondary,
-                                ),
-                                const SizedBox(width: 6),
-                                Flexible(
-                                  child: Text(
-                                    venue.promoMessage!,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: tt.labelSmall?.copyWith(
-                                      color: cs.onSecondary,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            if (venue.canAcceptGuestOrders)
-                              const _VenueMetaPill(label: 'ORDERING'),
-                            if (venue.priceLevelLabel != null)
-                              _VenueMetaPill(label: venue.priceLevelLabel!),
-                            if (distanceLabel != null)
-                              _VenueMetaPill(label: distanceLabel!),
-                          ],
-                        ),
-                      ],
+                    top: 14,
+                    right: 14,
+                    child: GuestMetaPill(
+                      label: _ratingLabel(venue),
+                      icon: Icons.star_rounded,
+                      emphasized: true,
                     ),
                   ),
                 ],
@@ -755,152 +644,82 @@ class _VenueCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTheme.space4,
-              vertical: AppTheme.space4,
-            ),
-            child: Row(
+            padding: const EdgeInsets.all(AppTheme.space4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  LucideIcons.messageSquare,
-                  size: 14,
-                  color: AppColors.white40,
+                Text(
+                  venue.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: tt.headlineSmall?.copyWith(height: 1.08),
                 ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'View details',
+                if (locality != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    locality,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.white40,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2.2,
+                    style: tt.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.8),
                     ),
                   ),
+                ],
+                const SizedBox(height: AppTheme.space4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    GuestMetaPill(
+                      label: venue.canAcceptGuestOrders
+                          ? 'Ordering'
+                          : venue.guestAvailabilityLabel,
+                      emphasized: venue.canAcceptGuestOrders,
+                    ),
+                    if (venue.priceLevelLabel != null)
+                      GuestMetaPill(label: venue.priceLevelLabel!),
+                    if (distanceLabel != null)
+                      GuestMetaPill(label: distanceLabel!),
+                  ],
                 ),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.white5,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                if (venue.isPromoActive &&
+                    venue.promoMessage?.isNotEmpty == true) ...[
+                  const SizedBox(height: AppTheme.space4),
+                  Text(
+                    venue.promoMessage!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: tt.bodySmall?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  child: Icon(
-                    LucideIcons.chevronRight,
-                    size: 20,
-                    color: cs.onSurfaceVariant,
-                  ),
+                ],
+                const SizedBox(height: AppTheme.space4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        venue.guestAvailabilityReason,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.78),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.space3),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 22,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _VenueMetaPill extends StatelessWidget {
-  final String label;
-
-  const _VenueMetaPill({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-        border: Border.all(color: AppColors.white10),
-      ),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 2.0,
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyVenuesState extends StatelessWidget {
-  final VoidCallback onResetFilters;
-
-  const _EmptyVenuesState({required this.onResetFilters});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.space6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: AppColors.white5,
-                borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
-              ),
-              child: Icon(
-                LucideIcons.search,
-                size: 44,
-                color: cs.onSurfaceVariant.withValues(alpha: 0.22),
-              ),
-            ),
-            const SizedBox(height: AppTheme.space6),
-            Text('No Venues Found', style: tt.headlineMedium),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters.',
-              textAlign: TextAlign.center,
-              style: tt.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.55),
-              ),
-            ),
-            const SizedBox(height: AppTheme.space8),
-            PressableScale(
-              onTap: onResetFilters,
-              semanticLabel: 'Reset filters',
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.space8,
-                  vertical: AppTheme.space5,
-                ),
-                decoration: BoxDecoration(
-                  color: cs.primary,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-                  boxShadow: [
-                    BoxShadow(
-                      color: cs.primary.withValues(alpha: 0.22),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  'RESET FILTERS',
-                  style: TextStyle(
-                    color: cs.onPrimary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2.6,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -15,7 +15,10 @@ import 'venue_routes.dart';
 /// Optional table parameter: `?t=12`
 final appRouter = GoRouter(
   initialLocation: '/',
-  refreshListenable: AppBootstrapService.instance,
+  refreshListenable: Listenable.merge([
+    AppBootstrapService.instance,
+    AuthRepository.instance,
+  ]),
   redirect: (context, state) {
     final bootstrap = AppBootstrapService.instance;
     if (!bootstrap.isReady) {
