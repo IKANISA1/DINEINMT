@@ -1,6 +1,7 @@
 import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
 import 'package:dinein_app/core/providers/providers.dart';
+import 'package:dinein_app/core/providers/bell_providers.dart';
 import 'package:dinein_app/features/venue/dashboard/venue_dashboard_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -103,6 +104,10 @@ void main() {
           menuItemsProvider(
             venue.id,
           ).overrideWith((ref) async => menuItems ?? testMenuItems),
+        if (venue != null)
+          pendingWavesProvider(
+            venue.id,
+          ).overrideWith((ref) => Stream.value(const [])),
       ],
       child: const MaterialApp(home: Scaffold(body: VenueDashboardScreen())),
     );
@@ -155,8 +160,8 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    expect(find.text('MANAGE MENU'), findsOneWidget);
-    expect(find.text('ADD MENU'), findsOneWidget);
+    expect(find.text('Manage menu'), findsOneWidget);
+    expect(find.text('Add item'), findsOneWidget);
   });
 
   testWidgets('renders recent order cards with table numbers', (tester) async {
@@ -205,7 +210,7 @@ void main() {
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
     expect(find.text('ACCEPTING ORDERS'), findsOneWidget);
-    expect(find.text('LIVE'), findsOneWidget);
+    expect(find.text('Live'), findsOneWidget);
   });
 
   testWidgets('shows OFF label for browse-only venue', (tester) async {
@@ -234,7 +239,7 @@ void main() {
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
     expect(find.text('ORDERING DISABLED'), findsOneWidget);
-    expect(find.text('OFF'), findsOneWidget);
+    expect(find.text('Paused'), findsOneWidget);
   });
 
   // ─── Empty Orders State ───

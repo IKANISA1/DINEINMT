@@ -8,7 +8,6 @@ void main() {
       expect(CountryConfig.mt.country, Country.mt);
       expect(CountryConfig.mt.playStoreId, 'com.dineinmalta.app');
       expect(CountryConfig.mt.privacyPolicyUrl, 'https://dineinmt.ikanisa.com/privacy');
-      expect(CountryConfig.mt.hasBioPay, isFalse);
       expect(CountryConfig.mt.hasRevolut, isTrue);
       expect(CountryConfig.mt.hasMomo, isFalse);
       expect(CountryConfig.mt.playStoreUrl, contains(CountryConfig.mt.playStoreId));
@@ -21,7 +20,6 @@ void main() {
       expect(CountryConfig.rw.country, Country.rw);
       expect(CountryConfig.rw.playStoreId, 'com.dineinrw.app');
       expect(CountryConfig.rw.privacyPolicyUrl, 'https://dineinrw.ikanisa.com/privacy');
-      expect(CountryConfig.rw.hasBioPay, isTrue);
       expect(CountryConfig.rw.hasRevolut, isFalse);
       expect(CountryConfig.rw.hasMomo, isTrue);
       expect(CountryConfig.rw.momoUssdCode, '*182*8*1#');

@@ -77,6 +77,27 @@ void main() {
       expect(repo.hasVenueAccess, isTrue);
     });
 
+    test('restoreVenueSession clears expired session from storage', () async {
+      final expiredSession = VenueAccessSession(
+        venueId: 'v1',
+        venueName: 'Test Venue',
+        whatsAppNumber: '1234567890',
+        accessToken: 'token-123',
+        issuedAt: DateTime.now().subtract(const Duration(days: 2)),
+        expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
+      );
+      FlutterSecureStorage.setMockInitialValues({
+        'dinein.venue_session': jsonEncode(expiredSession.toJson()),
+      });
+
+      await repo.restoreVenueSession();
+
+      expect(repo.currentVenueSession, isNull);
+      expect(repo.hasVenueAccess, isFalse);
+      final storage = const FlutterSecureStorage();
+      expect(await storage.read(key: 'dinein.venue_session'), isNull);
+    });
+
     test(
       'ensureVenueSession restores from storage when memory is cold',
       () async {
@@ -128,6 +149,27 @@ void main() {
       expect(repo.currentAdminSession, isNotNull);
       expect(repo.currentAdminSession!.adminUserId, 'a1');
       expect(repo.hasAdminAccess, isTrue);
+    });
+
+    test('restoreAdminSession clears expired session from storage', () async {
+      final expiredAdminSession = AdminAccessSession(
+        adminUserId: 'a1',
+        displayName: 'Test Admin',
+        whatsAppNumber: '0987654321',
+        accessToken: 'admin-token',
+        issuedAt: DateTime.now().subtract(const Duration(days: 2)),
+        expiresAt: DateTime.now().subtract(const Duration(minutes: 1)),
+      );
+      FlutterSecureStorage.setMockInitialValues({
+        'dinein.admin_session': jsonEncode(expiredAdminSession.toJson()),
+      });
+
+      await repo.restoreAdminSession();
+
+      expect(repo.currentAdminSession, isNull);
+      expect(repo.hasAdminAccess, isFalse);
+      final storage = const FlutterSecureStorage();
+      expect(await storage.read(key: 'dinein.admin_session'), isNull);
     });
 
     test(

@@ -27,14 +27,9 @@ void main() {
   ) async {
     await pumpSettingsScreen(tester);
 
-    // Header
     expect(find.text('Settings'), findsOneWidget);
-    expect(
-      find.text('Global administrative profile and account controls.'),
-      findsOneWidget,
-    );
+    expect(find.text('Console profile and account controls.'), findsOneWidget);
 
-    // Admin account card
     expect(find.text('Administrator Account'), findsOneWidget);
     expect(find.text('Full system access granted.'), findsOneWidget);
 
@@ -45,11 +40,9 @@ void main() {
   testWidgets('admin settings renders sign out button', (tester) async {
     await pumpSettingsScreen(tester);
 
-    // Sign out button
-    final signOutFinder = find.text('Sign Out of Console');
+    final signOutFinder = find.text('Sign out');
     expect(signOutFinder, findsOneWidget);
 
-    // The sign out button should be inside a PressableScale
     expect(
       find.ancestor(
         of: signOutFinder,
@@ -65,8 +58,7 @@ void main() {
   testWidgets('admin settings renders version footer', (tester) async {
     await pumpSettingsScreen(tester);
 
-    // Version string in footer
-    expect(find.text('DINEIN PWA v1.0.0'), findsOneWidget);
+    expect(find.text('DineIn PWA v1.0.0'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle();

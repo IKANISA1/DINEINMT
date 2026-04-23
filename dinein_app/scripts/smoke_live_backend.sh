@@ -77,7 +77,7 @@ PY
 
 supabase_url="${SUPABASE_URL:-$(extract_release_value SUPABASE_URL)}"
 supabase_anon_key="${SUPABASE_ANON_KEY:-$(extract_release_value SUPABASE_ANON_KEY)}"
-functions_url="${supabase_url%/}/functions/v1/dinein-api"
+functions_base_url="${supabase_url%/}/functions/v1"
 
 derive_project_ref_from_url() {
   python3 - "$1" <<'PY'
@@ -110,11 +110,53 @@ fail() {
   exit 1
 }
 
+extract_action() {
+  local payload="$1"
+  python3 - "$payload" <<'PY'
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+action = payload.get("action")
+if not action:
+    raise SystemExit("request payload is missing action")
+print(action)
+PY
+}
+
+edge_function_for_action() {
+  local action="$1"
+  case "$action" in
+    health|create_profile|get_user_role|track_guest_event)
+      printf 'core-api\n'
+      ;;
+    get_menu_items|get_menu_item_by_id|toggle_menu_item_availability|create_menu_item|update_menu_item|delete_menu_item|set_menu_item_highlights|ingest_menu_document|generate_menu_item_image|backfill_menu_images|audit_menu_item_images|upload_menu_item_image|image_health)
+      printf 'menu-api\n'
+      ;;
+    get_venues|get_all_venues|create_venue|get_venue_by_slug|get_venue_by_id|get_venue_for_owner|update_venue|enrich_venue_profile|backfill_venue_profiles|generate_venue_profile_image|backfill_venue_profile_images|get_venue_notification_settings|update_venue_notification_settings|register_push_device|unregister_push_device|send_wave|get_bell_requests|resolve_bell_request|search_google_maps)
+      printf 'venue-api\n'
+      ;;
+    place_order|get_orders_for_venue|get_orders_for_user|get_all_orders|get_admin_dashboard_kpis|get_order_by_id|issue_order_realtime_access|update_order_status|mark_order_paid)
+      printf 'orders-api\n'
+      ;;
+    get_admin_menu_queue|get_admin_menu_catalog|get_admin_menu_group_assignments|create_admin_menu_groups|assign_admin_menu_group|delete_admin_menu_group)
+      printf 'admin-api\n'
+      ;;
+    *)
+      printf 'Unsupported smoke-check action: %s\n' "$action" >&2
+      return 1
+      ;;
+  esac
+}
+
 call_api() {
   local payload="$1"
+  local action function_name
+  action="$(extract_action "${payload}")"
+  function_name="$(edge_function_for_action "${action}")"
   curl -sS \
     -X POST \
-    "${functions_url}" \
+    "${functions_base_url}/${function_name}" \
     -H "apikey: ${supabase_anon_key}" \
     -H 'Content-Type: application/json' \
     --data "${payload}" \
@@ -224,11 +266,11 @@ run_check() {
 
 echo "Live backend smoke check"
 echo "Project ref: ${project_ref}"
-echo "Functions URL: ${functions_url}"
+echo "Functions base URL: ${functions_base_url}"
 echo
 
 run_check 'health' '{"action":"health"}' '200' 'health' >/dev/null
-pass 'dinein-api health endpoint returned ok'
+pass 'core-api health endpoint returned ok'
 
 venue_meta="$(run_check \
   'get_venues' \

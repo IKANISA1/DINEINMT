@@ -104,7 +104,7 @@ void main() {
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
     expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('VENUE MANAGEMENT'), findsOneWidget);
+    expect(find.text('Venue tools'), findsOneWidget);
   });
 
   testWidgets('renders venue configuration tiles', (tester) async {
@@ -115,7 +115,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    expect(find.text('VENUE CONFIGURATION'), findsOneWidget);
+    expect(find.text('Venue'), findsOneWidget);
     expect(find.text('Venue Profile'), findsOneWidget);
     expect(find.text('Venue QR Codes'), findsOneWidget);
     expect(find.text('WiFi Sharing'), findsOneWidget);
@@ -129,7 +129,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    expect(find.text('PREFERENCES & SAFETY'), findsOneWidget);
+    expect(find.text('Preferences'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
     expect(find.text('Language & Region'), findsOneWidget);
     expect(find.text('Legal & Policies'), findsOneWidget);
@@ -143,7 +143,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    expect(find.text('SIGN OUT'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
   });
 
   testWidgets('displays venue name in manager card when no user metadata',

@@ -6,6 +6,7 @@ import 'package:dinein_app/main.dart';
 import 'package:ui/widgets/brand_mark.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,6 +15,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
     AppBootstrapService.instance.resetForTest();
     appRouter.goNamed(AppRouteNames.splash);
   });

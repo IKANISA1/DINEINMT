@@ -1,39 +1,11 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# core_pkg
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
+## Responsibility
+The `core_pkg` acts as the foundational cross-cutting package for the DineIn mono-repo. It is intentionally free of any visual UI logic or data-access models.
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
-
-## Features
-
-TODO: List what your package can do. Maybe include images, gifs, or videos.
-
-## Getting started
-
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+## Boundaries
+- **In-Scope**: Shared utilities, Enums, configuration values (e.g. `CountryConfig`), cross-platform deep-linking strings, and base constants.
+- **Out-of-Scope**: Database clients, Flutter Widgets, UI tokens (colors, fonts), and specific business implementations such as order flow handlers.
 
 ## Usage
-
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
-```dart
-const like = 'sample';
-```
-
-## Additional information
-
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+Import constants or enums from `core_pkg` to enforce a single source of truth across `db_pkg`, `ui_pkg`, and the guest, venue, and admin surfaces inside `dinein_app`.

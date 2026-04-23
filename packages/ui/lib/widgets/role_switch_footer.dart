@@ -274,7 +274,7 @@ class _MobileAppDownloadCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$appTitle on Google Play for BioPay, face scan, and device-only features.',
+                        '$appTitle on Google Play for device-only features and better performance.',
                         style: tt.bodySmall?.copyWith(
                           color: cs.onSurfaceVariant,
                           height: 1.35,

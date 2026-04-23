@@ -1,11 +1,5 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:core_pkg/config/country_runtime.dart';
-import '../../features/biopay/biopay_route_surface_native.dart'
-    if (dart.library.js_interop) '../../features/biopay/biopay_route_surface_web.dart'
-    deferred as biopaysurface;
 import '../../features/guest/cart/cart_screen.dart' deferred as cartscreen;
 import '../../features/guest/discover/discover_screen.dart'
     deferred as discoverscreen;
@@ -31,18 +25,6 @@ import '../../features/guest/venues/venues_browse_screen.dart'
 import 'app_routes.dart';
 import 'deferred_widget.dart';
 import 'route_helpers.dart';
-
-String? _biopayGuard(BuildContext context, GoRouterState state) {
-  return !kIsWeb && CountryRuntime.config.biopayEnabled
-      ? null
-      : AppRoutePaths.guestSettings;
-}
-
-String? _biopayConfirmGuard(BuildContext context, GoRouterState state) {
-  final marketRedirect = _biopayGuard(context, state);
-  if (marketRedirect != null) return marketRedirect;
-  return state.extra != null ? null : AppRoutePaths.guestSettings;
-}
 
 final List<RouteBase> guestRoutes = [
   GoRoute(
@@ -112,18 +94,6 @@ final List<RouteBase> guestRoutes = [
           DeferredWidget(
             libraryLoader: guestsettingsscreen.loadLibrary,
             createWidget: (_) => guestsettingsscreen.GuestSettingsScreen(),
-          ),
-        ),
-      ),
-      GoRoute(
-        path: AppRoutePaths.biopayHome,
-        name: AppRouteNames.biopayHome,
-        redirect: _biopayGuard,
-        pageBuilder: (context, state) => buildFadeSlidePage(
-          state,
-          DeferredWidget(
-            libraryLoader: biopaysurface.loadLibrary,
-            createWidget: (_) => biopaysurface.BiopayHomeScreen(),
           ),
         ),
       ),
@@ -232,70 +202,5 @@ final List<RouteBase> guestRoutes = [
         ],
       ),
     ],
-  ),
-  // ─── BioPay Full-Screen Routes (outside shell) ───
-  GoRoute(
-    path: AppRoutePaths.biopayRegister,
-    name: AppRouteNames.biopayRegister,
-    redirect: _biopayGuard,
-    pageBuilder: (context, state) => buildFadeSlidePage(
-      state,
-      DeferredWidget(
-        libraryLoader: biopaysurface.loadLibrary,
-        createWidget: (_) => biopaysurface.BiopayRegisterScreen(),
-      ),
-    ),
-  ),
-  GoRoute(
-    path: AppRoutePaths.biopayScanner,
-    name: AppRouteNames.biopayScanner,
-    redirect: _biopayGuard,
-    pageBuilder: (context, state) => buildFadeSlidePage(
-      state,
-      DeferredWidget(
-        libraryLoader: biopaysurface.loadLibrary,
-        createWidget: (_) => biopaysurface.BiopayScannerScreen(),
-      ),
-    ),
-  ),
-  GoRoute(
-    path: AppRoutePaths.biopayConfirm,
-    name: AppRouteNames.biopayConfirm,
-    redirect: _biopayConfirmGuard,
-    pageBuilder: (context, state) {
-      final matchResult = state.extra;
-      return buildFadeSlidePage(
-        state,
-        DeferredWidget(
-          libraryLoader: biopaysurface.loadLibrary,
-          createWidget: (_) =>
-              biopaysurface.BiopayConfirmScreen(matchResult: matchResult),
-        ),
-      );
-    },
-  ),
-  GoRoute(
-    path: AppRoutePaths.biopayReEnroll,
-    name: AppRouteNames.biopayReEnroll,
-    redirect: _biopayGuard,
-    pageBuilder: (context, state) => buildFadeSlidePage(
-      state,
-      DeferredWidget(
-        libraryLoader: biopaysurface.loadLibrary,
-        createWidget: (_) => biopaysurface.BiopayReEnrollScreen(),
-      ),
-    ),
-  ),
-  GoRoute(
-    path: AppRoutePaths.biopayManage,
-    name: AppRouteNames.biopayManage,
-    redirect: _biopayGuard,
-    pageBuilder: (context, state) => buildFadeSlidePage(
-      state,
-      DeferredWidget(
-        libraryLoader: biopaysurface.loadLibrary,
-        createWidget: (_) => biopaysurface.BiopayManageScreen(),
-      ),
-    ),
   ),
 ];

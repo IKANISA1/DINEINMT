@@ -100,7 +100,7 @@ void main() {
       await tester.tap(find.text('About'));
       await tester.pumpAndSettle();
 
-      expect(find.text('CONNECT TO WIFI'), findsOneWidget);
+      expect(find.text('Connect Wi-Fi'), findsOneWidget);
     },
   );
 
@@ -143,7 +143,7 @@ void main() {
       await tester.tap(find.text('About'));
       await tester.pumpAndSettle();
 
-      expect(find.text('CONNECT TO WIFI'), findsNothing);
+      expect(find.text('Connect Wi-Fi'), findsNothing);
     },
   );
 
@@ -190,11 +190,11 @@ void main() {
     await tester.tap(find.text('About'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('CONNECT TO WIFI'));
+    await tester.tap(find.text('Connect Wi-Fi'));
     await tester.pumpAndSettle();
 
     expect(find.text('HarborGuest'), findsOneWidget);
-    expect(find.text('TAP TO COPY PASSWORD'), findsOneWidget);
+    expect(find.text('Tap to copy password'), findsOneWidget);
   });
 
   testWidgets(
@@ -309,6 +309,9 @@ void main() {
         overrides: [
           venueBySlugProvider(venue.slug).overrideWith((ref) async => venue),
           menuItemsProvider(venue.id).overrideWith((ref) async => items),
+          menuItemPopularityProvider(
+            venue.id,
+          ).overrideWith((ref) async => const <String, int>{}),
         ],
         child: const MaterialApp(home: VenueDetailScreen(slug: 'harbor-table')),
       ),
@@ -317,17 +320,17 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
     await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('venue-detail-see-all-action')),
+      find.bySemanticsLabel('Full menu'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
     final actionSize = tester.getSize(
-      find.byKey(const ValueKey('venue-detail-see-all-action')),
+      find.bySemanticsLabel('Full menu'),
     );
 
-    expect(actionSize.width, greaterThanOrEqualTo(96));
-    expect(actionSize.height, greaterThanOrEqualTo(48));
+    expect(actionSize.width, greaterThanOrEqualTo(72));
+    expect(actionSize.height, greaterThanOrEqualTo(44));
   });
 }

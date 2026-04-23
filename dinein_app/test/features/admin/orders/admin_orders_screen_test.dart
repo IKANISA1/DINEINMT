@@ -83,16 +83,11 @@ void main() {
   ) async {
     await pumpOrdersScreen(tester, orders: buildOrders());
 
-    // Verify the header renders
     expect(find.text('Orders'), findsWidgets);
-
-    // Verify the order data is visible — at least one order card with venue name
     expect(find.text('Harbor Table'), findsWidgets);
-
-    // Verify 3-column stats grid labels (rendered via .toUpperCase())
-    expect(find.text('ACTIVE'), findsOneWidget);
-    expect(find.text('COMPLETED'), findsOneWidget);
-    expect(find.text('ISSUES'), findsOneWidget);
+    expect(find.text('Active'), findsOneWidget);
+    expect(find.text('Completed'), findsOneWidget);
+    expect(find.text('Issues'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));
@@ -107,7 +102,6 @@ void main() {
       config: CountryConfig.rw,
     );
 
-    // With no orders, the empty state should be visible
     final hasEmptyState = find.byType(EmptyState).evaluate().isNotEmpty;
     final hasZeroText = find.text('0').evaluate().isNotEmpty;
     final hasNoOrders = find.text('No orders').evaluate().isNotEmpty;
@@ -141,7 +135,6 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Error state rendering
     expect(find.byType(ErrorState), findsOneWidget);
     expect(find.text('Could not load orders.'), findsOneWidget);
 

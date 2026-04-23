@@ -32,7 +32,7 @@ void main() {
       expect(taps, 0);
     });
 
-    testWidgets('StatusBadge renders its uppercase label', (
+    testWidgets('StatusBadge renders its label', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -44,7 +44,7 @@ void main() {
         ),
       );
 
-      expect(find.text('READY'), findsOneWidget);
+      expect(find.text('Ready'), findsOneWidget);
     });
   });
 }

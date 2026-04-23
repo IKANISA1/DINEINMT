@@ -304,6 +304,10 @@ class MenuRepository {
   /// Uses a Postgres RPC function for efficient aggregation without
   /// transferring full order payloads to the client.
   Future<Map<String, int>> getVenueItemPopularity(String venueId) async {
+    if (!SupabaseConfig.isInitialized) {
+      return const {};
+    }
+
     try {
       final response =
           await SupabaseConfig.client.rpc(

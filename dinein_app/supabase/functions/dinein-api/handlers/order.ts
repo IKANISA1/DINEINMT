@@ -303,7 +303,7 @@ export async function handlePlaceOrder(
     await dispatchVenueOperationalAlert(
       supabase,
       venueId,
-      buildNewOrderPushNotification(orderData),
+      buildNewOrderPushNotification(orderData, stringValue(venue.country)),
     );
   } catch (error) {
     console.error("[dinein-api] order push dispatch failed", error);

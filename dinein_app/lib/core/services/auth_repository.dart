@@ -25,7 +25,7 @@ class AuthRepository extends ChangeNotifier {
 
   static const _venueSessionKey = 'dinein.venue_session';
   static const _adminSessionKey = 'dinein.admin_session';
-  static const _secureStorageTimeout = Duration(seconds: 2);
+  static const _secureStorageTimeout = Duration(seconds: 1);
   static const _secureStorage = FlutterSecureStorage();
 
   VenueAccessSession? _venueSession;
@@ -55,7 +55,10 @@ class AuthRepository extends ChangeNotifier {
     );
   }
 
-  /// Sign out.
+  /// Sign out and completely expunge all sessions.
+  /// 
+  /// This strictly nullifies memory references before clearing local storage 
+  /// to ensure no stale artifacts survive.
   Future<void> signOut() async {
     final client = _clientOrNull;
     if (client != null) {
@@ -70,6 +73,8 @@ class AuthRepository extends ChangeNotifier {
         );
       }
     }
+    _venueSession = null;
+    _adminSession = null;
     await clearVenueSession();
     await clearAdminSession();
   }
@@ -88,6 +93,11 @@ class AuthRepository extends ChangeNotifier {
   bool get isAuthenticated => currentUser != null;
 
   /// Current persisted venue-owner session.
+  ///
+  /// **Lifecycle & Ownership**:
+  /// This token exclusively grants venue-level data access to a single specific venue.
+  /// The token is valid until its internal `expiresAt` timestamp is reached, at which 
+  /// point this getter automatically rejects it as invalid.
   VenueAccessSession? get currentVenueSession {
     final session = _venueSession;
     if (session == null || session.isExpired) {
@@ -103,6 +113,10 @@ class AuthRepository extends ChangeNotifier {
   bool get hasVenueAccess => hasVenueSession;
 
   /// Current persisted admin console session.
+  ///
+  /// **Lifecycle & Ownership**:
+  /// This token grants root-level admin portal access. It strictly expires 
+  /// after its designated lifetime, automatically evaluating to null once expired.
   AdminAccessSession? get currentAdminSession {
     final session = _adminSession;
     if (session == null || session.isExpired) {

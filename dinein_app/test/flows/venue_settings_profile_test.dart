@@ -89,10 +89,10 @@ void main() {
 
       // Page header
       expect(find.text('Settings'), findsOneWidget);
-      expect(find.text('VENUE MANAGEMENT'), findsOneWidget);
+      expect(find.text('Venue tools'), findsOneWidget);
 
       // First section header
-      expect(find.text('VENUE CONFIGURATION'), findsOneWidget);
+      expect(find.text('Venue'), findsOneWidget);
 
       // Key tiles in the first section
       expect(find.text('Venue Profile'), findsOneWidget);

@@ -51,3 +51,5 @@ coverage/
 # Local tooling caches
 .wrangler/
 dinein_app/test_output.txt
+dinein_app/supabase/.temp/
+dinein_app/supabase/.branches/

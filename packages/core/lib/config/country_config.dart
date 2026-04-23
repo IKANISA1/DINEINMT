@@ -24,7 +24,6 @@ class CountryConfig {
   final String privacyPolicyUrl;
   final String? revolutMerchant;
   final String? momoUssdCode;
-  final bool biopayEnabled;
   final int localPhoneLength;
 
   const CountryConfig({
@@ -46,7 +45,6 @@ class CountryConfig {
     required this.privacyPolicyUrl,
     this.revolutMerchant,
     this.momoUssdCode,
-    this.biopayEnabled = false,
     required this.localPhoneLength,
   }) : adminAccessWhatsApp = adminAccessWhatsApp ?? supportWhatsApp,
        venueAccessWhatsApp = venueAccessWhatsApp ?? supportWhatsApp,
@@ -85,7 +83,6 @@ class CountryConfig {
     welcomeMessage: 'WELCOME TO DINEIN MALTA',
     privacyPolicyUrl: 'https://dineinmt.ikanisa.com/privacy',
     revolutMerchant: 'dineinmalta',
-    biopayEnabled: false,
     localPhoneLength: 8,
   );
 
@@ -108,7 +105,6 @@ class CountryConfig {
     welcomeMessage: 'WELCOME TO DINEIN RW',
     privacyPolicyUrl: 'https://dineinrw.ikanisa.com/privacy',
     momoUssdCode: '*182*8*1#', // MTN MoMo Rwanda
-    biopayEnabled: true,
     localPhoneLength: 9,
   );
 
@@ -125,9 +121,6 @@ class CountryConfig {
 
   /// Whether this country uses MoMo USSD.
   bool get hasMomo => momoUssdCode != null;
-
-  /// Whether this country has BioPay face-payment enabled.
-  bool get hasBioPay => biopayEnabled;
 
   /// Whether direct WhatsApp support is configured for this country.
   bool get hasWhatsAppSupport => supportWhatsApp.trim().isNotEmpty;

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -153,15 +152,6 @@ class GuestSettingsScreen extends ConsumerWidget {
             subtitle: 'Recent orders',
             onTap: () => context.goNamed(AppRouteNames.orderHistory),
           ),
-          if (config.hasBioPay && !kIsWeb) ...[
-            const SizedBox(height: AppTheme.space3),
-            _SettingsTile(
-              icon: LucideIcons.scanFace,
-              title: 'BioPay',
-              subtitle: 'Face pay',
-              onTap: () => context.goNamed(AppRouteNames.biopayHome),
-            ),
-          ],
           const SizedBox(height: AppTheme.space5),
           const GuestSectionHeader(
             title: 'Support and privacy',

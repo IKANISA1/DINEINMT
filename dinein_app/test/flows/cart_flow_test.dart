@@ -58,7 +58,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
-    await tester.tap(find.text('Table #'));
+    await tester.tap(find.text('Table'));
     await tester.pumpAndSettle();
 
     final tableField = find.byType(TextField).first;

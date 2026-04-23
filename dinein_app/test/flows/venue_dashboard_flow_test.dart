@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:core_pkg/constants/enums.dart';
 import 'package:db_pkg/models/models.dart';
+import 'package:dinein_app/core/providers/bell_providers.dart';
 import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/features/venue/dashboard/venue_dashboard_screen.dart';
 import 'package:flutter/material.dart';
@@ -71,6 +72,9 @@ void main() {
             venue.id,
           ).overrideWith((ref) => Stream.value(orders)),
           menuItemsProvider(venue.id).overrideWith((ref) async => menuItems),
+          pendingWavesProvider(
+            venue.id,
+          ).overrideWith((ref) => Stream.value(const [])),
         ],
         child: const MaterialApp(home: Scaffold(body: VenueDashboardScreen())),
       ),
@@ -83,8 +87,8 @@ void main() {
     expect(find.text('Dashboard'), findsOneWidget);
 
     // Quick actions match current UI
-    expect(find.text('MANAGE MENU'), findsOneWidget);
-    expect(find.text('ADD MENU'), findsOneWidget);
+    expect(find.text('Manage menu'), findsOneWidget);
+    expect(find.text('Add item'), findsOneWidget);
 
     // Section headers
     expect(find.text('Recent Orders'), findsOneWidget);
@@ -119,6 +123,9 @@ void main() {
             menuItemsProvider(
               venue.id,
             ).overrideWith((ref) => const <MenuItem>[]),
+            pendingWavesProvider(
+              venue.id,
+            ).overrideWith((ref) => Stream.value(const [])),
           ],
           child: const MaterialApp(
             home: Scaffold(body: VenueDashboardScreen()),
@@ -130,7 +137,7 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 1));
 
       expect(find.text('ORDERING DISABLED'), findsOneWidget);
-      expect(find.text('OFF'), findsOneWidget);
+      expect(find.text('Paused'), findsOneWidget);
     },
   );
 }

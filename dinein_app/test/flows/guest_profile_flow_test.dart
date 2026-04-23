@@ -72,12 +72,14 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
 
     expect(find.text('Guest'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
     expect(find.text('WELCOME TO DINEIN MALTA'), findsOneWidget);
-    expect(find.text('Order History'), findsOneWidget);
-    expect(find.text('VIEW YOUR PAST ORDERS'), findsOneWidget);
+    expect(find.text('Order history'), findsOneWidget);
+    expect(find.text('Recent orders'), findsOneWidget);
     expect(find.text('Get in Touch'), findsOneWidget);
-    expect(find.text('About DINEIN'), findsOneWidget);
+    expect(find.text('About DineIn'), findsOneWidget);
     expect(find.text('Privacy Policy'), findsOneWidget);
+    expect(find.text('Delete my data'), findsOneWidget);
     expect(find.text('Discover Venues'), findsNothing);
     expect(find.text('Terms & Conditions'), findsNothing);
     expect(find.text('SIGN OUT'), findsNothing);
@@ -96,8 +98,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    await tester.ensureVisible(find.text('Order History'));
-    await tester.tap(find.text('Order History'));
+    await tester.ensureVisible(find.text('Order history'));
+    await tester.tap(find.text('Order history'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 

@@ -281,18 +281,64 @@ jobs:
           SUPABASE_URL: https://mock.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: mock-key
           SUPABASE_ANON_KEY: mock-anon-key
-          BIOPAY_OWNER_TOKEN_SECRET: mock-biopay-secret
-          BIOPAY_MANAGE_CODE_PEPPER: mock-biopay-pepper
-          BIOPAY_RATE_LIMIT_SECRET: mock-rate-limit-secret
           DINEIN_ADMIN_SESSION_SECRET: mock-admin-secret
           DINEIN_VENUE_SESSION_SECRET: mock-venue-secret
         run: |
-          deno test --allow-all biopay-api/index_test.ts
-          deno test --allow-all dinein-api/index_test.ts
           deno test --allow-all whatsapp-otp/index_test.ts
+          deno test --allow-all _shared/admin-profile_test.ts
+          deno test --allow-all _shared/http_test.ts
+          deno test --allow-all _shared/menu-image_test.ts
+          deno test --allow-all _shared/menu-item-context_test.ts
+          deno test --allow-all _shared/phone_test.ts
+          deno test --allow-all _shared/signed-jwt_test.ts
           deno test --allow-all _shared/venue-profile-image_test.ts
           deno test --allow-all _shared/gemini-image-config_test.ts
-          deno test --allow-all dinein-api/security_test.ts
+          deno test --allow-all _shared/google-places_test.ts
+          deno test --allow-all _shared/whatsapp_test.ts
+          deno test --allow-all split_api_dispatch_test.ts
+          deno test --allow-all split_api_entrypoint_test.ts
+          cd dinein-api
+          deno test --allow-all
+          cd ..
+          deno check whatsapp-otp/index.ts
+          deno check dinein-api/index.ts
+          deno check dinein-api/core.ts
+          deno check dinein-api/domains/*.ts
+          deno check core-api/index.ts
+          deno check menu-api/index.ts
+          deno check venue-api/index.ts
+          deno check orders-api/index.ts
+          deno check admin-api/index.ts
+
+  supabase-local-reset:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dinein_app
+    env:
+      SUPABASE_TELEMETRY_DISABLED: 1
+      DO_NOT_TRACK: 1
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify Docker is available
+        run: docker version
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Verify migrations reset cleanly
+        run: supabase db reset --local
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop --no-backup
 
   shared-packages:
     runs-on: ubuntu-latest

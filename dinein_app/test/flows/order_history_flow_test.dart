@@ -25,10 +25,9 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.textContaining('ORDER'), findsOneWidget);
-    expect(find.textContaining('HISTORY'), findsOneWidget);
+    expect(find.text('Track every table visit'), findsOneWidget);
     expect(find.text('No orders yet'), findsOneWidget);
-    expect(find.text('DISCOVER VENUES'), findsOneWidget);
+    expect(find.text('Browse venues'), findsOneWidget);
   });
 
   testWidgets('order history renders venue-led order cards', (tester) async {

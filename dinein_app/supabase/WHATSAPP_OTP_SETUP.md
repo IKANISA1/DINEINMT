@@ -80,17 +80,20 @@ This should be disabled when testing ends.
 
 ## Deployment
 
-Deploy the functions to **both** projects:
+Deploy the auth surface to **both** projects:
 
 ```bash
 # ── Rwanda (RW) — project ref: kczghhipbyykluuiiunp ──
 supabase functions deploy whatsapp-otp --project-ref kczghhipbyykluuiiunp
-supabase functions deploy dinein-api   --project-ref kczghhipbyykluuiiunp
 
 # ── Malta (MT) — project ref: uskfnszcdqpcfrhjxitl ──
 supabase functions deploy whatsapp-otp --project-ref uskfnszcdqpcfrhjxitl
-supabase functions deploy dinein-api   --project-ref uskfnszcdqpcfrhjxitl
 ```
+
+Deploy `core-api`, `venue-api`, `menu-api`, `orders-api`, and `admin-api`
+through the backend release flow described in `supabase/README.md`. `dinein-api`
+is deprecated and should only be deployed for explicitly supported legacy
+compatibility.
 
 Apply migrations (link to the target project first):
 

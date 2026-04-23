@@ -41,7 +41,7 @@
         {
             "name": "Discover venues",
             "short_name": "Discover",
-            "description": "Browse nearby venues and menus",
+            "description": "Browse venues and menus",
             "url": "/discover",
             "icons": [
                 {

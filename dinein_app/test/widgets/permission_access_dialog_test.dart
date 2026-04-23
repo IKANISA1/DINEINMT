@@ -37,22 +37,4 @@ void main() {
     expect(find.text('CAMERA ACCESS'), findsOneWidget);
     expect(find.textContaining('Capture your printed menu'), findsOneWidget);
   });
-
-  testWidgets('BioPay camera popup renders enrollment copy', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: PermissionAccessDialog(
-            config: PermissionAccessDialogConfig.biopayCamera(),
-          ),
-        ),
-      ),
-    );
-
-    expect(find.text('BIOPAY CAMERA ACCESS'), findsOneWidget);
-    expect(
-      find.textContaining('create your Rwanda payment profile'),
-      findsOneWidget,
-    );
-  });
 }

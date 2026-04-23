@@ -75,6 +75,8 @@ case "$flavor" in
     ;;
 esac
 
+flavor_upper="$(printf '%s' "$flavor" | tr '[:lower:]' '[:upper:]')"
+
 cleanup() {
   if [[ -n "$rendered_well_known_dir" && -d "$rendered_well_known_dir" ]]; then
     rm -rf "$rendered_well_known_dir"
@@ -260,17 +262,10 @@ if [[ -f "$merged_android_manifest" ]]; then
     "$merged_android_manifest" \
     'android.permission.WRITE_EXTERNAL_STORAGE' \
     'Merged Android manifest still packages WRITE_EXTERNAL_STORAGE.'
-  if [[ "$flavor" == "mt" ]]; then
-    require_no_placeholder \
-      "$merged_android_manifest" \
-      'android.permission.CAMERA' \
-      'Merged Android manifest still packages CAMERA for Malta.'
-  else
-    require_contains \
-      "$merged_android_manifest" \
-      'android.permission.CAMERA' \
-      'Merged Android manifest is missing CAMERA for Rwanda.'
-  fi
+  require_no_placeholder \
+    "$merged_android_manifest" \
+    'android.permission.CAMERA' \
+    'Merged Android manifest still packages CAMERA.'
 fi
 
 require_file "$ios_entitlements" 'iOS associated domains entitlements file is missing.'
@@ -419,7 +414,7 @@ if [[ -f "$web_manifest" ]]; then
 fi
 require_file \
   "$asset_links" \
-  'Generated Android assetlinks file is missing. Run ./scripts/render_app_links.sh.'
+  "Generated Android assetlinks file is missing. Run PLAY_APP_SIGNING_SHA256_${flavor_upper}=... APPLE_TEAM_ID_${flavor_upper}=... ./scripts/render_app_links.sh --flavor ${flavor}."
 if [[ -f "$asset_links" ]]; then
   require_contains \
     "$asset_links" \
@@ -437,7 +432,7 @@ require_file \
 if [[ "$android_only" != "true" ]]; then
   require_file \
     "$apple_app_site_association" \
-    'Generated apple-app-site-association file is missing. Run ./scripts/render_app_links.sh.'
+    "Generated apple-app-site-association file is missing. Run PLAY_APP_SIGNING_SHA256_${flavor_upper}=... APPLE_TEAM_ID_${flavor_upper}=... ./scripts/render_app_links.sh --flavor ${flavor}."
 fi
 if [[ "$android_only" != "true" && -f "$apple_app_site_association" ]]; then
   if [[ "$android_only" != "true" ]]; then

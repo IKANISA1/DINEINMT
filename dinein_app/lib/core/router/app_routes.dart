@@ -40,12 +40,6 @@ abstract final class AppRouteNames {
 
   static const adminOrders = 'adminOrders';
 
-  static const biopayHome = 'biopayHome';
-  static const biopayRegister = 'biopayRegister';
-  static const biopayScanner = 'biopayScanner';
-  static const biopayConfirm = 'biopayConfirm';
-  static const biopayReEnroll = 'biopayReEnroll';
-  static const biopayManage = 'biopayManage';
 }
 
 abstract final class AppRouteParams {
@@ -105,10 +99,4 @@ abstract final class AppRoutePaths {
 
   static const orderBase = '/order';
 
-  static const biopayHome = '/biopay';
-  static const biopayRegister = '/biopay/register';
-  static const biopayScanner = '/biopay/scan';
-  static const biopayConfirm = '/biopay/confirm';
-  static const biopayReEnroll = '/biopay/re-enroll';
-  static const biopayManage = '/biopay/manage';
 }

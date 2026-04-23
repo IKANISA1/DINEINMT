@@ -4,13 +4,20 @@ import 'app_telemetry.dart';
 
 /// Persists guest order receipt tokens so unauthenticated order lookups can be
 /// authorized without exposing raw order IDs as public access credentials.
+///
+/// **Lifecycle & Ownership**:
+/// These tokens act as bearer tokens tied specifically to individual orders.
+/// They are intended to live on the device indefinitely to allow users to 
+/// historically reference their past orders (receipts) without logging in.
+/// If secure storage fails, the token is intentionally lost rather than 
+/// saved insecurely.
 class OrderReceiptService {
   OrderReceiptService._();
 
   static final instance = OrderReceiptService._();
 
   static const _receiptKeyPrefix = 'dinein.order_receipt.';
-  static const _secureStorageTimeout = Duration(seconds: 2);
+  static const _secureStorageTimeout = Duration(seconds: 1);
   static const _secureStorage = FlutterSecureStorage();
 
   String _keyForOrder(String orderId) => '$_receiptKeyPrefix$orderId';

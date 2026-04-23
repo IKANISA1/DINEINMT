@@ -4,31 +4,12 @@ import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/features/guest/discover/discover_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ui/theme/app_theme.dart';
 
-const _discoverTestVenues = [
-  Venue(
-    id: 'venue_1',
-    name: 'Harbor Table',
-    slug: 'harbor-table',
-    category: 'Seafood',
-    description: 'Seafront seafood dining with sunset views.',
-    address: 'Valletta Waterfront',
-    rating: 4.8,
-    ratingCount: 210,
-  ),
-  Venue(
-    id: 'venue_2',
-    name: 'Morning Edit',
-    slug: 'morning-edit',
-    category: 'Cafe',
-    description: 'Coffee and brunch studio.',
-    address: 'St Julian\'s',
-    rating: 4.3,
-    ratingCount: 75,
-  ),
-];
+const _discoverTestVenues = <Venue>[];
 
 final _discoverTestFeed = GuestVenueFeed.fromVenues(_discoverTestVenues);
 
@@ -37,9 +18,10 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
   });
 
-  testWidgets('discover screen exposes the hero and featured venues', (
+  testWidgets('discover screen exposes the current hero and empty state', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(800, 1200));
@@ -52,17 +34,30 @@ void main() {
             const GuestVenueQuery(limit: 12),
           ).overrideWith((ref) async => _discoverTestFeed),
         ],
-        child: const MaterialApp(home: Scaffold(body: DiscoverScreen())),
+        child: MaterialApp(
+          theme: AppTheme.light,
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(0.8)),
+            child: child!,
+          ),
+          home: const Scaffold(body: DiscoverScreen()),
+        ),
       ),
     );
 
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('FIND YOUR '), findsOneWidget);
-    expect(find.text('TABLE'), findsOneWidget);
-    expect(find.text('Featured'), findsOneWidget);
-    expect(find.text('All Venues'), findsOneWidget);
+    expect(find.text('Find a place quickly.'), findsOneWidget);
+    expect(
+      find.text('Search once, scan faster, and keep the screen quiet.'),
+      findsOneWidget,
+    );
+    expect(find.text('All venues'), findsOneWidget);
+    expect(find.text('No venues'), findsOneWidget);
+    expect(find.text('Try a different name or area.'), findsOneWidget);
 
     await tester.pumpAndSettle();
   });

@@ -1,5 +1,15 @@
 -- DineIn: venue push notifications
 
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at := timezone('utc', now());
+  RETURN NEW;
+END;
+$$;
+
 CREATE TABLE IF NOT EXISTS public.dinein_venue_notification_settings (
   venue_id UUID PRIMARY KEY REFERENCES public.dinein_venues(id) ON DELETE CASCADE,
   order_push_enabled BOOLEAN NOT NULL DEFAULT TRUE,

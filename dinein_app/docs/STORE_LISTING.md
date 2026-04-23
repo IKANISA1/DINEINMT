@@ -1,95 +1,58 @@
-# Google Play Store Listing — DineIn
+# Store Listing Source Of Truth
 
-## Malta (com.dineinmalta.app)
+Reviewed: 2026-04-22
 
-### App Details
+This document defines the approved product language for app-store and Play
+listing surfaces.
 
-| Field             | Content                                                              |
-| ----------------- | -------------------------------------------------------------------- |
-| **App Name**      | DineIn Malta                                                         |
-| **Short Desc**    | Scan a QR code, browse the menu, and order from your table in Malta. |
-| **Developer**     | IKANISA                                                              |
-| **Category**      | Food & Drink                                                         |
-| **Content Rating**| Everyone (PEGI 3)                                                    |
-| **Contact Email** | info@ikanisa.com                                                     |
-| **Privacy Policy**| https://dineinmt.ikanisa.com/privacy.html                            |
+## Core Positioning
 
-### Full Description (max 4000 chars)
+DineIn is a hospitality platform for:
 
-```
-DineIn Malta is the smart way to order at any partner restaurant in Malta.
+- guest QR and table ordering
+- venue operations
+- admin oversight
+- cross-country deployment for Malta and Rwanda
 
-HOW IT WORKS
-1. Scan the QR code on your table
-2. Browse the full menu on your phone
-3. Add items and place your order in just 4 taps
-4. Sit back — your food is on its way
+## Approved Feature Themes
 
-FEATURES
-• Instant menus — No app download needed to browse. QR scan opens your table menu instantly.
-• Fast ordering — Add items to your cart and order in seconds. No waving at waiters.
-• Real-time tracking — Know when your order is received, being prepared, and served.
-• Discover venues — Browse and explore restaurants across Malta.
-• Pay your way — Cash, card, or Revolut. No in-app payment processing.
-• Venue Wi-Fi — Auto-connect to the venue's Wi-Fi network with one tap.
-• Order history — View past orders and reorder your favourites.
-• Zero fees — No service fees, no markups. You pay menu prices only.
+- Browse menus and place table-linked orders
+- Track order progress from the guest device
+- Run venue operations from one app
+- Manage notifications and venue settings
+- Support country-specific external payment handoffs
 
-FOR VENUE OWNERS
-• Manage your menu and orders from a dedicated venue portal
-• Receive instant push notifications for new orders and table service requests
-• Generate table QR codes for your restaurant
-• AI-powered menu setup — upload a photo of your paper menu and we extract it for you
+## Country Language
 
-DineIn Malta is free for guests. No account required to browse and order.
+- Malta: cash and Revolut link handoff
+- Rwanda: cash and MoMo USSD handoff
 
-Download now and discover Malta's best restaurants from your table.
-```
+## Approved Short Description Themes
 
-### Assets Checklist
+- QR ordering for guests, venues, and operators
+- One hospitality platform for guest ordering and venue operations
+- Table-linked ordering with venue-side order management
 
-| Asset               | Spec            | Status               | Path                             |
-| -------------------- | --------------- | -------------------- | -------------------------------- |
-| App Icon             | 512×512 PNG     | ✅ (via Flutter)     | `android/app/src/main/res/`      |
-| Feature Graphic      | 1024×500 PNG    | ❌ **NEEDS CREATION** | `store_assets/feature_graphic.png` |
-| Phone Screenshots    | min 2, 320–3840 | ✅ 8 assets          | `store_assets/android/phone/`    |
-| Tablet 7" Screenshots | min 2          | ⚠️ Dir exists        | `store_assets/android/tablet_7/` |
-| Tablet 10" Screenshots | min 2         | ⚠️ Dir exists        | `store_assets/android/tablet_10/`|
+## Approved Long Description Elements
 
-### Missing Assets — Action Items
-1. **Feature Graphic** (1024×500) — Must be created. No text overlays per Google policy.
-2. **Tablet screenshots** — Verify content exists in tablet directories.
+Include:
 
----
+- guest ordering journey
+- venue login and operational tools
+- admin oversight
+- menu management
+- push notifications
+- country support
 
-## Rwanda (com.dineinrw.app)
+Do not claim:
 
-### App Details
+- direct payment processing inside the app
+- device inbox automation
+- identity-verification checkout
 
-| Field             | Content                                                               |
-| ----------------- | --------------------------------------------------------------------- |
-| **App Name**      | DineIn Rwanda                                                         |
-| **Short Desc**    | Scan a QR code, browse the menu, and order from your table in Rwanda. |
-| **Developer**     | IKANISA                                                               |
-| **Category**      | Food & Drink                                                          |
-| **Content Rating**| Everyone (PEGI 3)                                                     |
-| **Contact Email** | info@ikanisa.com                                                      |
-| **Privacy Policy**| https://dineinrw.ikanisa.com/privacy.html                             |
+## Review Notes
 
-### Full Description
-
-Same structure as Malta, with "Rwanda" replacing "Malta" and "MoMo" replacing "Revolut".
-
----
-
-## Pre-Submission Checklist
-
-- [ ] Feature graphic created (1024×500)
-- [ ] Tablet screenshots verified
-- [ ] Data Safety form completed (see DATA_SAFETY.md)
-- [ ] IARC rating questionnaire completed (see DATA_SAFETY.md §5)
-- [ ] Internal Testing track set up with 20+ testers
-- [ ] 14-day testing period completed
-- [ ] Privacy policy URL accessible and up to date
-- [ ] Account deletion mechanism implemented and tested
-- [ ] All app permissions are justified in store listing
+- Store claims must match active runtime behavior.
+- Landing pages, privacy pages, and store text must stay aligned.
+- Use this file with `DATA_SAFETY.md` and
+  `google_play_submission_permissions.md` during release review.

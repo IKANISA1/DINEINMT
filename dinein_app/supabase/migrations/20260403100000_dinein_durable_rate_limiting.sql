@@ -1,6 +1,6 @@
 -- Durable rate limiting for DineIn API actions (waves, Google Maps search).
 -- Replaces in-memory Map-based buckets that reset on cold starts.
--- Pattern mirrors biopay_rate_limit_buckets.
+-- Pattern mirrors the same service-role-only bucket structure used elsewhere.
 
 CREATE TABLE IF NOT EXISTS public.dinein_rate_limit_buckets (
     subject_key text NOT NULL,

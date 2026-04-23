@@ -1,5 +1,6 @@
 import 'package:db_pkg/models/bell_request.dart';
 import 'package:dinein_app/core/providers/bell_providers.dart';
+import 'package:dinein_app/core/providers/providers.dart';
 import 'package:dinein_app/features/venue/waves/venue_waves_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,9 @@ void main() {
     // AuthRepository.instance has no venue session in test context → guard fires
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          currentVenueProvider.overrideWith((ref) async => null),
+        ],
         child: MaterialApp(
           home: const Scaffold(body: VenueWavesScreen()),
         ),
@@ -55,6 +59,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          currentVenueProvider.overrideWith((ref) async => null),
           allWavesProvider(venueId).overrideWith(
             (ref) => Stream<List<BellRequest>>.error(
               Exception('Network failure'),

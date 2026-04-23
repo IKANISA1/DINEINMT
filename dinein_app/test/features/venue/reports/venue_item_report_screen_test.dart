@@ -161,7 +161,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(seconds: 2));
 
-    expect(find.text('Item Report'), findsOneWidget);
+    expect(find.text('Item report'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));
@@ -195,7 +195,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     // Should still render the report structure
-    expect(find.text('Item Report'), findsOneWidget);
+    expect(find.text('Item report'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 1));

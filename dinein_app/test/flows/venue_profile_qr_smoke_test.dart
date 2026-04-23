@@ -39,9 +39,9 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('Venue Profile'), findsOneWidget);
-    expect(find.text('UPLOAD COVER'), findsOneWidget);
-    expect(find.text('SAVE CHANGES'), findsOneWidget);
+    expect(find.text('Venue profile'), findsOneWidget);
+    expect(find.text('Upload cover'), findsOneWidget);
+    expect(find.text('Save changes'), findsOneWidget);
     expect(find.text('VENUE NAME'), findsOneWidget);
     expect(find.text('Ocean Pearl'), findsAtLeast(1));
     await tester.scrollUntilVisible(
@@ -60,7 +60,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('Venue QR Codes'), findsOneWidget);
+    expect(find.text('Venue QR codes'), findsOneWidget);
     expect(find.text('Guest Menu QR'), findsOneWidget);
     expect(find.text('Venue App QR'), findsOneWidget);
     await tester.scrollUntilVisible(
@@ -70,11 +70,11 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('SCAN TO ORDER TABLE 4'), findsOneWidget);
-    expect(find.text('TABLE NUMBER'), findsOneWidget);
+    expect(find.text('Table number'), findsOneWidget);
     expect(
       find.descendant(
         of: find.byKey(const Key('venue-table-qr-export-boundary')),
-        matching: find.text('TABLE NUMBER'),
+        matching: find.text('Table number'),
       ),
       findsNothing,
     );

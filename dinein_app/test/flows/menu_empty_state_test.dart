@@ -9,6 +9,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  const testVenue = Venue(
+    id: 'venue_1',
+    name: 'Harbor Table',
+    slug: 'harbor-table',
+    category: 'Seafood',
+    description: 'Seafront seafood dining with sunset views.',
+    address: 'Valletta Waterfront',
+  );
+
   setUp(() {
     SharedPreferences.setMockInitialValues({});
   });
@@ -19,9 +28,15 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          venueByIdProvider(
+            testVenue.id,
+          ).overrideWith((ref) async => testVenue),
           menuItemsProvider(
-            'venue_1',
+            testVenue.id,
           ).overrideWith((ref) async => const <MenuItem>[]),
+          menuItemPopularityProvider(
+            testVenue.id,
+          ).overrideWith((ref) async => const <String, int>{}),
         ],
         child: const MaterialApp(home: MenuScreen(venueId: 'venue_1')),
       ),
@@ -84,6 +99,9 @@ void main() {
         overrides: [
           venueByIdProvider(venue.id).overrideWith((ref) async => venue),
           menuItemsProvider(venue.id).overrideWith((ref) async => items),
+          menuItemPopularityProvider(
+            venue.id,
+          ).overrideWith((ref) async => const <String, int>{}),
         ],
         child: const MaterialApp(home: MenuScreen(venueId: 'venue_1')),
       ),
@@ -94,7 +112,7 @@ void main() {
 
     expect(find.text('Tiramisu'), findsNothing);
 
-    await tester.tap(find.text('DESSERTS'));
+    await tester.tap(find.text('Desserts'));
     await tester.pump();
     await tester.pumpAndSettle(const Duration(seconds: 1));
 
@@ -138,6 +156,9 @@ void main() {
         overrides: [
           venueByIdProvider(venue.id).overrideWith((ref) async => venue),
           menuItemsProvider(venue.id).overrideWith((ref) async => items),
+          menuItemPopularityProvider(
+            venue.id,
+          ).overrideWith((ref) async => const <String, int>{}),
         ],
         child: const MaterialApp(home: MenuScreen(venueId: 'venue_search')),
       ),
@@ -148,7 +169,7 @@ void main() {
 
     expect(find.text('Espresso'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Search menu'));
+    await tester.tap(find.bySemanticsLabel('Search menu'));
     await tester.pump();
     await tester.pumpAndSettle(const Duration(milliseconds: 300));
 
@@ -159,6 +180,6 @@ void main() {
 
     expect(find.text('Espresso'), findsNothing);
     expect(find.text('Tiramisu'), findsOneWidget);
-    expect(find.text('DESSERTS'), findsWidgets);
+    expect(find.text('Desserts'), findsWidgets);
   });
 }

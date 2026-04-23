@@ -440,7 +440,7 @@ class AppNotificationService {
     Map<String, dynamic>? payload,
   }) async {
     final response = await SupabaseConfig.client.functions.invoke(
-      'dinein-api',
+      'venue-api',
       body: {
         'action': action,
         'venue_session': {

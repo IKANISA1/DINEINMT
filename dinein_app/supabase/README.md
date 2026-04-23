@@ -1,6 +1,10 @@
-# AI Content Setup
+# DineIn Supabase
 
-This Supabase project now includes two production AI pipelines:
+`dinein_app/supabase/` is the only active backend tree in this monorepo.
+Historical materials under `supabase.ARCHIVED/` remain for audit and
+reproducibility only.
+
+This backend now includes the active production pipelines for:
 
 - Gemini-powered menu image generation
 - Gemini Google Maps grounding plus Gemini Search-grounded venue profile
@@ -24,21 +28,18 @@ This Supabase project now includes two production AI pipelines:
 > compatibility. MT uses `dinein_*` prefixed tables directly. Edge functions
 > reference `dinein_*` names on both projects.
 
-## What Was Added
+## Active Edge Functions
 
-- A migration that extends `dinein_menu_items` with AI image metadata and
-  creates the `menu-images` storage bucket.
-- A follow-up migration that explicitly grants `service_role` and app roles
-  access to the DineIn tables.
-- `generate-menu-item-image` for single-item generation and regeneration.
-- `backfill-menu-images` for batch-filling missing images.
-- A migration that extends `dinein_venues` with Google provider metadata, web
-  links, review snapshots, and enrichment status fields.
-- `enrich-venue-profile` for a single-venue refresh using Gemini Google Maps
-  grounding plus Gemini Google Search grounding.
-- `backfill-venue-profiles` for batch venue enrichment.
-- `generate-venue-profile-image` for single-venue AI profile image generation.
-- `backfill-venue-profile-images` for batch venue image backfill.
+- `core-api`: profile bootstrap and guest telemetry
+- `venue-api`: venue CRUD, search, push registration, bell/wave flows, venue AI
+- `menu-api`: menu CRUD, OCR/import, item imagery
+- `orders-api`: guest orders, venue/admin order operations, admin KPIs
+- `admin-api`: admin-managed menu catalog and grouping
+- `whatsapp-otp`: venue/admin OTP delivery and verification
+
+`dinein-api` is no longer the canonical runtime surface. It is retained only as
+a deprecated compatibility dispatcher for legacy callers while the split
+functions remain the production source of truth.
 
 ## Required Secrets
 
@@ -89,37 +90,25 @@ finish before image generation gives up.
 service account with permission to call the FCM HTTP v1 API for
 `FIREBASE_PROJECT_ID`.
 
-For the Rwanda BioPay rollout, also set:
-
-```bash
-supabase secrets set \
-  BIOPAY_OWNER_TOKEN_SECRET=choose-a-long-random-secret \
-  BIOPAY_MANAGE_CODE_PEPPER=choose-a-second-long-random-secret \
-  BIOPAY_DEFAULT_MATCH_THRESHOLD=0.72 \
-  BIOPAY_MIN_MATCH_THRESHOLD=0.80 \
-  BIOPAY_DUPLICATE_FACE_THRESHOLD=0.90 \
-  BIOPAY_MATCH_RATE_LIMIT_WINDOW_MINUTES=5 \
-  BIOPAY_MATCH_RATE_LIMIT_MAX_REQUESTS=20 \
-  BIOPAY_RATE_LIMIT_SECRET=choose-a-third-long-random-secret \
-  BIOPAY_ALLOWED_ORIGINS=https://dineinrw.ikanisa.com \
-  --project-ref kczghhipbyykluuiiunp
-```
-
-`BIOPAY_ALLOWED_ORIGINS` only affects browser-based requests. Native mobile
-calls do not send an `Origin` header, so they continue to work without CORS
-relaxation.
-
 ## Deploy
 
-Run from `dinein_app/`. **Always specify `--project-ref`:**
+Run from `dinein_app/`. **Always specify `--project-ref` and deploy the active
+function surface explicitly:**
 
 ```bash
 # ── Rwanda (RW) ──
-supabase functions deploy --project-ref kczghhipbyykluuiiunp
+for fn in core-api venue-api menu-api orders-api admin-api whatsapp-otp; do
+  supabase functions deploy "$fn" --project-ref kczghhipbyykluuiiunp
+done
 
 # ── Malta (MT) ──
-supabase functions deploy --project-ref uskfnszcdqpcfrhjxitl
+for fn in core-api venue-api menu-api orders-api admin-api whatsapp-otp; do
+  supabase functions deploy "$fn" --project-ref uskfnszcdqpcfrhjxitl
+done
 ```
+
+Deploy `dinein-api` only if an explicitly supported legacy client still depends
+on the compatibility dispatcher.
 
 ## Image Generation Policy
 
@@ -208,8 +197,8 @@ representative-generation workers in parallel.
 - New menu items do not auto-generate images.
 - OCR or import workflows do not auto-trigger image generation.
 - Venue owners can generate or regenerate an image from the item editor through
-  `dinein-api`.
+  `menu-api`.
 - Venue owners can trigger a missing-image backfill from the menu manager
-  through `dinein-api`.
+  through `menu-api`.
 - Protected images are skipped by generated-image requests until they are
   unlocked.
